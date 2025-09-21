@@ -1,0 +1,2 @@
+testuser,password:testuser123,role:employee
+testadmin,password:testadmin123,role:admin
