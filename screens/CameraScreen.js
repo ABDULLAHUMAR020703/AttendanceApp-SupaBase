@@ -35,19 +35,15 @@ export default function CameraScreen({ navigation, route }) {
 
   const initializeFaceVerification = async () => {
     try {
-      console.log('Checking face verification availability...');
+      console.log('Initializing Azure Face API...');
       const initialized = await initializeFaceAPI();
       if (initialized) {
-        console.log('Face verification initialized successfully');
+        console.log('Azure Face API initialized successfully');
       } else {
-        console.log('Face verification is disabled - app will work without it');
-        // Don't show error alerts since this is expected behavior
-        // The app is designed to work with or without face verification
+        console.warn('Azure Face API initialization failed - face verification may not work');
       }
     } catch (error) {
-      console.log('Face verification initialization failed - continuing without it:', error.message);
-      // Don't show error alerts since this is expected behavior
-      // The app is designed to work with or without face verification
+      console.error('Azure Face API initialization error:', error.message);
     }
   };
 
@@ -122,27 +118,7 @@ export default function CameraScreen({ navigation, route }) {
       // Perform face verification
       console.log('Starting face verification...');
       
-      // Check if models are loaded before attempting verification
-      if (!areModelsLoaded()) {
-        console.log('Face verification is disabled, proceeding with attendance');
-        setFaceVerificationStatus('skipped');
-        
-        // Show a more user-friendly message
-        Alert.alert(
-          'Ready to Submit Attendance',
-          `Photo and location captured successfully.\n\nProceed with ${type === 'checkin' ? 'check in' : 'check out'}?`,
-          [
-            { text: 'Cancel', style: 'cancel', onPress: () => {
-              setFaceVerificationStatus(null);
-              setIsLoading(false);
-            }},
-            { text: 'Submit', onPress: () => saveAttendance(photoResult.uri, currentLocation) }
-          ]
-        );
-        setIsVerifying(false);
-        return;
-      }
-
+      // Verify face with Azure Face API
       const verificationResult = await verifyFace(photoResult.uri, user.username);
       
       setIsVerifying(false);
@@ -162,16 +138,19 @@ export default function CameraScreen({ navigation, route }) {
       } else {
         setFaceVerificationStatus('failed');
         Alert.alert(
-          'Face Verification Failed',
-          verificationResult.error || 'Face verification failed. Please try again.',
+          'Face Not Matching',
+          verificationResult.error || 'Face verification failed. Please try again with better lighting and ensure your face is clearly visible.',
           [
             { text: 'Retry', onPress: () => {
               setFaceVerificationStatus(null);
               setIsLoading(false);
+              setPhoto(null);
             }},
             { text: 'Cancel', style: 'cancel', onPress: () => {
               setFaceVerificationStatus(null);
               setIsLoading(false);
+              setPhoto(null);
+              navigation.goBack();
             }}
           ]
         );

@@ -1,82 +1,113 @@
-// Note: Face verification is temporarily disabled due to compatibility issues
-// This is a placeholder implementation that will work without face verification
+// Azure Face API Integration for Face Verification
 import { Asset } from 'expo-asset';
+import * as FileSystem from 'expo-file-system/legacy';
 
-// Configuration
-const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
-const SIMILARITY_THRESHOLD = 0.6; // Adjust this threshold as needed (0-1, higher = more strict)
+// Azure Face API Configuration
+const AZURE_ENDPOINT = 'https://attendance123appface.cognitiveservices.azure.com';
+const AZURE_API_KEY = 'DhPDtKyPe1TymAauORFOvpr77f55LB0wPFcpyzbnd6pZDhQnzKFRJQQJ99BJAC3pKaRXJ3w3AAAKACOGXDUA';
+const SIMILARITY_THRESHOLD = 0.6; // Confidence threshold for face matching (0-1, higher = more strict)
 
 let modelsLoaded = false;
-let referenceDescriptors = new Map(); // Store face descriptors for each user
+let referenceFaceIds = new Map(); // Store Azure face IDs for each user
 
 /**
- * Initialize face-api.js models
- * This function loads the necessary models for face detection and recognition
- * Currently disabled due to compatibility issues with Expo SDK 54
+ * Initialize Azure Face API
+ * Verifies that the API is accessible with the provided credentials
  */
 export const initializeFaceAPI = async () => {
   try {
-    console.log('Face verification is temporarily disabled due to compatibility issues');
-    console.log('The app will work without face verification for now');
-    
-    // Return false to indicate face verification is not available
-    modelsLoaded = false;
-    return false;
-    
-    // TODO: Re-enable face verification when compatibility issues are resolved
-    // The original implementation is commented out below:
-    
-    /*
     if (modelsLoaded) {
-      console.log('Face API models already loaded');
+      console.log('Azure Face API already initialized');
       return true;
     }
 
-    console.log('Loading face-api.js models...');
+    console.log('Initializing Azure Face API...');
     
-    // Wait for TensorFlow.js to be ready
-    await tf.ready();
-    console.log('TensorFlow.js is ready');
-    
-    // Load the models with error handling for each
-    try {
-      await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-      console.log('TinyFaceDetector loaded');
-    } catch (detectorError) {
-      console.error('Error loading TinyFaceDetector:', detectorError);
-      throw detectorError;
+    // Test API connectivity with a simple request
+    const testResponse = await fetch(`${AZURE_ENDPOINT}/face/v1.0/detect`, {
+      method: 'POST',
+      headers: {
+        'Ocp-Apim-Subscription-Key': AZURE_API_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        url: 'https://raw.githubusercontent.com/Azure-Samples/cognitive-services-sample-data-files/master/Face/images/detection1.jpg'
+      }),
+    });
+
+    if (testResponse.ok) {
+      modelsLoaded = true;
+      console.log('Azure Face API initialized successfully');
+      return true;
+    } else {
+      const errorText = await testResponse.text();
+      console.error('Azure Face API initialization failed:', errorText);
+      modelsLoaded = false;
+      return false;
     }
-    
-    try {
-      await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
-      console.log('FaceLandmark68Net loaded');
-    } catch (landmarkError) {
-      console.error('Error loading FaceLandmark68Net:', landmarkError);
-      throw landmarkError;
-    }
-    
-    try {
-      await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
-      console.log('FaceRecognitionNet loaded');
-    } catch (recognitionError) {
-      console.error('Error loading FaceRecognitionNet:', recognitionError);
-      throw recognitionError;
-    }
-    
-    modelsLoaded = true;
-    console.log('All face-api.js models loaded successfully');
-    return true;
-    */
   } catch (error) {
-    console.error('Error loading face-api.js models:', error);
+    console.error('Error initializing Azure Face API:', error);
     modelsLoaded = false;
     return false;
   }
 };
 
 /**
- * Load reference face descriptor for a user
- * This function loads and processes the reference image for face comparison
+ * Detect face in an image using Azure Face API
+ * @param {string} imageUri - URI of the image to detect face in
+ * @returns {Promise<{faceId: string, faceRectangle: object} | null>}
+ */
+const detectFace = async (imageUri) => {
+  try {
+    console.log('Detecting face in image:', imageUri);
+    
+    // Read image file as base64
+    const imageBase64 = await FileSystem.readAsStringAsync(imageUri, {
+      encoding: 'base64',
+    });
+    
+    // Convert base64 to binary
+    const binaryData = Uint8Array.from(atob(imageBase64), c => c.charCodeAt(0));
+    
+    // Call Azure Face API to detect face
+    const response = await fetch(`${AZURE_ENDPOINT}/face/v1.0/detect`, {
+      method: 'POST',
+      headers: {
+        'Ocp-Apim-Subscription-Key': AZURE_API_KEY,
+        'Content-Type': 'application/octet-stream',
+      },
+      body: binaryData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Azure Face API detect failed:', errorText);
+      throw new Error(`Face detection failed: ${response.status} ${errorText}`);
+    }
+
+    const faces = await response.json();
+    console.log(`Detected ${faces.length} face(s)`);
+    
+    if (faces.length === 0) {
+      return null;
+    }
+    
+    if (faces.length > 1) {
+      console.warn('Multiple faces detected, using the first one');
+    }
+    
+    return {
+      faceId: faces[0].faceId,
+      faceRectangle: faces[0].faceRectangle,
+    };
+  } catch (error) {
+    console.error('Error detecting face:', error);
+    throw error;
+  }
+};
+
+/**
+ * Load reference face ID for a user from their reference image
  * @param {string} username - Username to load reference for
  * @returns {Promise<boolean>} - Success status
  */
@@ -85,27 +116,30 @@ export const loadReferenceFace = async (username) => {
     if (!modelsLoaded) {
       const initialized = await initializeFaceAPI();
       if (!initialized) {
-        throw new Error('Failed to initialize face API models');
+        throw new Error('Failed to initialize Azure Face API');
       }
     }
 
-    // Construct the path to the reference image
-    // For Expo, we need to use require() for assets
+    // Check if already loaded
+    if (referenceFaceIds.has(username)) {
+      console.log(`Reference face already loaded for ${username}`);
+      return true;
+    }
+
+    // Get reference image path
     let referenceImage;
     try {
-      // Try to load the reference image based on username
       if (username === 'testuser') {
         referenceImage = require('../assets/faces/testuser.jpg');
       } else {
         // For future extensibility - add more users here
-        // referenceImage = require(`../assets/faces/${username}.jpg`);
         throw new Error(`No reference image found for user: ${username}`);
       }
     } catch (requireError) {
       throw new Error(`Reference image not found for ${username}. Please ensure assets/faces/${username}.jpg exists.`);
     }
 
-    // Convert asset to URI
+    // Convert asset to local URI
     const asset = Asset.fromModule(referenceImage);
     await asset.downloadAsync();
     
@@ -113,19 +147,17 @@ export const loadReferenceFace = async (username) => {
       throw new Error('Failed to load reference image asset');
     }
 
-    // Load and process the reference image
-    const referenceImg = await faceapi.bufferToImage(asset.localUri);
-    const referenceDescriptor = await faceapi
-      .detectSingleFace(referenceImg, new faceapi.TinyFaceDetectorOptions())
-      .withFaceLandmarks()
-      .withFaceDescriptor();
-
-    if (!referenceDescriptor) {
+    console.log(`Loading reference face for ${username} from:`, asset.localUri);
+    
+    // Detect face in reference image
+    const faceData = await detectFace(asset.localUri);
+    
+    if (!faceData) {
       throw new Error('No face detected in reference image');
     }
 
-    // Store the descriptor for this user
-    referenceDescriptors.set(username, referenceDescriptor.descriptor);
+    // Store the face ID for this user
+    referenceFaceIds.set(username, faceData.faceId);
     console.log(`Reference face loaded successfully for ${username}`);
     return true;
   } catch (error) {
@@ -135,38 +167,29 @@ export const loadReferenceFace = async (username) => {
 };
 
 /**
- * Verify if the captured face matches the reference face
- * Currently disabled due to compatibility issues with Expo SDK 54
+ * Verify if the captured face matches the reference face using Azure Face API
  * @param {string} capturedImageUri - URI of the captured image
  * @param {string} username - Username to verify against
  * @returns {Promise<{success: boolean, confidence?: number, error?: string}>}
  */
 export const verifyFace = async (capturedImageUri, username) => {
   try {
-    console.log('Face verification is temporarily disabled');
+    console.log(`Starting face verification for ${username}...`);
     
-    // Return a failure result since face verification is not available
-    return {
-      success: false,
-      error: 'Face verification is temporarily disabled due to compatibility issues'
-    };
-    
-    // TODO: Re-enable the original implementation when compatibility issues are resolved
-    /*
     if (!modelsLoaded) {
       const initialized = await initializeFaceAPI();
       if (!initialized) {
         return {
           success: false,
-          error: 'Face API models not loaded'
+          error: 'Failed to initialize Azure Face API'
         };
       }
     }
 
-    // Check if we have a reference descriptor for this user
-    const referenceDescriptor = referenceDescriptors.get(username);
-    if (!referenceDescriptor) {
-      // Try to load the reference face if not already loaded
+    // Load reference face if not already loaded
+    let referenceFaceId = referenceFaceIds.get(username);
+    if (!referenceFaceId) {
+      console.log(`Reference face not loaded, loading for ${username}...`);
       const loaded = await loadReferenceFace(username);
       if (!loaded) {
         return {
@@ -174,45 +197,55 @@ export const verifyFace = async (capturedImageUri, username) => {
           error: `No reference image available for user: ${username}`
         };
       }
+      referenceFaceId = referenceFaceIds.get(username);
     }
 
-    // Load the captured image
-    const capturedImg = await faceapi.bufferToImage(capturedImageUri);
-    
     // Detect face in captured image
-    const capturedDescriptor = await faceapi
-      .detectSingleFace(capturedImg, new faceapi.TinyFaceDetectorOptions())
-      .withFaceLandmarks()
-      .withFaceDescriptor();
-
-    if (!capturedDescriptor) {
+    console.log('Detecting face in captured image...');
+    const capturedFaceData = await detectFace(capturedImageUri);
+    
+    if (!capturedFaceData) {
       return {
         success: false,
         error: 'No face detected in captured image. Please ensure your face is clearly visible.'
       };
     }
 
-    // Calculate face distance (lower distance = more similar)
-    const distance = faceapi.euclideanDistance(
-      referenceDescriptor,
-      capturedDescriptor.descriptor
-    );
+    console.log('Face detected, verifying with reference...');
+    
+    // Call Azure Face API Verify endpoint
+    const verifyResponse = await fetch(`${AZURE_ENDPOINT}/face/v1.0/verify`, {
+      method: 'POST',
+      headers: {
+        'Ocp-Apim-Subscription-Key': AZURE_API_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        faceId1: capturedFaceData.faceId,
+        faceId2: referenceFaceId,
+      }),
+    });
 
-    // Convert distance to similarity score (0-1, higher = more similar)
-    const similarity = 1 - distance;
-    const confidence = Math.max(0, Math.min(1, similarity));
+    if (!verifyResponse.ok) {
+      const errorText = await verifyResponse.text();
+      console.error('Azure Face API verify failed:', errorText);
+      return {
+        success: false,
+        error: `Face verification failed: ${verifyResponse.status}`
+      };
+    }
 
-    console.log(`Face verification for ${username}: distance=${distance.toFixed(3)}, confidence=${confidence.toFixed(3)}`);
-
-    // Check if similarity meets threshold
-    const isMatch = confidence >= SIMILARITY_THRESHOLD;
+    const verifyResult = await verifyResponse.json();
+    console.log('Verification result:', verifyResult);
+    
+    const { isIdentical, confidence } = verifyResult;
+    const isMatch = isIdentical && confidence >= SIMILARITY_THRESHOLD;
 
     return {
       success: isMatch,
       confidence: confidence,
-      error: isMatch ? null : `Face verification failed. Confidence: ${(confidence * 100).toFixed(1)}% (minimum required: ${(SIMILARITY_THRESHOLD * 100).toFixed(1)}%)`
+      error: isMatch ? null : `Face not matching. Confidence: ${(confidence * 100).toFixed(1)}% (minimum required: ${(SIMILARITY_THRESHOLD * 100).toFixed(1)}%)`
     };
-    */
   } catch (error) {
     console.error('Error during face verification:', error);
     return {
@@ -246,7 +279,7 @@ export const preloadReferenceFaces = async (usernames) => {
 };
 
 /**
- * Check if models are loaded
+ * Check if Azure Face API is initialized
  * @returns {boolean}
  */
 export const areModelsLoaded = () => {
@@ -258,14 +291,14 @@ export const areModelsLoaded = () => {
  * @returns {string[]}
  */
 export const getLoadedUsernames = () => {
-  return Array.from(referenceDescriptors.keys());
+  return Array.from(referenceFaceIds.keys());
 };
 
 /**
  * Clear all loaded reference faces (useful for memory management)
  */
 export const clearReferenceFaces = () => {
-  referenceDescriptors.clear();
+  referenceFaceIds.clear();
   console.log('Reference faces cleared');
 };
 
@@ -277,15 +310,3 @@ export const getSimilarityThreshold = () => {
   return SIMILARITY_THRESHOLD;
 };
 
-/**
- * Set a new similarity threshold
- * @param {number} threshold - New threshold (0-1)
- */
-export const setSimilarityThreshold = (threshold) => {
-  if (threshold >= 0 && threshold <= 1) {
-    SIMILARITY_THRESHOLD = threshold;
-    console.log(`Similarity threshold updated to: ${threshold}`);
-  } else {
-    console.warn('Similarity threshold must be between 0 and 1');
-  }
-};
