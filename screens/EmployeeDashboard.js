@@ -23,6 +23,12 @@ import {
   getWorkModeColor,
   getWorkModeIcon 
 } from '../utils/workModes';
+import { 
+  checkBiometricAvailability, 
+  hasFingerprintSupport,
+  getBiometricTypeName 
+} from '../utils/biometricAuth';
+import { getPreferredAuthMethod } from '../utils/authPreferences';
 
 export default function EmployeeDashboard({ navigation, route }) {
   const { user } = route.params;
@@ -34,9 +40,16 @@ export default function EmployeeDashboard({ navigation, route }) {
   const [selectedWorkMode, setSelectedWorkMode] = useState(null);
   const [requestReason, setRequestReason] = useState('');
   const [myRequests, setMyRequests] = useState([]);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricType, setBiometricType] = useState('');
+  const [hasFingerprint, setHasFingerprint] = useState(false);
 
   useEffect(() => {
     loadData();
+    // Delay biometric check to avoid crashes on app load
+    setTimeout(() => {
+      checkBiometricSupport();
+    }, 1000);
     
     // Reload data when screen comes into focus (returning from CameraScreen)
     const unsubscribe = navigation.addListener('focus', () => {
@@ -45,6 +58,24 @@ export default function EmployeeDashboard({ navigation, route }) {
 
     return unsubscribe;
   }, [navigation]);
+
+  const checkBiometricSupport = async () => {
+    try {
+      // Wrap in try-catch to prevent crashes
+      const availability = await checkBiometricAvailability();
+      setBiometricAvailable(availability.available);
+      
+      if (availability.available) {
+        const fingerprintSupport = await hasFingerprintSupport();
+        setHasFingerprint(fingerprintSupport);
+        setBiometricType(getBiometricTypeName(availability.types));
+      }
+    } catch (error) {
+      console.error('Error checking biometric support:', error);
+      // Silently fail - assume biometric not available
+      setBiometricAvailable(false);
+    }
+  };
 
   const loadData = async () => {
     await Promise.all([
@@ -92,17 +123,23 @@ export default function EmployeeDashboard({ navigation, route }) {
     setIsRefreshing(false);
   };
 
-  const handleCheckIn = () => {
+  const handleCheckIn = async () => {
+    // Get user's preferred authentication method
+    const authMethod = await getPreferredAuthMethod(user.username, biometricAvailable);
     navigation.navigate('CameraScreen', { 
       type: 'checkin',
-      user: user
+      user: user,
+      authMethod: authMethod
     });
   };
 
-  const handleCheckOut = () => {
+  const handleCheckOut = async () => {
+    // Get user's preferred authentication method
+    const authMethod = await getPreferredAuthMethod(user.username, biometricAvailable);
     navigation.navigate('CameraScreen', { 
       type: 'checkout',
-      user: user
+      user: user,
+      authMethod: authMethod
     });
   };
 
@@ -232,7 +269,11 @@ export default function EmployeeDashboard({ navigation, route }) {
                 <Text className={`text-sm ${
                   canCheckIn ? 'text-green-100' : 'text-gray-400'
                 }`}>
-                  {canCheckIn ? 'Start your work day' : 'Already checked in'}
+                  {canCheckIn 
+                    ? (biometricAvailable 
+                        ? `Use ${biometricType.toLowerCase()}` 
+                        : 'Take a selfie for verification')
+                    : 'Already checked in'}
                 </Text>
               </View>
               <Ionicons 
@@ -270,7 +311,11 @@ export default function EmployeeDashboard({ navigation, route }) {
                 <Text className={`text-sm ${
                   canCheckOut ? 'text-red-100' : 'text-gray-400'
                 }`}>
-                  {canCheckOut ? 'End your work day' : 'Must check in first'}
+                  {canCheckOut 
+                    ? (biometricAvailable 
+                        ? `Use ${biometricType.toLowerCase()}` 
+                        : 'Take a selfie for verification')
+                    : 'Must check in first'}
                 </Text>
               </View>
               <Ionicons 
@@ -296,6 +341,27 @@ export default function EmployeeDashboard({ navigation, route }) {
                 </Text>
                 <Text className="text-gray-600 text-sm">
                   Check your attendance records
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#6b7280" />
+            </View>
+          </TouchableOpacity>
+
+          {/* Authentication Settings Button */}
+          <TouchableOpacity
+            className="bg-white rounded-2xl p-6 shadow-sm mt-4"
+            onPress={() => navigation.navigate('AuthMethodSelection', { user: user })}
+          >
+            <View className="flex-row items-center">
+              <View className="w-12 h-12 bg-purple-100 rounded-full items-center justify-center mr-4">
+                <Ionicons name="finger-print" size={24} color="#9333ea" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-lg font-semibold text-gray-800">
+                  Authentication Settings
+                </Text>
+                <Text className="text-gray-600 text-sm">
+                  Choose face verification or fingerprint
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#6b7280" />

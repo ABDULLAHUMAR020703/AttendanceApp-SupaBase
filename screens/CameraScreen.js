@@ -17,10 +17,15 @@ import {
   verifyFace, 
   areModelsLoaded 
 } from '../utils/faceVerification';
+import { 
+  authenticateWithBiometric, 
+  checkBiometricAvailability,
+  getBiometricTypeName 
+} from '../utils/biometricAuth';
 import { getCurrentLocationWithAddress, formatAddressForDisplay } from '../utils/location';
 
 export default function CameraScreen({ navigation, route }) {
-  const { type, user } = route.params;
+  const { type, user, authMethod = 'face' } = route.params; // authMethod: 'face' or 'biometric'
   const [permission, requestPermission] = useCameraPermissions();
   const [cameraRef, setCameraRef] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -28,11 +33,63 @@ export default function CameraScreen({ navigation, route }) {
   const [photo, setPhoto] = useState(null);
   const [faceVerificationStatus, setFaceVerificationStatus] = useState(null);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricType, setBiometricType] = useState('');
 
   useEffect(() => {
-    getPermissions();
-    initializeFaceVerification();
-  }, []);
+    if (authMethod === 'biometric') {
+      checkBiometric();
+    } else {
+      getPermissions();
+      initializeFaceVerification();
+    }
+  }, [authMethod]);
+
+  const checkBiometric = async () => {
+    try {
+      const availability = await checkBiometricAvailability();
+      setBiometricAvailable(availability.available);
+      if (availability.available) {
+        setBiometricType(getBiometricTypeName(availability.types));
+      } else {
+        // Check if it's an Expo Go limitation
+        const isExpoGoError = availability.error && availability.error.includes('Expo Go');
+        Alert.alert(
+          'Biometric Not Available',
+          isExpoGoError 
+            ? 'Fingerprint authentication requires a development build and cannot be used in Expo Go. Please use Face Verification instead, or ask your developer to create a development build.'
+            : (availability.error || 'Biometric authentication is not available. Please use face recognition instead.'),
+          [
+            { text: 'Use Face Verification', onPress: () => {
+              // Automatically switch to face verification
+              navigation.replace('CameraScreen', { 
+                type: type,
+                user: user,
+                authMethod: 'face'
+              });
+            }},
+            { text: 'Cancel', style: 'cancel', onPress: () => navigation.goBack() }
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('Error checking biometric:', error);
+      Alert.alert(
+        'Error', 
+        'Failed to check biometric availability. This feature may not work in Expo Go.',
+        [
+          { text: 'Use Face Verification', onPress: () => {
+            navigation.replace('CameraScreen', { 
+              type: type,
+              user: user,
+              authMethod: 'face'
+            });
+          }},
+          { text: 'Cancel', style: 'cancel', onPress: () => navigation.goBack() }
+        ]
+      );
+    }
+  };
 
   const initializeFaceVerification = async () => {
     try {
@@ -81,6 +138,97 @@ export default function CameraScreen({ navigation, route }) {
   };
 
   // Removed getCurrentLocation - now using getCurrentLocationWithAddress from utils/location.js
+
+  const authenticateWithBiometricMethod = async () => {
+    setIsLoading(true);
+    setIsVerifying(true);
+    setFaceVerificationStatus(null);
+
+    try {
+      // Get location first
+      const currentLocation = await getCurrentLocationWithAddress();
+      setLocation(currentLocation);
+
+      // Authenticate with biometric
+      const authResult = await authenticateWithBiometric(
+        `Authenticate to ${type === 'checkin' ? 'check in' : 'check out'}`
+      );
+
+      setIsVerifying(false);
+
+      if (authResult.success) {
+        setFaceVerificationStatus('success');
+        // For biometric, we don't have a photo, so we'll save with null photo
+        Alert.alert(
+          'Biometric Authentication Successful',
+          `${biometricType} verified!\n\nConfirm ${type === 'checkin' ? 'check in' : 'check out'}?`,
+          [
+            { 
+              text: 'Cancel', 
+              style: 'cancel', 
+              onPress: () => {
+                setFaceVerificationStatus(null);
+                setIsLoading(false);
+              }
+            },
+            { 
+              text: 'Confirm', 
+              onPress: () => saveAttendance(null, currentLocation) 
+            }
+          ]
+        );
+      } else {
+        setFaceVerificationStatus('failed');
+        Alert.alert(
+          'Authentication Failed',
+          authResult.error || 'Biometric authentication failed. Please try again.',
+          [
+            { 
+              text: 'Retry', 
+              onPress: () => {
+                setFaceVerificationStatus(null);
+                setIsLoading(false);
+              }
+            },
+            { 
+              text: 'Cancel', 
+              style: 'cancel', 
+              onPress: () => {
+                setFaceVerificationStatus(null);
+                setIsLoading(false);
+                navigation.goBack();
+              }
+            }
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('Error during biometric authentication:', error);
+      setIsVerifying(false);
+      setFaceVerificationStatus('error');
+      Alert.alert(
+        'Error',
+        'Failed to authenticate. Please try again.',
+        [
+          { 
+            text: 'Retry', 
+            onPress: () => {
+              setFaceVerificationStatus(null);
+              setIsLoading(false);
+            }
+          },
+          { 
+            text: 'Cancel', 
+            style: 'cancel', 
+            onPress: () => {
+              setFaceVerificationStatus(null);
+              setIsLoading(false);
+            }
+          }
+        ]
+      );
+    }
+  };
 
   const takePicture = async () => {
     if (!cameraRef) return;
@@ -172,6 +320,7 @@ export default function CameraScreen({ navigation, route }) {
         timestamp: new Date().toISOString(),
         photo: photoUri,
         location: locationData,
+        authMethod: authMethod, // Store which authentication method was used
       };
 
       await saveAttendanceRecord(attendanceRecord);
@@ -203,6 +352,103 @@ export default function CameraScreen({ navigation, route }) {
     );
   }
 
+  // Biometric authentication view
+  if (authMethod === 'biometric') {
+    if (!biometricAvailable) {
+      return (
+        <View className="flex-1 justify-center items-center bg-gray-900 p-6">
+          <ActivityIndicator size="large" color="#3b82f6" />
+          <Text className="text-white mt-4">Checking biometric availability...</Text>
+        </View>
+      );
+    }
+
+    return (
+      <View className="flex-1 bg-gray-900">
+        {/* Header */}
+        <View className="bg-gray-800 px-6 py-4 flex-row items-center justify-between">
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            className="p-2"
+          >
+            <Ionicons name="arrow-back" size={24} color="white" />
+          </TouchableOpacity>
+          <Text className="text-white text-lg font-semibold">
+            {type === 'checkin' ? 'Check In' : 'Check Out'}
+          </Text>
+          <View className="w-8" />
+        </View>
+
+        {/* Biometric Authentication View */}
+        <View className="flex-1 justify-center items-center p-6">
+          <View className="bg-gray-800 rounded-2xl p-8 items-center max-w-sm">
+            <View className="w-24 h-24 bg-primary-500 rounded-full items-center justify-center mb-6">
+              <Ionicons name="finger-print" size={48} color="white" />
+            </View>
+            
+            <Text className="text-white text-xl font-semibold mb-2 text-center">
+              {type === 'checkin' ? 'Check In' : 'Check Out'} with {biometricType}
+            </Text>
+            <Text className="text-gray-400 text-center text-sm mb-6">
+              Use your {biometricType.toLowerCase()} to authenticate
+            </Text>
+
+            {/* Location Display */}
+            <View className="bg-black bg-opacity-50 rounded-full p-3 mb-6 w-full">
+              <Text className="text-white text-sm text-center">
+                {location ? (
+                  location.address ? 
+                    `📍 ${formatAddressForDisplay(location.address, 40)}` : 
+                    '📍 Location captured'
+                ) : '📍 Getting location...'}
+              </Text>
+            </View>
+
+            {/* Verification Status */}
+            {faceVerificationStatus && (
+              <View className={`bg-black bg-opacity-50 rounded-full p-4 mb-6 w-full ${
+                faceVerificationStatus === 'success' ? 'bg-green-500 bg-opacity-50' :
+                faceVerificationStatus === 'failed' ? 'bg-red-500 bg-opacity-50' :
+                'bg-yellow-500 bg-opacity-50'
+              }`}>
+                <Text className="text-white text-sm text-center">
+                  {faceVerificationStatus === 'success' ? `✅ ${biometricType} verified!` :
+                   faceVerificationStatus === 'failed' ? '❌ Authentication failed' :
+                   '⚠️ Verification error'}
+                </Text>
+              </View>
+            )}
+
+            {/* Authenticate Button */}
+            <TouchableOpacity
+              className={`w-full rounded-xl p-4 items-center ${
+                isLoading ? 'bg-gray-600' : 'bg-primary-500'
+              }`}
+              onPress={authenticateWithBiometricMethod}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator size="large" color="white" />
+              ) : (
+                <>
+                  <Ionicons name="finger-print" size={32} color="white" />
+                  <Text className="text-white font-semibold mt-2">
+                    Authenticate with {biometricType}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            <Text className="text-gray-400 text-center text-xs mt-4">
+              User: {user.username}
+            </Text>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  // Face recognition view (original camera view)
   if (!permission.granted) {
     return (
       <View className="flex-1 justify-center items-center bg-gray-900 p-6">

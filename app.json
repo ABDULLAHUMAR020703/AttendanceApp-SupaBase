@@ -18,6 +18,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.attendanceapp",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -42,6 +43,11 @@
           "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location for attendance tracking."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "3517a51b-4c71-476d-8c07-d44f1189df72"
+      }
+    }
   }
 }

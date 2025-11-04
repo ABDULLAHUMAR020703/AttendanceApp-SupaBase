@@ -10,6 +10,7 @@ import EmployeeDashboard from './screens/EmployeeDashboard';
 import AdminDashboard from './screens/AdminDashboard';
 import AttendanceHistory from './screens/AttendanceHistory';
 import CameraScreen from './screens/CameraScreen';
+import AuthMethodSelection from './screens/AuthMethodSelection';
 
 // Import auth context
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -101,6 +102,12 @@ function AppNavigator() {
                   name="CameraScreen" 
                   component={CameraScreen}
                   options={{ title: 'Take Photo' }}
+                  initialParams={{ user }}
+                />
+                <Stack.Screen 
+                  name="AuthMethodSelection" 
+                  component={AuthMethodSelection}
+                  options={{ title: 'Authentication Settings' }}
                   initialParams={{ user }}
                 />
               </>
