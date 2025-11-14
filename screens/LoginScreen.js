@@ -11,11 +11,12 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { authenticateUser } from '../utils/auth';
-import { saveUserSession } from '../utils/storage';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function LoginScreen() {
   const { handleLogin: loginUser } = useAuth();
+  const { colors } = useTheme();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -32,8 +33,10 @@ export default function LoginScreen() {
       const result = await authenticateUser(username.trim(), password);
       
       if (result.success) {
-        await saveUserSession(result.user);
-        loginUser(result.user);
+        loginUser({
+          username: result.user.username,
+          role: result.user.role
+        });
       } else {
         Alert.alert('Login Failed', 'Invalid username or password');
       }
@@ -47,27 +50,43 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView 
-      className="flex-1 bg-gray-50"
+      className="flex-1"
+      style={{ backgroundColor: colors.background }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
         <View className="flex-1 justify-center px-8">
           {/* Header */}
           <View className="items-center mb-12">
-            <View className="w-20 h-20 bg-primary-500 rounded-full items-center justify-center mb-4">
+            <View 
+              className="w-20 h-20 rounded-full items-center justify-center mb-4"
+              style={{ backgroundColor: colors.primary }}
+            >
               <Ionicons name="time-outline" size={40} color="white" />
             </View>
-            <Text className="text-3xl font-bold text-gray-800 mb-2">
+            <Text 
+              className="text-3xl font-bold mb-2"
+              style={{ color: colors.text }}
+            >
               Attendance App
             </Text>
-            <Text className="text-gray-600 text-center">
+            <Text 
+              className="text-center"
+              style={{ color: colors.textSecondary }}
+            >
               Sign in to track your attendance
             </Text>
           </View>
 
           {/* Login Form */}
-          <View className="bg-white rounded-2xl p-6 shadow-lg">
-            <Text className="text-xl font-semibold text-gray-800 mb-6 text-center">
+          <View 
+            className="rounded-2xl p-6 shadow-lg"
+            style={{ backgroundColor: colors.surface }}
+          >
+            <Text 
+              className="text-xl font-semibold mb-6 text-center"
+              style={{ color: colors.text }}
+            >
               Sign In
             </Text>
 
@@ -116,7 +135,7 @@ export default function LoginScreen() {
 
             {/* Login Button */}
             <TouchableOpacity
-              className={`bg-primary-500 rounded-xl py-4 items-center ${
+              className={`bg-primary-500 rounded-xl py-4 items-center mb-4 ${
                 isLoading ? 'opacity-50' : ''
               }`}
               onPress={handleLogin}
@@ -130,10 +149,10 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Demo Credentials */}
+          {/* Test Users Info */}
           <View className="mt-8 bg-blue-50 rounded-xl p-4">
             <Text className="text-blue-800 font-semibold mb-2 text-center">
-              Demo Credentials
+              Test Credentials
             </Text>
             <View className="space-y-1">
               <Text className="text-blue-700 text-sm">
@@ -142,6 +161,9 @@ export default function LoginScreen() {
               <Text className="text-blue-700 text-sm">
                 Admin: testadmin / testadmin123
               </Text>
+              <Text className="text-blue-600 text-xs mt-2 text-center">
+                See TEST_CREDENTIALS.md for more test accounts
+              </Text>
             </View>
           </View>
         </View>
@@ -149,3 +171,4 @@ export default function LoginScreen() {
     </KeyboardAvoidingView>
   );
 }
+

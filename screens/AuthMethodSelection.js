@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { checkBiometricAvailability, getBiometricTypeName } from '../utils/biometricAuth';
+import { checkFaceRecognitionAvailability, verifyFace } from '../utils/faceVerification';
 import { setAuthPreference, getAuthPreference } from '../utils/authPreferences';
 
 export default function AuthMethodSelection({ navigation, route }) {
@@ -17,8 +18,11 @@ export default function AuthMethodSelection({ navigation, route }) {
   const [selectedMethod, setSelectedMethod] = useState(null);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricType, setBiometricType] = useState('');
+  const [faceIDAvailable, setFaceIDAvailable] = useState(false);
+  const [faceIDEnrolled, setFaceIDEnrolled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [testingFaceID, setTestingFaceID] = useState(false);
 
   useEffect(() => {
     loadPreferences();
@@ -40,6 +44,17 @@ export default function AuthMethodSelection({ navigation, route }) {
       } catch (biometricError) {
         console.warn('Biometric check failed (may not work in Expo Go):', biometricError);
         setBiometricAvailable(false);
+      }
+
+      // Check Face ID availability and enrollment
+      try {
+        const faceAvailability = await checkFaceRecognitionAvailability();
+        setFaceIDAvailable(faceAvailability.available);
+        setFaceIDEnrolled(faceAvailability.available); // If available, it means enrolled
+      } catch (faceError) {
+        console.warn('Face ID check failed:', faceError);
+        setFaceIDAvailable(false);
+        setFaceIDEnrolled(false);
       }
       
       // Set initial selection
@@ -105,12 +120,6 @@ export default function AuthMethodSelection({ navigation, route }) {
       <View className="p-6">
         {/* Header */}
         <View className="mb-6">
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            className="mb-4"
-          >
-            <Ionicons name="arrow-back" size={24} color="#3b82f6" />
-          </TouchableOpacity>
           <Text className="text-2xl font-bold text-gray-800 mb-2">
             Choose Authentication Method
           </Text>
@@ -123,8 +132,19 @@ export default function AuthMethodSelection({ navigation, route }) {
         <TouchableOpacity
           className={`bg-white rounded-2xl p-6 mb-4 shadow-sm border-2 ${
             selectedMethod === 'face' ? 'border-primary-500 bg-primary-50' : 'border-gray-200'
-          }`}
-          onPress={() => setSelectedMethod('face')}
+          } ${!faceIDAvailable ? 'opacity-50' : ''}`}
+          onPress={async () => {
+            if (!faceIDAvailable) {
+              Alert.alert(
+                'Face ID Not Set Up',
+                'Face ID is not set up on this device.\n\nPlease set up Face ID in your device settings:\n\n• iOS: Settings > Face ID & Passcode\n• Android: Settings > Security > Face unlock\n\nAfter setting up Face ID, return to this app and try again.',
+                [{ text: 'OK' }]
+              );
+              return;
+            }
+            setSelectedMethod('face');
+          }}
+          disabled={!faceIDAvailable}
         >
           <View className="flex-row items-center">
             <View className={`w-16 h-16 rounded-full items-center justify-center mr-4 ${
@@ -143,19 +163,75 @@ export default function AuthMethodSelection({ navigation, route }) {
                 Face Verification
               </Text>
               <Text className="text-sm text-gray-600 mb-2">
-                Take a selfie photo that matches your registered face
+                Use device's native Face ID for authentication
               </Text>
               <Text className="text-xs text-gray-500">
-                • Uses Azure Face API for verification{'\n'}
-                • Your face is compared with stored reference image{'\n'}
-                • Works on all devices with camera
+                • Uses device's built-in Face ID/Face Unlock{'\n'}
+                • Secure and fast authentication{'\n'}
+                • No photo required - uses device's Face ID directly
               </Text>
+              {!faceIDAvailable && (
+                <View className="mt-2 bg-yellow-100 px-2 py-1 rounded-full self-start">
+                  <Text className="text-xs font-medium text-yellow-800">Not Set Up</Text>
+                </View>
+              )}
             </View>
             {selectedMethod === 'face' && (
               <Ionicons name="checkmark-circle" size={28} color="#3b82f6" />
             )}
           </View>
         </TouchableOpacity>
+
+        {/* Test Face ID Button - Only show if Face ID is selected and available */}
+        {selectedMethod === 'face' && faceIDAvailable && (
+          <TouchableOpacity
+            className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4"
+            onPress={async () => {
+              setTestingFaceID(true);
+              try {
+                const result = await verifyFace(
+                  user.username,
+                  'Test Face ID authentication'
+                );
+                if (result.success) {
+                  Alert.alert(
+                    'Face ID Test Successful',
+                    'Face ID is working correctly! You can use this method for authentication.',
+                    [{ text: 'OK' }]
+                  );
+                } else {
+                  Alert.alert(
+                    'Face ID Test Failed',
+                    result.error || 'Face ID authentication failed. Please ensure:\n\n• Face ID is properly set up\n• Your face is clearly visible\n• Try again in a well-lit area',
+                    [{ text: 'OK' }]
+                  );
+                }
+              } catch (error) {
+                Alert.alert(
+                  'Error',
+                  'Failed to test Face ID. Please try again.',
+                  [{ text: 'OK' }]
+                );
+              } finally {
+                setTestingFaceID(false);
+              }
+            }}
+            disabled={testingFaceID}
+          >
+            <View className="flex-row items-center">
+              <Ionicons name="checkmark-circle-outline" size={20} color="#3b82f6" className="mr-2" />
+              <Text className="text-sm font-medium text-blue-800 flex-1">
+                {testingFaceID ? 'Testing Face ID...' : 'Test Face ID'}
+              </Text>
+              {testingFaceID && (
+                <ActivityIndicator size="small" color="#3b82f6" />
+              )}
+            </View>
+            <Text className="text-xs text-blue-600 mt-1">
+              Tap to verify that Face ID is working on your device
+            </Text>
+          </TouchableOpacity>
+        )}
 
         {/* Fingerprint/Biometric Option */}
         <TouchableOpacity
@@ -226,7 +302,7 @@ export default function AuthMethodSelection({ navigation, route }) {
                 How It Works:
               </Text>
               <Text className="text-xs text-blue-700 leading-5">
-                <Text className="font-semibold">Face Verification:</Text> Your photo is taken and compared with your registered face using Azure Face API.{'\n\n'}
+                <Text className="font-semibold">Face ID:</Text> Uses your device's native Face ID/Face Unlock to authenticate. No photos are taken - authentication happens directly through your device's security system.{'\n\n'}
                 <Text className="font-semibold">Fingerprint Authentication:</Text> Your device's fingerprint sensor verifies your identity. Your fingerprint data is stored securely on your device and never shared with the app.{'\n\n'}
                 You can change this setting anytime.
               </Text>

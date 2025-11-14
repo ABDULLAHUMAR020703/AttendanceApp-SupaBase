@@ -1,312 +1,242 @@
-// Azure Face API Integration for Face Verification
-import { Asset } from 'expo-asset';
-import * as FileSystem from 'expo-file-system/legacy';
+// Device-based Face Recognition using expo-local-authentication
+// Similar to fingerprint authentication - uses device's native Face ID/Face Unlock
+import { Platform } from 'react-native';
 
-// Azure Face API Configuration
-const AZURE_ENDPOINT = 'https://attendance123appface.cognitiveservices.azure.com';
-const AZURE_API_KEY = 'DhPDtKyPe1TymAauORFOvpr77f55LB0wPFcpyzbnd6pZDhQnzKFRJQQJ99BJAC3pKaRXJ3w3AAAKACOGXDUA';
-const SIMILARITY_THRESHOLD = 0.6; // Confidence threshold for face matching (0-1, higher = more strict)
+let LocalAuthentication = null;
 
-let modelsLoaded = false;
-let referenceFaceIds = new Map(); // Store Azure face IDs for each user
-
-/**
- * Initialize Azure Face API
- * Verifies that the API is accessible with the provided credentials
- */
-export const initializeFaceAPI = async () => {
-  try {
-    if (modelsLoaded) {
-      console.log('Azure Face API already initialized');
-      return true;
-    }
-
-    console.log('Initializing Azure Face API...');
-    
-    // Test API connectivity with a simple request
-    const testResponse = await fetch(`${AZURE_ENDPOINT}/face/v1.0/detect`, {
-      method: 'POST',
-      headers: {
-        'Ocp-Apim-Subscription-Key': AZURE_API_KEY,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        url: 'https://raw.githubusercontent.com/Azure-Samples/cognitive-services-sample-data-files/master/Face/images/detection1.jpg'
-      }),
-    });
-
-    if (testResponse.ok) {
-      modelsLoaded = true;
-      console.log('Azure Face API initialized successfully');
-      return true;
-    } else {
-      const errorText = await testResponse.text();
-      console.error('Azure Face API initialization failed:', errorText);
-      modelsLoaded = false;
-      return false;
-    }
-  } catch (error) {
-    console.error('Error initializing Azure Face API:', error);
-    modelsLoaded = false;
-    return false;
-  }
-};
-
-/**
- * Detect face in an image using Azure Face API
- * @param {string} imageUri - URI of the image to detect face in
- * @returns {Promise<{faceId: string, faceRectangle: object} | null>}
- */
-const detectFace = async (imageUri) => {
-  try {
-    console.log('Detecting face in image:', imageUri);
-    
-    // Read image file as base64
-    const imageBase64 = await FileSystem.readAsStringAsync(imageUri, {
-      encoding: 'base64',
-    });
-    
-    // Convert base64 to binary
-    const binaryData = Uint8Array.from(atob(imageBase64), c => c.charCodeAt(0));
-    
-    // Call Azure Face API to detect face
-    const response = await fetch(`${AZURE_ENDPOINT}/face/v1.0/detect`, {
-      method: 'POST',
-      headers: {
-        'Ocp-Apim-Subscription-Key': AZURE_API_KEY,
-        'Content-Type': 'application/octet-stream',
-      },
-      body: binaryData,
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Azure Face API detect failed:', errorText);
-      throw new Error(`Face detection failed: ${response.status} ${errorText}`);
-    }
-
-    const faces = await response.json();
-    console.log(`Detected ${faces.length} face(s)`);
-    
-    if (faces.length === 0) {
+// Lazy load the module to prevent crashes
+const getLocalAuthentication = async () => {
+  if (LocalAuthentication === null) {
+    try {
+      const module = await Promise.resolve(import('expo-local-authentication'));
+      LocalAuthentication = module.default || module;
+      return LocalAuthentication;
+    } catch (error) {
+      console.warn('expo-local-authentication not available:', error.message);
       return null;
     }
+  }
+  return LocalAuthentication.default || LocalAuthentication;
+};
+
+/**
+ * Check if device-based face recognition is available
+ * @returns {Promise<{available: boolean, error?: string}>}
+ */
+export const checkFaceRecognitionAvailability = async () => {
+  try {
+    const LocalAuth = await getLocalAuthentication();
+    if (!LocalAuth) {
+      return {
+        available: false,
+        error: 'Face recognition module not available'
+      };
+    }
     
-    if (faces.length > 1) {
-      console.warn('Multiple faces detected, using the first one');
+    const hasHardware = await LocalAuth.hasHardwareAsync();
+    if (!hasHardware) {
+      return {
+        available: false,
+        error: 'Face recognition hardware is not available on this device. This device does not support Face ID.'
+      };
+    }
+
+    const isEnrolled = await LocalAuth.isEnrolledAsync();
+    if (!isEnrolled) {
+      return {
+        available: false,
+        error: 'Face ID is not enrolled. Please set up Face ID/Face Unlock in device settings:\n\n• iOS: Settings > Face ID & Passcode > Set Up Face ID\n• Android: Settings > Security > Face unlock\n\nAfter setting up Face ID, return to this app.'
+      };
+    }
+
+    const supportedTypes = await LocalAuth.supportedAuthenticationTypesAsync();
+    // Check for both FACIAL_RECOGNITION (iOS Face ID) and FINGERPRINT (Android Face Unlock)
+    const hasFaceRecognition = supportedTypes.includes(LocalAuth.AuthenticationType.FACIAL_RECOGNITION) ||
+                               (Platform.OS === 'android' && supportedTypes.length > 0);
+    
+    if (!hasFaceRecognition && Platform.OS === 'ios') {
+      return {
+        available: false,
+        error: 'Face recognition is not supported on this device. Please use fingerprint authentication instead.'
+      };
     }
     
     return {
-      faceId: faces[0].faceId,
-      faceRectangle: faces[0].faceRectangle,
+      available: true,
+      error: null
     };
   } catch (error) {
-    console.error('Error detecting face:', error);
-    throw error;
+    console.error('Error checking face recognition availability:', error);
+    return {
+      available: false,
+      error: `Error checking Face ID: ${error.message}`
+    };
   }
 };
 
 /**
- * Load reference face ID for a user from their reference image
- * @param {string} username - Username to load reference for
- * @returns {Promise<boolean>} - Success status
+ * Verify face using device's native face recognition (Face ID/Face Unlock)
+ * @param {string} username - Username (for logging purposes)
+ * @param {string} promptMessage - Custom prompt message (optional)
+ * @returns {Promise<{success: boolean, error?: string}>}
  */
-export const loadReferenceFace = async (username) => {
+export const verifyFace = async (username, promptMessage = 'Authenticate with Face ID to continue') => {
   try {
-    if (!modelsLoaded) {
-      const initialized = await initializeFaceAPI();
-      if (!initialized) {
-        throw new Error('Failed to initialize Azure Face API');
-      }
+    const LocalAuth = await getLocalAuthentication();
+    if (!LocalAuth) {
+        return {
+          success: false,
+        error: 'Face recognition module not available'
+        };
     }
 
-    // Check if already loaded
-    if (referenceFaceIds.has(username)) {
-      console.log(`Reference face already loaded for ${username}`);
-      return true;
+    // Check availability first
+    const availability = await checkFaceRecognitionAvailability();
+    if (!availability.available) {
+        return {
+          success: false,
+        error: availability.error || 'Face recognition not available. Please ensure Face ID is set up in your device settings.'
+      };
     }
 
-    // Get reference image path
-    let referenceImage;
-    try {
-      if (username === 'testuser') {
-        referenceImage = require('../assets/faces/testuser.jpg');
+    // Double-check enrollment before attempting authentication
+    const isEnrolled = await LocalAuth.isEnrolledAsync();
+    if (!isEnrolled) {
+      return {
+        success: false,
+        error: 'Face ID is not enrolled on this device. Please set up Face ID in your device settings first.'
+      };
+    }
+
+    // Get supported authentication types
+    const supportedTypes = await LocalAuth.supportedAuthenticationTypesAsync();
+    // On iOS, check for FACIAL_RECOGNITION. On Android, any biometric type works for face unlock
+    const hasFaceID = Platform.OS === 'ios' 
+      ? supportedTypes.includes(LocalAuth.AuthenticationType.FACIAL_RECOGNITION)
+      : supportedTypes.length > 0; // Android face unlock uses the same API as fingerprint
+    
+    if (!hasFaceID) {
+      return {
+        success: false,
+        error: 'Face ID is not supported on this device. Please use fingerprint authentication instead.'
+      };
+    }
+
+    // Attempt face recognition authentication
+    // IMPORTANT: On iOS, even with disableDeviceFallback: true, the system may still show passcode
+    // in certain scenarios (after restart, 48h inactivity, 5 failed attempts, etc.)
+    // This is a system security feature and cannot be bypassed
+    const authOptions = {
+      promptMessage: promptMessage,
+      cancelLabel: 'Cancel',
+      disableDeviceFallback: true, // Try to force Face ID only - no passcode fallback button
+    };
+
+    // On iOS, we can also specify to only use Face ID
+    if (Platform.OS === 'ios') {
+      authOptions.requireConfirmation = false;
+      // Note: iOS may still require passcode in certain security scenarios
+      // This is normal iOS behavior and cannot be disabled
+    }
+
+    const result = await LocalAuth.authenticateAsync(authOptions);
+
+    if (result.success) {
+      return {
+        success: true,
+        error: null
+      };
+    } else {
+      let errorMessage = 'Face recognition cancelled';
+      
+      if (result.error === 'user_cancel') {
+        errorMessage = 'Face recognition cancelled by user';
+      } else if (result.error === 'user_fallback') {
+        // This shouldn't happen with disableDeviceFallback: true, but if it does, explain why
+        errorMessage = 'Face ID authentication failed. Your device may require a passcode in certain security scenarios (after restart, extended inactivity, or multiple failed attempts). This is normal iOS security behavior.';
+      } else if (result.error === 'system_cancel') {
+        errorMessage = 'Face recognition cancelled by system. Please try again.';
+      } else if (result.error === 'not_available') {
+        errorMessage = 'Face recognition not available. Please ensure Face ID is set up in device settings.';
+      } else if (result.error === 'not_enrolled') {
+        errorMessage = 'Face ID is not enrolled. Please set up Face ID in your device settings:\n\nSettings > Face ID & Passcode (iOS)\nSettings > Security > Face unlock (Android)';
+      } else if (result.error === 'passcode_not_set') {
+        errorMessage = 'Device passcode is required for Face ID. Please set up a passcode in device settings first.';
       } else {
-        // For future extensibility - add more users here
-        throw new Error(`No reference image found for user: ${username}`);
+        errorMessage = result.error || 'Face recognition failed. Please try again.';
       }
-    } catch (requireError) {
-      throw new Error(`Reference image not found for ${username}. Please ensure assets/faces/${username}.jpg exists.`);
-    }
-
-    // Convert asset to local URI
-    const asset = Asset.fromModule(referenceImage);
-    await asset.downloadAsync();
-    
-    if (!asset.localUri) {
-      throw new Error('Failed to load reference image asset');
-    }
-
-    console.log(`Loading reference face for ${username} from:`, asset.localUri);
-    
-    // Detect face in reference image
-    const faceData = await detectFace(asset.localUri);
-    
-    if (!faceData) {
-      throw new Error('No face detected in reference image');
-    }
-
-    // Store the face ID for this user
-    referenceFaceIds.set(username, faceData.faceId);
-    console.log(`Reference face loaded successfully for ${username}`);
-    return true;
-  } catch (error) {
-    console.error(`Error loading reference face for ${username}:`, error);
-    return false;
-  }
-};
-
-/**
- * Verify if the captured face matches the reference face using Azure Face API
- * @param {string} capturedImageUri - URI of the captured image
- * @param {string} username - Username to verify against
- * @returns {Promise<{success: boolean, confidence?: number, error?: string}>}
- */
-export const verifyFace = async (capturedImageUri, username) => {
-  try {
-    console.log(`Starting face verification for ${username}...`);
-    
-    if (!modelsLoaded) {
-      const initialized = await initializeFaceAPI();
-      if (!initialized) {
-        return {
-          success: false,
-          error: 'Failed to initialize Azure Face API'
-        };
-      }
-    }
-
-    // Load reference face if not already loaded
-    let referenceFaceId = referenceFaceIds.get(username);
-    if (!referenceFaceId) {
-      console.log(`Reference face not loaded, loading for ${username}...`);
-      const loaded = await loadReferenceFace(username);
-      if (!loaded) {
-        return {
-          success: false,
-          error: `No reference image available for user: ${username}`
-        };
-      }
-      referenceFaceId = referenceFaceIds.get(username);
-    }
-
-    // Detect face in captured image
-    console.log('Detecting face in captured image...');
-    const capturedFaceData = await detectFace(capturedImageUri);
-    
-    if (!capturedFaceData) {
-      return {
-        success: false,
-        error: 'No face detected in captured image. Please ensure your face is clearly visible.'
-      };
-    }
-
-    console.log('Face detected, verifying with reference...');
-    
-    // Call Azure Face API Verify endpoint
-    const verifyResponse = await fetch(`${AZURE_ENDPOINT}/face/v1.0/verify`, {
-      method: 'POST',
-      headers: {
-        'Ocp-Apim-Subscription-Key': AZURE_API_KEY,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        faceId1: capturedFaceData.faceId,
-        faceId2: referenceFaceId,
-      }),
-    });
-
-    if (!verifyResponse.ok) {
-      const errorText = await verifyResponse.text();
-      console.error('Azure Face API verify failed:', errorText);
-      return {
-        success: false,
-        error: `Face verification failed: ${verifyResponse.status}`
-      };
-    }
-
-    const verifyResult = await verifyResponse.json();
-    console.log('Verification result:', verifyResult);
-    
-    const { isIdentical, confidence } = verifyResult;
-    const isMatch = isIdentical && confidence >= SIMILARITY_THRESHOLD;
 
     return {
-      success: isMatch,
-      confidence: confidence,
-      error: isMatch ? null : `Face not matching. Confidence: ${(confidence * 100).toFixed(1)}% (minimum required: ${(SIMILARITY_THRESHOLD * 100).toFixed(1)}%)`
+        success: false,
+        error: errorMessage
     };
+    }
   } catch (error) {
-    console.error('Error during face verification:', error);
+    console.error('Error during face recognition:', error);
     return {
       success: false,
-      error: `Face verification error: ${error.message}`
+      error: `Face recognition error: ${error.message}`
     };
   }
 };
 
+// Legacy functions for backward compatibility (no-op or simplified)
 /**
- * Preload reference faces for better performance
- * Call this function when the app starts to load all reference images
- * @param {string[]} usernames - Array of usernames to preload
+ * Initialize face API - no longer needed for device-based recognition
+ * @returns {Promise<boolean>}
  */
-export const preloadReferenceFaces = async (usernames) => {
-  console.log('Preloading reference faces...');
-  const results = [];
-  
-  for (const username of usernames) {
-    try {
-      const success = await loadReferenceFace(username);
-      results.push({ username, success });
-    } catch (error) {
-      console.error(`Failed to preload reference for ${username}:`, error);
-      results.push({ username, success: false, error: error.message });
-    }
-  }
-  
-  console.log('Reference faces preloading completed:', results);
-  return results;
+export const initializeFaceAPI = async () => {
+  console.log('Using device-based face recognition - no initialization needed');
+  return true;
 };
 
 /**
- * Check if Azure Face API is initialized
+ * Load reference face - no longer needed for device-based recognition
+ * @param {string} username - Username
+ * @returns {Promise<boolean>}
+ */
+export const loadReferenceFace = async (username) => {
+  console.log('Using device-based face recognition - no reference image needed');
+  return true;
+};
+
+/**
+ * Check if models are loaded - always true for device-based recognition
  * @returns {boolean}
  */
 export const areModelsLoaded = () => {
-  return modelsLoaded;
+  return true; // Always "loaded" since we use device native
 };
 
 /**
- * Get loaded usernames
- * @returns {string[]}
- */
-export const getLoadedUsernames = () => {
-  return Array.from(referenceFaceIds.keys());
-};
-
-/**
- * Clear all loaded reference faces (useful for memory management)
+ * Clear reference faces - no-op for device-based recognition
  */
 export const clearReferenceFaces = () => {
-  referenceFaceIds.clear();
-  console.log('Reference faces cleared');
+  // No-op for device-based recognition
 };
 
 /**
- * Get the similarity threshold
+ * Get similarity threshold - device handles confidence internally
  * @returns {number}
  */
 export const getSimilarityThreshold = () => {
-  return SIMILARITY_THRESHOLD;
+  return 1.0; // Device handles confidence internally
 };
 
+/**
+ * Preload reference faces - no-op for device-based recognition
+ * @param {string[]} usernames - Array of usernames
+ * @returns {Promise<Array>}
+ */
+export const preloadReferenceFaces = async (usernames) => {
+  console.log('Using device-based face recognition - no preloading needed');
+  return usernames.map(username => ({ username, success: true }));
+};
+
+/**
+ * Get loaded usernames - no-op for device-based recognition
+ * @returns {string[]}
+ */
+export const getLoadedUsernames = () => {
+  return []; // No usernames to track for device-based recognition
+};

@@ -8,26 +8,41 @@ import {
   RefreshControl,
   Image,
   TextInput,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getAttendanceRecords, clearAllAttendanceRecords } from '../utils/storage';
 import { exportAttendanceToCSV } from '../utils/export';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import EmployeeManagement from './EmployeeManagement';
+import CalendarScreen from './CalendarScreen';
+import HRDashboard from './HRDashboard';
+import { getUnreadNotificationCount } from '../utils/notifications';
 
-export default function AdminDashboard({ route }) {
+export default function AdminDashboard({ route, navigation }) {
   const { user } = route.params;
   const { handleLogout } = useAuth();
-  const [activeTab, setActiveTab] = useState('attendance'); // 'attendance' or 'employees'
+  const { colors } = useTheme();
+  const [activeTab, setActiveTab] = useState('attendance'); // 'attendance', 'employees', 'calendar', or 'hr'
   const [records, setRecords] = useState([]);
   const [filteredRecords, setFilteredRecords] = useState([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState('all'); // all, checkin, checkout
   const [isExporting, setIsExporting] = useState(false);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
 
   useEffect(() => {
     loadRecords();
+    loadNotificationCount();
+    
+    // Set up interval to check notifications every 30 seconds
+    const notificationInterval = setInterval(() => {
+      loadNotificationCount();
+    }, 30000);
+
+    return () => clearInterval(notificationInterval);
   }, []);
 
   useEffect(() => {
@@ -44,6 +59,15 @@ export default function AdminDashboard({ route }) {
     } catch (error) {
       console.error('Error loading records:', error);
       Alert.alert('Error', 'Failed to load attendance records');
+    }
+  };
+
+  const loadNotificationCount = async () => {
+    try {
+      const count = await getUnreadNotificationCount(user.username);
+      setUnreadNotificationCount(count);
+    } catch (error) {
+      console.error('Error loading notification count:', error);
     }
   };
 
@@ -142,13 +166,19 @@ export default function AdminDashboard({ route }) {
     const { date, time } = formatDate(item.timestamp);
     
     return (
-      <View className="bg-white rounded-xl p-4 mb-3 shadow-sm">
-        <View className="flex-row items-start">
+      <View style={{ backgroundColor: colors.surface, borderRadius: 12, padding: 16, marginBottom: 12, shadowColor: colors.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
           {/* Status Indicator */}
-          <View className="mr-4">
+          <View style={{ marginRight: 16 }}>
             <View 
-              className="w-12 h-12 rounded-full items-center justify-center"
-              style={{ backgroundColor: `${getStatusColor(item.type)}20` }}
+              style={{ 
+                width: 48, 
+                height: 48, 
+                borderRadius: 24, 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                backgroundColor: `${getStatusColor(item.type)}20` 
+              }}
             >
               <Ionicons 
                 name={getStatusIcon(item.type)} 
@@ -159,22 +189,27 @@ export default function AdminDashboard({ route }) {
           </View>
 
           {/* Record Details */}
-          <View className="flex-1">
-            <View className="flex-row items-center justify-between mb-2">
-              <Text className="text-lg font-semibold text-gray-800">
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text }}>
                 {item.username}
               </Text>
-              <Text className="text-sm text-gray-500">{time}</Text>
+              <Text style={{ fontSize: 14, color: colors.textSecondary }}>{time}</Text>
             </View>
             
-            <View className="flex-row items-center mb-2">
-              <Text className="text-gray-600 mr-2">{date}</Text>
-              <View className={`px-2 py-1 rounded-full ${
-                item.type === 'checkin' ? 'bg-green-100' : 'bg-red-100'
-              }`}>
-                <Text className={`text-xs font-medium ${
-                  item.type === 'checkin' ? 'text-green-800' : 'text-red-800'
-                }`}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+              <Text style={{ color: colors.textSecondary, marginRight: 8 }}>{date}</Text>
+              <View style={{
+                paddingHorizontal: 8,
+                paddingVertical: 4,
+                borderRadius: 12,
+                backgroundColor: item.type === 'checkin' ? colors.successLight : colors.errorLight
+              }}>
+                <Text style={{
+                  fontSize: 12,
+                  fontWeight: '500',
+                  color: item.type === 'checkin' ? colors.success : colors.error
+                }}>
                   {item.type === 'checkin' ? 'Check In' : 'Check Out'}
                 </Text>
               </View>
@@ -182,9 +217,9 @@ export default function AdminDashboard({ route }) {
             
             {/* Location */}
             {item.location && (
-              <View className="flex-row items-center mb-2">
-                <Ionicons name="location-outline" size={16} color="#6b7280" />
-                <Text className="text-gray-600 text-sm ml-1">
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                <Ionicons name="location-outline" size={16} color={colors.textSecondary} />
+                <Text style={{ color: colors.textSecondary, fontSize: 14, marginLeft: 4 }}>
                   {item.location.latitude.toFixed(4)}, {item.location.longitude.toFixed(4)}
                 </Text>
               </View>
@@ -192,10 +227,10 @@ export default function AdminDashboard({ route }) {
 
             {/* Photo */}
             {item.photo && (
-              <View className="mt-2">
+              <View style={{ marginTop: 8 }}>
                 <Image 
                   source={{ uri: item.photo }} 
-                  className="w-16 h-16 rounded-lg"
+                  style={{ width: 64, height: 64, borderRadius: 8 }}
                   resizeMode="cover"
                 />
               </View>
@@ -208,14 +243,18 @@ export default function AdminDashboard({ route }) {
 
   const FilterButton = ({ title, value, isActive }) => (
     <TouchableOpacity
-      className={`px-4 py-2 rounded-full ${
-        isActive ? 'bg-primary-500' : 'bg-gray-200'
-      }`}
+      style={{
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        backgroundColor: isActive ? colors.primary : colors.borderLight,
+      }}
       onPress={() => setFilter(value)}
     >
-      <Text className={`font-medium ${
-        isActive ? 'text-white' : 'text-gray-700'
-      }`}>
+      <Text style={{
+        fontWeight: '500',
+        color: isActive ? 'white' : colors.text
+      }}>
         {title}
       </Text>
     </TouchableOpacity>
@@ -223,92 +262,165 @@ export default function AdminDashboard({ route }) {
 
   const TabButton = ({ title, value, isActive, icon }) => (
     <TouchableOpacity
-      className={`flex-1 flex-row items-center justify-center py-3 ${
-        isActive ? 'border-b-2 border-primary-500' : ''
-      }`}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderBottomWidth: isActive ? 2 : 0,
+        borderBottomColor: isActive ? colors.primary : 'transparent',
+        minWidth: 100,
+      }}
       onPress={() => setActiveTab(value)}
     >
       <Ionicons 
         name={icon} 
         size={20} 
-        color={isActive ? '#3b82f6' : '#6b7280'} 
+        color={isActive ? colors.primary : colors.textSecondary} 
       />
-      <Text className={`ml-2 font-medium ${
-        isActive ? 'text-primary-500' : 'text-gray-500'
-      }`}>
+      <Text style={{
+        marginLeft: 8,
+        fontWeight: '500',
+        color: isActive ? colors.primary : colors.textSecondary
+      }}>
         {title}
       </Text>
     </TouchableOpacity>
   );
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1" style={{ backgroundColor: colors.background }}>
       {/* Header */}
-      <View className="bg-white px-6 py-4 shadow-sm">
-        <View className="flex-row items-center justify-between mb-4">
-          <Text className="text-xl font-bold text-gray-800">
+      <View style={{ backgroundColor: colors.surface, paddingHorizontal: 16, paddingVertical: 12, shadowColor: colors.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+          <Text 
+            style={{ 
+              fontSize: 20, 
+              fontWeight: 'bold', 
+              color: colors.text,
+              flex: 1,
+              textAlign: 'left'
+            }}
+            numberOfLines={1}
+          >
             Admin Dashboard
           </Text>
-          {activeTab === 'attendance' && (
-            <View className="flex-row space-x-2">
-              <TouchableOpacity
-                className="bg-green-500 rounded-xl px-4 py-2"
-                onPress={handleExport}
-                disabled={isExporting || records.length === 0}
-              >
-                <View className="flex-row items-center">
-                  <Ionicons name="download-outline" size={16} color="white" />
-                  <Text className="text-white font-semibold ml-1">
-                    {isExporting ? 'Exporting...' : 'Export CSV'}
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 8, paddingLeft: 8 }}
+            style={{ flexShrink: 0 }}
+          >
+            <TouchableOpacity
+              onPress={() => navigation.navigate('NotificationsScreen', { user: user })}
+              style={{ padding: 8, position: 'relative' }}
+            >
+              <Ionicons name="notifications" size={24} color={colors.primary} />
+              {unreadNotificationCount > 0 && (
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: 4,
+                    right: 4,
+                    backgroundColor: colors.error,
+                    borderRadius: 10,
+                    minWidth: 20,
+                    height: 20,
+                    paddingHorizontal: 6,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text style={{ color: 'white', fontSize: 12, fontWeight: '600' }}>
+                    {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
                   </Text>
                 </View>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                className="bg-red-500 rounded-xl px-4 py-2"
-                onPress={handleClearAll}
-                disabled={records.length === 0}
-              >
-                <View className="flex-row items-center">
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('ThemeSettingsScreen', { user: user })}
+              style={{ padding: 8 }}
+            >
+              <Ionicons name="color-palette" size={24} color={colors.primary} />
+            </TouchableOpacity>
+            {activeTab === 'attendance' && (
+              <>
+                <TouchableOpacity
+                  style={{ backgroundColor: colors.success, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', alignItems: 'center' }}
+                  onPress={handleExport}
+                  disabled={isExporting || records.length === 0}
+                >
+                  <Ionicons name="download-outline" size={16} color="white" />
+                  <Text style={{ color: 'white', fontWeight: '600', marginLeft: 6 }}>
+                    {isExporting ? 'Exporting...' : 'Export CSV'}
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={{ backgroundColor: colors.error, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', alignItems: 'center' }}
+                  onPress={handleClearAll}
+                  disabled={records.length === 0}
+                >
                   <Ionicons name="trash-outline" size={16} color="white" />
-                  <Text className="text-white font-semibold ml-1">Clear All</Text>
-                </View>
-              </TouchableOpacity>
-            </View>
-          )}
+                  <Text style={{ color: 'white', fontWeight: '600', marginLeft: 6 }}>Clear All</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </ScrollView>
         </View>
 
         {/* Tab Navigation */}
-        <View className="flex-row border-b border-gray-200">
-          <TabButton 
-            title="Attendance" 
-            value="attendance" 
-            isActive={activeTab === 'attendance'}
-            icon="time-outline"
-          />
-          <TabButton 
-            title="Employees" 
-            value="employees" 
-            isActive={activeTab === 'employees'}
-            icon="people-outline"
-          />
-        </View>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingRight: 16 }}
+          style={{ borderBottomWidth: 1, borderBottomColor: colors.border }}
+        >
+          <View style={{ flexDirection: 'row' }}>
+            <TabButton 
+              title="Attendance" 
+              value="attendance" 
+              isActive={activeTab === 'attendance'}
+              icon="time-outline"
+            />
+            <TabButton 
+              title="Employees" 
+              value="employees" 
+              isActive={activeTab === 'employees'}
+              icon="people-outline"
+            />
+            <TabButton 
+              title="Calendar" 
+              value="calendar" 
+              isActive={activeTab === 'calendar'}
+              icon="calendar-outline"
+            />
+            <TabButton 
+              title="HR" 
+              value="hr" 
+              isActive={activeTab === 'hr'}
+              icon="briefcase-outline"
+            />
+          </View>
+        </ScrollView>
 
         {/* Search Bar - Only for Attendance Tab */}
         {activeTab === 'attendance' && (
           <>
-            <View className="flex-row items-center bg-gray-100 rounded-xl px-4 py-3 mb-4">
-              <Ionicons name="search-outline" size={20} color="#6b7280" />
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.borderLight, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, marginBottom: 16 }}>
+              <Ionicons name="search-outline" size={20} color={colors.textSecondary} />
               <TextInput
-                className="flex-1 ml-3 text-gray-800"
+                style={{ flex: 1, marginLeft: 12, color: colors.text }}
                 placeholder="Search by username..."
+                placeholderTextColor={colors.textTertiary}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
               />
             </View>
             
             {/* Filter Buttons */}
-            <View className="flex-row space-x-2">
+            <View style={{ flexDirection: 'row', gap: 8 }}>
               <FilterButton title="All" value="all" isActive={filter === 'all'} />
               <FilterButton title="Check In" value="checkin" isActive={filter === 'checkin'} />
               <FilterButton title="Check Out" value="checkout" isActive={filter === 'checkout'} />
@@ -318,26 +430,34 @@ export default function AdminDashboard({ route }) {
       </View>
 
       {/* Conditional Content */}
-      {activeTab === 'attendance' ? (
+      {activeTab === 'hr' ? (
+        <View className="flex-1">
+          <HRDashboard navigation={navigation} route={route} />
+        </View>
+      ) : activeTab === 'calendar' ? (
+        <View className="flex-1">
+          <CalendarScreen navigation={navigation} route={route} />
+        </View>
+      ) : activeTab === 'attendance' ? (
         <>
           {/* Stats */}
-          <View className="bg-white mx-4 my-4 rounded-xl p-4 shadow-sm">
-            <View className="flex-row justify-around">
-              <View className="items-center">
-                <Text className="text-2xl font-bold text-primary-500">{records.length}</Text>
-                <Text className="text-gray-600 text-sm">Total Records</Text>
+          <View style={{ backgroundColor: colors.surface, marginHorizontal: 16, marginVertical: 16, borderRadius: 12, padding: 16, shadowColor: colors.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-around' }}>
+              <View style={{ alignItems: 'center' }}>
+                <Text style={{ fontSize: 24, fontWeight: 'bold', color: colors.primary }}>{records.length}</Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 14 }}>Total Records</Text>
               </View>
-              <View className="items-center">
-                <Text className="text-2xl font-bold text-green-500">
+              <View style={{ alignItems: 'center' }}>
+                <Text style={{ fontSize: 24, fontWeight: 'bold', color: colors.success }}>
                   {records.filter(r => r.type === 'checkin').length}
                 </Text>
-                <Text className="text-gray-600 text-sm">Check Ins</Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 14 }}>Check Ins</Text>
               </View>
-              <View className="items-center">
-                <Text className="text-2xl font-bold text-red-500">
+              <View style={{ alignItems: 'center' }}>
+                <Text style={{ fontSize: 24, fontWeight: 'bold', color: colors.error }}>
                   {records.filter(r => r.type === 'checkout').length}
                 </Text>
-                <Text className="text-gray-600 text-sm">Check Outs</Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 14 }}>Check Outs</Text>
               </View>
             </View>
           </View>
@@ -355,33 +475,33 @@ export default function AdminDashboard({ route }) {
               showsVerticalScrollIndicator={false}
             />
           ) : (
-            <View className="flex-1 justify-center items-center px-6">
-              <Ionicons name="people-outline" size={64} color="#d1d5db" />
-              <Text className="text-xl font-semibold text-gray-500 mt-4 text-center">
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 }}>
+              <Ionicons name="people-outline" size={64} color={colors.textTertiary} />
+              <Text style={{ fontSize: 20, fontWeight: '600', color: colors.textSecondary, marginTop: 16, textAlign: 'center' }}>
                 {records.length === 0 
                   ? 'No attendance records found'
                   : 'No records match your search'
                 }
               </Text>
-              <Text className="text-gray-400 text-center mt-2">
+              <Text style={{ color: colors.textTertiary, textAlign: 'center', marginTop: 8 }}>
                 {records.length === 0 
                   ? 'Employees need to check in to create records'
                   : 'Try adjusting your search or filter criteria'
                 }
               </Text>
               <TouchableOpacity
-                className="bg-primary-500 rounded-xl px-6 py-3 mt-6"
+                style={{ backgroundColor: colors.primary, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12, marginTop: 24 }}
                 onPress={onRefresh}
               >
-                <Text className="text-white font-semibold">Refresh</Text>
+                <Text style={{ color: 'white', fontWeight: '600' }}>Refresh</Text>
               </TouchableOpacity>
             </View>
           )}
 
           {/* Summary */}
           {filteredRecords.length > 0 && (
-            <View className="bg-white p-4 border-t border-gray-200">
-              <Text className="text-gray-600 text-center">
+            <View style={{ backgroundColor: colors.surface, padding: 16, borderTopWidth: 1, borderTopColor: colors.border }}>
+              <Text style={{ color: colors.textSecondary, textAlign: 'center' }}>
                 Showing {filteredRecords.length} of {records.length} record{records.length !== 1 ? 's' : ''}
               </Text>
             </View>

@@ -7,13 +7,13 @@ const WORK_MODE_REQUESTS_KEY = 'work_mode_requests';
 const WORK_MODE_HISTORY_KEY = 'work_mode_history';
 
 /**
- * Initialize default employees if none exist
+ * Initialize default employees - merges with existing employees
+ * Adds any missing default employees to the existing list
  */
 export const initializeDefaultEmployees = async () => {
   try {
     const existingEmployees = await getEmployees();
     
-    if (existingEmployees.length === 0) {
       const defaultEmployees = [
         {
           id: 'emp_001',
@@ -23,7 +23,7 @@ export const initializeDefaultEmployees = async () => {
           role: 'employee',
           workMode: WORK_MODES.IN_OFFICE,
           department: 'Engineering',
-          position: 'Software Developer',
+          position: 'AI Engineer',
           hireDate: '2023-01-15',
           isActive: true,
           createdAt: new Date().toISOString()
@@ -40,11 +40,129 @@ export const initializeDefaultEmployees = async () => {
           hireDate: '2023-01-01',
           isActive: true,
           createdAt: new Date().toISOString()
+        },
+        {
+          id: 'emp_003',
+          username: 'john.doe',
+          name: 'John Doe',
+          email: 'john.doe@company.com',
+          role: 'employee',
+          workMode: WORK_MODES.SEMI_REMOTE,
+          department: 'Engineering',
+          position: 'Senior AI Engineer',
+          hireDate: '2022-06-10',
+          isActive: true,
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 'emp_004',
+          username: 'jane.smith',
+          name: 'Jane Smith',
+          email: 'jane.smith@company.com',
+          role: 'employee',
+          workMode: WORK_MODES.FULLY_REMOTE,
+          department: 'Design',
+          position: 'UI/UX Designer',
+          hireDate: '2022-08-20',
+          isActive: true,
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 'emp_005',
+          username: 'mike.johnson',
+          name: 'Mike Johnson',
+          email: 'mike.johnson@company.com',
+          role: 'employee',
+          workMode: WORK_MODES.IN_OFFICE,
+          department: 'Sales',
+          position: 'Sales Manager',
+          hireDate: '2022-03-15',
+          isActive: true,
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 'emp_006',
+          username: 'sarah.williams',
+          name: 'Sarah Williams',
+          email: 'sarah.williams@company.com',
+          role: 'employee',
+          workMode: WORK_MODES.SEMI_REMOTE,
+          department: 'Marketing',
+          position: 'Marketing Specialist',
+          hireDate: '2023-02-01',
+          isActive: true,
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 'emp_007',
+          username: 'david.brown',
+          name: 'David Brown',
+          email: 'david.brown@company.com',
+          role: 'employee',
+          workMode: WORK_MODES.FULLY_REMOTE,
+          department: 'Engineering',
+          position: 'DevOps Engineer',
+          hireDate: '2022-11-05',
+          isActive: true,
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 'emp_008',
+          username: 'emily.davis',
+          name: 'Emily Davis',
+          email: 'emily.davis@company.com',
+          role: 'employee',
+          workMode: WORK_MODES.IN_OFFICE,
+          department: 'HR',
+          position: 'HR Coordinator',
+          hireDate: '2023-04-12',
+          isActive: true,
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 'emp_009',
+          username: 'admin2',
+          name: 'Admin Two',
+          email: 'admin2@company.com',
+          role: 'admin',
+          workMode: WORK_MODES.IN_OFFICE,
+          department: 'Management',
+          position: 'Operations Manager',
+          hireDate: '2022-01-10',
+          isActive: true,
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 'emp_010',
+          username: 'manager1',
+          name: 'Manager One',
+          email: 'manager1@company.com',
+          role: 'admin',
+          workMode: WORK_MODES.SEMI_REMOTE,
+          department: 'Management',
+          position: 'Project Manager',
+          hireDate: '2022-05-20',
+          isActive: true,
+          createdAt: new Date().toISOString()
         }
       ];
       
+      // If no existing employees, just save the defaults
+      if (existingEmployees.length === 0) {
       await AsyncStorage.setItem(EMPLOYEES_KEY, JSON.stringify(defaultEmployees));
       console.log('Default employees initialized');
+      } else {
+        // Merge: Add any missing default employees
+        const existingUsernames = new Set(existingEmployees.map(emp => emp.username));
+        const missingEmployees = defaultEmployees.filter(emp => !existingUsernames.has(emp.username));
+        
+        if (missingEmployees.length > 0) {
+          const mergedEmployees = [...existingEmployees, ...missingEmployees];
+          await AsyncStorage.setItem(EMPLOYEES_KEY, JSON.stringify(mergedEmployees));
+          console.log(`Added ${missingEmployees.length} new default employees`);
+        } else {
+          console.log('All default employees already exist');
+        }
     }
   } catch (error) {
     console.error('Error initializing default employees:', error);
@@ -77,6 +195,35 @@ export const getEmployeeByUsername = async (username) => {
   } catch (error) {
     console.error('Error getting employee by username:', error);
     return null;
+  }
+};
+
+/**
+ * Get employee by ID
+ * @param {string} employeeId - Employee ID to search for
+ * @returns {Promise<Object|null>} Employee object or null
+ */
+export const getEmployeeById = async (employeeId) => {
+  try {
+    const employees = await getEmployees();
+    return employees.find(emp => emp.id === employeeId) || null;
+  } catch (error) {
+    console.error('Error getting employee by ID:', error);
+    return null;
+  }
+};
+
+/**
+ * Get all admin users
+ * @returns {Promise<Array>} Array of admin employee objects
+ */
+export const getAdminUsers = async () => {
+  try {
+    const employees = await getEmployees();
+    return employees.filter(emp => emp.role === 'admin' && emp.isActive);
+  } catch (error) {
+    console.error('Error getting admin users:', error);
+    return [];
   }
 };
 

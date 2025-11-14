@@ -1,21 +1,17 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   Alert,
   ActivityIndicator,
-  Image,
 } from 'react-native';
-import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { saveAttendanceRecord } from '../utils/storage';
 import { 
-  initializeFaceAPI, 
-  loadReferenceFace, 
   verifyFace, 
-  areModelsLoaded 
+  checkFaceRecognitionAvailability
 } from '../utils/faceVerification';
 import { 
   authenticateWithBiometric, 
@@ -23,27 +19,38 @@ import {
   getBiometricTypeName 
 } from '../utils/biometricAuth';
 import { getCurrentLocationWithAddress, formatAddressForDisplay } from '../utils/location';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function CameraScreen({ navigation, route }) {
   const { type, user, authMethod = 'face' } = route.params; // authMethod: 'face' or 'biometric'
-  const [permission, requestPermission] = useCameraPermissions();
-  const [cameraRef, setCameraRef] = useState(null);
+  const { colors } = useTheme();
   const [isLoading, setIsLoading] = useState(false);
   const [location, setLocation] = useState(null);
-  const [photo, setPhoto] = useState(null);
-  const [faceVerificationStatus, setFaceVerificationStatus] = useState(null);
+  const [authStatus, setAuthStatus] = useState(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricType, setBiometricType] = useState('');
+  const [faceIDAvailable, setFaceIDAvailable] = useState(false);
 
   useEffect(() => {
     if (authMethod === 'biometric') {
       checkBiometric();
     } else {
-      getPermissions();
-      initializeFaceVerification();
+      checkFaceRecognition();
     }
+    // Get location
+    getLocation();
   }, [authMethod]);
+
+  const getLocation = async () => {
+    try {
+      const currentLocation = await getCurrentLocationWithAddress();
+      setLocation(currentLocation);
+    } catch (error) {
+      console.error('Error getting location:', error);
+      // Continue without location
+    }
+  };
 
   const checkBiometric = async () => {
     try {
@@ -52,16 +59,11 @@ export default function CameraScreen({ navigation, route }) {
       if (availability.available) {
         setBiometricType(getBiometricTypeName(availability.types));
       } else {
-        // Check if it's an Expo Go limitation
-        const isExpoGoError = availability.error && availability.error.includes('Expo Go');
         Alert.alert(
           'Biometric Not Available',
-          isExpoGoError 
-            ? 'Fingerprint authentication requires a development build and cannot be used in Expo Go. Please use Face Verification instead, or ask your developer to create a development build.'
-            : (availability.error || 'Biometric authentication is not available. Please use face recognition instead.'),
+          availability.error || 'Biometric authentication is not available. Please use Face ID instead.',
           [
-            { text: 'Use Face Verification', onPress: () => {
-              // Automatically switch to face verification
+            { text: 'Use Face ID', onPress: () => {
               navigation.replace('CameraScreen', { 
                 type: type,
                 user: user,
@@ -76,9 +78,9 @@ export default function CameraScreen({ navigation, route }) {
       console.error('Error checking biometric:', error);
       Alert.alert(
         'Error', 
-        'Failed to check biometric availability. This feature may not work in Expo Go.',
+        'Failed to check biometric availability.',
         [
-          { text: 'Use Face Verification', onPress: () => {
+          { text: 'Use Face ID', onPress: () => {
             navigation.replace('CameraScreen', { 
               type: type,
               user: user,
@@ -91,58 +93,118 @@ export default function CameraScreen({ navigation, route }) {
     }
   };
 
-  const initializeFaceVerification = async () => {
+  const checkFaceRecognition = async () => {
     try {
-      console.log('Initializing Azure Face API...');
-      const initialized = await initializeFaceAPI();
-      if (initialized) {
-        console.log('Azure Face API initialized successfully');
-      } else {
-        console.warn('Azure Face API initialization failed - face verification may not work');
+      const availability = await checkFaceRecognitionAvailability();
+      setFaceIDAvailable(availability.available);
+      if (!availability.available) {
+        const errorMsg = availability.error || 'Face ID is not available on this device.';
+        const isEnrollmentIssue = errorMsg.includes('enrolled') || errorMsg.includes('No face recognition');
+        
+        Alert.alert(
+          'Face ID Setup Required',
+          isEnrollmentIssue 
+            ? 'Face ID is not set up on this device.\n\nPlease set up Face ID in your device settings:\n\nSettings > Face ID & Passcode (iOS)\nSettings > Security > Face unlock (Android)\n\nAfter setting up Face ID, return to this app and try again.'
+            : errorMsg + '\n\nPlease use fingerprint authentication instead.',
+          [
+            ...(isEnrollmentIssue ? [] : [
+              { text: 'Use Fingerprint', onPress: () => {
+                navigation.replace('CameraScreen', { 
+                  type: type,
+                  user: user,
+                  authMethod: 'biometric'
+                });
+              }}
+            ]),
+            { text: 'OK', onPress: () => navigation.goBack() }
+          ]
+        );
+        return;
       }
     } catch (error) {
-      console.error('Azure Face API initialization error:', error.message);
+      console.error('Error checking face recognition availability:', error);
+      Alert.alert(
+        'Error',
+        'Failed to check Face ID availability.',
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      );
     }
   };
 
-  const getPermissions = async () => {
+  const authenticateWithFaceID = async () => {
+    setIsLoading(true);
+    setIsVerifying(true);
+    setAuthStatus(null);
+
     try {
-      // Request camera permission if not already granted
-      if (!permission?.granted) {
-        const result = await requestPermission();
-        if (!result.granted) {
-          Alert.alert('Permission Required', 'Camera permission is required to take attendance photos');
-          navigation.goBack();
-          return;
-        }
-      }
+      // Get location first
+      const currentLocation = await getCurrentLocationWithAddress();
+      setLocation(currentLocation);
+
+      // Authenticate with Face ID
+      const verificationResult = await verifyFace(
+        user.username, 
+        `Authenticate with Face ID to ${type === 'checkin' ? 'check in' : 'check out'}`
+      );
       
-      // Request location permission
-      const { status: locationStatus } = await Location.requestForegroundPermissionsAsync();
-      
-      if (locationStatus !== 'granted') {
+      setIsVerifying(false);
+
+      if (verificationResult.success) {
+        setAuthStatus('success');
         Alert.alert(
-          'Location Permission', 
-          'Location permission is recommended for accurate attendance tracking. You can still proceed without it.',
+          'Face ID Authentication Successful',
+          `Face ID verified successfully!\n\nConfirm ${type === 'checkin' ? 'check in' : 'check out'}?`,
           [
-            { text: 'Cancel', onPress: () => navigation.goBack() },
-            { text: 'Continue', onPress: () => {} }
+            { text: 'Cancel', style: 'cancel', onPress: () => {
+              setAuthStatus(null);
+              setIsLoading(false);
+            }},
+            { text: 'Confirm', onPress: () => saveAttendance(null, currentLocation) }
+          ]
+        );
+      } else {
+        setAuthStatus('failed');
+        Alert.alert(
+          'Face ID Authentication Failed',
+          verificationResult.error || 'Face ID authentication failed. Please try again.',
+          [
+            { text: 'Retry', onPress: () => {
+              setAuthStatus(null);
+              setIsLoading(false);
+            }},
+            { text: 'Cancel', style: 'cancel', onPress: () => {
+              setAuthStatus(null);
+              setIsLoading(false);
+              navigation.goBack();
+            }}
           ]
         );
       }
     } catch (error) {
-      console.error('Error getting permissions:', error);
-      Alert.alert('Error', 'Failed to get required permissions');
-      navigation.goBack();
+      console.error('Error during Face ID authentication:', error);
+      setIsVerifying(false);
+      setAuthStatus('error');
+      Alert.alert(
+        'Error', 
+        'Failed to authenticate with Face ID. Please try again.',
+        [
+          { text: 'Retry', onPress: () => {
+            setAuthStatus(null);
+            setIsLoading(false);
+          }},
+          { text: 'Cancel', style: 'cancel', onPress: () => {
+            setAuthStatus(null);
+            setIsLoading(false);
+          }}
+        ]
+      );
     }
   };
-
-  // Removed getCurrentLocation - now using getCurrentLocationWithAddress from utils/location.js
 
   const authenticateWithBiometricMethod = async () => {
     setIsLoading(true);
     setIsVerifying(true);
-    setFaceVerificationStatus(null);
+    setAuthStatus(null);
 
     try {
       // Get location first
@@ -157,8 +219,7 @@ export default function CameraScreen({ navigation, route }) {
       setIsVerifying(false);
 
       if (authResult.success) {
-        setFaceVerificationStatus('success');
-        // For biometric, we don't have a photo, so we'll save with null photo
+        setAuthStatus('success');
         Alert.alert(
           'Biometric Authentication Successful',
           `${biometricType} verified!\n\nConfirm ${type === 'checkin' ? 'check in' : 'check out'}?`,
@@ -167,7 +228,7 @@ export default function CameraScreen({ navigation, route }) {
               text: 'Cancel', 
               style: 'cancel', 
               onPress: () => {
-                setFaceVerificationStatus(null);
+                setAuthStatus(null);
                 setIsLoading(false);
               }
             },
@@ -178,7 +239,7 @@ export default function CameraScreen({ navigation, route }) {
           ]
         );
       } else {
-        setFaceVerificationStatus('failed');
+        setAuthStatus('failed');
         Alert.alert(
           'Authentication Failed',
           authResult.error || 'Biometric authentication failed. Please try again.',
@@ -186,7 +247,7 @@ export default function CameraScreen({ navigation, route }) {
             { 
               text: 'Retry', 
               onPress: () => {
-                setFaceVerificationStatus(null);
+                setAuthStatus(null);
                 setIsLoading(false);
               }
             },
@@ -194,7 +255,7 @@ export default function CameraScreen({ navigation, route }) {
               text: 'Cancel', 
               style: 'cancel', 
               onPress: () => {
-                setFaceVerificationStatus(null);
+                setAuthStatus(null);
                 setIsLoading(false);
                 navigation.goBack();
               }
@@ -205,7 +266,7 @@ export default function CameraScreen({ navigation, route }) {
     } catch (error) {
       console.error('Error during biometric authentication:', error);
       setIsVerifying(false);
-      setFaceVerificationStatus('error');
+      setAuthStatus('error');
       Alert.alert(
         'Error',
         'Failed to authenticate. Please try again.',
@@ -213,7 +274,7 @@ export default function CameraScreen({ navigation, route }) {
           { 
             text: 'Retry', 
             onPress: () => {
-              setFaceVerificationStatus(null);
+              setAuthStatus(null);
               setIsLoading(false);
             }
           },
@@ -221,91 +282,10 @@ export default function CameraScreen({ navigation, route }) {
             text: 'Cancel', 
             style: 'cancel', 
             onPress: () => {
-              setFaceVerificationStatus(null);
+              setAuthStatus(null);
               setIsLoading(false);
             }
           }
-        ]
-      );
-    }
-  };
-
-  const takePicture = async () => {
-    if (!cameraRef) return;
-
-    setIsLoading(true);
-    setIsVerifying(true);
-    setFaceVerificationStatus(null);
-    
-    try {
-      // Take photo
-      const photoResult = await cameraRef.takePictureAsync({
-        quality: 0.8,
-        base64: false,
-      });
-
-      // Get location with address
-      const currentLocation = await getCurrentLocationWithAddress();
-
-      setPhoto(photoResult.uri);
-      setLocation(currentLocation);
-
-      // Perform face verification
-      console.log('Starting face verification...');
-      
-      // Verify face with Azure Face API
-      const verificationResult = await verifyFace(photoResult.uri, user.username);
-      
-      setIsVerifying(false);
-      
-      if (verificationResult.success) {
-        setFaceVerificationStatus('success');
-        Alert.alert(
-          'Face Verification Successful',
-          `Face verified! Confidence: ${(verificationResult.confidence * 100).toFixed(1)}%\n\nConfirm ${type === 'checkin' ? 'check in' : 'check out'}?`,
-          [
-            { text: 'Cancel', style: 'cancel', onPress: () => {
-              setFaceVerificationStatus(null);
-            }},
-            { text: 'Confirm', onPress: () => saveAttendance(photoResult.uri, currentLocation) }
-          ]
-        );
-      } else {
-        setFaceVerificationStatus('failed');
-        Alert.alert(
-          'Face Not Matching',
-          verificationResult.error || 'Face verification failed. Please try again with better lighting and ensure your face is clearly visible.',
-          [
-            { text: 'Retry', onPress: () => {
-              setFaceVerificationStatus(null);
-              setIsLoading(false);
-              setPhoto(null);
-            }},
-            { text: 'Cancel', style: 'cancel', onPress: () => {
-              setFaceVerificationStatus(null);
-              setIsLoading(false);
-              setPhoto(null);
-              navigation.goBack();
-            }}
-          ]
-        );
-      }
-    } catch (error) {
-      console.error('Error taking picture:', error);
-      setIsVerifying(false);
-      setFaceVerificationStatus('error');
-      Alert.alert(
-        'Error', 
-        'Failed to take photo or verify face. Please try again.',
-        [
-          { text: 'Retry', onPress: () => {
-            setFaceVerificationStatus(null);
-            setIsLoading(false);
-          }},
-          { text: 'Cancel', style: 'cancel', onPress: () => {
-            setFaceVerificationStatus(null);
-            setIsLoading(false);
-          }}
         ]
       );
     }
@@ -318,7 +298,7 @@ export default function CameraScreen({ navigation, route }) {
         username: user.username,
         type: type,
         timestamp: new Date().toISOString(),
-        photo: photoUri,
+        photo: null, // No photo needed for device-native authentication
         location: locationData,
         authMethod: authMethod, // Store which authentication method was used
       };
@@ -343,59 +323,53 @@ export default function CameraScreen({ navigation, route }) {
     }
   };
 
-  if (!permission) {
+  // Loading state
+  if (authMethod === 'biometric' && !biometricAvailable) {
     return (
-      <View className="flex-1 justify-center items-center bg-gray-900">
-        <ActivityIndicator size="large" color="#3b82f6" />
-        <Text className="text-white mt-4">Requesting permissions...</Text>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ color: colors.text, marginTop: 16 }}>Checking biometric availability...</Text>
+      </View>
+    );
+  }
+
+  if (authMethod === 'face' && !faceIDAvailable) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ color: colors.text, marginTop: 16 }}>Checking Face ID availability...</Text>
       </View>
     );
   }
 
   // Biometric authentication view
   if (authMethod === 'biometric') {
-    if (!biometricAvailable) {
-      return (
-        <View className="flex-1 justify-center items-center bg-gray-900 p-6">
-          <ActivityIndicator size="large" color="#3b82f6" />
-          <Text className="text-white mt-4">Checking biometric availability...</Text>
-        </View>
-      );
-    }
-
     return (
-      <View className="flex-1 bg-gray-900">
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
         {/* Header */}
-        <View className="bg-gray-800 px-6 py-4 flex-row items-center justify-between">
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            className="p-2"
-          >
-            <Ionicons name="arrow-back" size={24} color="white" />
-          </TouchableOpacity>
-          <Text className="text-white text-lg font-semibold">
+        <View style={{ backgroundColor: colors.surface, paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ color: colors.text, fontSize: 18, fontWeight: '600' }}>
             {type === 'checkin' ? 'Check In' : 'Check Out'}
           </Text>
-          <View className="w-8" />
         </View>
 
         {/* Biometric Authentication View */}
-        <View className="flex-1 justify-center items-center p-6">
-          <View className="bg-gray-800 rounded-2xl p-8 items-center max-w-sm">
-            <View className="w-24 h-24 bg-primary-500 rounded-full items-center justify-center mb-6">
-              <Ionicons name="finger-print" size={48} color="white" />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+          <View style={{ backgroundColor: colors.surface, borderRadius: 24, padding: 32, alignItems: 'center', maxWidth: 400, width: '100%', shadowColor: colors.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 }}>
+            <View style={{ width: 96, height: 96, backgroundColor: colors.primaryLight, borderRadius: 48, alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
+              <Ionicons name="finger-print" size={48} color={colors.primary} />
             </View>
             
-            <Text className="text-white text-xl font-semibold mb-2 text-center">
+            <Text style={{ color: colors.text, fontSize: 24, fontWeight: '600', marginBottom: 8, textAlign: 'center' }}>
               {type === 'checkin' ? 'Check In' : 'Check Out'} with {biometricType}
             </Text>
-            <Text className="text-gray-400 text-center text-sm mb-6">
+            <Text style={{ color: colors.textSecondary, textAlign: 'center', marginBottom: 24, fontSize: 14 }}>
               Use your {biometricType.toLowerCase()} to authenticate
             </Text>
 
             {/* Location Display */}
-            <View className="bg-black bg-opacity-50 rounded-full p-3 mb-6 w-full">
-              <Text className="text-white text-sm text-center">
+            <View style={{ backgroundColor: colors.background, borderRadius: 12, padding: 12, marginBottom: 24, width: '100%' }}>
+              <Text style={{ color: colors.text, fontSize: 12, textAlign: 'center' }}>
                 {location ? (
                   location.address ? 
                     `📍 ${formatAddressForDisplay(location.address, 40)}` : 
@@ -405,15 +379,21 @@ export default function CameraScreen({ navigation, route }) {
             </View>
 
             {/* Verification Status */}
-            {faceVerificationStatus && (
-              <View className={`bg-black bg-opacity-50 rounded-full p-4 mb-6 w-full ${
-                faceVerificationStatus === 'success' ? 'bg-green-500 bg-opacity-50' :
-                faceVerificationStatus === 'failed' ? 'bg-red-500 bg-opacity-50' :
-                'bg-yellow-500 bg-opacity-50'
-              }`}>
-                <Text className="text-white text-sm text-center">
-                  {faceVerificationStatus === 'success' ? `✅ ${biometricType} verified!` :
-                   faceVerificationStatus === 'failed' ? '❌ Authentication failed' :
+            {authStatus && (
+              <View style={{ 
+                backgroundColor: authStatus === 'success' ? colors.successLight : 
+                                authStatus === 'failed' ? colors.errorLight : 
+                                colors.warningLight,
+                borderRadius: 12,
+                padding: 12,
+                marginBottom: 24,
+                width: '100%'
+              }}>
+                <Text style={{ color: authStatus === 'success' ? colors.success : 
+                                         authStatus === 'failed' ? colors.error : 
+                                         colors.warning, fontSize: 14, textAlign: 'center', fontWeight: '500' }}>
+                  {authStatus === 'success' ? `✅ ${biometricType} verified!` :
+                   authStatus === 'failed' ? '❌ Authentication failed' :
                    '⚠️ Verification error'}
                 </Text>
               </View>
@@ -421,9 +401,13 @@ export default function CameraScreen({ navigation, route }) {
 
             {/* Authenticate Button */}
             <TouchableOpacity
-              className={`w-full rounded-xl p-4 items-center ${
-                isLoading ? 'bg-gray-600' : 'bg-primary-500'
-              }`}
+              style={{
+                width: '100%',
+                borderRadius: 12,
+                padding: 16,
+                alignItems: 'center',
+                backgroundColor: isLoading ? colors.border : colors.primary,
+              }}
               onPress={authenticateWithBiometricMethod}
               disabled={isLoading}
             >
@@ -432,14 +416,14 @@ export default function CameraScreen({ navigation, route }) {
               ) : (
                 <>
                   <Ionicons name="finger-print" size={32} color="white" />
-                  <Text className="text-white font-semibold mt-2">
+                  <Text style={{ color: 'white', fontWeight: '600', marginTop: 8, fontSize: 16 }}>
                     Authenticate with {biometricType}
                   </Text>
                 </>
               )}
             </TouchableOpacity>
 
-            <Text className="text-gray-400 text-center text-xs mt-4">
+            <Text style={{ color: colors.textTertiary, textAlign: 'center', fontSize: 12, marginTop: 16 }}>
               User: {user.username}
             </Text>
           </View>
@@ -448,70 +432,33 @@ export default function CameraScreen({ navigation, route }) {
     );
   }
 
-  // Face recognition view (original camera view)
-  if (!permission.granted) {
-    return (
-      <View className="flex-1 justify-center items-center bg-gray-900 p-6">
-        <Ionicons name="camera-off" size={64} color="#ef4444" />
-        <Text className="text-white text-xl font-semibold mt-4 text-center">
-          Camera access denied
-        </Text>
-        <Text className="text-gray-400 text-center mt-2">
-          Please enable camera permission to take attendance photos
-        </Text>
-        <TouchableOpacity
-          className="bg-primary-500 rounded-xl px-6 py-3 mt-6"
-          onPress={() => navigation.goBack()}
-        >
-          <Text className="text-white font-semibold">Go Back</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
+  // Face ID authentication view
   return (
-    <View className="flex-1 bg-gray-900">
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Header */}
-      <View className="bg-gray-800 px-6 py-4 flex-row items-center justify-between">
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          className="p-2"
-        >
-          <Ionicons name="arrow-back" size={24} color="white" />
-        </TouchableOpacity>
-        <Text className="text-white text-lg font-semibold">
+      <View style={{ backgroundColor: colors.surface, paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Text style={{ color: colors.text, fontSize: 18, fontWeight: '600' }}>
           {type === 'checkin' ? 'Check In' : 'Check Out'}
         </Text>
-        <View className="w-8" />
       </View>
 
-      {/* Camera View */}
-      <View className="flex-1">
-        <CameraView
-          style={{ flex: 1 }}
-          facing="front"
-          ref={(ref) => setCameraRef(ref)}
-        />
-        
-        {/* Overlay with absolute positioning */}
-        <View className="absolute inset-0 flex-1 justify-between p-6">
-          {/* Top overlay */}
-          <View className="bg-black bg-opacity-50 rounded-xl p-4">
-            <Text className="text-white text-center font-semibold">
-              {type === 'checkin' ? 'Check In' : 'Check Out'} - Photo Required
-            </Text>
-            <Text className="text-gray-300 text-center text-sm mt-1">
-              Take a selfie for attendance verification
-            </Text>
-            <Text className="text-gray-400 text-center text-xs mt-1">
-              User: {user.username}
-            </Text>
+      {/* Face ID Authentication View */}
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+        <View style={{ backgroundColor: colors.surface, borderRadius: 24, padding: 32, alignItems: 'center', maxWidth: 400, width: '100%', shadowColor: colors.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 }}>
+          <View style={{ width: 96, height: 96, backgroundColor: colors.primaryLight, borderRadius: 48, alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
+            <Ionicons name="face-recognition" size={48} color={colors.primary} />
           </View>
 
-          {/* Bottom controls */}
-          <View className="items-center">
-            <View className="bg-black bg-opacity-50 rounded-full p-4 mb-4">
-              <Text className="text-white text-sm text-center">
+          <Text style={{ color: colors.text, fontSize: 24, fontWeight: '600', marginBottom: 8, textAlign: 'center' }}>
+            {type === 'checkin' ? 'Check In' : 'Check Out'} with Face ID
+          </Text>
+          <Text style={{ color: colors.textSecondary, textAlign: 'center', marginBottom: 24, fontSize: 14 }}>
+            Use your device's Face ID to authenticate
+          </Text>
+
+          {/* Location Display */}
+          <View style={{ backgroundColor: colors.background, borderRadius: 12, padding: 12, marginBottom: 24, width: '100%' }}>
+            <Text style={{ color: colors.text, fontSize: 12, textAlign: 'center' }}>
                 {location ? (
                   location.address ? 
                     `📍 ${formatAddressForDisplay(location.address, 40)}` : 
@@ -520,43 +467,54 @@ export default function CameraScreen({ navigation, route }) {
               </Text>
             </View>
 
-            {/* Face Verification Status */}
-            {faceVerificationStatus && (
-              <View className={`bg-black bg-opacity-50 rounded-full p-4 mb-4 ${
-                faceVerificationStatus === 'success' ? 'bg-green-500 bg-opacity-50' :
-                faceVerificationStatus === 'failed' ? 'bg-red-500 bg-opacity-50' :
-                faceVerificationStatus === 'skipped' ? 'bg-blue-500 bg-opacity-50' :
-                'bg-yellow-500 bg-opacity-50'
-              }`}>
-                <Text className="text-white text-sm text-center">
-                  {faceVerificationStatus === 'success' ? '✅ Face verified!' :
-                   faceVerificationStatus === 'failed' ? '❌ Face verification failed' :
-                   faceVerificationStatus === 'skipped' ? '📸 Photo captured' :
+          {/* Verification Status */}
+          {authStatus && (
+            <View style={{ 
+              backgroundColor: authStatus === 'success' ? colors.successLight : 
+                              authStatus === 'failed' ? colors.errorLight : 
+                              colors.warningLight,
+              borderRadius: 12,
+              padding: 12,
+              marginBottom: 24,
+              width: '100%'
+            }}>
+              <Text style={{ color: authStatus === 'success' ? colors.success : 
+                                       authStatus === 'failed' ? colors.error : 
+                                       colors.warning, fontSize: 14, textAlign: 'center', fontWeight: '500' }}>
+                {authStatus === 'success' ? '✅ Face ID verified!' :
+                 authStatus === 'failed' ? '❌ Face ID authentication failed' :
                    '⚠️ Verification error'}
                 </Text>
               </View>
             )}
             
+          {/* Authenticate Button */}
             <TouchableOpacity
-              className={`w-20 h-20 rounded-full items-center justify-center ${
-                isLoading ? 'bg-gray-600' : 'bg-white'
-              }`}
-              onPress={takePicture}
+            style={{
+              width: '100%',
+              borderRadius: 12,
+              padding: 16,
+              alignItems: 'center',
+              backgroundColor: isLoading ? colors.border : colors.primary,
+            }}
+            onPress={authenticateWithFaceID}
               disabled={isLoading}
             >
               {isLoading ? (
-                <ActivityIndicator size="large" color="#3b82f6" />
+              <ActivityIndicator size="large" color="white" />
               ) : (
-                <View className="w-16 h-16 bg-primary-500 rounded-full items-center justify-center">
-                  <Ionicons name="camera" size={32} color="white" />
-                </View>
+              <>
+                <Ionicons name="face-recognition" size={32} color="white" />
+                <Text style={{ color: 'white', fontWeight: '600', marginTop: 8, fontSize: 16 }}>
+                  Authenticate with Face ID
+                </Text>
+              </>
               )}
             </TouchableOpacity>
             
-            <Text className="text-white text-center mt-4">
-              {isLoading ? (isVerifying ? 'Processing...' : 'Processing...') : 'Tap to capture photo'}
+          <Text style={{ color: colors.textTertiary, textAlign: 'center', fontSize: 12, marginTop: 16 }}>
+            User: {user.username}
             </Text>
-          </View>
         </View>
       </View>
     </View>

@@ -11,9 +11,18 @@ import AdminDashboard from './screens/AdminDashboard';
 import AttendanceHistory from './screens/AttendanceHistory';
 import CameraScreen from './screens/CameraScreen';
 import AuthMethodSelection from './screens/AuthMethodSelection';
+import LeaveRequestScreen from './screens/LeaveRequestScreen';
+import CalendarScreen from './screens/CalendarScreen';
+import ThemeSettingsScreen from './screens/ThemeSettingsScreen';
+import NotificationsScreen from './screens/NotificationsScreen';
+import TicketScreen from './screens/TicketScreen';
+import HRDashboard from './screens/HRDashboard';
+import TicketManagementScreen from './screens/TicketManagementScreen';
 
 // Import auth context
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+// Import theme context
+import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 
 // Import employee initialization
 import { initializeDefaultEmployees } from './utils/employees';
@@ -28,30 +37,33 @@ export default function App() {
   }, []);
 
   return (
-    <AuthProvider>
-      <AppNavigator />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <AppNavigator />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 
 function AppNavigator() {
   const { user, isLoading, handleLogin, handleLogout } = useAuth();
+  const { colors, theme } = useTheme();
 
   if (isLoading) {
     return (
-      <View className="flex-1 justify-center items-center bg-gray-50">
-        <ActivityIndicator size="large" color="#3b82f6" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   return (
     <NavigationContainer>
-      <StatusBar style="auto" />
+      <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
       <Stack.Navigator
         screenOptions={{
           headerStyle: {
-            backgroundColor: '#3b82f6',
+            backgroundColor: colors.primary,
           },
           headerTintColor: '#fff',
           headerTitleStyle: {
@@ -110,6 +122,36 @@ function AppNavigator() {
                   options={{ title: 'Authentication Settings' }}
                   initialParams={{ user }}
                 />
+                <Stack.Screen 
+                  name="LeaveRequestScreen" 
+                  component={LeaveRequestScreen}
+                  options={{ title: 'Leave Requests' }}
+                  initialParams={{ user }}
+                />
+                <Stack.Screen 
+                  name="CalendarScreen" 
+                  component={CalendarScreen}
+                  options={{ title: 'Calendar' }}
+                  initialParams={{ user }}
+                />
+                <Stack.Screen 
+                  name="ThemeSettingsScreen" 
+                  component={ThemeSettingsScreen}
+                  options={{ title: 'Theme Settings' }}
+                  initialParams={{ user }}
+                />
+                <Stack.Screen 
+                  name="NotificationsScreen" 
+                  component={NotificationsScreen}
+                  options={{ title: 'Notifications' }}
+                  initialParams={{ user }}
+                />
+                <Stack.Screen 
+                  name="TicketScreen" 
+                  component={TicketScreen}
+                  options={{ title: 'My Tickets' }}
+                  initialParams={{ user }}
+                />
               </>
             ) : (
               <>
@@ -129,6 +171,36 @@ function AppNavigator() {
                       </View>
                     )
                   }}
+                  initialParams={{ user }}
+                />
+                <Stack.Screen 
+                  name="CalendarScreen" 
+                  component={CalendarScreen}
+                  options={{ title: 'Calendar' }}
+                  initialParams={{ user }}
+                />
+                <Stack.Screen 
+                  name="ThemeSettingsScreen" 
+                  component={ThemeSettingsScreen}
+                  options={{ title: 'Theme Settings' }}
+                  initialParams={{ user }}
+                />
+                <Stack.Screen 
+                  name="NotificationsScreen" 
+                  component={NotificationsScreen}
+                  options={{ title: 'Notifications' }}
+                  initialParams={{ user }}
+                />
+                <Stack.Screen 
+                  name="HRDashboard" 
+                  component={HRDashboard}
+                  options={{ title: 'HR Dashboard' }}
+                  initialParams={{ user }}
+                />
+                <Stack.Screen 
+                  name="TicketManagement" 
+                  component={TicketManagementScreen}
+                  options={{ title: 'Ticket Management' }}
                   initialParams={{ user }}
                 />
               </>

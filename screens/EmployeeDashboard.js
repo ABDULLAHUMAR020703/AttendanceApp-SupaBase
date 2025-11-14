@@ -29,10 +29,21 @@ import {
   getBiometricTypeName 
 } from '../utils/biometricAuth';
 import { getPreferredAuthMethod } from '../utils/authPreferences';
+import { useTheme } from '../contexts/ThemeContext';
+import { getUnreadNotificationCount } from '../utils/notifications';
+import { getEmployeeLeaveBalance, calculateRemainingLeaves } from '../utils/leaveManagement';
+import { getUserAnalytics, formatHours, formatPercentage } from '../utils/analytics';
+import { 
+  getHRRoleFromPosition, 
+  getHRRoleColor, 
+  getHRRoleIcon, 
+  getHRRoleLabel 
+} from '../utils/hrRoles';
 
 export default function EmployeeDashboard({ navigation, route }) {
   const { user } = route.params;
   const { handleLogout } = useAuth();
+  const { colors } = useTheme();
   const [lastRecord, setLastRecord] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [employee, setEmployee] = useState(null);
@@ -43,6 +54,12 @@ export default function EmployeeDashboard({ navigation, route }) {
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricType, setBiometricType] = useState('');
   const [hasFingerprint, setHasFingerprint] = useState(false);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const [leaveBalance, setLeaveBalance] = useState(null);
+  const [remainingLeaves, setRemainingLeaves] = useState(null);
+  const [analytics, setAnalytics] = useState(null);
+  const [analyticsPeriod, setAnalyticsPeriod] = useState('monthly');
+  const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -56,7 +73,15 @@ export default function EmployeeDashboard({ navigation, route }) {
       loadData();
     });
 
-    return unsubscribe;
+    // Set up interval to check notifications every 30 seconds
+    const notificationInterval = setInterval(() => {
+      loadNotificationCount();
+    }, 30000);
+
+    return () => {
+      unsubscribe();
+      clearInterval(notificationInterval);
+    };
   }, [navigation]);
 
   const checkBiometricSupport = async () => {
@@ -81,8 +106,45 @@ export default function EmployeeDashboard({ navigation, route }) {
     await Promise.all([
       loadLastRecord(),
       loadEmployeeData(),
-      loadMyRequests()
+      loadMyRequests(),
+      loadNotificationCount(),
+      loadLeaveBalance(),
+      loadAnalytics()
     ]);
+  };
+
+  const loadLeaveBalance = async () => {
+    try {
+      if (employee) {
+        const balance = await getEmployeeLeaveBalance(employee.id);
+        const remaining = calculateRemainingLeaves(balance);
+        setLeaveBalance(balance);
+        setRemainingLeaves(remaining);
+      }
+    } catch (error) {
+      console.error('Error loading leave balance:', error);
+    }
+  };
+
+  const loadAnalytics = async () => {
+    setIsLoadingAnalytics(true);
+    try {
+      const analyticsData = await getUserAnalytics(user.username, analyticsPeriod);
+      setAnalytics(analyticsData);
+    } catch (error) {
+      console.error('Error loading analytics:', error);
+    } finally {
+      setIsLoadingAnalytics(false);
+    }
+  };
+
+  const loadNotificationCount = async () => {
+    try {
+      const count = await getUnreadNotificationCount(user.username);
+      setUnreadNotificationCount(count);
+    } catch (error) {
+      console.error('Error loading notification count:', error);
+    }
   };
 
   const loadLastRecord = async () => {
@@ -191,51 +253,356 @@ export default function EmployeeDashboard({ navigation, route }) {
   const canCheckOut = lastRecord && lastRecord.type === 'checkin';
 
   return (
-    <ScrollView 
-      className="flex-1 bg-gray-50"
-      refreshControl={
-        <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
-      }
-    >
-      <View className="p-6">
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      {/* Header with Back Button */}
+      <View style={{ backgroundColor: colors.surface, paddingHorizontal: 16, paddingVertical: 12, shadowColor: colors.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text }}>
+            Employee Dashboard
+          </Text>
+        </View>
+      </View>
+      <ScrollView 
+        style={{ flex: 1 }}
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
+        }
+      >
+        <View className="p-6">
         {/* Welcome Header */}
-        <View className="bg-white rounded-2xl p-6 mb-6 shadow-sm">
+        <View 
+          className="rounded-2xl p-6 mb-6 shadow-sm"
+          style={{ backgroundColor: colors.surface }}
+        >
           <View className="flex-row items-center">
-            <View className="w-12 h-12 bg-primary-100 rounded-full items-center justify-center mr-4">
-              <Ionicons name="person" size={24} color="#3b82f6" />
+            <View 
+              className="w-12 h-12 rounded-full items-center justify-center mr-4"
+              style={{ backgroundColor: colors.primaryLight }}
+            >
+              <Ionicons name="person" size={24} color={colors.primary} />
             </View>
             <View className="flex-1">
-              <Text className="text-xl font-bold text-gray-800">
+              <Text 
+                className="text-xl font-bold"
+                style={{ color: colors.text }}
+              >
                 Welcome, {user.username}!
               </Text>
-              <Text className="text-gray-600">Employee Dashboard</Text>
+              <View className="flex-row items-center">
+                <Text style={{ color: colors.textSecondary }}>Employee Dashboard</Text>
+                {employee && employee.position && (
+                  <>
+                    <Text style={{ color: colors.textTertiary, marginHorizontal: 8 }}>•</Text>
+                    <View className="flex-row items-center">
+                      <Ionicons 
+                        name={getHRRoleIcon(getHRRoleFromPosition(employee.position))} 
+                        size={14} 
+                        color={getHRRoleColor(getHRRoleFromPosition(employee.position))} 
+                      />
+                      <Text 
+                        className="text-xs font-medium ml-1"
+                        style={{ color: getHRRoleColor(getHRRoleFromPosition(employee.position)) }}
+                      >
+                        {getHRRoleLabel(getHRRoleFromPosition(employee.position))}
+                      </Text>
+                    </View>
+                  </>
+                )}
+              </View>
             </View>
           </View>
         </View>
 
         {/* Current Status */}
-        <View className="bg-white rounded-2xl p-6 mb-6 shadow-sm">
-          <Text className="text-lg font-semibold text-gray-800 mb-4">
+        <View 
+          className="rounded-2xl p-6 mb-6 shadow-sm"
+          style={{ backgroundColor: colors.surface }}
+        >
+          <Text 
+            className="text-lg font-semibold mb-4"
+            style={{ color: colors.text }}
+          >
             Current Status
           </Text>
           {lastRecord ? (
             <View className="flex-row items-center">
-              <View className={`w-4 h-4 rounded-full mr-3 ${
-                lastRecord.type === 'checkin' ? 'bg-green-500' : 'bg-red-500'
-              }`} />
+              <View 
+                className="w-4 h-4 rounded-full mr-3"
+                style={{ backgroundColor: lastRecord.type === 'checkin' ? colors.success : colors.error }}
+              />
               <View className="flex-1">
-                <Text className="text-gray-800 font-medium">
+                <Text 
+                  className="font-medium"
+                  style={{ color: colors.text }}
+                >
                   {lastRecord.type === 'checkin' ? 'Checked In' : 'Checked Out'}
                 </Text>
-                <Text className="text-gray-600 text-sm">
+                <Text 
+                  className="text-sm"
+                  style={{ color: colors.textSecondary }}
+                >
                   {new Date(lastRecord.timestamp).toLocaleString()}
                 </Text>
               </View>
             </View>
           ) : (
             <View className="flex-row items-center">
-              <View className="w-4 h-4 rounded-full mr-3 bg-gray-400" />
-              <Text className="text-gray-600">No attendance records yet</Text>
+              <View 
+                className="w-4 h-4 rounded-full mr-3"
+                style={{ backgroundColor: colors.textTertiary }}
+              />
+              <Text style={{ color: colors.textSecondary }}>No attendance records yet</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Leave Balance Card */}
+        {leaveBalance && remainingLeaves && (
+          <View 
+            className="rounded-2xl p-6 mb-6 shadow-sm"
+            style={{ backgroundColor: colors.surface }}
+          >
+            <View className="flex-row items-center justify-between mb-4">
+              <Text 
+                className="text-lg font-semibold"
+                style={{ color: colors.text }}
+              >
+                Leave Balance
+              </Text>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('LeaveRequestScreen', { user: user })}
+              >
+                <Text 
+                  className="text-sm font-medium"
+                  style={{ color: colors.primary }}
+                >
+                  View Details →
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <View className="space-y-3">
+              <View className="flex-row justify-between items-center">
+                <View className="flex-row items-center">
+                  <View 
+                    className="w-3 h-3 rounded-full mr-2"
+                    style={{ backgroundColor: colors.primary }}
+                  />
+                  <Text style={{ color: colors.textSecondary }}>Annual Leaves</Text>
+                </View>
+                <Text 
+                  className="font-semibold"
+                  style={{ color: colors.text }}
+                >
+                  {remainingLeaves.annual} / {leaveBalance.annualLeaves}
+                </Text>
+              </View>
+              <View className="flex-row justify-between items-center">
+                <View className="flex-row items-center">
+                  <View 
+                    className="w-3 h-3 rounded-full mr-2"
+                    style={{ backgroundColor: colors.success }}
+                  />
+                  <Text style={{ color: colors.textSecondary }}>Sick Leaves</Text>
+                </View>
+                <Text 
+                  className="font-semibold"
+                  style={{ color: colors.text }}
+                >
+                  {remainingLeaves.sick} / {leaveBalance.sickLeaves}
+                </Text>
+              </View>
+              <View className="flex-row justify-between items-center">
+                <View className="flex-row items-center">
+                  <View 
+                    className="w-3 h-3 rounded-full mr-2"
+                    style={{ backgroundColor: colors.warning }}
+                  />
+                  <Text style={{ color: colors.textSecondary }}>Casual Leaves</Text>
+                </View>
+                <Text 
+                  className="font-semibold"
+                  style={{ color: colors.text }}
+                >
+                  {remainingLeaves.casual} / {leaveBalance.casualLeaves}
+                </Text>
+              </View>
+              <View 
+                className="border-t pt-3 mt-2"
+                style={{ borderColor: colors.border }}
+              >
+                <View className="flex-row justify-between items-center">
+                  <Text 
+                    className="font-semibold"
+                    style={{ color: colors.text }}
+                  >
+                    Total Remaining
+                  </Text>
+                  <Text 
+                    className="font-bold text-lg"
+                    style={{ color: colors.primary }}
+                  >
+                    {remainingLeaves.total} days
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Analytics Card */}
+        <View 
+          className="rounded-2xl p-6 mb-6 shadow-sm"
+          style={{ backgroundColor: colors.surface }}
+        >
+          <View className="flex-row items-center justify-between mb-4">
+            <Text 
+              className="text-lg font-semibold"
+              style={{ color: colors.text }}
+            >
+              My Analytics
+            </Text>
+            {/* Period Filter */}
+            <View className="flex-row gap-2">
+              {['weekly', 'monthly', 'yearly'].map((period) => (
+                <TouchableOpacity
+                  key={period}
+                  onPress={() => setAnalyticsPeriod(period)}
+                  style={{
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    borderRadius: 12,
+                    backgroundColor: analyticsPeriod === period ? colors.primary : colors.background,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: analyticsPeriod === period ? 'white' : colors.textSecondary,
+                      fontWeight: analyticsPeriod === period ? '600' : '400',
+                      fontSize: 10,
+                      textTransform: 'capitalize',
+                    }}
+                  >
+                    {period}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {isLoadingAnalytics ? (
+            <View style={{ padding: 20, alignItems: 'center' }}>
+              <Text style={{ color: colors.textSecondary }}>Loading analytics...</Text>
+            </View>
+          ) : analytics ? (
+            <View>
+              <View className="flex-row gap-4 mb-4">
+                {/* Attendance Rate */}
+                <View 
+                  className="flex-1 rounded-xl p-4"
+                  style={{ backgroundColor: colors.background }}
+                >
+                  <View className="flex-row items-center mb-2">
+                    <Ionicons name="calendar" size={16} color={colors.primary} />
+                    <Text 
+                      className="text-xs ml-2"
+                      style={{ color: colors.textSecondary }}
+                    >
+                      Attendance Rate
+                    </Text>
+                  </View>
+                  <Text 
+                    className="text-2xl font-bold"
+                    style={{ color: colors.text }}
+                  >
+                    {formatPercentage(analytics.attendanceRate.rate)}
+                  </Text>
+                  <Text 
+                    className="text-xs mt-1"
+                    style={{ color: colors.textTertiary }}
+                  >
+                    {analytics.attendanceRate.presentDays} / {analytics.attendanceRate.totalDays} days
+                  </Text>
+                </View>
+
+                {/* Average Hours */}
+                <View 
+                  className="flex-1 rounded-xl p-4"
+                  style={{ backgroundColor: colors.background }}
+                >
+                  <View className="flex-row items-center mb-2">
+                    <Ionicons name="time" size={16} color="#10b981" />
+                    <Text 
+                      className="text-xs ml-2"
+                      style={{ color: colors.textSecondary }}
+                    >
+                      Avg Hours/Day
+                    </Text>
+                  </View>
+                  <Text 
+                    className="text-2xl font-bold"
+                    style={{ color: colors.text }}
+                  >
+                    {formatHours(analytics.averageHours.averageHours)}
+                  </Text>
+                  <Text 
+                    className="text-xs mt-1"
+                    style={{ color: colors.textTertiary }}
+                  >
+                    {analytics.averageHours.daysWorked} days worked
+                  </Text>
+                </View>
+              </View>
+
+              {/* Additional Stats */}
+              <View 
+                className="rounded-xl p-4"
+                style={{ backgroundColor: colors.background }}
+              >
+                <View className="flex-row justify-between items-center mb-2">
+                  <View className="flex-row items-center">
+                    <Ionicons name="time-outline" size={14} color={colors.textSecondary} />
+                    <Text 
+                      className="text-sm ml-2"
+                      style={{ color: colors.textSecondary }}
+                    >
+                      Total Hours
+                    </Text>
+                  </View>
+                  <Text 
+                    className="font-semibold"
+                    style={{ color: colors.text }}
+                  >
+                    {formatHours(analytics.averageHours.totalHours)}
+                  </Text>
+                </View>
+                <View className="flex-row justify-between items-center">
+                  <View className="flex-row items-center">
+                    <Ionicons name="checkmark-circle-outline" size={14} color={colors.textSecondary} />
+                    <Text 
+                      className="text-sm ml-2"
+                      style={{ color: colors.textSecondary }}
+                    >
+                      Present Days
+                    </Text>
+                  </View>
+                  <Text 
+                    className="font-semibold"
+                    style={{ color: colors.text }}
+                  >
+                    {analytics.attendanceRate.presentDays} days
+                  </Text>
+                </View>
+              </View>
+            </View>
+          ) : (
+            <View style={{ padding: 20, alignItems: 'center' }}>
+              <Ionicons name="analytics-outline" size={32} color={colors.textTertiary} />
+              <Text 
+                className="text-sm mt-2 text-center"
+                style={{ color: colors.textSecondary }}
+              >
+                No analytics data available yet
+              </Text>
             </View>
           )}
         </View>
@@ -272,7 +639,7 @@ export default function EmployeeDashboard({ navigation, route }) {
                   {canCheckIn 
                     ? (biometricAvailable 
                         ? `Use ${biometricType.toLowerCase()}` 
-                        : 'Take a selfie for verification')
+                        : 'Use Face ID or fingerprint')
                     : 'Already checked in'}
                 </Text>
               </View>
@@ -314,7 +681,7 @@ export default function EmployeeDashboard({ navigation, route }) {
                   {canCheckOut 
                     ? (biometricAvailable 
                         ? `Use ${biometricType.toLowerCase()}` 
-                        : 'Take a selfie for verification')
+                        : 'Use Face ID or fingerprint')
                     : 'Must check in first'}
                 </Text>
               </View>
@@ -328,22 +695,178 @@ export default function EmployeeDashboard({ navigation, route }) {
 
           {/* View History Button */}
           <TouchableOpacity
-            className="bg-white rounded-2xl p-6 shadow-sm"
+            className="rounded-2xl p-6 shadow-sm"
+            style={{ backgroundColor: colors.surface }}
             onPress={handleViewHistory}
           >
             <View className="flex-row items-center">
-              <View className="w-12 h-12 bg-primary-100 rounded-full items-center justify-center mr-4">
-                <Ionicons name="time-outline" size={24} color="#3b82f6" />
+              <View 
+                className="w-12 h-12 rounded-full items-center justify-center mr-4"
+                style={{ backgroundColor: colors.primaryLight }}
+              >
+                <Ionicons name="time-outline" size={24} color={colors.primary} />
               </View>
               <View className="flex-1">
-                <Text className="text-lg font-semibold text-gray-800">
+                <Text 
+                  className="text-lg font-semibold"
+                  style={{ color: colors.text }}
+                >
                   View History
                 </Text>
-                <Text className="text-gray-600 text-sm">
+                <Text 
+                  className="text-sm"
+                  style={{ color: colors.textSecondary }}
+                >
                   Check your attendance records
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color="#6b7280" />
+              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+            </View>
+          </TouchableOpacity>
+
+          {/* Leave Requests Button */}
+          <TouchableOpacity
+            className="rounded-2xl p-6 shadow-sm mt-4"
+            style={{ backgroundColor: colors.surface }}
+            onPress={() => navigation.navigate('LeaveRequestScreen', { user: user })}
+          >
+            <View className="flex-row items-center">
+              <View 
+                className="w-12 h-12 rounded-full items-center justify-center mr-4"
+                style={{ backgroundColor: colors.warningLight }}
+              >
+                <Ionicons name="calendar-outline" size={24} color={colors.warning} />
+              </View>
+              <View className="flex-1">
+                <Text 
+                  className="text-lg font-semibold"
+                  style={{ color: colors.text }}
+                >
+                  Leave Requests
+                </Text>
+                <Text 
+                  className="text-sm"
+                  style={{ color: colors.textSecondary }}
+                >
+                  Request and manage your leaves
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+            </View>
+          </TouchableOpacity>
+
+          {/* Calendar Button */}
+          <TouchableOpacity
+            className="rounded-2xl p-6 shadow-sm mt-4"
+            style={{ backgroundColor: colors.surface }}
+            onPress={() => navigation.navigate('CalendarScreen', { user: user })}
+          >
+            <View className="flex-row items-center">
+              <View 
+                className="w-12 h-12 rounded-full items-center justify-center mr-4"
+                style={{ backgroundColor: colors.primaryLight }}
+              >
+                <Ionicons name="calendar" size={24} color={colors.primary} />
+              </View>
+              <View className="flex-1">
+                <Text 
+                  className="text-lg font-semibold"
+                  style={{ color: colors.text }}
+                >
+                  Calendar
+                </Text>
+                <Text 
+                  className="text-sm"
+                  style={{ color: colors.textSecondary }}
+                >
+                  View meetings, reminders, and events
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+            </View>
+          </TouchableOpacity>
+
+          {/* Notifications Button */}
+          <TouchableOpacity
+            className="rounded-2xl p-6 shadow-sm mt-4"
+            style={{ backgroundColor: colors.surface }}
+            onPress={() => navigation.navigate('NotificationsScreen', { user: user })}
+          >
+            <View className="flex-row items-center">
+              <View 
+                className="w-12 h-12 rounded-full items-center justify-center mr-4"
+                style={{ backgroundColor: colors.primaryLight }}
+              >
+                <Ionicons name="notifications" size={24} color={colors.primary} />
+                {unreadNotificationCount > 0 && (
+                  <View
+                    style={{
+                      position: 'absolute',
+                      top: -2,
+                      right: -2,
+                      backgroundColor: colors.error,
+                      borderRadius: 10,
+                      minWidth: 20,
+                      height: 20,
+                      paddingHorizontal: 6,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Text style={{ color: 'white', fontSize: 12, fontWeight: '600' }}>
+                      {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <View className="flex-1">
+                <Text 
+                  className="text-lg font-semibold"
+                  style={{ color: colors.text }}
+                >
+                  Notifications
+                </Text>
+                <Text 
+                  className="text-sm"
+                  style={{ color: colors.textSecondary }}
+                >
+                  {unreadNotificationCount > 0 
+                    ? `${unreadNotificationCount} unread notification${unreadNotificationCount !== 1 ? 's' : ''}`
+                    : 'View your notifications'}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+            </View>
+          </TouchableOpacity>
+
+          {/* Tickets Button */}
+          <TouchableOpacity
+            className="rounded-2xl p-6 shadow-sm mt-4"
+            style={{ backgroundColor: colors.surface }}
+            onPress={() => navigation.navigate('TicketScreen', { user: user })}
+          >
+            <View className="flex-row items-center">
+              <View 
+                className="w-12 h-12 rounded-full items-center justify-center mr-4"
+                style={{ backgroundColor: '#ef444420' }}
+              >
+                <Ionicons name="ticket-outline" size={24} color="#ef4444" />
+              </View>
+              <View className="flex-1">
+                <Text 
+                  className="text-lg font-semibold"
+                  style={{ color: colors.text }}
+                >
+                  Tickets
+                </Text>
+                <Text 
+                  className="text-sm"
+                  style={{ color: colors.textSecondary }}
+                >
+                  Raise and track support tickets
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
             </View>
           </TouchableOpacity>
 
@@ -485,7 +1008,8 @@ export default function EmployeeDashboard({ navigation, route }) {
             </View>
           </View>
         </View>
-      </View>
+        </View>
+      </ScrollView>
 
       {/* Work Mode Request Modal */}
       <Modal
@@ -546,6 +1070,6 @@ export default function EmployeeDashboard({ navigation, route }) {
           </View>
         </View>
       </Modal>
-    </ScrollView>
+    </View>
   );
 }
