@@ -18,11 +18,9 @@ import {
   getEmployeeLeaveRequests
 } from '../utils/leaveManagement';
 import { getEmployeeByUsername } from '../utils/employees';
-import { useTheme } from '../contexts/ThemeContext';
 
 export default function LeaveRequestScreen({ navigation, route }) {
   const { user } = route.params;
-  const { colors } = useTheme();
   const [leaveBalance, setLeaveBalance] = useState(null);
   const [myRequests, setMyRequests] = useState([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -33,6 +31,8 @@ export default function LeaveRequestScreen({ navigation, route }) {
   const [reason, setReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [employee, setEmployee] = useState(null);
+  const [isHalfDay, setIsHalfDay] = useState(false);
+  const [halfDayPeriod, setHalfDayPeriod] = useState('morning');
 
   useEffect(() => {
     loadData();
@@ -95,7 +95,12 @@ export default function LeaveRequestScreen({ navigation, route }) {
   };
 
   const handleSubmitRequest = async () => {
-    if (!startDate || !endDate) {
+    if (!startDate) {
+      Alert.alert('Error', 'Please select a date');
+      return;
+    }
+
+    if (!isHalfDay && !endDate) {
       Alert.alert('Error', 'Please select both start and end dates');
       return;
     }
@@ -111,8 +116,10 @@ export default function LeaveRequestScreen({ navigation, route }) {
         employee.id,
         leaveType,
         startDate,
-        endDate,
-        reason
+        isHalfDay ? startDate : endDate, // For half-day, end date = start date
+        reason,
+        isHalfDay,
+        isHalfDay ? halfDayPeriod : null
       );
 
       if (result.success) {
@@ -122,6 +129,8 @@ export default function LeaveRequestScreen({ navigation, route }) {
         setEndDate('');
         setReason('');
         setLeaveType('annual');
+        setIsHalfDay(false);
+        setHalfDayPeriod('morning');
         await loadData();
       } else {
         Alert.alert('Error', result.error || 'Failed to submit leave request');
@@ -181,10 +190,11 @@ export default function LeaveRequestScreen({ navigation, route }) {
             {getLeaveTypeLabel(item.leaveType)}
           </Text>
           <Text className="text-gray-600 text-sm">
-            {new Date(item.startDate).toLocaleDateString()} - {new Date(item.endDate).toLocaleDateString()}
+            {new Date(item.startDate).toLocaleDateString()}{item.startDate !== item.endDate ? ` - ${new Date(item.endDate).toLocaleDateString()}` : ''}
+            {item.isHalfDay && ` (${item.halfDayPeriod === 'morning' ? 'Morning' : 'Afternoon'})`}
           </Text>
           <Text className="text-gray-500 text-xs mt-1">
-            {item.days} day{item.days !== 1 ? 's' : ''} • Requested {new Date(item.requestedAt).toLocaleDateString()}
+            {item.isHalfDay ? 'Half day' : `${item.days} day${item.days !== 1 ? 's' : ''}`} • Requested {new Date(item.requestedAt).toLocaleDateString()}
           </Text>
         </View>
         <View className="items-end">
@@ -224,21 +234,21 @@ export default function LeaveRequestScreen({ navigation, route }) {
   const remaining = leaveBalance ? calculateRemainingLeaves(leaveBalance) : null;
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View className="flex-1 bg-gray-50">
       {/* Header */}
-      <View style={{ backgroundColor: colors.surface, paddingHorizontal: 16, paddingVertical: 12, shadowColor: colors.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-            <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text }}>
-              Leave Requests
-            </Text>
-          </View>
+      <View className="bg-white px-6 py-4 shadow-sm">
+        <View className="flex-row items-center justify-between">
+          <Text className="text-xl font-bold text-gray-800">
+            Leave Requests
+          </Text>
           <TouchableOpacity
-            style={{ backgroundColor: colors.primary, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', alignItems: 'center' }}
+            className="bg-primary-500 rounded-xl px-4 py-2"
             onPress={() => setShowRequestModal(true)}
           >
-            <Ionicons name="add" size={18} color="white" />
-            <Text style={{ color: 'white', fontWeight: '600', marginLeft: 6 }}>New Request</Text>
+            <View className="flex-row items-center">
+              <Ionicons name="add" size={18} color="white" />
+              <Text className="text-white font-semibold ml-1">New Request</Text>
+            </View>
           </TouchableOpacity>
         </View>
       </View>
@@ -319,41 +329,36 @@ export default function LeaveRequestScreen({ navigation, route }) {
         animationType="slide"
         onRequestClose={() => setShowRequestModal(false)}
       >
-        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
-          <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '80%', marginTop: 100 }}>
+        <View className="flex-1 justify-end bg-black bg-opacity-50">
+          <View className="bg-white rounded-t-3xl p-6 max-h-96">
             <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text }}>
+              <View className="flex-row items-center justify-between mb-4">
+                <Text className="text-xl font-bold text-gray-800">
                   New Leave Request
                 </Text>
                 <TouchableOpacity onPress={() => setShowRequestModal(false)}>
-                  <Ionicons name="close" size={24} color={colors.textSecondary} />
+                  <Ionicons name="close" size={24} color="#6b7280" />
                 </TouchableOpacity>
               </View>
 
               {/* Leave Type Selection */}
-              <View style={{ marginBottom: 16 }}>
-                <Text style={{ color: colors.text, marginBottom: 8, fontWeight: '500' }}>Leave Type</Text>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
+              <View className="mb-4">
+                <Text className="text-gray-700 mb-2 font-medium">Leave Type</Text>
+                <View className="flex-row space-x-2">
                   {['annual', 'sick', 'casual'].map((type) => (
                     <TouchableOpacity
                       key={type}
-                      style={{
-                        flex: 1,
-                        borderRadius: 8,
-                        padding: 12,
-                        borderWidth: 2,
-                        borderColor: leaveType === type ? colors.primary : colors.border,
-                        backgroundColor: leaveType === type ? colors.primaryLight : colors.surface,
-                      }}
+                      className={`flex-1 rounded-lg p-3 border-2 ${
+                        leaveType === type
+                          ? 'border-primary-500 bg-primary-50'
+                          : 'border-gray-200 bg-white'
+                      }`}
                       onPress={() => setLeaveType(type)}
                     >
                       <Text
-                        style={{
-                          textAlign: 'center',
-                          fontWeight: '500',
-                          color: leaveType === type ? colors.primary : colors.text
-                        }}
+                        className={`text-center font-medium ${
+                          leaveType === type ? 'text-primary-600' : 'text-gray-600'
+                        }`}
                       >
                         {getLeaveTypeLabel(type)}
                       </Text>
@@ -362,43 +367,140 @@ export default function LeaveRequestScreen({ navigation, route }) {
                 </View>
               </View>
 
-              {/* Start Date */}
-              <View style={{ marginBottom: 16 }}>
-                <Text style={{ color: colors.text, marginBottom: 8, fontWeight: '500' }}>Start Date</Text>
+              {/* Half Day Toggle */}
+              <View className="mb-4">
+                <Text className="text-gray-700 mb-2 font-medium">Leave Duration</Text>
+                <View className="flex-row space-x-2">
+                  <TouchableOpacity
+                    className={`flex-1 rounded-lg p-3 border-2 ${
+                      !isHalfDay
+                        ? 'border-primary-500 bg-primary-50'
+                        : 'border-gray-200 bg-white'
+                    }`}
+                    onPress={() => setIsHalfDay(false)}
+                  >
+                    <Text
+                      className={`text-center font-medium ${
+                        !isHalfDay ? 'text-primary-600' : 'text-gray-600'
+                      }`}
+                    >
+                      Full Day(s)
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    className={`flex-1 rounded-lg p-3 border-2 ${
+                      isHalfDay
+                        ? 'border-primary-500 bg-primary-50'
+                        : 'border-gray-200 bg-white'
+                    }`}
+                    onPress={() => setIsHalfDay(true)}
+                  >
+                    <Text
+                      className={`text-center font-medium ${
+                        isHalfDay ? 'text-primary-600' : 'text-gray-600'
+                      }`}
+                    >
+                      Half Day
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Half Day Period Selection */}
+              {isHalfDay && (
+                <View className="mb-4">
+                  <Text className="text-gray-700 mb-2 font-medium">Half Day Period</Text>
+                  <View className="flex-row space-x-2">
+                    <TouchableOpacity
+                      className={`flex-1 rounded-lg p-3 border-2 ${
+                        halfDayPeriod === 'morning'
+                          ? 'border-amber-500 bg-amber-50'
+                          : 'border-gray-200 bg-white'
+                      }`}
+                      onPress={() => setHalfDayPeriod('morning')}
+                    >
+                      <View className="items-center">
+                        <Ionicons 
+                          name="sunny-outline" 
+                          size={20} 
+                          color={halfDayPeriod === 'morning' ? '#f59e0b' : '#6b7280'} 
+                        />
+                        <Text
+                          className={`text-center font-medium mt-1 ${
+                            halfDayPeriod === 'morning' ? 'text-amber-600' : 'text-gray-600'
+                          }`}
+                        >
+                          Morning
+                        </Text>
+                        <Text className="text-xs text-gray-500">First half</Text>
+                      </View>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      className={`flex-1 rounded-lg p-3 border-2 ${
+                        halfDayPeriod === 'afternoon'
+                          ? 'border-orange-500 bg-orange-50'
+                          : 'border-gray-200 bg-white'
+                      }`}
+                      onPress={() => setHalfDayPeriod('afternoon')}
+                    >
+                      <View className="items-center">
+                        <Ionicons 
+                          name="partly-sunny-outline" 
+                          size={20} 
+                          color={halfDayPeriod === 'afternoon' ? '#ea580c' : '#6b7280'} 
+                        />
+                        <Text
+                          className={`text-center font-medium mt-1 ${
+                            halfDayPeriod === 'afternoon' ? 'text-orange-600' : 'text-gray-600'
+                          }`}
+                        >
+                          Afternoon
+                        </Text>
+                        <Text className="text-xs text-gray-500">Second half</Text>
+                      </View>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              {/* Start Date / Date Selection */}
+              <View className="mb-4">
+                <Text className="text-gray-700 mb-2 font-medium">
+                  {isHalfDay ? 'Date' : 'Start Date'}
+                </Text>
                 <TextInput
-                  style={{ backgroundColor: colors.borderLight, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, color: colors.text }}
+                  className="bg-gray-100 rounded-xl px-4 py-3 text-gray-800"
                   placeholder="YYYY-MM-DD (e.g., 2024-01-15)"
-                  placeholderTextColor={colors.textTertiary}
                   value={startDate}
                   onChangeText={setStartDate}
                 />
-                <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 4 }}>
+                <Text className="text-xs text-gray-500 mt-1">
                   Format: YYYY-MM-DD
                 </Text>
               </View>
 
-              {/* End Date */}
-              <View style={{ marginBottom: 16 }}>
-                <Text style={{ color: colors.text, marginBottom: 8, fontWeight: '500' }}>End Date</Text>
-                <TextInput
-                  style={{ backgroundColor: colors.borderLight, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, color: colors.text }}
-                  placeholder="YYYY-MM-DD (e.g., 2024-01-20)"
-                  placeholderTextColor={colors.textTertiary}
-                  value={endDate}
-                  onChangeText={setEndDate}
-                />
-                <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 4 }}>
-                  Format: YYYY-MM-DD
-                </Text>
-              </View>
+              {/* End Date - Only show for full day leaves */}
+              {!isHalfDay && (
+                <View className="mb-4">
+                  <Text className="text-gray-700 mb-2 font-medium">End Date</Text>
+                  <TextInput
+                    className="bg-gray-100 rounded-xl px-4 py-3 text-gray-800"
+                    placeholder="YYYY-MM-DD (e.g., 2024-01-20)"
+                    value={endDate}
+                    onChangeText={setEndDate}
+                  />
+                  <Text className="text-xs text-gray-500 mt-1">
+                    Format: YYYY-MM-DD
+                  </Text>
+                </View>
+              )}
 
               {/* Reason */}
-              <View style={{ marginBottom: 16 }}>
-                <Text style={{ color: colors.text, marginBottom: 8, fontWeight: '500' }}>Reason (Optional)</Text>
+              <View className="mb-4">
+                <Text className="text-gray-700 mb-2 font-medium">Reason (Optional)</Text>
                 <TextInput
-                  style={{ backgroundColor: colors.borderLight, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, color: colors.text, minHeight: 80 }}
+                  className="bg-gray-100 rounded-xl px-4 py-3 text-gray-800"
                   placeholder="Enter reason for leave..."
-                  placeholderTextColor={colors.textTertiary}
                   value={reason}
                   onChangeText={setReason}
                   multiline
@@ -407,20 +509,20 @@ export default function LeaveRequestScreen({ navigation, route }) {
                 />
               </View>
 
-              <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
+              <View className="flex-row space-x-2 mt-4">
                 <TouchableOpacity
-                  style={{ backgroundColor: colors.borderLight, borderRadius: 8, padding: 12, flex: 1 }}
+                  className="bg-gray-200 rounded-lg p-3 flex-1"
                   onPress={() => setShowRequestModal(false)}
                 >
-                  <Text style={{ textAlign: 'center', fontWeight: '500', color: colors.text }}>Cancel</Text>
+                  <Text className="text-center font-medium text-gray-700">Cancel</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity
-                  style={{ backgroundColor: colors.primary, borderRadius: 8, padding: 12, flex: 1 }}
+                  className="bg-primary-500 rounded-lg p-3 flex-1"
                   onPress={handleSubmitRequest}
                   disabled={isSubmitting}
                 >
-                  <Text style={{ textAlign: 'center', fontWeight: '500', color: 'white' }}>
+                  <Text className="text-center font-medium text-white">
                     {isSubmitting ? 'Submitting...' : 'Submit Request'}
                   </Text>
                 </TouchableOpacity>

@@ -278,17 +278,15 @@ export default function TicketScreen({ navigation, route }) {
         }}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-            <Text
-              style={{
-                fontSize: 20,
-                fontWeight: 'bold',
-                color: colors.text,
-              }}
-            >
-              My Tickets
-            </Text>
-          </View>
+          <Text
+            style={{
+              fontSize: 20,
+              fontWeight: 'bold',
+              color: colors.text,
+            }}
+          >
+            My Tickets
+          </Text>
           <TouchableOpacity
             style={{
               backgroundColor: colors.primary,

@@ -81,36 +81,28 @@ export default function ThemeSettingsScreen({ navigation, route }) {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* Header with Back Button */}
-      <View style={{ backgroundColor: colors.surface, paddingHorizontal: 16, paddingVertical: 12, shadowColor: colors.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text }}>
-            Theme Settings
-          </Text>
-        </View>
-      </View>
-      <ScrollView
-        style={{
-          flex: 1,
-          backgroundColor: colors.background,
-        }}
-      >
-        <View style={{ padding: 16 }}>
-          <View
-            style={{
-              backgroundColor: colors.surface,
-              borderRadius: 16,
-              padding: 20,
-              marginBottom: 16,
-              shadowColor: colors.shadow,
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.1,
-              shadowRadius: 4,
-              elevation: 3,
-            }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+    <ScrollView
+      style={{
+        flex: 1,
+        backgroundColor: colors.background,
+      }}
+    >
+      <View style={{ padding: 16 }}>
+        {/* Header */}
+        <View
+          style={{
+            backgroundColor: colors.surface,
+            borderRadius: 16,
+            padding: 20,
+            marginBottom: 16,
+            shadowColor: colors.shadow,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 4,
+            elevation: 3,
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
             <View
               style={{
                 width: 48,
@@ -357,8 +349,7 @@ export default function ThemeSettingsScreen({ navigation, route }) {
           </View>
         </View>
       </View>
-      </ScrollView>
-    </View>
+    </ScrollView>
   );
 }
 

@@ -43,11 +43,9 @@ import {
   getHRRoleIcon, 
   getHRRoleLabel 
 } from '../utils/hrRoles';
-import { useTheme } from '../contexts/ThemeContext';
 
-export default function EmployeeManagement({ route, navigation }) {
+export default function EmployeeManagement({ route }) {
   const { user } = route.params;
-  const { colors } = useTheme();
   const [employees, setEmployees] = useState([]);
   const [filteredEmployees, setFilteredEmployees] = useState([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -383,49 +381,50 @@ export default function EmployeeManagement({ route, navigation }) {
     const leaveInfo = employeeLeaveBalances[employeeId];
     
     return (
-    <View style={{ backgroundColor: colors.surface, borderRadius: 12, padding: 16, marginBottom: 12, shadowColor: colors.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text }}>
+    <View className="bg-white rounded-xl p-4 mb-3 shadow-sm">
+      <View className="flex-row items-center justify-between">
+        <View className="flex-1">
+          <Text className="text-lg font-semibold text-gray-800">
             {item.name}
           </Text>
-          <Text style={{ color: colors.textSecondary, fontSize: 14 }}>
+          <Text className="text-gray-600 text-sm">
             {item.department} • {item.position}
           </Text>
             {/* HR Role Display */}
             {item.position && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+              <View className="flex-row items-center mt-1">
                 <Ionicons 
                   name={getHRRoleIcon(getHRRoleFromPosition(item.position))} 
                   size={12} 
                   color={getHRRoleColor(getHRRoleFromPosition(item.position))} 
                 />
                 <Text 
-                  style={{ fontSize: 12, fontWeight: '500', marginLeft: 4, color: getHRRoleColor(getHRRoleFromPosition(item.position)) }}
+                  className="text-xs font-medium ml-1"
+                  style={{ color: getHRRoleColor(getHRRoleFromPosition(item.position)) }}
                 >
                   {getHRRoleLabel(getHRRoleFromPosition(item.position))}
                 </Text>
               </View>
             )}
-            <Text style={{ color: colors.textTertiary, fontSize: 12, marginTop: 4 }}>
+            <Text className="text-gray-500 text-xs mt-1">
             @{item.username}
           </Text>
             
             {/* Remaining Leaves Display */}
             {leaveInfo && leaveInfo.remaining && (
-              <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.border }}>
-                <Text style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 4 }}>Remaining Leaves:</Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-                  <Text style={{ fontSize: 12, color: colors.text }}>
-                    <Text style={{ fontWeight: '600', color: colors.primary }}>Annual:</Text> {leaveInfo.remaining.annual}
+              <View className="mt-2 pt-2 border-t border-gray-100">
+                <Text className="text-xs text-gray-500 mb-1">Remaining Leaves:</Text>
+                <View className="flex-row flex-wrap gap-x-3 gap-y-1">
+                  <Text className="text-xs text-gray-700">
+                    <Text className="font-semibold text-blue-600">Annual:</Text> {leaveInfo.remaining.annual}
                   </Text>
-                  <Text style={{ fontSize: 12, color: colors.text }}>
-                    <Text style={{ fontWeight: '600', color: colors.success }}>Sick:</Text> {leaveInfo.remaining.sick}
+                  <Text className="text-xs text-gray-700">
+                    <Text className="font-semibold text-green-600">Sick:</Text> {leaveInfo.remaining.sick}
                   </Text>
-                  <Text style={{ fontSize: 12, color: colors.text }}>
-                    <Text style={{ fontWeight: '600', color: colors.warning }}>Casual:</Text> {leaveInfo.remaining.casual}
+                  <Text className="text-xs text-gray-700">
+                    <Text className="font-semibold text-orange-600">Casual:</Text> {leaveInfo.remaining.casual}
                   </Text>
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: colors.primary }}>
+                  <Text className="text-xs font-semibold text-primary-500">
                     Total: {leaveInfo.remaining.total} days
                   </Text>
                 </View>
@@ -433,33 +432,34 @@ export default function EmployeeManagement({ route, navigation }) {
             )}
         </View>
         
-        <View style={{ alignItems: 'flex-end' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+        <View className="items-end">
+          <View className="flex-row items-center mb-2">
             <Ionicons 
               name={getWorkModeIcon(item.workMode)} 
               size={16} 
               color={getWorkModeColor(item.workMode)} 
             />
             <Text 
-              style={{ fontSize: 14, fontWeight: '500', marginLeft: 4, color: getWorkModeColor(item.workMode) }}
+              className="text-sm font-medium ml-1"
+              style={{ color: getWorkModeColor(item.workMode) }}
             >
               {getWorkModeLabel(item.workMode)}
             </Text>
           </View>
           
-            <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View className="flex-row space-x-2">
           <TouchableOpacity
-            style={{ backgroundColor: colors.primary, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 }}
+            className="bg-primary-500 rounded-lg px-3 py-1"
             onPress={() => handleWorkModeChange(item)}
           >
-                <Text style={{ color: 'white', fontSize: 12, fontWeight: '500' }}>Work Mode</Text>
+                <Text className="text-white text-xs font-medium">Work Mode</Text>
               </TouchableOpacity>
               
               <TouchableOpacity
-                style={{ backgroundColor: colors.success, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 }}
+                className="bg-green-500 rounded-lg px-3 py-1"
                 onPress={() => handleManageLeaves(item)}
               >
-                <Text style={{ color: 'white', fontSize: 12, fontWeight: '500' }}>Leaves</Text>
+                <Text className="text-white text-xs font-medium">Leaves</Text>
           </TouchableOpacity>
             </View>
         </View>
@@ -469,39 +469,39 @@ export default function EmployeeManagement({ route, navigation }) {
   };
 
   const renderPendingRequest = ({ item }) => (
-    <View style={{ backgroundColor: colors.surface, borderRadius: 12, padding: 16, marginBottom: 12, shadowColor: colors.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-        <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text }}>
+    <View className="bg-white rounded-xl p-4 mb-3 shadow-sm">
+      <View className="flex-row items-center justify-between mb-2">
+        <Text className="text-lg font-semibold text-gray-800">
           {item.employeeId}
         </Text>
-        <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+        <Text className="text-xs text-gray-500">
           {new Date(item.requestedAt).toLocaleDateString()}
         </Text>
       </View>
       
-      <Text style={{ color: colors.textSecondary, marginBottom: 8 }}>
-        Requesting: <Text style={{ fontWeight: '500', color: colors.text }}>{getWorkModeLabel(item.requestedMode)}</Text>
+      <Text className="text-gray-600 mb-2">
+        Requesting: <Text className="font-medium">{getWorkModeLabel(item.requestedMode)}</Text>
       </Text>
       
       {item.reason && (
-        <Text style={{ color: colors.textTertiary, fontSize: 14, marginBottom: 12 }}>
+        <Text className="text-gray-500 text-sm mb-3">
           Reason: {item.reason}
         </Text>
       )}
       
-      <View style={{ flexDirection: 'row', gap: 8 }}>
+      <View className="flex-row space-x-2">
         <TouchableOpacity
-          style={{ backgroundColor: colors.success, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 10, flex: 1 }}
+          className="bg-green-500 rounded-lg px-4 py-2 flex-1"
           onPress={() => handleProcessRequest(item.id, 'approved')}
         >
-          <Text style={{ color: 'white', textAlign: 'center', fontWeight: '500' }}>Approve</Text>
+          <Text className="text-white text-center font-medium">Approve</Text>
         </TouchableOpacity>
         
         <TouchableOpacity
-          style={{ backgroundColor: colors.error, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 10, flex: 1 }}
+          className="bg-red-500 rounded-lg px-4 py-2 flex-1"
           onPress={() => handleProcessRequest(item.id, 'rejected')}
         >
-          <Text style={{ color: 'white', textAlign: 'center', fontWeight: '500' }}>Reject</Text>
+          <Text className="text-white text-center font-medium">Reject</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -522,45 +522,51 @@ export default function EmployeeManagement({ route, navigation }) {
     };
 
     return (
-      <View style={{ backgroundColor: colors.surface, borderRadius: 12, padding: 16, marginBottom: 12, shadowColor: colors.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-          <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text }}>
+      <View className="bg-white rounded-xl p-4 mb-3 shadow-sm">
+        <View className="flex-row items-center justify-between mb-2">
+          <Text className="text-lg font-semibold text-gray-800">
             {employeeName}
           </Text>
-          <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+          <Text className="text-xs text-gray-500">
             {new Date(item.requestedAt).toLocaleDateString()}
           </Text>
         </View>
         
-        <Text style={{ color: colors.textSecondary, marginBottom: 8 }}>
-          <Text style={{ fontWeight: '500', color: colors.text }}>{getLeaveTypeLabel(item.leaveType)}</Text>
+        <Text className="text-gray-600 mb-2">
+          <Text className="font-medium">{getLeaveTypeLabel(item.leaveType)}</Text>
           {' • '}
-          <Text style={{ fontWeight: '500', color: colors.text }}>{item.days} day{item.days !== 1 ? 's' : ''}</Text>
+          <Text className="font-medium">
+            {item.isHalfDay ? 'Half day' : `${item.days} day${item.days !== 1 ? 's' : ''}`}
+          </Text>
+          {item.isHalfDay && (
+            <Text className="text-amber-600"> ({item.halfDayPeriod === 'morning' ? 'Morning' : 'Afternoon'})</Text>
+          )}
         </Text>
         
-        <Text style={{ color: colors.textTertiary, fontSize: 14, marginBottom: 4 }}>
-          {new Date(item.startDate).toLocaleDateString()} - {new Date(item.endDate).toLocaleDateString()}
+        <Text className="text-gray-500 text-sm mb-1">
+          {new Date(item.startDate).toLocaleDateString()}
+          {item.startDate !== item.endDate && ` - ${new Date(item.endDate).toLocaleDateString()}`}
         </Text>
         
         {item.reason && (
-          <Text style={{ color: colors.textTertiary, fontSize: 14, marginBottom: 12 }}>
+          <Text className="text-gray-500 text-sm mb-3">
             Reason: {item.reason}
           </Text>
         )}
         
-        <View style={{ flexDirection: 'row', gap: 8 }}>
+        <View className="flex-row space-x-2">
           <TouchableOpacity
-            style={{ backgroundColor: colors.success, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 10, flex: 1 }}
+            className="bg-green-500 rounded-lg px-4 py-2 flex-1"
             onPress={() => handleProcessLeaveRequest(item.id, 'approved')}
           >
-            <Text style={{ color: 'white', textAlign: 'center', fontWeight: '500' }}>Approve</Text>
+            <Text className="text-white text-center font-medium">Approve</Text>
           </TouchableOpacity>
           
           <TouchableOpacity
-            style={{ backgroundColor: colors.error, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 10, flex: 1 }}
+            className="bg-red-500 rounded-lg px-4 py-2 flex-1"
             onPress={() => handleProcessLeaveRequest(item.id, 'rejected')}
           >
-            <Text style={{ color: 'white', textAlign: 'center', fontWeight: '500' }}>Reject</Text>
+            <Text className="text-white text-center font-medium">Reject</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -630,21 +636,14 @@ export default function EmployeeManagement({ route, navigation }) {
       animationType="slide"
       onRequestClose={() => setShowRequestsModal(false)}
     >
-      <View style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
-        <View style={{ 
-          flex: 1, 
-          backgroundColor: colors.surface, 
-          borderTopLeftRadius: 20, 
-          borderTopRightRadius: 20,
-          marginTop: 100,
-          padding: 16,
-        }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-            <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text }}>
+      <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
+        <View className="bg-white rounded-xl p-6 mx-4 w-full max-w-md max-h-96">
+          <View className="flex-row items-center justify-between mb-4">
+            <Text className="text-xl font-bold text-gray-800">
               Pending Work Mode Requests
             </Text>
             <TouchableOpacity onPress={() => setShowRequestsModal(false)}>
-              <Ionicons name="close" size={24} color={colors.textSecondary} />
+              <Ionicons name="close" size={24} color="#6b7280" />
             </TouchableOpacity>
           </View>
           
@@ -656,9 +655,9 @@ export default function EmployeeManagement({ route, navigation }) {
               showsVerticalScrollIndicator={false}
             />
           ) : (
-            <View style={{ alignItems: 'center', paddingVertical: 32 }}>
-              <Ionicons name="checkmark-circle" size={48} color={colors.success} />
-              <Text style={{ color: colors.textSecondary, marginTop: 8 }}>No pending work mode requests</Text>
+            <View className="items-center py-8">
+              <Ionicons name="checkmark-circle" size={48} color="#10b981" />
+              <Text className="text-gray-600 mt-2">No pending work mode requests</Text>
             </View>
           )}
         </View>
@@ -673,21 +672,14 @@ export default function EmployeeManagement({ route, navigation }) {
       animationType="slide"
       onRequestClose={() => setShowLeaveRequestsModal(false)}
     >
-      <View style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
-        <View style={{ 
-          flex: 1, 
-          backgroundColor: colors.surface, 
-          borderTopLeftRadius: 20, 
-          borderTopRightRadius: 20,
-          marginTop: 100,
-          padding: 16,
-        }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-            <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text }}>
+      <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
+        <View className="bg-white rounded-xl p-6 mx-4 w-full max-w-md max-h-96">
+          <View className="flex-row items-center justify-between mb-4">
+            <Text className="text-xl font-bold text-gray-800">
               Pending Leave Requests
             </Text>
             <TouchableOpacity onPress={() => setShowLeaveRequestsModal(false)}>
-              <Ionicons name="close" size={24} color={colors.textSecondary} />
+              <Ionicons name="close" size={24} color="#6b7280" />
             </TouchableOpacity>
           </View>
           
@@ -699,9 +691,9 @@ export default function EmployeeManagement({ route, navigation }) {
               showsVerticalScrollIndicator={false}
             />
           ) : (
-            <View style={{ alignItems: 'center', paddingVertical: 32 }}>
-              <Ionicons name="checkmark-circle" size={48} color={colors.success} />
-              <Text style={{ color: colors.textSecondary, marginTop: 8 }}>No pending leave requests</Text>
+            <View className="items-center py-8">
+              <Ionicons name="checkmark-circle" size={48} color="#10b981" />
+              <Text className="text-gray-600 mt-2">No pending leave requests</Text>
             </View>
           )}
         </View>
@@ -710,69 +702,38 @@ export default function EmployeeManagement({ route, navigation }) {
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View className="flex-1 bg-gray-50">
       {/* Header */}
-      <View style={{ backgroundColor: colors.surface, paddingHorizontal: 16, paddingVertical: 12, shadowColor: colors.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-          <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text }}>
+      <View className="bg-white px-6 py-4 shadow-sm">
+        <View className="flex-row items-center justify-between mb-4">
+          <Text className="text-xl font-bold text-gray-800">
             Employee Management
           </Text>
-        </View>
-        
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 8 }}
-        >
-          <TouchableOpacity
-            style={{
-              backgroundColor: colors.primary,
-              borderRadius: 12,
-              paddingHorizontal: 16,
-              paddingVertical: 10,
-              flexDirection: 'row',
-              alignItems: 'center',
-            }}
-            onPress={() => setShowLeaveSettingsModal(true)}
-          >
-            <Ionicons name="settings-outline" size={16} color="white" />
-            <Text style={{ color: 'white', fontWeight: '600', marginLeft: 6 }}>Leaves</Text>
-          </TouchableOpacity>
-        
-          <TouchableOpacity
-            style={{
-              backgroundColor: colors.warning,
-              borderRadius: 12,
-              paddingHorizontal: 16,
-              paddingVertical: 10,
-              flexDirection: 'row',
-              alignItems: 'center',
-            }}
-            onPress={() => setShowRequestsModal(true)}
-          >
-            <Ionicons name="notifications" size={16} color="white" />
-            <Text style={{ color: 'white', fontWeight: '600', marginLeft: 6 }}>
-              Requests ({pendingRequests.length})
-            </Text>
-          </TouchableOpacity>
+          
+          <View className="flex-row space-x-2">
+            <TouchableOpacity
+              className="bg-blue-500 rounded-xl px-4 py-2"
+              onPress={() => setShowLeaveSettingsModal(true)}
+            >
+              <View className="flex-row items-center">
+                <Ionicons name="settings-outline" size={16} color="white" />
+                <Text className="text-white font-semibold ml-1">Leaves</Text>
+              </View>
+            </TouchableOpacity>
           
           <TouchableOpacity
-            style={{
-              backgroundColor: colors.success,
-              borderRadius: 12,
-              paddingHorizontal: 16,
-              paddingVertical: 10,
-              flexDirection: 'row',
-              alignItems: 'center',
-            }}
-            onPress={() => setShowLeaveRequestsModal(true)}
+            className="bg-orange-500 rounded-xl px-4 py-2"
+            onPress={() => setShowRequestsModal(true)}
           >
-            <Ionicons name="calendar-outline" size={16} color="white" />
-            <Text style={{ color: 'white', fontWeight: '600', marginLeft: 6 }}>
-              Leave Requests ({pendingLeaveRequests.length})
-            </Text>
+            <View className="flex-row items-center">
+              <Ionicons name="notifications" size={16} color="white" />
+              <Text className="text-white font-semibold ml-1">
+                Requests ({pendingRequests.length})
+              </Text>
+            </View>
           </TouchableOpacity>
-        </ScrollView>
+          </View>
+        </View>
       </View>
 
       {/* Statistics */}
@@ -809,12 +770,12 @@ export default function EmployeeManagement({ route, navigation }) {
           showsVerticalScrollIndicator={false}
         />
       ) : (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 }}>
-          <Ionicons name="people-outline" size={64} color={colors.textTertiary} />
-          <Text style={{ fontSize: 20, fontWeight: '600', color: colors.textSecondary, marginTop: 16, textAlign: 'center' }}>
+        <View className="flex-1 justify-center items-center px-6">
+          <Ionicons name="people-outline" size={64} color="#d1d5db" />
+          <Text className="text-xl font-semibold text-gray-500 mt-4 text-center">
             No employees found
           </Text>
-          <Text style={{ color: colors.textTertiary, textAlign: 'center', marginTop: 8 }}>
+          <Text className="text-gray-400 text-center mt-2">
             Employees will appear here once they are added to the system
           </Text>
         </View>
@@ -877,10 +838,18 @@ const LeaveSettingsModal = ({ visible, onClose, defaultSettings, onSave, onSetti
           <TouchableWithoutFeedback onPress={() => {}}>
             <View className="bg-white rounded-xl p-6 mx-4 w-full max-w-sm">
               {/* Header with Back Button */}
-              <View className="flex-row items-center justify-center mb-4">
-                <Text className="text-xl font-bold text-gray-800 text-center">
+              <View className="flex-row items-center justify-between mb-4">
+                <TouchableOpacity
+                  onPress={handleBack}
+                  className="flex-row items-center"
+                >
+                  <Ionicons name="arrow-back" size={24} color="#3b82f6" />
+                  <Text className="text-primary-500 font-semibold ml-2">Back</Text>
+                </TouchableOpacity>
+                <Text className="text-xl font-bold text-gray-800 flex-1 text-center">
                   Default Leave Settings
                 </Text>
+                <View style={{ width: 80 }} />
               </View>
               
               <Text className="text-gray-600 mb-4 text-sm">
@@ -989,10 +958,18 @@ const EmployeeLeaveModal = ({ visible, onClose, employeeData, leaveInputs, onInp
             <View className="bg-white rounded-xl p-6 mx-4 w-full max-w-sm max-h-96">
               <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 {/* Header with Back Button */}
-                <View className="flex-row items-center justify-center mb-2">
-                  <Text className="text-xl font-bold text-gray-800 text-center">
+                <View className="flex-row items-center justify-between mb-2">
+                  <TouchableOpacity
+                    onPress={handleBack}
+                    className="flex-row items-center"
+                  >
+                    <Ionicons name="arrow-back" size={24} color="#3b82f6" />
+                    <Text className="text-primary-500 font-semibold ml-2">Back</Text>
+                  </TouchableOpacity>
+                  <Text className="text-xl font-bold text-gray-800 flex-1 text-center">
                     Manage Leaves
                   </Text>
+                  <View style={{ width: 80 }} />
                 </View>
                 
                 <Text className="text-gray-600 mb-4 text-sm">

@@ -24,12 +24,11 @@ import {
 } from '../utils/ticketManagement';
 import { getEmployees } from '../utils/employees';
 import { generateAttendanceReport, generateLeaveReport } from '../utils/export';
-import { getAllUsersAnalytics, formatHours, formatPercentage } from '../utils/analytics';
 
 export default function HRDashboard({ navigation, route }) {
   const { user } = route.params;
   const { colors } = useTheme();
-  const [activeTab, setActiveTab] = useState('overview'); // overview, attendance, leaves, tickets, analytics
+  const [activeTab, setActiveTab] = useState('overview'); // overview, attendance, leaves, tickets
   const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Overview stats
@@ -50,11 +49,6 @@ export default function HRDashboard({ navigation, route }) {
   // Ticket data
   const [tickets, setTickets] = useState([]);
   const [ticketFilter, setTicketFilter] = useState('all');
-  
-  // Analytics data
-  const [analytics, setAnalytics] = useState([]);
-  const [analyticsPeriod, setAnalyticsPeriod] = useState('monthly');
-  const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -62,7 +56,7 @@ export default function HRDashboard({ navigation, route }) {
       loadData();
     });
     return unsubscribe;
-  }, [navigation, activeTab, ticketFilter, analyticsPeriod]);
+  }, [navigation, activeTab, ticketFilter]);
 
   const loadData = async () => {
     await Promise.all([
@@ -70,7 +64,6 @@ export default function HRDashboard({ navigation, route }) {
       activeTab === 'attendance' && loadAttendanceData(),
       activeTab === 'leaves' && loadLeaveData(),
       activeTab === 'tickets' && loadTicketData(),
-      activeTab === 'analytics' && loadAnalytics(),
     ]);
   };
 
@@ -138,18 +131,6 @@ export default function HRDashboard({ navigation, route }) {
       setTickets(sorted);
     } catch (error) {
       console.error('Error loading ticket data:', error);
-    }
-  };
-
-  const loadAnalytics = async () => {
-    setIsLoadingAnalytics(true);
-    try {
-      const analyticsData = await getAllUsersAnalytics(analyticsPeriod);
-      setAnalytics(analyticsData);
-    } catch (error) {
-      console.error('Error loading analytics:', error);
-    } finally {
-      setIsLoadingAnalytics(false);
     }
   };
 
@@ -595,7 +576,8 @@ export default function HRDashboard({ navigation, route }) {
                     {item.employeeName || item.employeeId}
                   </Text>
                   <Text style={{ fontSize: 12, color: colors.textSecondary }}>
-                    {item.startDate} to {item.endDate} ({item.days} days)
+                    {item.startDate}{item.startDate !== item.endDate ? ` to ${item.endDate}` : ''} ({item.isHalfDay ? 'Half day' : `${item.days} day${item.days !== 1 ? 's' : ''}`})
+                    {item.isHalfDay && ` - ${item.halfDayPeriod === 'morning' ? 'Morning' : 'Afternoon'}`}
                   </Text>
                 </View>
                 <View
@@ -632,151 +614,6 @@ export default function HRDashboard({ navigation, route }) {
           <Ionicons name="calendar-outline" size={64} color={colors.textTertiary} />
           <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text, marginTop: 16 }}>
             No leave requests
-          </Text>
-        </View>
-      )}
-    </View>
-  );
-
-  const renderAnalytics = () => (
-    <View style={{ flex: 1 }}>
-      <View style={{ padding: 16 }}>
-        <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text, marginBottom: 12 }}>
-          Employee Analytics
-        </Text>
-        
-        {/* Period Filter */}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
-          {['daily', 'weekly', 'monthly', 'yearly', 'all'].map((period) => (
-            <TouchableOpacity
-              key={period}
-              onPress={() => setAnalyticsPeriod(period)}
-              style={{
-                paddingHorizontal: 12,
-                paddingVertical: 6,
-                borderRadius: 16,
-                backgroundColor: analyticsPeriod === period ? colors.primary : colors.background,
-              }}
-            >
-              <Text
-                style={{
-                  color: analyticsPeriod === period ? 'white' : colors.textSecondary,
-                  fontWeight: analyticsPeriod === period ? '600' : '400',
-                  fontSize: 12,
-                  textTransform: 'capitalize',
-                }}
-              >
-                {period}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      {isLoadingAnalytics ? (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 }}>
-          <Text style={{ fontSize: 16, color: colors.textSecondary }}>Loading analytics...</Text>
-        </View>
-      ) : analytics.length > 0 ? (
-        <FlatList
-          data={analytics}
-          keyExtractor={(item) => item.username}
-          renderItem={({ item }) => (
-            <View
-              style={{
-                backgroundColor: colors.surface,
-                borderRadius: 12,
-                padding: 16,
-                marginHorizontal: 16,
-                marginBottom: 12,
-                shadowColor: colors.shadow,
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.1,
-                shadowRadius: 4,
-                elevation: 3,
-              }}
-            >
-              <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text, marginBottom: 12 }}>
-                {item.username}
-              </Text>
-              
-              <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
-                {/* Attendance Rate Card */}
-                <View
-                  style={{
-                    flex: 1,
-                    backgroundColor: colors.background,
-                    borderRadius: 12,
-                    padding: 12,
-                  }}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                    <Ionicons name="calendar" size={16} color={colors.primary} />
-                    <Text style={{ fontSize: 12, color: colors.textSecondary, marginLeft: 6 }}>
-                      Attendance Rate
-                    </Text>
-                  </View>
-                  <Text style={{ fontSize: 24, fontWeight: 'bold', color: colors.text }}>
-                    {formatPercentage(item.attendanceRate.rate)}
-                  </Text>
-                  <Text style={{ fontSize: 10, color: colors.textTertiary, marginTop: 4 }}>
-                    {item.attendanceRate.presentDays} / {item.attendanceRate.totalDays} days
-                  </Text>
-                </View>
-
-                {/* Average Hours Card */}
-                <View
-                  style={{
-                    flex: 1,
-                    backgroundColor: colors.background,
-                    borderRadius: 12,
-                    padding: 12,
-                  }}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                    <Ionicons name="time" size={16} color="#10b981" />
-                    <Text style={{ fontSize: 12, color: colors.textSecondary, marginLeft: 6 }}>
-                      Avg Hours/Day
-                    </Text>
-                  </View>
-                  <Text style={{ fontSize: 24, fontWeight: 'bold', color: colors.text }}>
-                    {formatHours(item.averageHours.averageHours)}
-                  </Text>
-                  <Text style={{ fontSize: 10, color: colors.textTertiary, marginTop: 4 }}>
-                    {item.averageHours.daysWorked} days worked
-                  </Text>
-                </View>
-              </View>
-
-              {/* Additional Stats */}
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Ionicons name="time-outline" size={14} color={colors.textSecondary} />
-                  <Text style={{ fontSize: 12, color: colors.textSecondary, marginLeft: 4 }}>
-                    Total: {formatHours(item.averageHours.totalHours)}
-                  </Text>
-                </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Ionicons name="checkmark-circle-outline" size={14} color={colors.textSecondary} />
-                  <Text style={{ fontSize: 12, color: colors.textSecondary, marginLeft: 4 }}>
-                    Present: {item.attendanceRate.presentDays} days
-                  </Text>
-                </View>
-              </View>
-            </View>
-          )}
-          refreshControl={
-            <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
-          }
-        />
-      ) : (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 }}>
-          <Ionicons name="analytics-outline" size={64} color={colors.textTertiary} />
-          <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text, marginTop: 16 }}>
-            No analytics data
-          </Text>
-          <Text style={{ fontSize: 14, color: colors.textSecondary, marginTop: 8, textAlign: 'center' }}>
-            Analytics will appear once attendance records are available
           </Text>
         </View>
       )}
@@ -927,25 +764,20 @@ export default function HRDashboard({ navigation, route }) {
           elevation: 3,
         }}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-          <Text
-            style={{
-              fontSize: 20,
-              fontWeight: 'bold',
-              color: colors.text,
-            }}
-          >
-            HR Dashboard
-          </Text>
-        </View>
+        <Text
+          style={{
+            fontSize: 20,
+            fontWeight: 'bold',
+            color: colors.text,
+            marginBottom: 12,
+          }}
+        >
+          HR Dashboard
+        </Text>
 
         {/* Tab Navigation */}
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingRight: 16, gap: 8 }}
-        >
-          {['overview', 'attendance', 'leaves', 'tickets', 'analytics'].map((tab) => (
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          {['overview', 'attendance', 'leaves', 'tickets'].map((tab) => (
             <TouchableOpacity
               key={tab}
               onPress={() => setActiveTab(tab)}
@@ -954,7 +786,6 @@ export default function HRDashboard({ navigation, route }) {
                 paddingVertical: 8,
                 borderRadius: 20,
                 backgroundColor: activeTab === tab ? colors.primary : colors.background,
-                marginRight: 8,
               }}
             >
               <Text
@@ -969,7 +800,7 @@ export default function HRDashboard({ navigation, route }) {
               </Text>
             </TouchableOpacity>
           ))}
-        </ScrollView>
+        </View>
       </View>
 
       {/* Content */}
@@ -977,7 +808,6 @@ export default function HRDashboard({ navigation, route }) {
       {activeTab === 'attendance' && renderAttendance()}
       {activeTab === 'leaves' && renderLeaves()}
       {activeTab === 'tickets' && renderTickets()}
-      {activeTab === 'analytics' && renderAnalytics()}
     </View>
   );
 }

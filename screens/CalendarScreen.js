@@ -510,17 +510,15 @@ export default function CalendarScreen({ navigation, route }) {
         }}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-            <Text
-              style={{
-                fontSize: 20,
-                fontWeight: 'bold',
-                color: colors.text,
-              }}
-            >
-              Calendar
-            </Text>
-          </View>
+          <Text
+            style={{
+              fontSize: 20,
+              fontWeight: 'bold',
+              color: colors.text,
+            }}
+          >
+            Calendar
+          </Text>
           <TouchableOpacity
             style={{
               backgroundColor: colors.primary,
@@ -1050,7 +1048,8 @@ export default function CalendarScreen({ navigation, route }) {
                               marginLeft: 6,
                             }}
                           >
-                            {item.startDate} to {item.endDate} ({item.days} day{item.days !== 1 ? 's' : ''})
+                            {item.startDate}{item.startDate !== item.endDate ? ` to ${item.endDate}` : ''} ({item.isHalfDay ? 'Half day' : `${item.days} day${item.days !== 1 ? 's' : ''}`})
+                            {item.isHalfDay && ` - ${item.halfDayPeriod === 'morning' ? 'Morning' : 'Afternoon'}`}
                           </Text>
                         </View>
                         {item.reason && (

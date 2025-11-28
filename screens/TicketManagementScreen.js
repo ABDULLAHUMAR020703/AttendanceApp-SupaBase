@@ -173,14 +173,6 @@ export default function TicketManagementScreen({ navigation, route }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* Header with Back Button */}
-      <View style={{ backgroundColor: colors.surface, paddingHorizontal: 16, paddingVertical: 12, shadowColor: colors.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text }}>
-            Ticket Management
-          </Text>
-        </View>
-      </View>
       <ScrollView
         style={{ flex: 1 }}
         refreshControl={

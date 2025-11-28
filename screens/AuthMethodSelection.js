@@ -120,6 +120,12 @@ export default function AuthMethodSelection({ navigation, route }) {
       <View className="p-6">
         {/* Header */}
         <View className="mb-6">
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            className="mb-4"
+          >
+            <Ionicons name="arrow-back" size={24} color="#3b82f6" />
+          </TouchableOpacity>
           <Text className="text-2xl font-bold text-gray-800 mb-2">
             Choose Authentication Method
           </Text>

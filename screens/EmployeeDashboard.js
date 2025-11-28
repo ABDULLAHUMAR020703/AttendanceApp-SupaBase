@@ -32,7 +32,6 @@ import { getPreferredAuthMethod } from '../utils/authPreferences';
 import { useTheme } from '../contexts/ThemeContext';
 import { getUnreadNotificationCount } from '../utils/notifications';
 import { getEmployeeLeaveBalance, calculateRemainingLeaves } from '../utils/leaveManagement';
-import { getUserAnalytics, formatHours, formatPercentage } from '../utils/analytics';
 import { 
   getHRRoleFromPosition, 
   getHRRoleColor, 
@@ -57,9 +56,6 @@ export default function EmployeeDashboard({ navigation, route }) {
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [leaveBalance, setLeaveBalance] = useState(null);
   const [remainingLeaves, setRemainingLeaves] = useState(null);
-  const [analytics, setAnalytics] = useState(null);
-  const [analyticsPeriod, setAnalyticsPeriod] = useState('monthly');
-  const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -108,8 +104,7 @@ export default function EmployeeDashboard({ navigation, route }) {
       loadEmployeeData(),
       loadMyRequests(),
       loadNotificationCount(),
-      loadLeaveBalance(),
-      loadAnalytics()
+      loadLeaveBalance()
     ]);
   };
 
@@ -123,18 +118,6 @@ export default function EmployeeDashboard({ navigation, route }) {
       }
     } catch (error) {
       console.error('Error loading leave balance:', error);
-    }
-  };
-
-  const loadAnalytics = async () => {
-    setIsLoadingAnalytics(true);
-    try {
-      const analyticsData = await getUserAnalytics(user.username, analyticsPeriod);
-      setAnalytics(analyticsData);
-    } catch (error) {
-      console.error('Error loading analytics:', error);
-    } finally {
-      setIsLoadingAnalytics(false);
     }
   };
 
@@ -253,22 +236,14 @@ export default function EmployeeDashboard({ navigation, route }) {
   const canCheckOut = lastRecord && lastRecord.type === 'checkin';
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* Header with Back Button */}
-      <View style={{ backgroundColor: colors.surface, paddingHorizontal: 16, paddingVertical: 12, shadowColor: colors.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text }}>
-            Employee Dashboard
-          </Text>
-        </View>
-      </View>
-      <ScrollView 
-        style={{ flex: 1 }}
-        refreshControl={
-          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
-        }
-      >
-        <View className="p-6">
+    <ScrollView 
+      className="flex-1"
+      style={{ backgroundColor: colors.background }}
+      refreshControl={
+        <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
+      }
+    >
+      <View className="p-6">
         {/* Welcome Header */}
         <View 
           className="rounded-2xl p-6 mb-6 shadow-sm"
@@ -448,164 +423,6 @@ export default function EmployeeDashboard({ navigation, route }) {
             </View>
           </View>
         )}
-
-        {/* Analytics Card */}
-        <View 
-          className="rounded-2xl p-6 mb-6 shadow-sm"
-          style={{ backgroundColor: colors.surface }}
-        >
-          <View className="flex-row items-center justify-between mb-4">
-            <Text 
-              className="text-lg font-semibold"
-              style={{ color: colors.text }}
-            >
-              My Analytics
-            </Text>
-            {/* Period Filter */}
-            <View className="flex-row gap-2">
-              {['weekly', 'monthly', 'yearly'].map((period) => (
-                <TouchableOpacity
-                  key={period}
-                  onPress={() => setAnalyticsPeriod(period)}
-                  style={{
-                    paddingHorizontal: 8,
-                    paddingVertical: 4,
-                    borderRadius: 12,
-                    backgroundColor: analyticsPeriod === period ? colors.primary : colors.background,
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: analyticsPeriod === period ? 'white' : colors.textSecondary,
-                      fontWeight: analyticsPeriod === period ? '600' : '400',
-                      fontSize: 10,
-                      textTransform: 'capitalize',
-                    }}
-                  >
-                    {period}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {isLoadingAnalytics ? (
-            <View style={{ padding: 20, alignItems: 'center' }}>
-              <Text style={{ color: colors.textSecondary }}>Loading analytics...</Text>
-            </View>
-          ) : analytics ? (
-            <View>
-              <View className="flex-row gap-4 mb-4">
-                {/* Attendance Rate */}
-                <View 
-                  className="flex-1 rounded-xl p-4"
-                  style={{ backgroundColor: colors.background }}
-                >
-                  <View className="flex-row items-center mb-2">
-                    <Ionicons name="calendar" size={16} color={colors.primary} />
-                    <Text 
-                      className="text-xs ml-2"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      Attendance Rate
-                    </Text>
-                  </View>
-                  <Text 
-                    className="text-2xl font-bold"
-                    style={{ color: colors.text }}
-                  >
-                    {formatPercentage(analytics.attendanceRate.rate)}
-                  </Text>
-                  <Text 
-                    className="text-xs mt-1"
-                    style={{ color: colors.textTertiary }}
-                  >
-                    {analytics.attendanceRate.presentDays} / {analytics.attendanceRate.totalDays} days
-                  </Text>
-                </View>
-
-                {/* Average Hours */}
-                <View 
-                  className="flex-1 rounded-xl p-4"
-                  style={{ backgroundColor: colors.background }}
-                >
-                  <View className="flex-row items-center mb-2">
-                    <Ionicons name="time" size={16} color="#10b981" />
-                    <Text 
-                      className="text-xs ml-2"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      Avg Hours/Day
-                    </Text>
-                  </View>
-                  <Text 
-                    className="text-2xl font-bold"
-                    style={{ color: colors.text }}
-                  >
-                    {formatHours(analytics.averageHours.averageHours)}
-                  </Text>
-                  <Text 
-                    className="text-xs mt-1"
-                    style={{ color: colors.textTertiary }}
-                  >
-                    {analytics.averageHours.daysWorked} days worked
-                  </Text>
-                </View>
-              </View>
-
-              {/* Additional Stats */}
-              <View 
-                className="rounded-xl p-4"
-                style={{ backgroundColor: colors.background }}
-              >
-                <View className="flex-row justify-between items-center mb-2">
-                  <View className="flex-row items-center">
-                    <Ionicons name="time-outline" size={14} color={colors.textSecondary} />
-                    <Text 
-                      className="text-sm ml-2"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      Total Hours
-                    </Text>
-                  </View>
-                  <Text 
-                    className="font-semibold"
-                    style={{ color: colors.text }}
-                  >
-                    {formatHours(analytics.averageHours.totalHours)}
-                  </Text>
-                </View>
-                <View className="flex-row justify-between items-center">
-                  <View className="flex-row items-center">
-                    <Ionicons name="checkmark-circle-outline" size={14} color={colors.textSecondary} />
-                    <Text 
-                      className="text-sm ml-2"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      Present Days
-                    </Text>
-                  </View>
-                  <Text 
-                    className="font-semibold"
-                    style={{ color: colors.text }}
-                  >
-                    {analytics.attendanceRate.presentDays} days
-                  </Text>
-                </View>
-              </View>
-            </View>
-          ) : (
-            <View style={{ padding: 20, alignItems: 'center' }}>
-              <Ionicons name="analytics-outline" size={32} color={colors.textTertiary} />
-              <Text 
-                className="text-sm mt-2 text-center"
-                style={{ color: colors.textSecondary }}
-              >
-                No analytics data available yet
-              </Text>
-            </View>
-          )}
-        </View>
 
         {/* Action Buttons */}
         <View className="space-y-4">
@@ -1008,8 +825,7 @@ export default function EmployeeDashboard({ navigation, route }) {
             </View>
           </View>
         </View>
-        </View>
-      </ScrollView>
+      </View>
 
       {/* Work Mode Request Modal */}
       <Modal
@@ -1070,6 +886,6 @@ export default function EmployeeDashboard({ navigation, route }) {
           </View>
         </View>
       </Modal>
-    </View>
+    </ScrollView>
   );
 }

@@ -50,11 +50,9 @@ export const checkFaceRecognitionAvailability = async () => {
     }
 
     const supportedTypes = await LocalAuth.supportedAuthenticationTypesAsync();
-    // Check for both FACIAL_RECOGNITION (iOS Face ID) and FINGERPRINT (Android Face Unlock)
-    const hasFaceRecognition = supportedTypes.includes(LocalAuth.AuthenticationType.FACIAL_RECOGNITION) ||
-                               (Platform.OS === 'android' && supportedTypes.length > 0);
+    const hasFaceRecognition = supportedTypes.includes(LocalAuth.AuthenticationType.FACIAL_RECOGNITION);
     
-    if (!hasFaceRecognition && Platform.OS === 'ios') {
+    if (!hasFaceRecognition) {
       return {
         available: false,
         error: 'Face recognition is not supported on this device. Please use fingerprint authentication instead.'
@@ -110,10 +108,7 @@ export const verifyFace = async (username, promptMessage = 'Authenticate with Fa
 
     // Get supported authentication types
     const supportedTypes = await LocalAuth.supportedAuthenticationTypesAsync();
-    // On iOS, check for FACIAL_RECOGNITION. On Android, any biometric type works for face unlock
-    const hasFaceID = Platform.OS === 'ios' 
-      ? supportedTypes.includes(LocalAuth.AuthenticationType.FACIAL_RECOGNITION)
-      : supportedTypes.length > 0; // Android face unlock uses the same API as fingerprint
+    const hasFaceID = supportedTypes.includes(LocalAuth.AuthenticationType.FACIAL_RECOGNITION);
     
     if (!hasFaceID) {
       return {

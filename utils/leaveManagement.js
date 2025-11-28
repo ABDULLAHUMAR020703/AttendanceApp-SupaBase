@@ -251,9 +251,11 @@ export const calculateRemainingLeaves = (leaveBalance) => {
  * @param {string} startDate - Start date (YYYY-MM-DD)
  * @param {string} endDate - End date (YYYY-MM-DD)
  * @param {string} reason - Reason for leave
+ * @param {boolean} isHalfDay - Whether this is a half-day leave (default: false)
+ * @param {string} halfDayPeriod - For half-day: 'morning' or 'afternoon' (optional)
  * @returns {Promise<{success: boolean, requestId?: string, error?: string}>}
  */
-export const createLeaveRequest = async (employeeId, leaveType, startDate, endDate, reason = '') => {
+export const createLeaveRequest = async (employeeId, leaveType, startDate, endDate, reason = '', isHalfDay = false, halfDayPeriod = null) => {
   try {
     // Validate leave type
     const validTypes = ['annual', 'sick', 'casual'];
@@ -277,6 +279,14 @@ export const createLeaveRequest = async (employeeId, leaveType, startDate, endDa
       };
     }
 
+    // For half-day leave, start and end date must be the same
+    if (isHalfDay && startDate !== endDate) {
+      return {
+        success: false,
+        error: 'Half-day leave must be for a single day only'
+      };
+    }
+
     if (start > end) {
       return {
         success: false,
@@ -285,7 +295,12 @@ export const createLeaveRequest = async (employeeId, leaveType, startDate, endDa
     }
 
     // Calculate number of days (excluding weekends)
-    const days = calculateWorkingDays(start, end);
+    let days;
+    if (isHalfDay) {
+      days = 0.5; // Half day
+    } else {
+      days = calculateWorkingDays(start, end);
+    }
 
     // Check if employee has enough leaves
     const leaveBalance = await getEmployeeLeaveBalance(employeeId);
@@ -303,7 +318,7 @@ export const createLeaveRequest = async (employeeId, leaveType, startDate, endDa
     if (days > availableLeaves) {
       return {
         success: false,
-        error: `Insufficient ${leaveType} leaves. Available: ${availableLeaves} days, Requested: ${days} days`
+        error: `Insufficient ${leaveType} leaves. Available: ${availableLeaves} days, Requested: ${days} day${days !== 1 ? 's' : ''}`
       };
     }
 
@@ -317,6 +332,8 @@ export const createLeaveRequest = async (employeeId, leaveType, startDate, endDa
       endDate,
       days,
       reason,
+      isHalfDay: isHalfDay || false,
+      halfDayPeriod: isHalfDay ? (halfDayPeriod || 'morning') : null,
       status: 'pending', // pending, approved, rejected
       requestedAt: new Date().toISOString(),
       processedAt: null,
@@ -342,8 +359,10 @@ export const createLeaveRequest = async (employeeId, leaveType, startDate, endDa
         casual: 'Casual Leave'
       };
       
+      const halfDayText = isHalfDay ? ` (Half Day - ${halfDayPeriod || 'morning'})` : '';
+      const daysText = isHalfDay ? 'half day' : `${days} day${days !== 1 ? 's' : ''}`;
       const notificationTitle = 'New Leave Request';
-      const notificationBody = `${employee ? employee.name : 'An employee'} has submitted a ${leaveTypeLabels[leaveType]} request for ${days} day${days !== 1 ? 's' : ''} (${startDate} to ${endDate})`;
+      const notificationBody = `${employee ? employee.name : 'An employee'} has submitted a ${leaveTypeLabels[leaveType]} request for ${daysText}${halfDayText} (${startDate}${startDate !== endDate ? ` to ${endDate}` : ''})`;
       
       // Send notification to each admin
       for (const admin of admins) {
@@ -660,7 +679,9 @@ export const getAllLeaveDatesWithEmployees = async () => {
             reason: request.reason || '',
             days: request.days,
             startDate: request.startDate,
-            endDate: request.endDate
+            endDate: request.endDate,
+            isHalfDay: request.isHalfDay || false,
+            halfDayPeriod: request.halfDayPeriod || null
           });
         }
         current.setDate(current.getDate() + 1);

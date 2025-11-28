@@ -347,10 +347,17 @@ export default function CameraScreen({ navigation, route }) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         {/* Header */}
-        <View style={{ backgroundColor: colors.surface, paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ backgroundColor: colors.surface, paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={{ padding: 8 }}
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
+          </TouchableOpacity>
           <Text style={{ color: colors.text, fontSize: 18, fontWeight: '600' }}>
             {type === 'checkin' ? 'Check In' : 'Check Out'}
           </Text>
+          <View style={{ width: 32 }} />
         </View>
 
         {/* Biometric Authentication View */}
@@ -437,9 +444,16 @@ export default function CameraScreen({ navigation, route }) {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Header */}
       <View style={{ backgroundColor: colors.surface, paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={{ padding: 8 }}
+        >
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
+        </TouchableOpacity>
         <Text style={{ color: colors.text, fontSize: 18, fontWeight: '600' }}>
           {type === 'checkin' ? 'Check In' : 'Check Out'}
         </Text>
+        <View style={{ width: 32 }} />
       </View>
 
       {/* Face ID Authentication View */}

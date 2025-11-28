@@ -37,7 +37,8 @@ The Attendance App is a full-featured employee management system designed for or
   - Days worked count
 - **Leave Management**:
   - View leave balance (Annual, Sick, Casual)
-  - Submit leave requests
+  - Submit leave requests (Full day or Half day)
+  - Half-day leave support (Morning/Afternoon)
   - Track leave request status
 - **Work Mode Requests** - Request work mode changes (In Office, Semi Remote, Fully Remote)
 - **Notifications** - Real-time notifications for approvals, rejections, and updates
@@ -317,7 +318,10 @@ AttendanceApp/
 4. **Request Leave**
    - Go to Leave Requests
    - Tap "New Request"
-   - Select leave type, dates, and reason
+   - Select leave type (Annual/Sick/Casual)
+   - Choose duration (Full Day or Half Day)
+   - For half-day: Select Morning or Afternoon period
+   - Select date(s) and reason
    - Submit request
 
 5. **Create Tickets**
@@ -397,6 +401,13 @@ Password: testadmin123
 - **Annual Leave** - Standard vacation days
 - **Sick Leave** - Medical leave
 - **Casual Leave** - Personal leave
+
+### Leave Duration Options
+
+- **Full Day** - Complete day leave (counts as 1 day)
+- **Half Day** - Partial day leave (counts as 0.5 days)
+  - **Morning** - First half of the day
+  - **Afternoon** - Second half of the day
 
 ### Ticket Categories
 
@@ -512,7 +523,15 @@ For issues or questions:
 
 ## 🎯 Version
 
-**Current Version:** 1.0.0
+**Current Version:** 1.1.0
+
+### Recent Updates (v1.1.0)
+- ✅ Added half-day leave functionality
+- ✅ Morning/Afternoon period selection for half-day leaves
+- ✅ Enhanced leave request UI with duration toggle
+- ✅ Updated all leave displays to show half-day information
+- ✅ Calendar integration for half-day leaves
+- ✅ HR Dashboard support for half-day leave tracking
 
 ## 📚 Additional Resources
 

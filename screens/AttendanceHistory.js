@@ -10,9 +10,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getUserAttendanceRecords } from '../utils/storage';
-import { useTheme } from '../contexts/ThemeContext';
 
-export default function AttendanceHistory({ route, navigation }) {
+export default function AttendanceHistory({ route }) {
   const { user } = route.params;
   const [records, setRecords] = useState([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -138,17 +137,13 @@ export default function AttendanceHistory({ route, navigation }) {
     </TouchableOpacity>
   );
 
-  const { colors } = useTheme();
-  
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View className="flex-1 bg-gray-50">
       {/* Header */}
-      <View style={{ backgroundColor: colors.surface, paddingHorizontal: 16, paddingVertical: 12, shadowColor: colors.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-          <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text }}>
-            Attendance History
-          </Text>
-        </View>
+      <View className="bg-white px-6 py-4 shadow-sm">
+        <Text className="text-xl font-bold text-gray-800 mb-4">
+          Attendance History
+        </Text>
         
         {/* Filter Buttons */}
         <View className="flex-row space-x-2">

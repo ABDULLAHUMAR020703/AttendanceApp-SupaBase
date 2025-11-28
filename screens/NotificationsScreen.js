@@ -234,6 +234,12 @@ export default function NotificationsScreen({ navigation, route }) {
       <View style={{ backgroundColor: colors.surface, paddingHorizontal: 16, paddingVertical: 12, shadowColor: colors.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <TouchableOpacity
+              onPress={() => navigation.goBack()}
+              style={{ padding: 8, marginRight: 8 }}
+            >
+              <Ionicons name="arrow-back" size={24} color={colors.text} />
+            </TouchableOpacity>
             <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text }}>
               Notifications
             </Text>
