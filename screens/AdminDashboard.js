@@ -20,10 +20,10 @@ import HRDashboard from './HRDashboard';
 import { getUnreadNotificationCount } from '../utils/notifications';
 
 export default function AdminDashboard({ route, navigation }) {
-  const { user } = route.params;
+  const { user, initialTab, openLeaveRequests } = route.params || {};
   const { handleLogout } = useAuth();
   const { colors } = useTheme();
-  const [activeTab, setActiveTab] = useState('attendance'); // 'attendance', 'employees', 'calendar', or 'hr'
+  const [activeTab, setActiveTab] = useState(initialTab || 'attendance'); // 'attendance', 'employees', 'calendar', or 'hr'
   const [records, setRecords] = useState([]);
   const [filteredRecords, setFilteredRecords] = useState([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -43,6 +43,13 @@ export default function AdminDashboard({ route, navigation }) {
 
     return () => clearInterval(notificationInterval);
   }, []);
+
+  // Handle navigation params for opening leave requests
+  useEffect(() => {
+    if (initialTab === 'employees' && openLeaveRequests) {
+      setActiveTab('employees');
+    }
+  }, [initialTab, openLeaveRequests]);
 
   useEffect(() => {
     filterRecords();
@@ -269,9 +276,18 @@ export default function AdminDashboard({ route, navigation }) {
       {/* Header */}
       <View className="px-6 py-4 shadow-sm" style={{ backgroundColor: colors.surface }}>
         <View className="flex-row items-center justify-between mb-4">
-          <Text className="text-xl font-bold" style={{ color: colors.text }}>
-            Admin Dashboard
-          </Text>
+          <View className="flex-1">
+            <Text className="text-xl font-bold" style={{ color: colors.text }}>
+              {user.role === 'super_admin' ? 'Super Admin Dashboard' : 
+               user.role === 'manager' ? `${user.department || 'Department'} Manager Dashboard` : 
+               'Admin Dashboard'}
+            </Text>
+            {user.role === 'manager' && user.department && (
+              <Text className="text-sm" style={{ color: colors.textSecondary }}>
+                Managing: {user.department} Department
+              </Text>
+            )}
+          </View>
           <View className="flex-row items-center space-x-2">
             <TouchableOpacity
               onPress={() => navigation.navigate('NotificationsScreen', { user: user })}
@@ -308,6 +324,15 @@ export default function AdminDashboard({ route, navigation }) {
             </TouchableOpacity>
             {activeTab === 'attendance' && (
               <View className="flex-row space-x-2">
+                <TouchableOpacity
+                  className="bg-blue-500 rounded-xl px-4 py-2"
+                  onPress={() => navigation.navigate('ManualAttendance', { user: user })}
+                >
+                  <View className="flex-row items-center">
+                    <Ionicons name="create-outline" size={16} color="white" />
+                    <Text className="text-white font-semibold ml-1">Manual</Text>
+                  </View>
+                </TouchableOpacity>
                 <TouchableOpacity
                   className="bg-green-500 rounded-xl px-4 py-2"
                   onPress={handleExport}
@@ -466,7 +491,7 @@ export default function AdminDashboard({ route, navigation }) {
           )}
         </>
       ) : (
-        <EmployeeManagement route={{ params: { user } }} />
+        <EmployeeManagement route={{ params: { user, openLeaveRequests } }} />
       )}
     </View>
   );

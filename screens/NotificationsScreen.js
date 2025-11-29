@@ -154,6 +154,81 @@ export default function NotificationsScreen({ navigation, route }) {
     return date.toLocaleDateString();
   };
 
+  const handleNotificationPress = async (notification) => {
+    // Mark as read if unread
+    if (!notification.read) {
+      await handleMarkAsRead(notification.id);
+    }
+
+    // Navigate based on notification type and data
+    // Check if navigation data exists in notification.data
+    const navData = notification.data?.navigation;
+    
+    if (navData) {
+      const { screen, params } = navData;
+      
+      try {
+        // Navigate to the specified screen
+        navigation.navigate(screen, params);
+        return;
+      } catch (error) {
+        console.error('Error navigating from notification:', error);
+        // Fall through to fallback navigation
+      }
+    }
+    
+    // Fallback navigation based on notification type
+    switch (notification.type) {
+      case 'leave_request':
+        // For admins, navigate to EmployeeManagement
+        if (user.role === 'admin') {
+          navigation.navigate('AdminDashboard', {
+            user: user,
+            initialTab: 'employees',
+            openLeaveRequests: true
+          });
+        }
+        break;
+      case 'ticket_created':
+      case 'ticket_assigned':
+        // For admins, navigate to TicketManagement
+        if (user.role === 'admin') {
+          navigation.navigate('TicketManagement', {
+            user: user,
+            ticketId: notification.data?.ticketId
+          });
+        }
+        break;
+      case 'leave_approved':
+      case 'leave_rejected':
+        // For employees, navigate to LeaveRequestScreen
+        if (user.role === 'employee') {
+          navigation.navigate('LeaveRequestScreen', {
+            user: user
+          });
+        }
+        break;
+      case 'ticket_updated':
+      case 'ticket_response':
+        // Navigate to TicketScreen for employees, TicketManagement for admins
+        if (user.role === 'employee') {
+          navigation.navigate('TicketScreen', {
+            user: user,
+            ticketId: notification.data?.ticketId
+          });
+        } else if (user.role === 'admin') {
+          navigation.navigate('TicketManagement', {
+            user: user,
+            ticketId: notification.data?.ticketId
+          });
+        }
+        break;
+      default:
+        // No navigation for other types
+        break;
+    }
+  };
+
   const renderNotification = ({ item }) => (
     <TouchableOpacity
       style={{
@@ -164,11 +239,7 @@ export default function NotificationsScreen({ navigation, route }) {
         borderLeftWidth: 4,
         borderLeftColor: getNotificationColor(item.type),
       }}
-      onPress={() => {
-        if (!item.read) {
-          handleMarkAsRead(item.id);
-        }
-      }}
+      onPress={() => handleNotificationPress(item)}
     >
       <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
         <View

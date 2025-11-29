@@ -18,6 +18,7 @@ import {
   getEmployeeLeaveRequests
 } from '../utils/leaveManagement';
 import { getEmployeeByUsername } from '../utils/employees';
+import DatePickerCalendar from '../components/DatePickerCalendar';
 
 export default function LeaveRequestScreen({ navigation, route }) {
   const { user } = route.params;
@@ -33,6 +34,7 @@ export default function LeaveRequestScreen({ navigation, route }) {
   const [employee, setEmployee] = useState(null);
   const [isHalfDay, setIsHalfDay] = useState(false);
   const [halfDayPeriod, setHalfDayPeriod] = useState('morning');
+  const [selectedPreviewDate, setSelectedPreviewDate] = useState(null); // Date selected in calendar but not yet assigned
 
   useEffect(() => {
     loadData();
@@ -94,6 +96,16 @@ export default function LeaveRequestScreen({ navigation, route }) {
     setIsRefreshing(false);
   };
 
+  const resetForm = () => {
+    setStartDate('');
+    setEndDate('');
+    setReason('');
+    setLeaveType('annual');
+    setIsHalfDay(false);
+    setHalfDayPeriod('morning');
+    setSelectedPreviewDate(null);
+  };
+
   const handleSubmitRequest = async () => {
     if (!startDate) {
       Alert.alert('Error', 'Please select a date');
@@ -125,12 +137,7 @@ export default function LeaveRequestScreen({ navigation, route }) {
       if (result.success) {
         Alert.alert('Success', 'Leave request submitted successfully');
         setShowRequestModal(false);
-        setStartDate('');
-        setEndDate('');
-        setReason('');
-        setLeaveType('annual');
-        setIsHalfDay(false);
-        setHalfDayPeriod('morning');
+        resetForm();
         await loadData();
       } else {
         Alert.alert('Error', result.error || 'Failed to submit leave request');
@@ -327,16 +334,22 @@ export default function LeaveRequestScreen({ navigation, route }) {
         visible={showRequestModal}
         transparent
         animationType="slide"
-        onRequestClose={() => setShowRequestModal(false)}
+        onRequestClose={() => {
+          setShowRequestModal(false);
+          resetForm();
+        }}
       >
         <View className="flex-1 justify-end bg-black bg-opacity-50">
-          <View className="bg-white rounded-t-3xl p-6 max-h-96">
+          <View className="bg-white rounded-t-3xl p-6" style={{ maxHeight: '90%' }}>
             <ScrollView showsVerticalScrollIndicator={false}>
               <View className="flex-row items-center justify-between mb-4">
                 <Text className="text-xl font-bold text-gray-800">
                   New Leave Request
                 </Text>
-                <TouchableOpacity onPress={() => setShowRequestModal(false)}>
+                <TouchableOpacity onPress={() => {
+                  setShowRequestModal(false);
+                  resetForm();
+                }}>
                   <Ionicons name="close" size={24} color="#6b7280" />
                 </TouchableOpacity>
               </View>
@@ -463,37 +476,179 @@ export default function LeaveRequestScreen({ navigation, route }) {
                 </View>
               )}
 
-              {/* Start Date / Date Selection */}
+              {/* Date Selection Calendar */}
               <View className="mb-4">
                 <Text className="text-gray-700 mb-2 font-medium">
-                  {isHalfDay ? 'Date' : 'Start Date'}
+                  {isHalfDay ? 'Select Date' : 'Select Date Range'}
                 </Text>
-                <TextInput
-                  className="bg-gray-100 rounded-xl px-4 py-3 text-gray-800"
-                  placeholder="YYYY-MM-DD (e.g., 2024-01-15)"
-                  value={startDate}
-                  onChangeText={setStartDate}
-                />
-                <Text className="text-xs text-gray-500 mt-1">
-                  Format: YYYY-MM-DD
-                </Text>
-              </View>
-
-              {/* End Date - Only show for full day leaves */}
-              {!isHalfDay && (
-                <View className="mb-4">
-                  <Text className="text-gray-700 mb-2 font-medium">End Date</Text>
-                  <TextInput
-                    className="bg-gray-100 rounded-xl px-4 py-3 text-gray-800"
-                    placeholder="YYYY-MM-DD (e.g., 2024-01-20)"
-                    value={endDate}
-                    onChangeText={setEndDate}
+                {isHalfDay ? (
+                  <DatePickerCalendar
+                    onDateSelect={(date) => {
+                      setSelectedPreviewDate(date);
+                    }}
+                    selectedStartDate={startDate}
+                    selectedEndDate={null}
+                    previewDate={selectedPreviewDate}
+                    allowRangeSelection={false}
                   />
-                  <Text className="text-xs text-gray-500 mt-1">
-                    Format: YYYY-MM-DD
-                  </Text>
-                </View>
-              )}
+                ) : (
+                  <DatePickerCalendar
+                    onDateSelect={(date) => {
+                      setSelectedPreviewDate(date);
+                    }}
+                    selectedStartDate={startDate}
+                    selectedEndDate={endDate}
+                    previewDate={selectedPreviewDate}
+                    allowRangeSelection={true}
+                  />
+                )}
+
+                {/* Action Buttons for Full Day Leaves */}
+                {!isHalfDay && (
+                  <View className="mt-4 flex-row space-x-2">
+                    <TouchableOpacity
+                      className={`flex-1 rounded-lg p-3 border-2 ${
+                        startDate
+                          ? 'border-red-500 bg-red-50'
+                          : selectedPreviewDate
+                          ? 'border-primary-500 bg-primary-500'
+                          : 'border-gray-300 bg-gray-100'
+                      }`}
+                      onPress={() => {
+                        if (startDate) {
+                          // Unselect start date
+                          setStartDate('');
+                          if (endDate && endDate === startDate) {
+                            setEndDate('');
+                          }
+                        } else if (selectedPreviewDate) {
+                          // Set selected date as start date
+                          setStartDate(selectedPreviewDate);
+                          // If end date is before new start date, clear it
+                          if (endDate && new Date(endDate) < new Date(selectedPreviewDate)) {
+                            setEndDate('');
+                          }
+                          setSelectedPreviewDate(null); // Clear preview after assignment
+                        }
+                      }}
+                      disabled={!selectedPreviewDate && !startDate}
+                    >
+                      <Text
+                        className={`text-center font-medium ${
+                          startDate
+                            ? 'text-red-600'
+                            : selectedPreviewDate
+                            ? 'text-white'
+                            : 'text-gray-500'
+                        }`}
+                      >
+                        {startDate ? 'Unselect Start Date' : 'Select Start Date'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      className={`flex-1 rounded-lg p-3 border-2 ${
+                        endDate
+                          ? 'border-red-500 bg-red-50'
+                          : selectedPreviewDate && startDate && new Date(selectedPreviewDate) >= new Date(startDate)
+                          ? 'border-primary-500 bg-primary-500'
+                          : 'border-gray-300 bg-gray-100'
+                      }`}
+                      onPress={() => {
+                        if (endDate) {
+                          // Unselect end date
+                          setEndDate('');
+                        } else if (selectedPreviewDate && startDate) {
+                          // Validate that end date is after start date
+                          if (new Date(selectedPreviewDate) >= new Date(startDate)) {
+                            setEndDate(selectedPreviewDate);
+                            setSelectedPreviewDate(null); // Clear preview after assignment
+                          } else {
+                            Alert.alert('Invalid Date', 'End date must be on or after start date');
+                          }
+                        } else if (selectedPreviewDate && !startDate) {
+                          Alert.alert('Select Start Date First', 'Please select a start date before selecting an end date');
+                        }
+                      }}
+                      disabled={(!selectedPreviewDate || !startDate) && !endDate}
+                    >
+                      <Text
+                        className={`text-center font-medium ${
+                          endDate
+                            ? 'text-red-600'
+                            : selectedPreviewDate && startDate && new Date(selectedPreviewDate) >= new Date(startDate)
+                            ? 'text-white'
+                            : 'text-gray-500'
+                        }`}
+                      >
+                        {endDate ? 'Unselect End Date' : 'Select End Date'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* Action Button for Half Day Leaves */}
+                {isHalfDay && (
+                  <View className="mt-4">
+                    <TouchableOpacity
+                      className={`rounded-lg p-3 border-2 ${
+                        startDate
+                          ? 'border-red-500 bg-red-50'
+                          : selectedPreviewDate
+                          ? 'border-primary-500 bg-primary-500'
+                          : 'border-gray-300 bg-gray-100'
+                      }`}
+                      onPress={() => {
+                        if (startDate) {
+                          // Unselect date
+                          setStartDate('');
+                          setEndDate('');
+                        } else if (selectedPreviewDate) {
+                          // Set selected date
+                          setStartDate(selectedPreviewDate);
+                          setEndDate(selectedPreviewDate);
+                          setSelectedPreviewDate(null); // Clear preview after assignment
+                        }
+                      }}
+                      disabled={!selectedPreviewDate && !startDate}
+                    >
+                      <Text
+                        className={`text-center font-medium ${
+                          startDate
+                            ? 'text-red-600'
+                            : selectedPreviewDate
+                            ? 'text-white'
+                            : 'text-gray-500'
+                        }`}
+                      >
+                        {startDate ? 'Unselect Date' : 'Select Date'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* Display Selected Dates */}
+                {(startDate || endDate) && (
+                  <View className="mt-3 flex-row items-center justify-center space-x-4">
+                    {startDate && (
+                      <View className="flex-row items-center">
+                        <Ionicons name="calendar-outline" size={16} color="#3b82f6" />
+                        <Text className="text-sm text-gray-700 ml-1">
+                          {isHalfDay ? 'Date' : 'Start'}: {new Date(startDate).toLocaleDateString()}
+                        </Text>
+                      </View>
+                    )}
+                    {!isHalfDay && endDate && startDate !== endDate && (
+                      <View className="flex-row items-center">
+                        <Ionicons name="calendar-outline" size={16} color="#3b82f6" />
+                        <Text className="text-sm text-gray-700 ml-1">
+                          End: {new Date(endDate).toLocaleDateString()}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+              </View>
 
               {/* Reason */}
               <View className="mb-4">
@@ -512,7 +667,10 @@ export default function LeaveRequestScreen({ navigation, route }) {
               <View className="flex-row space-x-2 mt-4">
                 <TouchableOpacity
                   className="bg-gray-200 rounded-lg p-3 flex-1"
-                  onPress={() => setShowRequestModal(false)}
+                  onPress={() => {
+                    setShowRequestModal(false);
+                    resetForm();
+                  }}
                 >
                   <Text className="text-center font-medium text-gray-700">Cancel</Text>
                 </TouchableOpacity>

@@ -33,10 +33,26 @@ export default function LoginScreen() {
       const result = await authenticateUser(username.trim(), password);
       
       if (result.success) {
-        loginUser({
-          username: result.user.username,
-          role: result.user.role
-        });
+        // Fetch full employee data including department
+        const { getEmployeeByUsername } = await import('../utils/employees');
+        const employee = await getEmployeeByUsername(result.user.username);
+        
+        if (employee) {
+          loginUser({
+            username: employee.username,
+            role: employee.role,
+            department: employee.department,
+            name: employee.name,
+            email: employee.email,
+            id: employee.id
+          });
+        } else {
+          // Fallback to basic user data if employee not found
+          loginUser({
+            username: result.user.username,
+            role: result.user.role
+          });
+        }
       } else {
         Alert.alert('Login Failed', 'Invalid username or password');
       }

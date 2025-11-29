@@ -162,7 +162,15 @@ export const createTicket = async (createdBy, category, priority, subject, descr
             createdBy,
             category,
             priority,
-            subject
+            subject,
+            // Navigation data
+            navigation: {
+              screen: 'TicketManagement',
+              params: {
+                user: admin,
+                ticketId: ticketId
+              }
+            }
           }
         );
       }
@@ -285,7 +293,15 @@ export const updateTicketStatus = async (ticketId, status, updatedBy) => {
         {
           ticketId,
           status,
-          subject: ticket.subject
+          subject: ticket.subject,
+          // Navigation data
+          navigation: {
+            screen: 'TicketScreen',
+            params: {
+              user: { username: ticket.createdBy },
+              ticketId: ticketId
+            }
+          }
         }
       );
     } catch (notifError) {
@@ -347,7 +363,15 @@ export const assignTicket = async (ticketId, assignedTo, assignedBy) => {
         {
           ticketId,
           priority: ticket.priority,
-          subject: ticket.subject
+          subject: ticket.subject,
+          // Navigation data
+          navigation: {
+            screen: 'TicketManagement',
+            params: {
+              user: { username: assignedTo },
+              ticketId: ticketId
+            }
+          }
         }
       );
     } catch (notifError) {
@@ -436,7 +460,15 @@ export const addTicketResponse = async (ticketId, respondedBy, message) => {
           {
             ticketId,
             subject: ticket.subject,
-            respondedBy
+            respondedBy,
+            // Navigation data
+            navigation: {
+              screen: 'TicketManagement',
+              params: {
+                user: { username: ticket.assignedTo },
+                ticketId: ticketId
+              }
+            }
           }
         );
       }
@@ -498,5 +530,7 @@ export const getAssignedTickets = async (username) => {
     return [];
   }
 };
+
+
 
 

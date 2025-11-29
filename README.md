@@ -15,7 +15,8 @@ The Attendance App is a full-featured employee management system designed for or
   - Photo Verification - Camera-based face verification
 - **Role-Based Access Control**:
   - Employee role with personal dashboard
-  - Admin role with full system access
+  - Super Admin role with full system access across all departments
+  - Manager role with department-specific access (HR Manager, Tech Manager, etc.)
   - HR role with analytics and management tools
 - **Session Management** - Secure session handling with AsyncStorage
 
@@ -59,22 +60,31 @@ The Attendance App is a full-featured employee management system designed for or
   - HR - Access HR dashboard with analytics
 
 #### Attendance Management
-- **View All Records** - See attendance from all employees
+- **View All Records** - See attendance from all employees (filtered by role)
 - **Search & Filter** - Search by username, filter by type (check-in/check-out)
 - **Statistics** - Total records, check-ins, check-outs
+- **Manual Attendance** - Add, edit, or delete attendance records for employees
+  - Create check-in/check-out records with custom date and time
+  - Edit existing attendance records
+  - Delete attendance records
+  - Calendar date picker for date selection
+  - Time input with validation
 - **CSV Export** - Export all attendance data to CSV format
 - **Data Management** - Clear all records functionality
 
 #### Employee Management
-- **Employee Profiles** - View and manage employee information
-- **Work Mode Management** - Update employee work modes
+- **Role-Based Access**:
+  - **Super Admins**: Can manage all employees across all departments
+  - **Managers**: Can only manage employees in their department (e.g., HR Manager manages HR employees, Tech Manager manages Engineering employees)
+- **Employee Profiles** - View and manage employee information (filtered by role)
+- **Work Mode Management** - Update employee work modes (with permission checks)
 - **Leave Management**:
   - Set default leave balances
   - Manage individual employee leave balances
-  - View and process leave requests
+  - View and process leave requests (filtered by department for managers)
   - Support for half-day leaves (Morning/Afternoon periods)
 - **Work Mode Requests** - Approve/reject work mode change requests
-- **Leave Requests** - Process employee leave requests
+- **Leave Requests** - Process employee leave requests (department-filtered for managers)
 
 ### 📊 HR Dashboard Features
 
@@ -150,7 +160,12 @@ The Attendance App is a full-featured employee management system designed for or
   - Work mode request updates
   - Ticket status changes
   - Admin responses
-- **Notification Center** - View all notifications
+- **Smart Navigation** - Click notifications to navigate directly to relevant screens:
+  - Leave requests navigate to Employee Management with leave requests modal
+  - Ticket notifications navigate to Ticket Management or Ticket Screen
+  - Leave approvals navigate to Leave Request Screen
+- **Department-Based Notifications** - Managers receive notifications only for their department
+- **Notification Center** - View all notifications with filtering
 - **Unread Count** - Badge showing unread notifications
 
 ### 📤 Data Export
@@ -276,7 +291,11 @@ AttendanceApp/
 │   ├── NotificationsScreen.js  # Notifications center
 │   ├── TicketScreen.js        # Employee ticket management
 │   ├── TicketManagementScreen.js # Admin ticket management
-│   └── EmployeeManagement.js  # Employee profile management
+│   ├── EmployeeManagement.js  # Employee profile management
+│   └── ManualAttendanceScreen.js # Manual attendance management
+│
+├── components/                 # Reusable components
+│   └── DatePickerCalendar.js  # Calendar date picker component
 │
 └── utils/                      # Utility functions
     ├── analytics.js           # Analytics calculations
@@ -322,7 +341,10 @@ AttendanceApp/
    - Select leave type (Annual/Sick/Casual)
    - Choose duration (Full Day or Half Day)
    - For half-day: Select Morning or Afternoon period
-   - Select date(s) and reason
+   - Use calendar date picker to select date(s)
+   - For full-day: Select start date, then press "Select Start Date" button, then select end date and press "Select End Date" button
+   - For half-day: Select date, then press "Select Date" button
+   - Enter reason (optional)
    - Submit request
 
 5. **Create Tickets**
@@ -331,21 +353,22 @@ AttendanceApp/
    - Fill in category, priority, subject, and description
    - Submit ticket
 
-### For Admins
+### For Super Admins
 
 1. **View Attendance**
    - Navigate to Admin Dashboard
    - Select "Attendance" tab
-   - View all employee records
+   - View all employee records across all departments
    - Use search and filters
+   - Click "Manual" button to add/edit/delete attendance records
    - Export to CSV
 
 2. **Manage Employees**
    - Select "Employees" tab
-   - View employee list
-   - Update work modes
-   - Manage leave balances
-   - Process requests
+   - View all employees across all departments
+   - Update work modes for any employee
+   - Manage leave balances for any employee
+   - Process all leave requests
 
 3. **HR Analytics**
    - Navigate to HR Dashboard
@@ -359,16 +382,59 @@ AttendanceApp/
    - Update status
    - Respond to tickets
 
+### For Managers
+
+1. **View Attendance**
+   - Navigate to Admin Dashboard
+   - Select "Attendance" tab
+   - View attendance records for employees in your department only
+   - Click "Manual" button to add/edit/delete attendance for your department employees
+   - Export to CSV
+
+2. **Manage Employees**
+   - Select "Employees" tab
+   - View only employees in your department
+   - Update work modes for department employees
+   - Manage leave balances for department employees
+   - Process leave requests for department employees only
+
+3. **Notifications**
+   - Receive notifications for leave requests from your department employees
+   - Click notifications to navigate directly to relevant screens
+
 ## 🔑 Demo Credentials
 
 ```
+Super Admin:
+Username: testadmin
+Password: testadmin123
+(Can manage all employees across all departments)
+
+Managers:
+Username: hrmanager
+Password: hrmanager123
+(Can manage HR department employees only)
+
+Username: techmanager
+Password: techmanager123
+(Can manage Engineering department employees only)
+
+Username: salesmanager
+Password: salesmanager123
+(Can manage Sales department employees only)
+
 Employee:
 Username: testuser
 Password: testuser123
+(Engineering department)
 
-Admin:
-Username: testadmin
-Password: testadmin123
+Other Employees:
+- john.doe / john123 (Engineering)
+- jane.smith / jane123 (Design)
+- mike.johnson / mike123 (Sales)
+- sarah.williams / sarah123 (Marketing)
+- david.brown / david123 (Engineering)
+- emily.davis / emily123 (HR)
 ```
 
 ## 📊 Features Breakdown
@@ -524,9 +590,19 @@ For issues or questions:
 
 ## 🎯 Version
 
-**Current Version:** 1.1.0
+**Current Version:** 1.2.0
 
-### Recent Updates (v1.1.0)
+### Recent Updates (v1.2.0)
+- ✅ Added Super Admin and Manager role system
+- ✅ Department-based employee management
+- ✅ Manual attendance management (add/edit/delete records)
+- ✅ Calendar date picker for leave request form
+- ✅ Smart notification navigation
+- ✅ Department managers receive notifications only for their department
+- ✅ Permission-based access control throughout the app
+- ✅ Removed backward compatibility for regular admin role
+
+### Previous Updates (v1.1.0)
 - ✅ Added half-day leave functionality
 - ✅ Morning/Afternoon period selection for half-day leaves
 - ✅ Enhanced leave request UI with duration toggle

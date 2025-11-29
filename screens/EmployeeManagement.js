@@ -18,7 +18,9 @@ import {
   updateEmployeeWorkMode, 
   getWorkModeStatistics,
   getPendingWorkModeRequests,
-  processWorkModeRequest
+  processWorkModeRequest,
+  getManageableEmployees,
+  canManageEmployee
 } from '../utils/employees';
 import { 
   getAllWorkModes, 
@@ -45,7 +47,7 @@ import {
 } from '../utils/hrRoles';
 
 export default function EmployeeManagement({ route }) {
-  const { user } = route.params;
+  const { user, openLeaveRequests } = route.params || {};
   const [employees, setEmployees] = useState([]);
   const [filteredEmployees, setFilteredEmployees] = useState([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -54,7 +56,7 @@ export default function EmployeeManagement({ route }) {
   const [pendingRequests, setPendingRequests] = useState([]);
   const [showRequestsModal, setShowRequestsModal] = useState(false);
   const [pendingLeaveRequests, setPendingLeaveRequests] = useState([]);
-  const [showLeaveRequestsModal, setShowLeaveRequestsModal] = useState(false);
+  const [showLeaveRequestsModal, setShowLeaveRequestsModal] = useState(openLeaveRequests || false);
   const [selectedLeaveRequest, setSelectedLeaveRequest] = useState(null);
   const [employeeLeaveBalances, setEmployeeLeaveBalances] = useState({}); // { employeeId: { remaining, balance } }
   const [stats, setStats] = useState({ total: 0, inOffice: 0, semiRemote: 0, fullyRemote: 0 });
@@ -77,6 +79,13 @@ export default function EmployeeManagement({ route }) {
   useEffect(() => {
     loadData();
   }, []);
+
+  // Reload leave requests when employees change
+  useEffect(() => {
+    if (employees.length > 0) {
+      loadPendingLeaveRequests();
+    }
+  }, [employees]);
 
   const loadData = async () => {
     await Promise.all([
@@ -117,7 +126,9 @@ export default function EmployeeManagement({ route }) {
 
   const loadEmployees = async () => {
     try {
-      const employeeList = await getEmployees();
+      // Get employees based on user's role
+      // Super admins see everyone, managers see only their department
+      const employeeList = await getManageableEmployees(user);
       setEmployees(employeeList);
       setFilteredEmployees(employeeList);
     } catch (error) {
@@ -137,8 +148,13 @@ export default function EmployeeManagement({ route }) {
 
   const loadPendingLeaveRequests = async () => {
     try {
-      const requests = await getPendingLeaveRequests();
-      setPendingLeaveRequests(requests);
+      const allRequests = await getPendingLeaveRequests();
+      // Filter leave requests to only show those for employees the user can manage
+      const manageableEmployeeIds = new Set(employees.map(emp => emp.id));
+      const filteredRequests = allRequests.filter(req => 
+        manageableEmployeeIds.has(req.employeeId)
+      );
+      setPendingLeaveRequests(filteredRequests);
     } catch (error) {
       console.error('Error loading pending leave requests:', error);
     }
@@ -160,6 +176,11 @@ export default function EmployeeManagement({ route }) {
   };
 
   const handleWorkModeChange = (employee) => {
+    // Check if user can manage this employee
+    if (!canManageEmployee(user, employee)) {
+      Alert.alert('Permission Denied', 'You can only manage work modes for employees in your department.');
+      return;
+    }
     setSelectedEmployee(employee);
     setShowWorkModeModal(true);
   };
@@ -215,6 +236,15 @@ export default function EmployeeManagement({ route }) {
   };
 
   const handleProcessLeaveRequest = async (requestId, status) => {
+    // Check if user can manage this leave request
+    const request = pendingLeaveRequests.find(req => req.id === requestId);
+    if (request) {
+      const employee = employees.find(emp => emp.id === request.employeeId);
+      if (employee && !canManageEmployee(user, employee)) {
+        Alert.alert('Permission Denied', 'You can only manage leave requests for employees in your department.');
+        return;
+      }
+    }
     try {
       const result = await processLeaveRequest(
         requestId,
@@ -239,6 +269,12 @@ export default function EmployeeManagement({ route }) {
   };
 
   const handleManageLeaves = async (employee) => {
+    // Check if user can manage this employee
+    if (!canManageEmployee(user, employee)) {
+      Alert.alert('Permission Denied', 'You can only manage leaves for employees in your department.');
+      return;
+    }
+    
     try {
       // Use employee.id for AsyncStorage employees
       const employeeId = employee.id;

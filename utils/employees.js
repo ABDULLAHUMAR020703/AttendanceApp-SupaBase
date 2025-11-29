@@ -33,7 +33,7 @@ export const initializeDefaultEmployees = async () => {
           username: 'testadmin',
           name: 'Test Admin',
           email: 'admin@company.com',
-          role: 'admin',
+          role: 'super_admin',
           workMode: WORK_MODES.IN_OFFICE,
           department: 'Management',
           position: 'System Administrator',
@@ -120,28 +120,41 @@ export const initializeDefaultEmployees = async () => {
           createdAt: new Date().toISOString()
         },
         {
-          id: 'emp_009',
-          username: 'admin2',
-          name: 'Admin Two',
-          email: 'admin2@company.com',
-          role: 'admin',
+          id: 'emp_010',
+          username: 'hrmanager',
+          name: 'HR Manager',
+          email: 'hrmanager@company.com',
+          role: 'manager',
           workMode: WORK_MODES.IN_OFFICE,
-          department: 'Management',
-          position: 'Operations Manager',
-          hireDate: '2022-01-10',
+          department: 'HR',
+          position: 'HR Manager',
+          hireDate: '2022-03-01',
           isActive: true,
           createdAt: new Date().toISOString()
         },
         {
-          id: 'emp_010',
-          username: 'manager1',
-          name: 'Manager One',
-          email: 'manager1@company.com',
-          role: 'admin',
-          workMode: WORK_MODES.SEMI_REMOTE,
-          department: 'Management',
-          position: 'Project Manager',
-          hireDate: '2022-05-20',
+          id: 'emp_011',
+          username: 'techmanager',
+          name: 'Tech Manager',
+          email: 'techmanager@company.com',
+          role: 'manager',
+          workMode: WORK_MODES.IN_OFFICE,
+          department: 'Engineering',
+          position: 'Engineering Manager',
+          hireDate: '2022-02-15',
+          isActive: true,
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 'emp_012',
+          username: 'salesmanager',
+          name: 'Sales Manager',
+          email: 'salesmanager@company.com',
+          role: 'manager',
+          workMode: WORK_MODES.IN_OFFICE,
+          department: 'Sales',
+          position: 'Sales Manager',
+          hireDate: '2022-01-20',
           isActive: true,
           createdAt: new Date().toISOString()
         }
@@ -214,17 +227,106 @@ export const getEmployeeById = async (employeeId) => {
 };
 
 /**
- * Get all admin users
+ * Get all admin users (super_admins and managers only)
  * @returns {Promise<Array>} Array of admin employee objects
  */
 export const getAdminUsers = async () => {
   try {
     const employees = await getEmployees();
-    return employees.filter(emp => emp.role === 'admin' && emp.isActive);
+    return employees.filter(emp => 
+      (emp.role === 'super_admin' || emp.role === 'manager') && emp.isActive
+    );
   } catch (error) {
     console.error('Error getting admin users:', error);
     return [];
   }
+};
+
+/**
+ * Get super admin users only
+ * @returns {Promise<Array>} Array of super admin employee objects
+ */
+export const getSuperAdminUsers = async () => {
+  try {
+    const employees = await getEmployees();
+    return employees.filter(emp => emp.role === 'super_admin' && emp.isActive);
+  } catch (error) {
+    console.error('Error getting super admin users:', error);
+    return [];
+  }
+};
+
+/**
+ * Get managers for a specific department
+ * @param {string} department - Department name
+ * @returns {Promise<Array>} Array of manager employee objects for the department
+ */
+export const getManagersByDepartment = async (department) => {
+  try {
+    const employees = await getEmployees();
+    return employees.filter(emp => 
+      emp.role === 'manager' && 
+      emp.department === department && 
+      emp.isActive
+    );
+  } catch (error) {
+    console.error('Error getting managers by department:', error);
+    return [];
+  }
+};
+
+/**
+ * Get employees that a user can manage
+ * @param {Object} user - User object with role and department
+ * @returns {Promise<Array>} Array of employees the user can manage
+ */
+export const getManageableEmployees = async (user) => {
+  try {
+    const employees = await getEmployees();
+    
+    // Super admins can manage everyone
+    if (user.role === 'super_admin') {
+      return employees.filter(emp => emp.isActive);
+    }
+    
+    // Managers can only manage employees in their department
+    if (user.role === 'manager') {
+      return employees.filter(emp => 
+        emp.isActive && 
+        emp.department === user.department &&
+        emp.role !== 'super_admin' // Managers can't manage super admins
+      );
+    }
+    
+    // Employees and regular admins can't manage anyone
+    return [];
+  } catch (error) {
+    console.error('Error getting manageable employees:', error);
+    return [];
+  }
+};
+
+/**
+ * Check if a user can manage a specific employee
+ * @param {Object} user - User object with role and department
+ * @param {Object} employee - Employee to check
+ * @returns {boolean} Whether the user can manage the employee
+ */
+export const canManageEmployee = (user, employee) => {
+  if (!user || !employee) return false;
+  
+  // Super admins can manage everyone
+  if (user.role === 'super_admin') {
+    return true;
+  }
+  
+  // Managers can only manage employees in their department
+  if (user.role === 'manager') {
+    return employee.department === user.department && employee.role !== 'super_admin';
+  }
+  
+  // Only super admins and managers can manage employees
+  return false;
 };
 
 /**

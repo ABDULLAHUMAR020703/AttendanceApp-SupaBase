@@ -18,6 +18,7 @@ import NotificationsScreen from './screens/NotificationsScreen';
 import TicketScreen from './screens/TicketScreen';
 import HRDashboard from './screens/HRDashboard';
 import TicketManagementScreen from './screens/TicketManagementScreen';
+import ManualAttendanceScreen from './screens/ManualAttendanceScreen';
 
 // Import auth context
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -84,7 +85,7 @@ function AppNavigator() {
         ) : (
           // Main App Stack
           <>
-            {user.role === 'employee' ? (
+            {(user.role === 'employee') ? (
               <>
                 <Stack.Screen 
                   name="EmployeeDashboard" 
@@ -153,7 +154,7 @@ function AppNavigator() {
                   initialParams={{ user }}
                 />
               </>
-            ) : (
+            ) : (user.role === 'super_admin' || user.role === 'manager') ? (
               <>
                 <Stack.Screen 
                   name="AdminDashboard" 
@@ -201,6 +202,12 @@ function AppNavigator() {
                   name="TicketManagement" 
                   component={TicketManagementScreen}
                   options={{ title: 'Ticket Management' }}
+                  initialParams={{ user }}
+                />
+                <Stack.Screen 
+                  name="ManualAttendance" 
+                  component={ManualAttendanceScreen}
+                  options={{ title: 'Manual Attendance' }}
                   initialParams={{ user }}
                 />
               </>

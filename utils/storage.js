@@ -55,6 +55,84 @@ export const getUserAttendanceRecords = async (username) => {
 };
 
 /**
+ * Update an attendance record
+ * @param {string} recordId - Record ID to update
+ * @param {Object} updates - Fields to update
+ * @returns {Promise<{success: boolean, error?: string}>}
+ */
+export const updateAttendanceRecord = async (recordId, updates) => {
+  try {
+    const records = await getAttendanceRecords();
+    const recordIndex = records.findIndex(r => r.id === recordId);
+    
+    if (recordIndex === -1) {
+      return { success: false, error: 'Record not found' };
+    }
+    
+    records[recordIndex] = {
+      ...records[recordIndex],
+      ...updates,
+      updatedAt: new Date().toISOString(),
+      updatedBy: updates.updatedBy || 'system'
+    };
+    
+    await AsyncStorage.setItem(ATTENDANCE_RECORDS_KEY, JSON.stringify(records));
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating attendance record:', error);
+    return { success: false, error: error.message || 'Failed to update record' };
+  }
+};
+
+/**
+ * Delete an attendance record
+ * @param {string} recordId - Record ID to delete
+ * @returns {Promise<{success: boolean, error?: string}>}
+ */
+export const deleteAttendanceRecord = async (recordId) => {
+  try {
+    const records = await getAttendanceRecords();
+    const filteredRecords = records.filter(r => r.id !== recordId);
+    
+    if (filteredRecords.length === records.length) {
+      return { success: false, error: 'Record not found' };
+    }
+    
+    await AsyncStorage.setItem(ATTENDANCE_RECORDS_KEY, JSON.stringify(filteredRecords));
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting attendance record:', error);
+    return { success: false, error: error.message || 'Failed to delete record' };
+  }
+};
+
+/**
+ * Create a manual attendance record (for admins/managers)
+ * @param {Object} attendanceData - Attendance data (username, type, timestamp, location, etc.)
+ * @param {string} createdBy - Username of admin/manager creating the record
+ * @returns {Promise<{success: boolean, recordId?: string, error?: string}>}
+ */
+export const createManualAttendanceRecord = async (attendanceData, createdBy) => {
+  try {
+    const records = await getAttendanceRecords();
+    const newRecord = {
+      id: Date.now().toString(),
+      ...attendanceData,
+      timestamp: attendanceData.timestamp || new Date().toISOString(),
+      isManual: true,
+      createdBy: createdBy,
+      createdAt: new Date().toISOString()
+    };
+    records.push(newRecord);
+    await AsyncStorage.setItem(ATTENDANCE_RECORDS_KEY, JSON.stringify(records));
+    return { success: true, recordId: newRecord.id };
+  } catch (error) {
+    console.error('Error creating manual attendance record:', error);
+    return { success: false, error: error.message || 'Failed to create record' };
+  }
+};
+
+/**
  * Clear all attendance records from AsyncStorage
  */
 export const clearAllAttendanceRecords = async () => {

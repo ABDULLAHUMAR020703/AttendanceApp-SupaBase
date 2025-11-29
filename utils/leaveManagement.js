@@ -1,7 +1,7 @@
 // Leave Management Utilities using AsyncStorage
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createNotification } from './notifications';
-import { getEmployeeById, getAdminUsers } from './employees';
+import { getEmployeeById, getAdminUsers, getSuperAdminUsers, getManagersByDepartment } from './employees';
 
 const LEAVE_SETTINGS_KEY = 'leave_settings';
 const EMPLOYEE_LEAVES_KEY = 'employee_leaves';
@@ -364,10 +364,24 @@ export const createLeaveRequest = async (employeeId, leaveType, startDate, endDa
       const notificationTitle = 'New Leave Request';
       const notificationBody = `${employee ? employee.name : 'An employee'} has submitted a ${leaveTypeLabels[leaveType]} request for ${daysText}${halfDayText} (${startDate}${startDate !== endDate ? ` to ${endDate}` : ''})`;
       
-      // Send notification to each admin
-      for (const admin of admins) {
+      // Get super admins and department managers
+      const superAdmins = await getSuperAdminUsers();
+      const departmentManagers = employee && employee.department 
+        ? await getManagersByDepartment(employee.department)
+        : [];
+      
+      // Combine all recipients (super admins + department managers)
+      const recipients = [...superAdmins, ...departmentManagers];
+      
+      // Remove duplicates based on username
+      const uniqueRecipients = recipients.filter((admin, index, self) =>
+        index === self.findIndex(a => a.username === admin.username)
+      );
+      
+      // Send notification to each recipient
+      for (const recipient of uniqueRecipients) {
         await createNotification(
-          admin.username,
+          recipient.username,
           notificationTitle,
           notificationBody,
           'leave_request',
@@ -378,7 +392,16 @@ export const createLeaveRequest = async (employeeId, leaveType, startDate, endDa
             leaveType,
             days,
             startDate,
-            endDate
+            endDate,
+            // Navigation data
+            navigation: {
+              screen: 'AdminDashboard',
+              params: {
+                user: recipient,
+                initialTab: 'employees',
+                openLeaveRequests: true
+              }
+            }
           }
         );
       }
@@ -546,7 +569,14 @@ export const processLeaveRequest = async (requestId, status, processedBy, adminN
             endDate: request.endDate,
             status,
             processedBy,
-            adminNotes
+            adminNotes,
+            // Navigation data
+            navigation: {
+              screen: 'LeaveRequestScreen',
+              params: {
+                user: employee
+              }
+            }
           }
         );
       }

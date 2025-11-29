@@ -18,15 +18,16 @@ export const authenticateUser = async (username, password) => {
     } else {
       // If file doesn't exist, use default content
       fileContent = `testuser,password:testuser123,role:employee
-testadmin,password:testadmin123,role:admin
+testadmin,password:testadmin123,role:super_admin
 john.doe,password:john123,role:employee
 jane.smith,password:jane123,role:employee
 mike.johnson,password:mike123,role:employee
 sarah.williams,password:sarah123,role:employee
 david.brown,password:david123,role:employee
 emily.davis,password:emily123,role:employee
-admin2,password:admin123,role:admin
-manager1,password:manager123,role:admin`;
+hrmanager,password:hrmanager123,role:manager
+techmanager,password:techmanager123,role:manager
+salesmanager,password:salesmanager123,role:manager`;
     }
     const lines = fileContent.trim().split('\n');
     
@@ -76,15 +77,16 @@ export const initializeUsersFile = async () => {
     if (!fileExists.exists) {
       // Create the users.txt file with default credentials
       const defaultUsers = `testuser,password:testuser123,role:employee
-testadmin,password:testadmin123,role:admin
+testadmin,password:testadmin123,role:super_admin
 john.doe,password:john123,role:employee
 jane.smith,password:jane123,role:employee
 mike.johnson,password:mike123,role:employee
 sarah.williams,password:sarah123,role:employee
 david.brown,password:david123,role:employee
 emily.davis,password:emily123,role:employee
-admin2,password:admin123,role:admin
-manager1,password:manager123,role:admin`;
+hrmanager,password:hrmanager123,role:manager
+techmanager,password:techmanager123,role:manager
+salesmanager,password:salesmanager123,role:manager`;
       
       await FileSystem.writeAsStringAsync(usersFilePath, defaultUsers);
       console.log('Users file initialized successfully');
