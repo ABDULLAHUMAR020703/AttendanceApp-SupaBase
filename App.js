@@ -1,41 +1,26 @@
 import React, { useEffect } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack';
-import { StatusBar } from 'expo-status-bar';
-import { View, ActivityIndicator } from 'react-native';
 
-// Import screens
-import LoginScreen from './screens/LoginScreen';
-import SignUpScreen from './screens/SignUpScreen';
-import EmployeeDashboard from './screens/EmployeeDashboard';
-import AdminDashboard from './screens/AdminDashboard';
-import AttendanceHistory from './screens/AttendanceHistory';
-import AuthenticationScreen from './screens/AuthenticationScreen';
-import AuthMethodSelection from './screens/AuthMethodSelection';
-import LeaveRequestScreen from './screens/LeaveRequestScreen';
-import CalendarScreen from './screens/CalendarScreen';
-import ThemeSettingsScreen from './screens/ThemeSettingsScreen';
-import NotificationsScreen from './screens/NotificationsScreen';
-import TicketScreen from './screens/TicketScreen';
-import HRDashboard from './screens/HRDashboard';
-import TicketManagementScreen from './screens/TicketManagementScreen';
-import ManualAttendanceScreen from './screens/ManualAttendanceScreen';
-import SignupApprovalScreen from './screens/SignupApprovalScreen';
-import CreateUserScreen from './screens/CreateUserScreen';
+// Core providers
+import { AuthProvider } from './core/contexts/AuthContext';
+import { ThemeProvider } from './core/contexts/ThemeContext';
 
-// Import auth context
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-// Import theme context
-import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+// Navigation
+import AppNavigator from './core/navigation/AppNavigator';
 
 // Import employee initialization
 import { initializeDefaultEmployees } from './utils/employees';
-// Import users file initialization
-// Firebase handles authentication automatically - no file initialization needed
 
-const Stack = createStackNavigator();
-
-
+/**
+ * Main App Component
+ * 
+ * This is the root component of the application.
+ * It sets up the core providers (Theme, Auth) and initializes the navigation.
+ * 
+ * Architecture:
+ * - Core providers wrap the entire app
+ * - AppNavigator handles routing based on auth state
+ * - Features are organized in feature modules
+ */
 export default function App() {
   useEffect(() => {
     // Initialize default employees when app starts
@@ -52,189 +37,5 @@ export default function App() {
         <AppNavigator />
       </AuthProvider>
     </ThemeProvider>
-  );
-}
-
-
-function AppNavigator() {
-  const { user, isLoading, handleLogin, handleLogout } = useAuth();
-  const { colors, theme } = useTheme();
-
-  if (isLoading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
-
-  return (
-    <NavigationContainer>
-      <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
-      <Stack.Navigator
-        screenOptions={{
-          headerStyle: {
-            backgroundColor: colors.primary,
-          },
-          headerTintColor: '#fff',
-          headerTitleStyle: {
-            fontWeight: 'bold',
-          },
-        }}
-      >
-        {!user ? (
-          // Auth Stack
-          <>
-            <Stack.Screen 
-              name="Login" 
-              component={LoginScreen}
-              options={{ 
-                title: 'Present',
-                headerShown: false 
-              }}
-            />
-            <Stack.Screen 
-              name="SignUp" 
-              component={SignUpScreen}
-              options={{ 
-                title: 'Sign Up',
-                headerShown: false 
-              }}
-            />
-          </>
-        ) : (
-          // Main App - Stack navigation for logged in users
-          <>
-            {user.role === 'employee' ? (
-              <>
-                <Stack.Screen 
-                  name="EmployeeDashboard" 
-                  component={EmployeeDashboard}
-                  options={{ headerShown: false }}
-                  initialParams={{ user }}
-                />
-                <Stack.Screen 
-                  name="AttendanceHistory" 
-                  component={AttendanceHistory}
-                  options={{ title: 'Attendance History' }}
-                  initialParams={{ user }}
-                />
-                <Stack.Screen 
-                  name="AuthenticationScreen" 
-                  component={AuthenticationScreen}
-                  options={{ title: 'Authentication' }}
-                  initialParams={{ user }}
-                />
-                <Stack.Screen 
-                  name="AuthMethodSelection" 
-                  component={AuthMethodSelection}
-                  options={{ title: 'Auth Settings' }}
-                  initialParams={{ user }}
-                />
-                <Stack.Screen 
-                  name="LeaveRequestScreen" 
-                  component={LeaveRequestScreen}
-                  options={{ title: 'Leave Requests' }}
-                  initialParams={{ user }}
-                />
-                <Stack.Screen 
-                  name="CalendarScreen" 
-                  component={CalendarScreen}
-                  options={{ title: 'Calendar' }}
-                  initialParams={{ user }}
-                />
-                <Stack.Screen 
-                  name="ThemeSettingsScreen" 
-                  component={ThemeSettingsScreen}
-                  options={{ title: 'Theme Settings' }}
-                  initialParams={{ user }}
-                />
-                <Stack.Screen 
-                  name="NotificationsScreen" 
-                  component={NotificationsScreen}
-                  options={{ title: 'Notifications' }}
-                  initialParams={{ user }}
-                />
-                <Stack.Screen 
-                  name="TicketScreen" 
-                  component={TicketScreen}
-                  options={{ title: 'My Tickets' }}
-                  initialParams={{ user }}
-                />
-              </>
-            ) : (user.role === 'super_admin' || user.role === 'manager') ? (
-              <>
-                <Stack.Screen 
-                  name="AdminDashboard" 
-                  component={AdminDashboard}
-                  options={{ headerShown: false }}
-                  initialParams={{ user }}
-                />
-                <Stack.Screen 
-                  name="CalendarScreen" 
-                  component={CalendarScreen}
-                  options={{ title: 'Calendar' }}
-                  initialParams={{ user }}
-                />
-                <Stack.Screen 
-                  name="ThemeSettingsScreen" 
-                  component={ThemeSettingsScreen}
-                  options={{ title: 'Theme Settings' }}
-                  initialParams={{ user }}
-                />
-                <Stack.Screen 
-                  name="NotificationsScreen" 
-                  component={NotificationsScreen}
-                  options={{ title: 'Notifications' }}
-                  initialParams={{ user }}
-                />
-                <Stack.Screen 
-                  name="HRDashboard" 
-                  component={HRDashboard}
-                  options={{ title: 'HR Dashboard' }}
-                  initialParams={{ user }}
-                />
-                <Stack.Screen 
-                  name="TicketManagement" 
-                  component={TicketManagementScreen}
-                  options={{ title: 'Ticket Management' }}
-                  initialParams={{ user }}
-                />
-                <Stack.Screen 
-                  name="ManualAttendance" 
-                  component={ManualAttendanceScreen}
-                  options={{ title: 'Manual Attendance' }}
-                  initialParams={{ user }}
-                />
-                <Stack.Screen 
-                  name="SignupApproval" 
-                  component={SignupApprovalScreen}
-                  options={{ title: 'Signup Approvals' }}
-                  initialParams={{ user }}
-                />
-                {user.role === 'super_admin' && (
-                  <Stack.Screen 
-                    name="CreateUser" 
-                    component={CreateUserScreen}
-                    options={{ title: 'Create User' }}
-                    initialParams={{ user }}
-                  />
-                )}
-              </>
-            ) : (
-              // Fallback for unrecognized roles - show login screen
-              <Stack.Screen 
-                name="Login" 
-                component={LoginScreen}
-                options={{ 
-                  title: 'Present',
-                  headerShown: false 
-                }}
-              />
-            )}
-          </>
-        )}
-      </Stack.Navigator>
-    </NavigationContainer>
   );
 }

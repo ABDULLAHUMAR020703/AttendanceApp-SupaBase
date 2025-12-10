@@ -1,0 +1,57 @@
+// Navigation Routes Constants
+export const ROUTES = {
+  // Auth Routes
+  LOGIN: 'Login',
+  SIGNUP: 'SignUp',
+  
+  // Employee Routes
+  EMPLOYEE_DASHBOARD: 'EmployeeDashboard',
+  ATTENDANCE_HISTORY: 'AttendanceHistory',
+  AUTHENTICATION_SCREEN: 'AuthenticationScreen',
+  AUTH_METHOD_SELECTION: 'AuthMethodSelection',
+  LEAVE_REQUEST: 'LeaveRequestScreen',
+  CALENDAR: 'CalendarScreen',
+  THEME_SETTINGS: 'ThemeSettingsScreen',
+  NOTIFICATIONS: 'NotificationsScreen',
+  TICKET_SCREEN: 'TicketScreen',
+  
+  // Admin Routes
+  ADMIN_DASHBOARD: 'AdminDashboard',
+  HR_DASHBOARD: 'HRDashboard',
+  TICKET_MANAGEMENT: 'TicketManagement',
+  MANUAL_ATTENDANCE: 'ManualAttendance',
+  SIGNUP_APPROVAL: 'SignupApproval',
+  CREATE_USER: 'CreateUser',
+  EMPLOYEE_MANAGEMENT: 'EmployeeManagement',
+};
+
+// Route groups by role
+export const EMPLOYEE_ROUTES = [
+  ROUTES.EMPLOYEE_DASHBOARD,
+  ROUTES.ATTENDANCE_HISTORY,
+  ROUTES.AUTHENTICATION_SCREEN,
+  ROUTES.AUTH_METHOD_SELECTION,
+  ROUTES.LEAVE_REQUEST,
+  ROUTES.CALENDAR,
+  ROUTES.THEME_SETTINGS,
+  ROUTES.NOTIFICATIONS,
+  ROUTES.TICKET_SCREEN,
+];
+
+export const ADMIN_ROUTES = [
+  ROUTES.ADMIN_DASHBOARD,
+  ROUTES.CALENDAR,
+  ROUTES.THEME_SETTINGS,
+  ROUTES.NOTIFICATIONS,
+  ROUTES.HR_DASHBOARD,
+  ROUTES.TICKET_MANAGEMENT,
+  ROUTES.MANUAL_ATTENDANCE,
+  ROUTES.SIGNUP_APPROVAL,
+  ROUTES.EMPLOYEE_MANAGEMENT,
+];
+
+export const SUPER_ADMIN_ROUTES = [
+  ...ADMIN_ROUTES,
+  ROUTES.CREATE_USER,
+];
+

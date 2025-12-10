@@ -2,20 +2,93 @@
 
 ## Table of Contents
 1. [Overview](#overview)
-2. [Authentication System](#authentication-system)
-3. [User Roles & Permissions](#user-roles--permissions)
-4. [Employee Data Structure](#employee-data-structure)
-5. [Firebase Integration](#firebase-integration)
-6. [Ticket Routing System](#ticket-routing-system)
-7. [Data Storage](#data-storage)
-8. [Login Flow](#login-flow)
-9. [Employee Management](#employee-management)
+2. [Code Architecture](#code-architecture)
+3. [Authentication System](#authentication-system)
+4. [User Roles & Permissions](#user-roles--permissions)
+5. [Employee Data Structure](#employee-data-structure)
+6. [Firebase Integration](#firebase-integration)
+7. [Ticket Routing System](#ticket-routing-system)
+8. [Data Storage](#data-storage)
+9. [Login Flow](#login-flow)
+10. [Employee Management](#employee-management)
 
 ---
 
 ## Overview
 
 This attendance management system uses **Firebase Authentication** and **Firestore** for user management, with **AsyncStorage** for local data persistence. The system supports three authentication roles with different permission levels and automatic ticket routing based on departments.
+
+The codebase follows a **modular, feature-based architecture** where each feature is self-contained and isolated, ensuring features don't interfere with each other and the code is deployment-ready.
+
+---
+
+## Code Architecture
+
+### Modular Structure
+
+The application is organized into three main layers:
+
+#### 1. Core (`core/`)
+Core infrastructure that the entire app depends on:
+- **`config/`**: Firebase and app configuration
+- **`contexts/`**: React Context providers (Auth, Theme)
+- **`navigation/`**: Navigation setup and routing
+- **`services/`**: Core services (storage abstraction)
+
+#### 2. Features (`features/`)
+Self-contained feature modules:
+- **`auth/`**: Authentication (login, signup, biometric)
+- **`attendance/`**: Attendance tracking (check-in/out, history)
+- **`tickets/`**: Ticket management and routing
+- **`leave/`**: Leave request management
+- **`employees/`**: Employee management
+- **`notifications/`**: Notification system
+- **`calendar/`**: Calendar and events
+- **`analytics/`**: Analytics and dashboards
+
+Each feature contains:
+- `screens/` - UI components
+- `services/` - Business logic
+- `utils/` - Feature-specific utilities
+- `index.js` - Public API exports
+
+#### 3. Shared (`shared/`)
+Reusable code across features:
+- **`components/`**: Reusable UI components (Logo, Trademark, etc.)
+- **`utils/`**: Shared utilities (responsive, export)
+- **`constants/`**: Constants and enums (roles, workModes, routes)
+- **`hooks/`**: Shared React hooks
+
+### Architecture Benefits
+
+1. **Feature Isolation**: Changes to one feature don't affect others
+2. **Clear Dependencies**: Features only import from `shared/` and `core/`
+3. **Deployment Ready**: Clear structure for CI/CD pipelines
+4. **Maintainability**: Easy to find and modify code by feature
+5. **Scalability**: Easy to add new features without affecting existing ones
+
+### Import Patterns
+
+```javascript
+// Import from features
+import { authenticateUser } from '../features/auth';
+
+// Import from shared
+import { ROLES } from '../shared/constants/roles';
+import { WORK_MODES } from '../shared/constants/workModes';
+
+// Import from core
+import { useAuth } from '../core/contexts/AuthContext';
+import { storage } from '../core/services/storage';
+```
+
+### Navigation Structure
+
+- **`AppNavigator.js`**: Main router that decides between auth and main navigation
+- **`AuthNavigator.js`**: Handles login/signup flow
+- **`MainNavigator.js`**: Routes based on user role (employee, manager, super_admin)
+
+For detailed architecture documentation, see `docs/MODULAR_ARCHITECTURE.md`.
 
 ---
 
@@ -551,14 +624,33 @@ Example: testuser,password:testuser123,role:employee
 
 ## File References
 
+### Data Structure Examples
 - **User Data Structure**: `users.json`, `asyncStorage-users-example.json`
-- **Firebase Setup**: `FIREBASE_SETUP.md`
+
+### Documentation
+- **Modular Architecture**: `docs/MODULAR_ARCHITECTURE.md`
+- **Firebase Setup**: `docs/FIREBASE_SETUP.md`
+- **Deployment Guide**: `docs/DEPLOYMENT.md`
+- **Migration Guide**: `docs/MIGRATION_GUIDE.md`
+
+### Code Locations (New Modular Structure)
+- **Auth Service**: `features/auth/services/authService.js`
+- **Auth Feature**: `features/auth/index.js`
+- **Employee Utils**: `utils/employees.js` (legacy, being migrated)
+- **Ticket Utils**: `utils/ticketManagement.js` (legacy, being migrated)
+- **Core Auth Context**: `core/contexts/AuthContext.js`
+- **Core Navigation**: `core/navigation/AppNavigator.js`
+- **Shared Constants**: `shared/constants/roles.js`, `shared/constants/workModes.js`
+
+### Scripts
 - **Migration Script**: `scripts/migrate-users-to-firebase.mjs`
-- **Auth Utils**: `utils/auth.js`
-- **Employee Utils**: `utils/employees.js`
-- **Ticket Utils**: `utils/ticketManagement.js`
+
+### Legacy Code (Being Migrated)
+- **Legacy Auth**: `utils/auth.js` (use `features/auth` instead)
+- **Legacy Screens**: `screens/` (being migrated to feature modules)
+- **Legacy Utils**: `utils/` (being migrated to feature modules)
 
 ---
 
-*Last Updated: 2024-01-01*
+*Last Updated: 2025-01-02*
 
