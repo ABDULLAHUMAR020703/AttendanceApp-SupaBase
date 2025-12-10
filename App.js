@@ -2,14 +2,15 @@ import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar } from 'expo-status-bar';
-import { View, ActivityIndicator, Text } from 'react-native';
+import { View, ActivityIndicator } from 'react-native';
 
 // Import screens
 import LoginScreen from './screens/LoginScreen';
+import SignUpScreen from './screens/SignUpScreen';
 import EmployeeDashboard from './screens/EmployeeDashboard';
 import AdminDashboard from './screens/AdminDashboard';
 import AttendanceHistory from './screens/AttendanceHistory';
-import CameraScreen from './screens/CameraScreen';
+import AuthenticationScreen from './screens/AuthenticationScreen';
 import AuthMethodSelection from './screens/AuthMethodSelection';
 import LeaveRequestScreen from './screens/LeaveRequestScreen';
 import CalendarScreen from './screens/CalendarScreen';
@@ -19,6 +20,8 @@ import TicketScreen from './screens/TicketScreen';
 import HRDashboard from './screens/HRDashboard';
 import TicketManagementScreen from './screens/TicketManagementScreen';
 import ManualAttendanceScreen from './screens/ManualAttendanceScreen';
+import SignupApprovalScreen from './screens/SignupApprovalScreen';
+import CreateUserScreen from './screens/CreateUserScreen';
 
 // Import auth context
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -27,6 +30,8 @@ import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 
 // Import employee initialization
 import { initializeDefaultEmployees } from './utils/employees';
+// Import users file initialization
+// Firebase handles authentication automatically - no file initialization needed
 
 const Stack = createStackNavigator();
 
@@ -34,7 +39,11 @@ const Stack = createStackNavigator();
 export default function App() {
   useEffect(() => {
     // Initialize default employees when app starts
-    initializeDefaultEmployees();
+    // Firebase handles authentication automatically - no file initialization needed
+    const initializeApp = async () => {
+      await initializeDefaultEmployees();
+    };
+    initializeApp();
   }, []);
 
   return (
@@ -45,6 +54,7 @@ export default function App() {
     </ThemeProvider>
   );
 }
+
 
 function AppNavigator() {
   const { user, isLoading, handleLogin, handleLogout } = useAuth();
@@ -74,35 +84,33 @@ function AppNavigator() {
       >
         {!user ? (
           // Auth Stack
-          <Stack.Screen 
-            name="Login" 
-            component={LoginScreen}
-            options={{ 
-              title: 'Attendance App',
-              headerShown: false 
-            }}
-          />
-        ) : (
-          // Main App Stack
           <>
-            {(user.role === 'employee') ? (
+            <Stack.Screen 
+              name="Login" 
+              component={LoginScreen}
+              options={{ 
+                title: 'Present',
+                headerShown: false 
+              }}
+            />
+            <Stack.Screen 
+              name="SignUp" 
+              component={SignUpScreen}
+              options={{ 
+                title: 'Sign Up',
+                headerShown: false 
+              }}
+            />
+          </>
+        ) : (
+          // Main App - Stack navigation for logged in users
+          <>
+            {user.role === 'employee' ? (
               <>
                 <Stack.Screen 
                   name="EmployeeDashboard" 
                   component={EmployeeDashboard}
-                  options={{ 
-                    title: 'Employee Dashboard',
-                    headerRight: () => (
-                      <View className="mr-4">
-                        <Text 
-                          className="text-white text-sm"
-                          onPress={handleLogout}
-                        >
-                          Logout
-                        </Text>
-                      </View>
-                    )
-                  }}
+                  options={{ headerShown: false }}
                   initialParams={{ user }}
                 />
                 <Stack.Screen 
@@ -112,15 +120,15 @@ function AppNavigator() {
                   initialParams={{ user }}
                 />
                 <Stack.Screen 
-                  name="CameraScreen" 
-                  component={CameraScreen}
-                  options={{ title: 'Take Photo' }}
+                  name="AuthenticationScreen" 
+                  component={AuthenticationScreen}
+                  options={{ title: 'Authentication' }}
                   initialParams={{ user }}
                 />
                 <Stack.Screen 
                   name="AuthMethodSelection" 
                   component={AuthMethodSelection}
-                  options={{ title: 'Authentication Settings' }}
+                  options={{ title: 'Auth Settings' }}
                   initialParams={{ user }}
                 />
                 <Stack.Screen 
@@ -159,19 +167,7 @@ function AppNavigator() {
                 <Stack.Screen 
                   name="AdminDashboard" 
                   component={AdminDashboard}
-                  options={{ 
-                    title: 'Admin Dashboard',
-                    headerRight: () => (
-                      <View className="mr-4">
-                        <Text 
-                          className="text-white text-sm"
-                          onPress={handleLogout}
-                        >
-                          Logout
-                        </Text>
-                      </View>
-                    )
-                  }}
+                  options={{ headerShown: false }}
                   initialParams={{ user }}
                 />
                 <Stack.Screen 
@@ -210,7 +206,31 @@ function AppNavigator() {
                   options={{ title: 'Manual Attendance' }}
                   initialParams={{ user }}
                 />
+                <Stack.Screen 
+                  name="SignupApproval" 
+                  component={SignupApprovalScreen}
+                  options={{ title: 'Signup Approvals' }}
+                  initialParams={{ user }}
+                />
+                {user.role === 'super_admin' && (
+                  <Stack.Screen 
+                    name="CreateUser" 
+                    component={CreateUserScreen}
+                    options={{ title: 'Create User' }}
+                    initialParams={{ user }}
+                  />
+                )}
               </>
+            ) : (
+              // Fallback for unrecognized roles - show login screen
+              <Stack.Screen 
+                name="Login" 
+                component={LoginScreen}
+                options={{ 
+                  title: 'Present',
+                  headerShown: false 
+                }}
+              />
             )}
           </>
         )}

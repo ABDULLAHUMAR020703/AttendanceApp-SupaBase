@@ -165,13 +165,49 @@ export const initializeDefaultEmployees = async () => {
       await AsyncStorage.setItem(EMPLOYEES_KEY, JSON.stringify(defaultEmployees));
       console.log('Default employees initialized');
       } else {
-        // Merge: Add any missing default employees
+        // Merge: Add any missing default employees and update roles for existing ones
         const existingUsernames = new Set(existingEmployees.map(emp => emp.username));
-        const missingEmployees = defaultEmployees.filter(emp => !existingUsernames.has(emp.username));
+        const existingIds = new Set(existingEmployees.map(emp => emp.id));
+        
+        // Filter out employees that already exist (by username) and ensure no duplicate IDs
+        const missingEmployees = defaultEmployees.filter(emp => 
+          !existingUsernames.has(emp.username) && !existingIds.has(emp.id)
+        );
+        
+        // Update existing employees with correct roles from defaults
+        const updatedEmployees = existingEmployees.map(existingEmp => {
+          const defaultEmp = defaultEmployees.find(def => def.username === existingEmp.username);
+          if (defaultEmp) {
+            // Update role and other fields if they don't match the default
+            if (existingEmp.role !== defaultEmp.role) {
+              console.log(`Updating role for ${existingEmp.username} from ${existingEmp.role} to ${defaultEmp.role}`);
+            }
+            // Merge default data with existing, keeping existing ID if different
+            return { 
+              ...defaultEmp, 
+              id: existingEmp.id, // Keep existing ID to avoid duplicates
+              createdAt: existingEmp.createdAt || defaultEmp.createdAt // Keep original creation date
+            };
+          }
+          return existingEmp;
+        });
+        
+        // Remove any duplicates by ID before combining
+        const uniqueExisting = updatedEmployees.filter((emp, index, self) => 
+          index === self.findIndex(e => e.id === emp.id)
+        );
+        
+        // Combine updated existing employees with missing ones
+        const mergedEmployees = [...uniqueExisting, ...missingEmployees];
+        
+        // Final check: remove any remaining duplicates by ID
+        const finalEmployees = mergedEmployees.filter((emp, index, self) => 
+          index === self.findIndex(e => e.id === emp.id)
+        );
+        
+        await AsyncStorage.setItem(EMPLOYEES_KEY, JSON.stringify(finalEmployees));
         
         if (missingEmployees.length > 0) {
-          const mergedEmployees = [...existingEmployees, ...missingEmployees];
-          await AsyncStorage.setItem(EMPLOYEES_KEY, JSON.stringify(mergedEmployees));
           console.log(`Added ${missingEmployees.length} new default employees`);
         } else {
           console.log('All default employees already exist');
@@ -553,5 +589,150 @@ export const getWorkModeStatistics = async () => {
   } catch (error) {
     console.error('Error getting work mode statistics:', error);
     return { total: 0, inOffice: 0, semiRemote: 0, fullyRemote: 0 };
+  }
+};
+
+/**
+ * Create a new employee
+ * @param {Object} employeeData - Employee data
+ * @returns {Promise<{success: boolean, id?: string, error?: string}>}
+ */
+export const createEmployee = async (employeeData) => {
+  try {
+    const {
+      username,
+      password,
+      name,
+      email,
+      role = 'employee',
+      department = '',
+      position = '',
+      workMode = WORK_MODES.IN_OFFICE,
+      hireDate = new Date().toISOString().split('T')[0],
+    } = employeeData;
+
+    // Validate required fields
+    if (!username || !password || !name || !email) {
+      return { success: false, error: 'Username, password, name, and email are required' };
+    }
+
+    // Check if username already exists
+    const existingEmployee = await getEmployeeByUsername(username);
+    if (existingEmployee) {
+      return { success: false, error: 'Username already exists' };
+    }
+
+    // Check if username exists in Firebase
+    const { checkUsernameExists, addUserToFile } = await import('./auth');
+    const usernameExists = await checkUsernameExists(username);
+    if (usernameExists) {
+      return { success: false, error: 'Username already exists in system' };
+    }
+
+    // Create employee ID
+    const employeeId = `emp_${Date.now()}`;
+
+    // Create employee object
+    const newEmployee = {
+      id: employeeId,
+      username,
+      name,
+      email,
+      role,
+      department,
+      position,
+      workMode,
+      hireDate,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+    };
+
+    // Add to employees list
+    const employees = await getEmployees();
+    employees.push(newEmployee);
+    await AsyncStorage.setItem(EMPLOYEES_KEY, JSON.stringify(employees));
+
+    // Create user in Firebase
+    const addUserResult = await addUserToFile({
+      username,
+      password,
+      email,
+      name,
+      role,
+      department,
+      position,
+      workMode,
+      hireDate,
+    });
+
+    if (!addUserResult.success) {
+      // Rollback: remove employee if user creation failed
+      const updatedEmployees = employees.filter(emp => emp.id !== employeeId);
+      await AsyncStorage.setItem(EMPLOYEES_KEY, JSON.stringify(updatedEmployees));
+      return { success: false, error: addUserResult.error || 'Failed to create user account' };
+    }
+
+    console.log('✓ Employee created:', employeeId);
+    return { success: true, id: employeeId };
+  } catch (error) {
+    console.error('Error creating employee:', error);
+    return { success: false, error: error.message || 'Failed to create employee' };
+  }
+};
+
+/**
+ * Update employee information (including role)
+ * @param {string} employeeId - Employee ID
+ * @param {Object} updates - Fields to update
+ * @returns {Promise<{success: boolean, error?: string}>}
+ */
+export const updateEmployee = async (employeeId, updates) => {
+  try {
+    const employees = await getEmployees();
+    const employeeIndex = employees.findIndex(emp => emp.id === employeeId);
+
+    if (employeeIndex === -1) {
+      return { success: false, error: 'Employee not found' };
+    }
+
+    const employee = employees[employeeIndex];
+    const updatedEmployee = {
+      ...employee,
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    };
+
+    // If role is being updated, also update Firebase
+    if (updates.role && updates.role !== employee.role) {
+      const { updateUserRole } = await import('./auth');
+      const updateRoleResult = await updateUserRole(employee.username, updates.role);
+      
+      if (!updateRoleResult.success) {
+        return { success: false, error: updateRoleResult.error || 'Failed to update user role' };
+      }
+    }
+
+    employees[employeeIndex] = updatedEmployee;
+    await AsyncStorage.setItem(EMPLOYEES_KEY, JSON.stringify(employees));
+
+    console.log('✓ Employee updated:', employeeId);
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating employee:', error);
+    return { success: false, error: error.message || 'Failed to update employee' };
+  }
+};
+
+/**
+ * Delete employee (soft delete - set isActive to false)
+ * @param {string} employeeId - Employee ID
+ * @returns {Promise<{success: boolean, error?: string}>}
+ */
+export const deleteEmployee = async (employeeId) => {
+  try {
+    return await updateEmployee(employeeId, { isActive: false });
+  } catch (error) {
+    console.error('Error deleting employee:', error);
+    return { success: false, error: error.message || 'Failed to delete employee' };
   }
 };

@@ -157,7 +157,7 @@ export default function AuthMethodSelection({ navigation, route }) {
               selectedMethod === 'face' ? 'bg-primary-500' : 'bg-gray-200'
             }`}>
               <Ionicons 
-                name="camera" 
+                name="finger-print" 
                 size={32} 
                 color={selectedMethod === 'face' ? 'white' : '#9ca3af'} 
               />

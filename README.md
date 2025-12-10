@@ -1,10 +1,10 @@
-# Attendance App - Complete Employee Management System
+# Present - Complete Employee Management System
 
 A comprehensive attendance tracking and employee management application built with React Native and Expo SDK 54. Features role-based authentication, biometric authentication, advanced analytics, leave management, ticket system, and more.
 
 ## 📱 Overview
 
-The Attendance App is a full-featured employee management system designed for organizations to track employee attendance, manage leaves, handle support tickets, and analyze workforce data. The app supports multiple authentication methods, provides detailed analytics, and offers a modern, responsive UI with dark mode support.
+Present is a full-featured employee management system designed for organizations to track employee attendance, manage leaves, handle support tickets, and analyze workforce data. The app supports multiple authentication methods, provides detailed analytics, and offers a modern, responsive UI with dark mode support.
 
 ## ✨ Key Features
 
@@ -12,7 +12,6 @@ The Attendance App is a full-featured employee management system designed for or
 - **Multiple Authentication Methods**:
   - Face ID (iOS & Android) - Device native face recognition
   - Biometric Authentication - Fingerprint/Face unlock
-  - Photo Verification - Camera-based face verification
 - **Role-Based Access Control**:
   - Employee role with personal dashboard
   - Super Admin role with full system access across all departments
@@ -27,7 +26,6 @@ The Attendance App is a full-featured employee management system designed for or
 - **Attendance History** - View all personal attendance records
 - **Filter Records** - Filter by check-in, check-out, or view all
 - **Location Tracking** - GPS coordinates captured with each attendance
-- **Photo Capture** - Selfie verification for attendance
 
 #### Personal Dashboard
 - **Current Status** - See last check-in/check-out status
@@ -183,7 +181,6 @@ The Attendance App is a full-featured employee management system designed for or
 
 ### Key Libraries
 - **@react-native-async-storage/async-storage** - Local data persistence
-- **expo-camera** - Camera integration for photo capture
 - **expo-location** - GPS location tracking
 - **expo-local-authentication** - Biometric and Face ID authentication
 - **expo-notifications** - Push notifications
@@ -248,7 +245,6 @@ Firebase is currently disabled. To enable:
 
 #### Permissions
 The app requires the following permissions:
-- **Camera** - For attendance photo capture
 - **Location** - For GPS tracking (optional)
 - **Biometric/Face ID** - For authentication (if enabled)
 - **Notifications** - For push notifications
@@ -283,7 +279,7 @@ AttendanceApp/
 │   ├── AdminDashboard.js      # Admin main dashboard
 │   ├── HRDashboard.js         # HR analytics dashboard
 │   ├── AttendanceHistory.js   # Attendance records list
-│   ├── CameraScreen.js        # Camera for photo capture
+│   ├── AuthenticationScreen.js # Biometric and Face ID authentication
 │   ├── AuthMethodSelection.js # Authentication method selection
 │   ├── LeaveRequestScreen.js  # Leave request management
 │   ├── CalendarScreen.js      # Calendar and events
@@ -326,9 +322,9 @@ AttendanceApp/
 
 2. **Check In/Out**
    - Tap "Check In" or "Check Out" button
-   - Choose authentication method (Face ID, Biometric, or Photo)
+   - Choose authentication method (Face ID or Biometric)
    - Complete authentication
-   - Location and photo are captured automatically
+   - Location is captured automatically
 
 3. **View Analytics**
    - Navigate to Employee Dashboard
@@ -450,12 +446,7 @@ Other Employees:
 2. **Biometric Authentication**
    - Fingerprint (Android)
    - Face ID (iOS)
-   - Fallback to Face Verification if unavailable
-
-3. **Photo Verification**
-   - Camera-based face verification
-   - Works in Expo Go
-   - Fallback option
+   - Uses device-native authentication systems
 
 ### Work Modes
 
@@ -511,7 +502,7 @@ The app supports comprehensive theming:
 - **Secure Authentication** - Multiple authentication layers
 - **Biometric Security** - Device-native biometric authentication
 - **Location Verification** - GPS tracking for attendance
-- **Photo Verification** - Visual confirmation of attendance
+- **Device-Native Authentication** - Uses device's built-in Face ID/Face Unlock or fingerprint sensors
 - **Session Management** - Secure session handling
 
 ## 📈 Analytics Features

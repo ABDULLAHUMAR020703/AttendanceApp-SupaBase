@@ -7,9 +7,13 @@ import {
   Alert,
   RefreshControl,
   Image,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getUserAttendanceRecords } from '../utils/storage';
+import { fontSize, spacing, iconSize, componentSize, responsivePadding, responsiveFont, normalize } from '../utils/responsive';
+import Logo from '../components/Logo';
+import Trademark from '../components/Trademark';
 
 export default function AttendanceHistory({ route }) {
   const { user } = route.params;
@@ -68,50 +72,87 @@ export default function AttendanceHistory({ route }) {
     const { date, time } = formatDate(item.timestamp);
     
     return (
-      <View className="bg-white rounded-xl p-4 mb-3 shadow-sm">
+      <View 
+        className="bg-white rounded-xl shadow-sm"
+        style={{
+          padding: responsivePadding(16),
+          marginBottom: spacing.md,
+          marginHorizontal: spacing.sm,
+        }}
+      >
         <View className="flex-row items-start">
           {/* Status Indicator */}
-          <View className="mr-4">
+          <View style={{ marginRight: spacing.md }}>
             <View 
-              className="w-12 h-12 rounded-full items-center justify-center"
-              style={{ backgroundColor: `${getStatusColor(item.type)}20` }}
+              className="rounded-full items-center justify-center"
+              style={{ 
+                width: componentSize.avatarMedium,
+                height: componentSize.avatarMedium,
+                backgroundColor: `${getStatusColor(item.type)}20` 
+              }}
             >
               <Ionicons 
                 name={getStatusIcon(item.type)} 
-                size={20} 
+                size={iconSize.md} 
                 color={getStatusColor(item.type)} 
               />
             </View>
           </View>
 
           {/* Record Details */}
-          <View className="flex-1">
-            <View className="flex-row items-center justify-between mb-2">
-              <Text className="text-lg font-semibold text-gray-800 capitalize">
+          <View className="flex-1" style={{ flexShrink: 1 }}>
+            <View className="flex-row items-center justify-between" style={{ marginBottom: spacing.xs }}>
+              <Text 
+                className="font-semibold text-gray-800 capitalize"
+                style={{ fontSize: responsiveFont(18) }}
+              >
                 {item.type === 'checkin' ? 'Check In' : 'Check Out'}
               </Text>
-              <Text className="text-sm text-gray-500">{time}</Text>
+              <Text 
+                className="text-gray-500"
+                style={{ fontSize: responsiveFont(12) }}
+              >
+                {time}
+              </Text>
             </View>
             
-            <Text className="text-gray-600 mb-2">{date}</Text>
+            <Text 
+              className="text-gray-600"
+              style={{ 
+                fontSize: responsiveFont(14),
+                marginBottom: spacing.xs,
+              }}
+            >
+              {date}
+            </Text>
             
             {/* Location */}
             {item.location && (
-              <View className="flex-row items-center mb-2">
-                <Ionicons name="location-outline" size={16} color="#6b7280" />
-                <Text className="text-gray-600 text-sm ml-1 flex-1">
+              <View className="flex-row items-center" style={{ marginBottom: spacing.xs }}>
+                <Ionicons name="location-outline" size={iconSize.sm} color="#6b7280" />
+                <Text 
+                  className="text-gray-600 ml-1 flex-1"
+                  style={{ fontSize: responsiveFont(12) }}
+                  numberOfLines={1}
+                >
                   {item.location.address || 
-                   `${item.location.latitude.toFixed(4)}, ${item.location.longitude.toFixed(4)}`}
+                   (item.location.latitude !== undefined && item.location.longitude !== undefined
+                     ? `${item.location.latitude.toFixed(4)}, ${item.location.longitude.toFixed(4)}`
+                     : 'Location unavailable')}
                 </Text>
               </View>
             )}
 
             {/* Photo */}
             {item.photo && (
-              <View className="mt-2">
+              <View style={{ marginTop: spacing.xs }}>
                 <Image 
                   source={{ uri: item.photo }} 
-                  className="w-16 h-16 rounded-lg"
+                  className="rounded-lg"
+                  style={{ 
+                    width: componentSize.avatarLarge,
+                    height: componentSize.avatarLarge,
+                  }}
                   resizeMode="cover"
                 />
               </View>
@@ -124,14 +165,22 @@ export default function AttendanceHistory({ route }) {
 
   const FilterButton = ({ title, value, isActive }) => (
     <TouchableOpacity
-      className={`px-4 py-2 rounded-full ${
+      className={`rounded-full ${
         isActive ? 'bg-primary-500' : 'bg-gray-200'
       }`}
+      style={{
+        paddingHorizontal: responsivePadding(16),
+        paddingVertical: spacing.xs,
+        marginRight: spacing.xs,
+      }}
       onPress={() => setFilter(value)}
     >
-      <Text className={`font-medium ${
+      <Text 
+        className={`font-medium ${
         isActive ? 'text-white' : 'text-gray-700'
-      }`}>
+        }`}
+        style={{ fontSize: responsiveFont(14) }}
+      >
         {title}
       </Text>
     </TouchableOpacity>
@@ -140,17 +189,37 @@ export default function AttendanceHistory({ route }) {
   return (
     <View className="flex-1 bg-gray-50">
       {/* Header */}
-      <View className="bg-white px-6 py-4 shadow-sm">
-        <Text className="text-xl font-bold text-gray-800 mb-4">
+      <View 
+        className="bg-white shadow-sm"
+        style={{
+          paddingHorizontal: responsivePadding(24),
+          paddingVertical: responsivePadding(16),
+        }}
+      >
+        <View className="flex-row items-center" style={{ marginBottom: spacing.md }}>
+          <Logo size="small" style={{ marginRight: spacing.sm }} />
+          <Text 
+            className="font-bold text-gray-800"
+            style={{ 
+              fontSize: responsiveFont(20),
+            }}
+          >
           Attendance History
         </Text>
+        </View>
         
         {/* Filter Buttons */}
-        <View className="flex-row space-x-2">
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingRight: responsivePadding(16) }}
+        >
+          <View className="flex-row">
           <FilterButton title="All" value="all" isActive={filter === 'all'} />
           <FilterButton title="Check In" value="checkin" isActive={filter === 'checkin'} />
           <FilterButton title="Check Out" value="checkout" isActive={filter === 'checkout'} />
         </View>
+        </ScrollView>
       </View>
 
       {/* Records List */}
@@ -166,34 +235,70 @@ export default function AttendanceHistory({ route }) {
           showsVerticalScrollIndicator={false}
         />
       ) : (
-        <View className="flex-1 justify-center items-center px-6">
-          <Ionicons name="time-outline" size={64} color="#d1d5db" />
-          <Text className="text-xl font-semibold text-gray-500 mt-4 text-center">
+        <View 
+          className="flex-1 justify-center items-center"
+          style={{ paddingHorizontal: responsivePadding(24) }}
+        >
+          <Ionicons name="time-outline" size={iconSize['4xl']} color="#d1d5db" />
+          <Text 
+            className="font-semibold text-gray-500 text-center"
+            style={{ 
+              fontSize: responsiveFont(20),
+              marginTop: spacing.md,
+            }}
+          >
             No attendance records found
           </Text>
-          <Text className="text-gray-400 text-center mt-2">
+          <Text 
+            className="text-gray-400 text-center"
+            style={{ 
+              fontSize: responsiveFont(14),
+              marginTop: spacing.xs,
+            }}
+          >
             {filter === 'all' 
               ? 'Start by checking in to create your first record'
               : `No ${filter} records found`
             }
           </Text>
           <TouchableOpacity
-            className="bg-primary-500 rounded-xl px-6 py-3 mt-6"
+            className="bg-primary-500 rounded-xl"
+            style={{
+              paddingHorizontal: responsivePadding(24),
+              paddingVertical: spacing.md,
+              marginTop: spacing.lg,
+            }}
             onPress={onRefresh}
           >
-            <Text className="text-white font-semibold">Refresh</Text>
+            <Text 
+              className="text-white font-semibold"
+              style={{ fontSize: responsiveFont(16) }}
+            >
+              Refresh
+            </Text>
           </TouchableOpacity>
         </View>
       )}
 
       {/* Summary */}
       {records.length > 0 && (
-        <View className="bg-white p-4 border-t border-gray-200">
-          <Text className="text-gray-600 text-center">
+        <View 
+          className="bg-white border-t border-gray-200"
+          style={{ padding: responsivePadding(16) }}
+        >
+          <Text 
+            className="text-gray-600 text-center"
+            style={{ fontSize: responsiveFont(14) }}
+          >
             Showing {records.length} record{records.length !== 1 ? 's' : ''}
           </Text>
         </View>
       )}
+
+      {/* Trademark */}
+      <View style={{ padding: responsivePadding(16) }}>
+        <Trademark position="bottom" />
+      </View>
     </View>
   );
 }

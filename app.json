@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Attendance App",
+    "name": "Present",
     "slug": "attendance-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -24,7 +24,7 @@
       "package": "com.attendanceapp",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#14b8a6"
       },
       "permissions": [
         "USE_BIOMETRIC",

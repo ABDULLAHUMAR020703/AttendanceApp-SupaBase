@@ -20,7 +20,8 @@ import {
   getPendingWorkModeRequests,
   processWorkModeRequest,
   getManageableEmployees,
-  canManageEmployee
+  canManageEmployee,
+  updateEmployee
 } from '../utils/employees';
 import { 
   getAllWorkModes, 
@@ -75,6 +76,9 @@ export default function EmployeeManagement({ route }) {
     sickLeaves: '',
     casualLeaves: ''
   });
+  const [showRoleEditModal, setShowRoleEditModal] = useState(false);
+  const [selectedEmployeeForRoleEdit, setSelectedEmployeeForRoleEdit] = useState(null);
+  const [selectedRole, setSelectedRole] = useState('employee');
 
   useEffect(() => {
     loadData();
@@ -411,6 +415,34 @@ export default function EmployeeManagement({ route }) {
     }
   };
 
+  const ROLES = [
+    { value: 'employee', label: 'Employee' },
+    { value: 'manager', label: 'Manager' },
+    { value: 'super_admin', label: 'Super Admin' },
+  ];
+
+  const handleUpdateRole = async () => {
+    if (!selectedEmployeeForRoleEdit) return;
+
+    try {
+      const result = await updateEmployee(selectedEmployeeForRoleEdit.id, {
+        role: selectedRole,
+      });
+
+      if (result.success) {
+        Alert.alert('Success', `Employee role updated to ${selectedRole}`);
+        setShowRoleEditModal(false);
+        setSelectedEmployeeForRoleEdit(null);
+        await loadData();
+      } else {
+        Alert.alert('Error', result.error || 'Failed to update employee role');
+      }
+    } catch (error) {
+      console.error('Error updating role:', error);
+      Alert.alert('Error', 'Failed to update employee role');
+    }
+  };
+
   const renderEmployee = ({ item }) => {
     // Get employee ID
     const employeeId = item.id;
@@ -497,6 +529,20 @@ export default function EmployeeManagement({ route }) {
               >
                 <Text className="text-white text-xs font-medium">Leaves</Text>
           </TouchableOpacity>
+              
+              {/* Role Edit Button - Only for super_admin */}
+              {user.role === 'super_admin' && (
+                <TouchableOpacity
+                  className="bg-purple-500 rounded-lg px-3 py-1"
+                  onPress={() => {
+                    setSelectedEmployeeForRoleEdit(item);
+                    setSelectedRole(item.role);
+                    setShowRoleEditModal(true);
+                  }}
+                >
+                  <Text className="text-white text-xs font-medium">Role</Text>
+                </TouchableOpacity>
+              )}
             </View>
         </View>
       </View>
@@ -827,6 +873,72 @@ export default function EmployeeManagement({ route }) {
         onSave={handleSaveDefaultLeaves}
         onSettingsChange={setDefaultLeaveSettings}
       />
+      {/* Role Edit Modal */}
+      <Modal
+        visible={showRoleEditModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowRoleEditModal(false)}
+      >
+        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
+          <View className="bg-white rounded-xl p-6 mx-4 w-full max-w-sm">
+            <Text className="text-xl font-bold text-gray-800 mb-4">
+              Edit Employee Role
+            </Text>
+            
+            {selectedEmployeeForRoleEdit && (
+              <View className="mb-4">
+                <Text className="text-gray-600 mb-2">
+                  Employee: <Text className="font-medium">{selectedEmployeeForRoleEdit.name}</Text>
+                </Text>
+                <Text className="text-gray-500 text-sm">
+                  @{selectedEmployeeForRoleEdit.username}
+                </Text>
+                <Text className="text-gray-500 text-sm mt-1">
+                  Current Role: <Text className="font-medium capitalize">{selectedEmployeeForRoleEdit.role}</Text>
+                </Text>
+              </View>
+            )}
+            
+            <Text className="text-gray-800 font-medium mb-2">
+              Select New Role:
+            </Text>
+            <View className="mb-4">
+              {ROLES.map((role) => (
+                <TouchableOpacity
+                  key={role.value}
+                  className={`rounded-lg p-3 mb-2 ${selectedRole === role.value ? 'bg-primary-500' : 'bg-gray-200'}`}
+                  onPress={() => setSelectedRole(role.value)}
+                >
+                  <Text className={`font-medium ${selectedRole === role.value ? 'text-white' : 'text-gray-700'}`}>
+                    {role.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            
+            <View className="flex-row space-x-3">
+              <TouchableOpacity
+                className="bg-gray-200 rounded-lg p-3 flex-1"
+                onPress={() => {
+                  setShowRoleEditModal(false);
+                  setSelectedEmployeeForRoleEdit(null);
+                }}
+              >
+                <Text className="text-center font-medium text-gray-700">Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                className="bg-primary-500 rounded-lg p-3 flex-1"
+                onPress={handleUpdateRole}
+              >
+                <Text className="text-center font-medium text-white">Update Role</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <EmployeeLeaveModal
         visible={showEmployeeLeaveModal}
         onClose={() => {

@@ -1,21 +1,19 @@
-// Firebase Configuration - DISABLED
-// This file is kept for reference but Firebase is no longer used
-// All functionality has been moved to AsyncStorage
-
-// Uncomment and configure if you want to re-enable Firebase in the future
-/*
+// Firebase Configuration
 import { initializeApp } from 'firebase/app';
 import { getAuth, initializeAuth, getReactNativePersistence } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, initializeFirestore } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// Firebase configuration
+// Get these values from your Firebase project settings
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyByLF4IV7KNfVHkFywimANGoWo_2mpdb2E",
+  authDomain: "attendanceapp-8c711.firebaseapp.com",
+  projectId: "attendanceapp-8c711",
+  storageBucket: "attendanceapp-8c711.firebasestorage.app",
+  messagingSenderId: "481410140032",
+  appId: "1:481410140032:web:3667cba45c34463259e365",
+  measurementId: "G-KTWFRYJSER"
 };
 
 let app;
@@ -23,23 +21,52 @@ let auth;
 let db;
 
 try {
+  // Initialize Firebase App
   app = initializeApp(firebaseConfig);
+  
+  // Initialize Firebase Auth with AsyncStorage persistence
   auth = initializeAuth(app, {
     persistence: getReactNativePersistence(AsyncStorage)
   });
-  db = getFirestore(app);
-  console.log('Firebase initialized successfully');
+  
+  // Initialize Firestore
+  db = initializeFirestore(app, {
+    experimentalForceLongPolling: true, // For React Native compatibility
+  });
+  
+  console.log('✓ Firebase initialized successfully');
 } catch (error) {
-  console.error('Firebase initialization error:', error);
+  console.error('✗ Firebase initialization error:', error);
+  
+  // Fallback initialization if there's an error
+  if (!app) {
+    try {
+      app = initializeApp(firebaseConfig);
+    } catch (initError) {
+      console.error('✗ Failed to initialize Firebase app:', initError);
+    }
+  }
+  
   if (app && !auth) {
-    auth = getAuth(app);
+    try {
+      auth = getAuth(app);
+    } catch (authError) {
+      console.error('✗ Failed to initialize Firebase auth:', authError);
+    }
+  }
+  
+  if (app && !db) {
+    try {
+      db = getFirestore(app);
+    } catch (dbError) {
+      console.error('✗ Failed to initialize Firestore:', dbError);
+    }
   }
 }
 
-export { auth, db, app };
-*/
+// Ensure app is initialized before exporting
+if (!app) {
+  console.error('✗ Firebase app was not initialized!');
+}
 
-// Export empty objects to prevent import errors
-export const auth = null;
-export const db = null;
-export const app = null;
+export { auth, db, app };

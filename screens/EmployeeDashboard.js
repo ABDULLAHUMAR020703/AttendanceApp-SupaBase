@@ -9,6 +9,7 @@ import {
   Modal,
   TextInput,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { getUserAttendanceRecords } from '../utils/storage';
 import { useAuth } from '../contexts/AuthContext';
@@ -38,8 +39,13 @@ import {
   getHRRoleIcon, 
   getHRRoleLabel 
 } from '../utils/hrRoles';
+import { fontSize, spacing, iconSize, componentSize, responsivePadding, responsiveFont, wp, normalize } from '../utils/responsive';
+import Logo from '../components/Logo';
+import Trademark from '../components/Trademark';
+import { useNavigation } from '@react-navigation/native';
 
-export default function EmployeeDashboard({ navigation, route }) {
+export default function EmployeeDashboard({ route }) {
+  const navigation = useNavigation();
   const { user } = route.params;
   const { handleLogout } = useAuth();
   const { colors } = useTheme();
@@ -64,7 +70,7 @@ export default function EmployeeDashboard({ navigation, route }) {
       checkBiometricSupport();
     }, 1000);
     
-    // Reload data when screen comes into focus (returning from CameraScreen)
+    // Reload data when screen comes into focus (returning from AuthenticationScreen)
     const unsubscribe = navigation.addListener('focus', () => {
       loadData();
     });
@@ -171,7 +177,7 @@ export default function EmployeeDashboard({ navigation, route }) {
   const handleCheckIn = async () => {
     // Get user's preferred authentication method
     const authMethod = await getPreferredAuthMethod(user.username, biometricAvailable);
-    navigation.navigate('CameraScreen', { 
+    navigation.navigate('AuthenticationScreen', { 
       type: 'checkin',
       user: user,
       authMethod: authMethod
@@ -181,7 +187,7 @@ export default function EmployeeDashboard({ navigation, route }) {
   const handleCheckOut = async () => {
     // Get user's preferred authentication method
     const authMethod = await getPreferredAuthMethod(user.username, biometricAvailable);
-    navigation.navigate('CameraScreen', { 
+    navigation.navigate('AuthenticationScreen', { 
       type: 'checkout',
       user: user,
       authMethod: authMethod
@@ -236,47 +242,71 @@ export default function EmployeeDashboard({ navigation, route }) {
   const canCheckOut = lastRecord && lastRecord.type === 'checkin';
 
   return (
-    <ScrollView 
-      className="flex-1"
-      style={{ backgroundColor: colors.background }}
-      refreshControl={
-        <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
-      }
-    >
-      <View className="p-6">
+    <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }} edges={['top']}>
+      <ScrollView 
+        className="flex-1"
+        style={{ backgroundColor: colors.background }}
+        contentContainerStyle={{ padding: responsivePadding(24) }}
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
+        }
+      >
         {/* Welcome Header */}
         <View 
-          className="rounded-2xl p-6 mb-6 shadow-sm"
-          style={{ backgroundColor: colors.surface }}
+          className="rounded-2xl shadow-sm"
+          style={{ 
+            backgroundColor: colors.surface,
+            marginBottom: spacing.lg,
+          }}
         >
-          <View className="flex-row items-center">
-            <View 
-              className="w-12 h-12 rounded-full items-center justify-center mr-4"
-              style={{ backgroundColor: colors.primaryLight }}
-            >
-              <Ionicons name="person" size={24} color={colors.primary} />
-            </View>
-            <View className="flex-1">
-              <Text 
-                className="text-xl font-bold"
-                style={{ color: colors.text }}
-              >
-                Welcome, {user.username}!
-              </Text>
-              <View className="flex-row items-center">
-                <Text style={{ color: colors.textSecondary }}>Employee Dashboard</Text>
+          <View className="flex-row items-center justify-between" style={{ padding: responsivePadding(24) }}>
+            <View className="flex-row items-center flex-1" style={{ flexShrink: 1 }}>
+              <Logo size="small" style={{ marginRight: spacing.md }} />
+              <View className="flex-1" style={{ flexShrink: 1 }}>
+                <Text 
+                  className="font-bold"
+                  style={{ 
+                    color: colors.text,
+                    fontSize: responsiveFont(20),
+                  }}
+                  numberOfLines={1}
+                >
+                  Welcome, {user.username}!
+                </Text>
+              <View className="flex-row items-center flex-wrap">
+                <Text 
+                  style={{ 
+                    color: colors.textSecondary,
+                    fontSize: responsiveFont(12),
+                  }}
+                >
+                  Employee Dashboard
+                </Text>
                 {employee && employee.position && (
                   <>
-                    <Text style={{ color: colors.textTertiary, marginHorizontal: 8 }}>•</Text>
+                    <Text 
+                      style={{ 
+                        color: colors.textTertiary, 
+                        marginHorizontal: spacing.xs,
+                        fontSize: responsiveFont(12),
+                      }}
+                    >
+                      •
+                    </Text>
                     <View className="flex-row items-center">
                       <Ionicons 
                         name={getHRRoleIcon(getHRRoleFromPosition(employee.position))} 
-                        size={14} 
+                        size={iconSize.xs} 
                         color={getHRRoleColor(getHRRoleFromPosition(employee.position))} 
                       />
                       <Text 
-                        className="text-xs font-medium ml-1"
-                        style={{ color: getHRRoleColor(getHRRoleFromPosition(employee.position)) }}
+                        className="font-medium"
+                        style={{ 
+                          color: getHRRoleColor(getHRRoleFromPosition(employee.position)),
+                          fontSize: responsiveFont(10),
+                          marginLeft: spacing.xs / 2,
+                        }}
+                        numberOfLines={1}
                       >
                         {getHRRoleLabel(getHRRoleFromPosition(employee.position))}
                       </Text>
@@ -285,36 +315,74 @@ export default function EmployeeDashboard({ navigation, route }) {
                 )}
               </View>
             </View>
+            </View>
+            <TouchableOpacity
+              onPress={() => {
+                Alert.alert(
+                  'Logout',
+                  'Are you sure you want to logout?',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Logout', style: 'destructive', onPress: handleLogout },
+                  ]
+                );
+              }}
+              style={{ 
+                padding: spacing.xs,
+                marginLeft: spacing.sm,
+              }}
+            >
+              <Ionicons name="log-out-outline" size={iconSize.lg} color={colors.error} />
+            </TouchableOpacity>
           </View>
         </View>
 
         {/* Current Status */}
         <View 
-          className="rounded-2xl p-6 mb-6 shadow-sm"
-          style={{ backgroundColor: colors.surface }}
+          className="rounded-2xl shadow-sm"
+          style={{ 
+            backgroundColor: colors.surface,
+            padding: responsivePadding(24),
+            marginBottom: spacing.lg,
+          }}
         >
           <Text 
-            className="text-lg font-semibold mb-4"
-            style={{ color: colors.text }}
+            className="font-semibold"
+            style={{ 
+              color: colors.text,
+              fontSize: responsiveFont(18),
+              marginBottom: spacing.md,
+            }}
           >
             Current Status
           </Text>
           {lastRecord ? (
             <View className="flex-row items-center">
               <View 
-                className="w-4 h-4 rounded-full mr-3"
-                style={{ backgroundColor: lastRecord.type === 'checkin' ? colors.success : colors.error }}
+                className="rounded-full"
+                style={{ 
+                  width: normalize(8),
+                  height: normalize(8),
+                  backgroundColor: lastRecord.type === 'checkin' ? colors.success : colors.error,
+                  marginRight: spacing.md,
+                }}
               />
-              <View className="flex-1">
+              <View className="flex-1" style={{ flexShrink: 1 }}>
                 <Text 
                   className="font-medium"
-                  style={{ color: colors.text }}
+                  style={{ 
+                    color: colors.text,
+                    fontSize: responsiveFont(16),
+                  }}
                 >
                   {lastRecord.type === 'checkin' ? 'Checked In' : 'Checked Out'}
                 </Text>
                 <Text 
-                  className="text-sm"
-                  style={{ color: colors.textSecondary }}
+                  style={{ 
+                    color: colors.textSecondary,
+                    fontSize: responsiveFont(12),
+                    marginTop: spacing.xs / 2,
+                  }}
                 >
                   {new Date(lastRecord.timestamp).toLocaleString()}
                 </Text>
@@ -323,10 +391,22 @@ export default function EmployeeDashboard({ navigation, route }) {
           ) : (
             <View className="flex-row items-center">
               <View 
-                className="w-4 h-4 rounded-full mr-3"
-                style={{ backgroundColor: colors.textTertiary }}
+                className="rounded-full"
+                style={{ 
+                  width: normalize(8),
+                  height: normalize(8),
+                  backgroundColor: colors.textTertiary,
+                  marginRight: spacing.md,
+                }}
               />
-              <Text style={{ color: colors.textSecondary }}>No attendance records yet</Text>
+              <Text 
+                style={{ 
+                  color: colors.textSecondary,
+                  fontSize: responsiveFont(14),
+                }}
+              >
+                No attendance records yet
+              </Text>
             </View>
           )}
         </View>
@@ -334,13 +414,20 @@ export default function EmployeeDashboard({ navigation, route }) {
         {/* Leave Balance Card */}
         {leaveBalance && remainingLeaves && (
           <View 
-            className="rounded-2xl p-6 mb-6 shadow-sm"
-            style={{ backgroundColor: colors.surface }}
+            className="rounded-2xl shadow-sm"
+            style={{ 
+              backgroundColor: colors.surface,
+              padding: responsivePadding(24),
+              marginBottom: spacing.lg,
+            }}
           >
-            <View className="flex-row items-center justify-between mb-4">
+            <View className="flex-row items-center justify-between" style={{ marginBottom: spacing.md }}>
               <Text 
-                className="text-lg font-semibold"
-                style={{ color: colors.text }}
+                className="font-semibold"
+                style={{ 
+                  color: colors.text,
+                  fontSize: responsiveFont(18),
+                }}
               >
                 Leave Balance
               </Text>
@@ -348,73 +435,131 @@ export default function EmployeeDashboard({ navigation, route }) {
                 onPress={() => navigation.navigate('LeaveRequestScreen', { user: user })}
               >
                 <Text 
-                  className="text-sm font-medium"
-                  style={{ color: colors.primary }}
+                  className="font-medium"
+                  style={{ 
+                    color: colors.primary,
+                    fontSize: responsiveFont(12),
+                  }}
                 >
                   View Details →
                 </Text>
               </TouchableOpacity>
             </View>
-            <View className="space-y-3">
+            <View style={{ gap: spacing.md }}>
               <View className="flex-row justify-between items-center">
-                <View className="flex-row items-center">
+                <View className="flex-row items-center" style={{ flexShrink: 1 }}>
                   <View 
-                    className="w-3 h-3 rounded-full mr-2"
-                    style={{ backgroundColor: colors.primary }}
+                    className="rounded-full"
+                    style={{ 
+                      width: normalize(6),
+                      height: normalize(6),
+                      backgroundColor: colors.primary,
+                      marginRight: spacing.xs,
+                    }}
                   />
-                  <Text style={{ color: colors.textSecondary }}>Annual Leaves</Text>
+                  <Text 
+                    style={{ 
+                      color: colors.textSecondary,
+                      fontSize: responsiveFont(14),
+                    }}
+                  >
+                    Annual Leaves
+                  </Text>
                 </View>
                 <Text 
                   className="font-semibold"
-                  style={{ color: colors.text }}
+                  style={{ 
+                    color: colors.text,
+                    fontSize: responsiveFont(14),
+                  }}
                 >
                   {remainingLeaves.annual} / {leaveBalance.annualLeaves}
                 </Text>
               </View>
               <View className="flex-row justify-between items-center">
-                <View className="flex-row items-center">
+                <View className="flex-row items-center" style={{ flexShrink: 1 }}>
                   <View 
-                    className="w-3 h-3 rounded-full mr-2"
-                    style={{ backgroundColor: colors.success }}
+                    className="rounded-full"
+                    style={{ 
+                      width: normalize(6),
+                      height: normalize(6),
+                      backgroundColor: colors.success,
+                      marginRight: spacing.xs,
+                    }}
                   />
-                  <Text style={{ color: colors.textSecondary }}>Sick Leaves</Text>
+                  <Text 
+                    style={{ 
+                      color: colors.textSecondary,
+                      fontSize: responsiveFont(14),
+                    }}
+                  >
+                    Sick Leaves
+                  </Text>
                 </View>
                 <Text 
                   className="font-semibold"
-                  style={{ color: colors.text }}
+                  style={{ 
+                    color: colors.text,
+                    fontSize: responsiveFont(14),
+                  }}
                 >
                   {remainingLeaves.sick} / {leaveBalance.sickLeaves}
                 </Text>
               </View>
               <View className="flex-row justify-between items-center">
-                <View className="flex-row items-center">
+                <View className="flex-row items-center" style={{ flexShrink: 1 }}>
                   <View 
-                    className="w-3 h-3 rounded-full mr-2"
-                    style={{ backgroundColor: colors.warning }}
+                    className="rounded-full"
+                    style={{ 
+                      width: normalize(6),
+                      height: normalize(6),
+                      backgroundColor: colors.warning,
+                      marginRight: spacing.xs,
+                    }}
                   />
-                  <Text style={{ color: colors.textSecondary }}>Casual Leaves</Text>
+                  <Text 
+                    style={{ 
+                      color: colors.textSecondary,
+                      fontSize: responsiveFont(14),
+                    }}
+                  >
+                    Casual Leaves
+                  </Text>
                 </View>
                 <Text 
                   className="font-semibold"
-                  style={{ color: colors.text }}
+                  style={{ 
+                    color: colors.text,
+                    fontSize: responsiveFont(14),
+                  }}
                 >
                   {remainingLeaves.casual} / {leaveBalance.casualLeaves}
                 </Text>
               </View>
               <View 
-                className="border-t pt-3 mt-2"
-                style={{ borderColor: colors.border }}
+                className="border-t"
+                style={{ 
+                  borderColor: colors.border,
+                  paddingTop: spacing.md,
+                  marginTop: spacing.xs,
+                }}
               >
                 <View className="flex-row justify-between items-center">
                   <Text 
                     className="font-semibold"
-                    style={{ color: colors.text }}
+                    style={{ 
+                      color: colors.text,
+                      fontSize: responsiveFont(14),
+                    }}
                   >
                     Total Remaining
                   </Text>
                   <Text 
-                    className="font-bold text-lg"
-                    style={{ color: colors.primary }}
+                    className="font-bold"
+                    style={{ 
+                      color: colors.primary,
+                      fontSize: responsiveFont(18),
+                    }}
                   >
                     {remainingLeaves.total} days
                   </Text>
@@ -428,31 +573,51 @@ export default function EmployeeDashboard({ navigation, route }) {
         <View className="space-y-4">
           {/* Check In Button */}
           <TouchableOpacity
-            className={`rounded-2xl p-6 shadow-sm ${
+            className={`rounded-2xl shadow-sm ${
               canCheckIn 
                 ? 'bg-green-500' 
                 : 'bg-gray-300'
             }`}
+            style={{
+              padding: responsivePadding(24),
+              marginBottom: spacing.md,
+            }}
             onPress={handleCheckIn}
             disabled={!canCheckIn}
           >
             <View className="flex-row items-center">
-              <View className="w-12 h-12 bg-white rounded-full items-center justify-center mr-4">
+              <View 
+                className="bg-white rounded-full items-center justify-center"
+                style={{
+                  width: componentSize.avatarMedium,
+                  height: componentSize.avatarMedium,
+                  marginRight: spacing.md,
+                }}
+              >
                 <Ionicons 
                   name="log-in-outline" 
-                  size={24} 
+                  size={iconSize.lg} 
                   color={canCheckIn ? "#10b981" : "#9ca3af"} 
                 />
               </View>
-              <View className="flex-1">
-                <Text className={`text-lg font-semibold ${
-                  canCheckIn ? 'text-white' : 'text-gray-500'
-                }`}>
+              <View className="flex-1" style={{ flexShrink: 1 }}>
+                <Text 
+                  className={`font-semibold ${
+                    canCheckIn ? 'text-white' : 'text-gray-500'
+                  }`}
+                  style={{ fontSize: responsiveFont(18) }}
+                >
                   Check In
                 </Text>
-                <Text className={`text-sm ${
-                  canCheckIn ? 'text-green-100' : 'text-gray-400'
-                }`}>
+                <Text 
+                  className={`${
+                    canCheckIn ? 'text-green-100' : 'text-gray-400'
+                  }`}
+                  style={{ 
+                    fontSize: responsiveFont(12),
+                    marginTop: spacing.xs / 2,
+                  }}
+                >
                   {canCheckIn 
                     ? (biometricAvailable 
                         ? `Use ${biometricType.toLowerCase()}` 
@@ -462,7 +627,7 @@ export default function EmployeeDashboard({ navigation, route }) {
               </View>
               <Ionicons 
                 name="chevron-forward" 
-                size={20} 
+                size={iconSize.md} 
                 color={canCheckIn ? "white" : "#9ca3af"} 
               />
             </View>
@@ -470,31 +635,51 @@ export default function EmployeeDashboard({ navigation, route }) {
 
           {/* Check Out Button */}
           <TouchableOpacity
-            className={`rounded-2xl p-6 shadow-sm ${
+            className={`rounded-2xl shadow-sm ${
               canCheckOut 
                 ? 'bg-red-500' 
                 : 'bg-gray-300'
             }`}
+            style={{
+              padding: responsivePadding(24),
+              marginBottom: spacing.md,
+            }}
             onPress={handleCheckOut}
             disabled={!canCheckOut}
           >
             <View className="flex-row items-center">
-              <View className="w-12 h-12 bg-white rounded-full items-center justify-center mr-4">
+              <View 
+                className="bg-white rounded-full items-center justify-center"
+                style={{
+                  width: componentSize.avatarMedium,
+                  height: componentSize.avatarMedium,
+                  marginRight: spacing.md,
+                }}
+              >
                 <Ionicons 
                   name="log-out-outline" 
-                  size={24} 
+                  size={iconSize.lg} 
                   color={canCheckOut ? "#ef4444" : "#9ca3af"} 
                 />
               </View>
-              <View className="flex-1">
-                <Text className={`text-lg font-semibold ${
-                  canCheckOut ? 'text-white' : 'text-gray-500'
-                }`}>
+              <View className="flex-1" style={{ flexShrink: 1 }}>
+                <Text 
+                  className={`font-semibold ${
+                    canCheckOut ? 'text-white' : 'text-gray-500'
+                  }`}
+                  style={{ fontSize: responsiveFont(18) }}
+                >
                   Check Out
                 </Text>
-                <Text className={`text-sm ${
-                  canCheckOut ? 'text-red-100' : 'text-gray-400'
-                }`}>
+                <Text 
+                  className={`${
+                    canCheckOut ? 'text-red-100' : 'text-gray-400'
+                  }`}
+                  style={{ 
+                    fontSize: responsiveFont(12),
+                    marginTop: spacing.xs / 2,
+                  }}
+                >
                   {canCheckOut 
                     ? (biometricAvailable 
                         ? `Use ${biometricType.toLowerCase()}` 
@@ -504,7 +689,7 @@ export default function EmployeeDashboard({ navigation, route }) {
               </View>
               <Ionicons 
                 name="chevron-forward" 
-                size={20} 
+                size={iconSize.md} 
                 color={canCheckOut ? "white" : "#9ca3af"} 
               />
             </View>
@@ -825,7 +1010,12 @@ export default function EmployeeDashboard({ navigation, route }) {
             </View>
           </View>
         </View>
-      </View>
+
+        {/* Trademark */}
+        <View style={{ paddingBottom: spacing.lg }}>
+          <Trademark position="bottom" />
+        </View>
+      </ScrollView>
 
       {/* Work Mode Request Modal */}
       <Modal
@@ -886,6 +1076,6 @@ export default function EmployeeDashboard({ navigation, route }) {
           </View>
         </View>
       </Modal>
-    </ScrollView>
+    </SafeAreaView>
   );
 }

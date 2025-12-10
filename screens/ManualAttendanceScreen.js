@@ -727,3 +727,8 @@ export default function ManualAttendanceScreen({ navigation, route }) {
   );
 }
 
+
+
+
+
+

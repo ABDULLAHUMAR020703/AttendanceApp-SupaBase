@@ -1,44 +1,89 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '../config/firebase';
+import { getEmployeeByUsername } from '../utils/employees';
 
 const AuthContext = createContext();
-const USER_SESSION_KEY = '@user_session';
 
 export function AuthProvider({ children }) {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    // Check for existing session
-    const loadSession = async () => {
-      try {
-        const sessionData = await AsyncStorage.getItem(USER_SESSION_KEY);
-        if (sessionData) {
-          setUser(JSON.parse(sessionData));
+    // Listen to Firebase auth state changes
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          // Get user data from Firestore
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          const userData = userDoc.data();
+          
+          if (userData) {
+            // Try to get employee data for additional info
+            let employee = null;
+            if (userData.username) {
+              try {
+                employee = await getEmployeeByUsername(userData.username);
+              } catch (error) {
+                console.log('Employee not found, using Firestore data only');
+              }
+            }
+            
+            // Combine Firebase user with Firestore data and employee data
+            // Firestore now contains all fields, so prioritize Firestore data
+            const combinedUser = {
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              username: userData.username || firebaseUser.email?.split('@')[0],
+              role: userData.role || 'employee',
+              name: userData.name || employee?.name || firebaseUser.displayName,
+              department: userData.department || employee?.department || '',
+              position: userData.position || employee?.position || '',
+              workMode: userData.workMode || employee?.workMode || 'in_office',
+              hireDate: userData.hireDate || employee?.hireDate,
+              id: employee?.id || firebaseUser.uid,
+            };
+            
+            setUser(combinedUser);
+          } else {
+            // Fallback if Firestore document doesn't exist
+            setUser({
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              username: firebaseUser.email?.split('@')[0],
+              role: 'employee',
+            });
+          }
+        } catch (error) {
+          console.error('Error loading user data:', error);
+          // Fallback to basic Firebase user
+          setUser({
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            username: firebaseUser.email?.split('@')[0],
+            role: 'employee',
+          });
+        }
+      } else {
+        setUser(null);
       }
-    } catch (error) {
-        console.error('Error loading session:', error);
-    } finally {
       setIsLoading(false);
-    }
-  };
+    });
 
-    loadSession();
+    return () => unsubscribe();
   }, []);
 
   const handleLogin = async (userData) => {
-    try {
+    // Login is handled by Firebase Auth, this is just for compatibility
+    // The actual login happens in LoginScreen using Firebase
     setUser(userData);
-      await AsyncStorage.setItem(USER_SESSION_KEY, JSON.stringify(userData));
-    } catch (error) {
-      console.error('Error saving session:', error);
-    }
   };
 
   const handleLogout = async () => {
     try {
-      await AsyncStorage.removeItem(USER_SESSION_KEY);
-    setUser(null);
+      await firebaseSignOut(auth);
+      setUser(null);
     } catch (error) {
       console.error('Logout error:', error);
     }

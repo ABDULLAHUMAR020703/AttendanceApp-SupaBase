@@ -8,7 +8,9 @@ import {
   RefreshControl,
   Image,
   TextInput,
+  ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { getAttendanceRecords, clearAllAttendanceRecords } from '../utils/storage';
 import { exportAttendanceToCSV } from '../utils/export';
@@ -18,8 +20,14 @@ import EmployeeManagement from './EmployeeManagement';
 import CalendarScreen from './CalendarScreen';
 import HRDashboard from './HRDashboard';
 import { getUnreadNotificationCount } from '../utils/notifications';
+import { getPendingSignupCount } from '../utils/signupRequests';
+import { fontSize, spacing, iconSize, componentSize, responsivePadding, responsiveFont, wp, isSmallScreen, normalize } from '../utils/responsive';
+import Logo from '../components/Logo';
+import Trademark from '../components/Trademark';
+import { useNavigation } from '@react-navigation/native';
 
-export default function AdminDashboard({ route, navigation }) {
+export default function AdminDashboard({ route }) {
+  const navigation = useNavigation();
   const { user, initialTab, openLeaveRequests } = route.params || {};
   const { handleLogout } = useAuth();
   const { colors } = useTheme();
@@ -31,14 +39,17 @@ export default function AdminDashboard({ route, navigation }) {
   const [filter, setFilter] = useState('all'); // all, checkin, checkout
   const [isExporting, setIsExporting] = useState(false);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const [pendingSignupCount, setPendingSignupCount] = useState(0);
 
   useEffect(() => {
     loadRecords();
     loadNotificationCount();
+    loadPendingSignupCount();
     
     // Set up interval to check notifications every 30 seconds
     const notificationInterval = setInterval(() => {
       loadNotificationCount();
+      loadPendingSignupCount();
     }, 30000);
 
     return () => clearInterval(notificationInterval);
@@ -74,6 +85,15 @@ export default function AdminDashboard({ route, navigation }) {
       setUnreadNotificationCount(count);
     } catch (error) {
       console.error('Error loading notification count:', error);
+    }
+  };
+
+  const loadPendingSignupCount = async () => {
+    try {
+      const count = await getPendingSignupCount();
+      setPendingSignupCount(count);
+    } catch (error) {
+      console.error('Error loading pending signup count:', error);
     }
   };
 
@@ -172,49 +192,86 @@ export default function AdminDashboard({ route, navigation }) {
     const { date, time } = formatDate(item.timestamp);
     
     return (
-      <View className="bg-white rounded-xl p-4 mb-3 shadow-sm">
+      <View 
+        className="bg-white rounded-xl mb-3 shadow-sm"
+        style={{ 
+          padding: responsivePadding(16),
+          marginHorizontal: spacing.sm,
+        }}
+      >
         <View className="flex-row items-start">
           {/* Status Indicator */}
-          <View className="mr-4">
+          <View style={{ marginRight: spacing.md }}>
             <View 
-              className="w-12 h-12 rounded-full items-center justify-center"
-              style={{ backgroundColor: `${getStatusColor(item.type)}20` }}
+              className="rounded-full items-center justify-center"
+              style={{ 
+                width: componentSize.avatarMedium,
+                height: componentSize.avatarMedium,
+                backgroundColor: `${getStatusColor(item.type)}20` 
+              }}
             >
               <Ionicons 
                 name={getStatusIcon(item.type)} 
-                size={20} 
+                size={iconSize.md} 
                 color={getStatusColor(item.type)} 
               />
             </View>
           </View>
 
           {/* Record Details */}
-          <View className="flex-1">
-            <View className="flex-row items-center justify-between mb-2">
-              <Text className="text-lg font-semibold text-gray-800">
+          <View className="flex-1" style={{ flexShrink: 1 }}>
+            <View className="flex-row items-center justify-between" style={{ marginBottom: spacing.xs }}>
+              <Text 
+                className="font-semibold text-gray-800"
+                style={{ fontSize: responsiveFont(18), flexShrink: 1 }}
+                numberOfLines={1}
+              >
                 {item.username}
               </Text>
-              <Text className="text-sm text-gray-500">{time}</Text>
+              <Text 
+                className="text-gray-500"
+                style={{ fontSize: responsiveFont(12), marginLeft: spacing.xs }}
+              >
+                {time}
+              </Text>
             </View>
             
-            <View className="flex-row items-center mb-2">
-              <Text className="text-gray-600 mr-2">{date}</Text>
-              <View className={`px-2 py-1 rounded-full ${
+            <View className="flex-row items-center flex-wrap" style={{ marginBottom: spacing.xs }}>
+              <Text 
+                className="text-gray-600"
+                style={{ fontSize: responsiveFont(14), marginRight: spacing.xs }}
+              >
+                {date}
+              </Text>
+              <View 
+                className={`rounded-full ${
                 item.type === 'checkin' ? 'bg-green-100' : 'bg-red-100'
-              }`}>
-                <Text className={`text-xs font-medium ${
+                }`}
+                style={{ 
+                  paddingHorizontal: spacing.xs,
+                  paddingVertical: spacing.xs / 2,
+                }}
+              >
+                <Text 
+                  className={`font-medium ${
                   item.type === 'checkin' ? 'text-green-800' : 'text-red-800'
-                }`}>
+                  }`}
+                  style={{ fontSize: responsiveFont(10) }}
+                >
                   {item.type === 'checkin' ? 'Check In' : 'Check Out'}
                 </Text>
               </View>
             </View>
             
             {/* Location */}
-            {item.location && (
-              <View className="flex-row items-center mb-2">
-                <Ionicons name="location-outline" size={16} color="#6b7280" />
-                <Text className="text-gray-600 text-sm ml-1">
+            {item.location && item.location.latitude !== undefined && item.location.longitude !== undefined && (
+              <View className="flex-row items-center" style={{ marginBottom: spacing.xs }}>
+                <Ionicons name="location-outline" size={iconSize.sm} color="#6b7280" />
+                <Text 
+                  className="text-gray-600 ml-1"
+                  style={{ fontSize: responsiveFont(12), flexShrink: 1 }}
+                  numberOfLines={1}
+                >
                   {item.location.latitude.toFixed(4)}, {item.location.longitude.toFixed(4)}
                 </Text>
               </View>
@@ -222,10 +279,14 @@ export default function AdminDashboard({ route, navigation }) {
 
             {/* Photo */}
             {item.photo && (
-              <View className="mt-2">
+              <View style={{ marginTop: spacing.xs }}>
                 <Image 
                   source={{ uri: item.photo }} 
-                  className="w-16 h-16 rounded-lg"
+                  className="rounded-lg"
+                  style={{ 
+                    width: componentSize.avatarLarge,
+                    height: componentSize.avatarLarge,
+                  }}
                   resizeMode="cover"
                 />
               </View>
@@ -238,14 +299,21 @@ export default function AdminDashboard({ route, navigation }) {
 
   const FilterButton = ({ title, value, isActive }) => (
     <TouchableOpacity
-      className={`px-4 py-2 rounded-full ${
-        isActive ? 'bg-primary-500' : 'bg-gray-200'
-      }`}
+      className={isActive ? 'bg-primary-500' : 'bg-gray-200'}
+      style={{
+        paddingHorizontal: responsivePadding(18),
+        paddingVertical: responsivePadding(8),
+        marginRight: spacing.sm,
+        borderRadius: 50,
+      }}
       onPress={() => setFilter(value)}
     >
-      <Text className={`font-medium ${
+      <Text 
+        className={`font-medium ${
         isActive ? 'text-white' : 'text-gray-700'
-      }`}>
+        }`}
+        style={{ fontSize: responsiveFont(14) }}
+      >
         {title}
       </Text>
     </TouchableOpacity>
@@ -253,115 +321,300 @@ export default function AdminDashboard({ route, navigation }) {
 
   const TabButton = ({ title, value, isActive, icon }) => (
     <TouchableOpacity
-      className={`flex-1 flex-row items-center justify-center py-3 ${
+      className={`flex-1 flex-row items-center justify-center ${
         isActive ? 'border-b-2 border-primary-500' : ''
       }`}
+      style={{ 
+        paddingVertical: spacing.md,
+        minHeight: componentSize.tabBarHeight,
+      }}
       onPress={() => setActiveTab(value)}
     >
       <Ionicons 
         name={icon} 
-        size={20} 
+        size={isSmallScreen() ? iconSize.sm : iconSize.md} 
         color={isActive ? '#3b82f6' : '#6b7280'} 
       />
-      <Text className={`ml-2 font-medium ${
+      <Text 
+        className={`font-medium ${
         isActive ? 'text-primary-500' : 'text-gray-500'
-      }`}>
+        }`}
+        style={{ 
+          fontSize: isSmallScreen() ? responsiveFont(12) : responsiveFont(14),
+          marginLeft: spacing.xs,
+        }}
+        numberOfLines={1}
+      >
         {title}
       </Text>
     </TouchableOpacity>
   );
 
   return (
-    <View className="flex-1" style={{ backgroundColor: colors.background }}>
-      {/* Header */}
-      <View className="px-6 py-4 shadow-sm" style={{ backgroundColor: colors.surface }}>
-        <View className="flex-row items-center justify-between mb-4">
-          <View className="flex-1">
-            <Text className="text-xl font-bold" style={{ color: colors.text }}>
-              {user.role === 'super_admin' ? 'Super Admin Dashboard' : 
-               user.role === 'manager' ? `${user.department || 'Department'} Manager Dashboard` : 
-               'Admin Dashboard'}
-            </Text>
-            {user.role === 'manager' && user.department && (
-              <Text className="text-sm" style={{ color: colors.textSecondary }}>
-                Managing: {user.department} Department
+    <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }} edges={['top']}>
+      {/* Main Container - Welcome, Action Buttons, and Manual/Export/Clear */}
+      <View 
+        className="rounded-2xl shadow-sm"
+        style={{ 
+          backgroundColor: colors.surface,
+          margin: responsivePadding(24),
+          marginBottom: spacing.lg,
+        }}
+      >
+        {/* Welcome Header */}
+        <View className="flex-row items-center justify-between" style={{ padding: responsivePadding(24), paddingBottom: spacing.md }}>
+          <View className="flex-row items-center flex-1" style={{ flexShrink: 1 }}>
+            <Logo size="small" style={{ marginRight: spacing.md }} />
+            <View className="flex-1" style={{ flexShrink: 1 }}>
+              <Text 
+                className="font-bold"
+                style={{ 
+                  color: colors.text,
+                  fontSize: responsiveFont(20),
+                }}
+                numberOfLines={1}
+              >
+                Welcome, {user.username}!
               </Text>
-            )}
+              <View className="flex-row items-center flex-wrap">
+                <Text 
+                  style={{ 
+                    color: colors.textSecondary,
+                    fontSize: responsiveFont(12),
+                  }}
+                >
+                  {user.role === 'super_admin' ? 'Super Admin Dashboard' : 
+                   user.role === 'manager' ? `${user.department || 'Department'} Manager Dashboard` : 
+                   'Admin Dashboard'}
+                </Text>
+                {user.role === 'manager' && user.department && (
+                  <>
+                    <Text 
+                      style={{ 
+                        color: colors.textTertiary, 
+                        marginHorizontal: spacing.xs,
+                        fontSize: responsiveFont(12),
+                      }}
+                    >
+                      •
+                    </Text>
+                    <Text 
+                      style={{ 
+                        color: colors.textSecondary,
+                        fontSize: responsiveFont(12),
+                      }}
+                    >
+                      {user.department}
+                    </Text>
+                  </>
+                )}
+              </View>
+            </View>
           </View>
-          <View className="flex-row items-center space-x-2">
+        </View>
+
+        {/* Action Buttons - Functions */}
+        <View 
+          className="flex-row items-center justify-end"
+          style={{ 
+            paddingHorizontal: responsivePadding(24),
+            paddingBottom: spacing.md,
+          }}
+        >
+          <TouchableOpacity
+            onPress={() => navigation.navigate('NotificationsScreen', { user: user })}
+            style={{ 
+              position: 'relative',
+              padding: spacing.xs,
+              marginRight: spacing.sm,
+            }}
+          >
+            <Ionicons name="notifications" size={iconSize.lg} color={colors.primary} />
+            {unreadNotificationCount > 0 && (
+              <View
+                style={{
+                  position: 'absolute',
+                  top: 2,
+                  right: 2,
+                  backgroundColor: colors.error,
+                  borderRadius: 10,
+                  minWidth: normalize(18),
+                  height: normalize(18),
+                  paddingHorizontal: spacing.xs / 2,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Text style={{ 
+                  color: 'white', 
+                  fontSize: responsiveFont(10), 
+                  fontWeight: '600' 
+                }}>
+                  {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => {
+              Alert.alert(
+                'Logout',
+                'Are you sure you want to logout?',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Logout', style: 'destructive', onPress: handleLogout },
+                ]
+              );
+            }}
+            style={{ 
+              padding: spacing.xs,
+              marginLeft: spacing.xs,
+            }}
+          >
+            <Ionicons name="log-out-outline" size={iconSize.lg} color={colors.error} />
+          </TouchableOpacity>
+          {(user.role === 'super_admin' || user.role === 'manager') && (
             <TouchableOpacity
-              onPress={() => navigation.navigate('NotificationsScreen', { user: user })}
-              className="p-2"
-              style={{ position: 'relative' }}
+              onPress={() => navigation.navigate('SignupApproval', { user: user })}
+              style={{ 
+                position: 'relative',
+                padding: spacing.xs,
+                marginLeft: spacing.xs,
+              }}
             >
-              <Ionicons name="notifications" size={24} color={colors.primary} />
-              {unreadNotificationCount > 0 && (
+              <Ionicons name="person-add" size={iconSize.lg} color={colors.primary} />
+              {pendingSignupCount > 0 && (
                 <View
                   style={{
                     position: 'absolute',
-                    top: 4,
-                    right: 4,
+                    top: 2,
+                    right: 2,
                     backgroundColor: colors.error,
                     borderRadius: 10,
-                    minWidth: 20,
-                    height: 20,
-                    paddingHorizontal: 6,
+                    minWidth: normalize(18),
+                    height: normalize(18),
+                    paddingHorizontal: spacing.xs / 2,
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <Text style={{ color: 'white', fontSize: 12, fontWeight: '600' }}>
-                    {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
+                  <Text style={{ 
+                    color: 'white', 
+                    fontSize: responsiveFont(10), 
+                    fontWeight: '600' 
+                  }}>
+                    {pendingSignupCount > 99 ? '99+' : pendingSignupCount}
                   </Text>
                 </View>
               )}
             </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('ThemeSettingsScreen', { user: user })}
-              className="p-2"
-            >
-              <Ionicons name="color-palette" size={24} color={colors.primary} />
-            </TouchableOpacity>
-            {activeTab === 'attendance' && (
-              <View className="flex-row space-x-2">
-                <TouchableOpacity
-                  className="bg-blue-500 rounded-xl px-4 py-2"
-                  onPress={() => navigation.navigate('ManualAttendance', { user: user })}
-                >
-                  <View className="flex-row items-center">
-                    <Ionicons name="create-outline" size={16} color="white" />
-                    <Text className="text-white font-semibold ml-1">Manual</Text>
-                  </View>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  className="bg-green-500 rounded-xl px-4 py-2"
-                  onPress={handleExport}
-                  disabled={isExporting || records.length === 0}
-                >
-                  <View className="flex-row items-center">
-                    <Ionicons name="download-outline" size={16} color="white" />
-                    <Text className="text-white font-semibold ml-1">
-                      {isExporting ? 'Exporting...' : 'Export CSV'}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  className="bg-red-500 rounded-xl px-4 py-2"
-                  onPress={handleClearAll}
-                  disabled={records.length === 0}
-                >
-                  <View className="flex-row items-center">
-                    <Ionicons name="trash-outline" size={16} color="white" />
-                    <Text className="text-white font-semibold ml-1">Clear All</Text>
-                  </View>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
+          )}
+          <TouchableOpacity
+            onPress={() => navigation.navigate('ThemeSettingsScreen', { user: user })}
+            style={{ padding: spacing.xs, marginLeft: spacing.xs }}
+          >
+            <Ionicons name="color-palette" size={iconSize.lg} color={colors.primary} />
+          </TouchableOpacity>
         </View>
 
-        {/* Tab Navigation */}
+        {/* Action Buttons - Manual, Export CSV, Clear All */}
+        {activeTab === 'attendance' && (
+          <View 
+            style={{ 
+              paddingHorizontal: responsivePadding(24),
+              paddingBottom: responsivePadding(12),
+            }}
+          >
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ 
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              style={{ maxWidth: '100%' }}
+              nestedScrollEnabled={true}
+            >
+              <TouchableOpacity
+                className="bg-blue-500"
+                onPress={() => navigation.navigate('ManualAttendance', { user: user })}
+                style={{ 
+                  flexShrink: 0,
+                  paddingHorizontal: responsivePadding(14),
+                  paddingVertical: responsivePadding(6),
+                  marginRight: spacing.xs,
+                  borderRadius: 50,
+                }}
+              >
+                <View className="flex-row items-center">
+                  <Ionicons name="create-outline" size={iconSize.sm} color="white" />
+                  <Text 
+                    className="text-white font-semibold"
+                    style={{ 
+                      fontSize: responsiveFont(13),
+                      marginLeft: spacing.xs / 2,
+                    }}
+                  >
+                    Manual
+                  </Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                className="bg-green-500"
+                onPress={handleExport}
+                disabled={isExporting || records.length === 0}
+                style={{ 
+                  flexShrink: 0,
+                  paddingHorizontal: responsivePadding(14),
+                  paddingVertical: responsivePadding(6),
+                  marginRight: spacing.xs,
+                  borderRadius: 50,
+                }}
+              >
+                <View className="flex-row items-center">
+                  <Ionicons name="download-outline" size={iconSize.sm} color="white" />
+                  <Text 
+                    className="text-white font-semibold"
+                    style={{ 
+                      fontSize: responsiveFont(13),
+                      marginLeft: spacing.xs / 2,
+                    }}
+                  >
+                    {isExporting ? 'Exporting...' : 'Export CSV'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                className="bg-red-500"
+                onPress={handleClearAll}
+                disabled={records.length === 0}
+                style={{ 
+                  flexShrink: 0,
+                  paddingHorizontal: responsivePadding(14),
+                  paddingVertical: responsivePadding(6),
+                  borderRadius: 50,
+                }}
+              >
+                <View className="flex-row items-center">
+                  <Ionicons name="trash-outline" size={iconSize.sm} color="white" />
+                  <Text 
+                    className="text-white font-semibold"
+                    style={{ 
+                      fontSize: responsiveFont(13),
+                      marginLeft: spacing.xs / 2,
+                    }}
+                  >
+                    Clear All
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        )}
+      </View>
+
+      {/* Tab Navigation */}
         <View className="flex-row border-b border-gray-200">
           <TabButton 
             title="Attendance" 
@@ -392,25 +645,56 @@ export default function AdminDashboard({ route, navigation }) {
         {/* Search Bar - Only for Attendance Tab */}
         {activeTab === 'attendance' && (
           <>
-            <View className="flex-row items-center bg-gray-100 rounded-xl px-4 py-3 mb-4">
-              <Ionicons name="search-outline" size={20} color="#6b7280" />
+            <View 
+              className="flex-row items-center bg-gray-100 rounded-xl"
+              style={{
+                paddingHorizontal: responsivePadding(16),
+                paddingVertical: spacing.md,
+                marginBottom: spacing.md,
+                marginTop: spacing.xs,
+              }}
+            >
+              <Ionicons name="search-outline" size={iconSize.md} color="#6b7280" />
               <TextInput
-                className="flex-1 ml-3 text-gray-800"
+                className="flex-1 text-gray-800"
                 placeholder="Search by username..."
                 value={searchQuery}
                 onChangeText={setSearchQuery}
+                style={{
+                  fontSize: responsiveFont(14),
+                  marginLeft: spacing.md,
+                }}
+                placeholderTextColor="#9ca3af"
               />
             </View>
             
             {/* Filter Buttons */}
-            <View className="flex-row space-x-2">
-              <FilterButton title="All" value="all" isActive={filter === 'all'} />
-              <FilterButton title="Check In" value="checkin" isActive={filter === 'checkin'} />
-              <FilterButton title="Check Out" value="checkout" isActive={filter === 'checkout'} />
+            <View 
+              style={{ 
+                backgroundColor: colors.surface,
+                borderRadius: 12,
+                padding: responsivePadding(12),
+                marginHorizontal: responsivePadding(24),
+                marginBottom: spacing.md,
+              }}
+            >
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ 
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <View className="flex-row">
+                  <FilterButton title="All" value="all" isActive={filter === 'all'} />
+                  <FilterButton title="Check In" value="checkin" isActive={filter === 'checkin'} />
+                  <FilterButton title="Check Out" value="checkout" isActive={filter === 'checkout'} />
+                </View>
+              </ScrollView>
             </View>
           </>
         )}
-      </View>
 
       {/* Conditional Content */}
       {activeTab === 'hr' ? (
@@ -424,23 +708,68 @@ export default function AdminDashboard({ route, navigation }) {
       ) : activeTab === 'attendance' ? (
         <>
           {/* Stats */}
-          <View className="bg-white mx-4 my-4 rounded-xl p-4 shadow-sm">
+          <View 
+            className="bg-white rounded-xl shadow-sm"
+            style={{
+              marginHorizontal: responsivePadding(16),
+              marginVertical: spacing.md,
+              padding: responsivePadding(16),
+            }}
+          >
             <View className="flex-row justify-around">
-              <View className="items-center">
-                <Text className="text-2xl font-bold text-primary-500">{records.length}</Text>
-                <Text className="text-gray-600 text-sm">Total Records</Text>
+              <View className="items-center" style={{ flex: 1 }}>
+                <Text 
+                  className="font-bold text-primary-500"
+                  style={{ fontSize: responsiveFont(24) }}
+                >
+                  {records.length}
+                </Text>
+                <Text 
+                  className="text-gray-600"
+                  style={{ 
+                    fontSize: responsiveFont(12),
+                    marginTop: spacing.xs / 2,
+                  }}
+                  numberOfLines={1}
+                >
+                  Total Records
+                </Text>
               </View>
-              <View className="items-center">
-                <Text className="text-2xl font-bold text-green-500">
+              <View className="items-center" style={{ flex: 1 }}>
+                <Text 
+                  className="font-bold text-green-500"
+                  style={{ fontSize: responsiveFont(24) }}
+                >
                   {records.filter(r => r.type === 'checkin').length}
                 </Text>
-                <Text className="text-gray-600 text-sm">Check Ins</Text>
+                <Text 
+                  className="text-gray-600"
+                  style={{ 
+                    fontSize: responsiveFont(12),
+                    marginTop: spacing.xs / 2,
+                  }}
+                  numberOfLines={1}
+                >
+                  Check Ins
+                </Text>
               </View>
-              <View className="items-center">
-                <Text className="text-2xl font-bold text-red-500">
+              <View className="items-center" style={{ flex: 1 }}>
+                <Text 
+                  className="font-bold text-red-500"
+                  style={{ fontSize: responsiveFont(24) }}
+                >
                   {records.filter(r => r.type === 'checkout').length}
                 </Text>
-                <Text className="text-gray-600 text-sm">Check Outs</Text>
+                <Text 
+                  className="text-gray-600"
+                  style={{ 
+                    fontSize: responsiveFont(12),
+                    marginTop: spacing.xs / 2,
+                  }}
+                  numberOfLines={1}
+                >
+                  Check Outs
+                </Text>
               </View>
             </View>
           </View>
@@ -458,41 +787,75 @@ export default function AdminDashboard({ route, navigation }) {
               showsVerticalScrollIndicator={false}
             />
           ) : (
-            <View className="flex-1 justify-center items-center px-6">
-              <Ionicons name="people-outline" size={64} color="#d1d5db" />
-              <Text className="text-xl font-semibold text-gray-500 mt-4 text-center">
+            <View 
+              className="flex-1 justify-center items-center"
+              style={{ paddingHorizontal: responsivePadding(24) }}
+            >
+              <Ionicons name="people-outline" size={iconSize['4xl']} color="#d1d5db" />
+              <Text 
+                className="font-semibold text-gray-500 text-center"
+                style={{ 
+                  fontSize: responsiveFont(20),
+                  marginTop: spacing.md,
+                }}
+              >
                 {records.length === 0 
                   ? 'No attendance records found'
                   : 'No records match your search'
                 }
               </Text>
-              <Text className="text-gray-400 text-center mt-2">
+              <Text 
+                className="text-gray-400 text-center"
+                style={{ 
+                  fontSize: responsiveFont(14),
+                  marginTop: spacing.xs,
+                }}
+              >
                 {records.length === 0 
                   ? 'Employees need to check in to create records'
                   : 'Try adjusting your search or filter criteria'
                 }
               </Text>
               <TouchableOpacity
-                className="bg-primary-500 rounded-xl px-6 py-3 mt-6"
+                className="bg-primary-500 rounded-xl"
+                style={{
+                  paddingHorizontal: responsivePadding(24),
+                  paddingVertical: spacing.md,
+                  marginTop: spacing.lg,
+                }}
                 onPress={onRefresh}
               >
-                <Text className="text-white font-semibold">Refresh</Text>
+                <Text 
+                  className="text-white font-semibold"
+                  style={{ fontSize: responsiveFont(16) }}
+                >
+                  Refresh
+                </Text>
               </TouchableOpacity>
             </View>
           )}
 
           {/* Summary */}
           {filteredRecords.length > 0 && (
-            <View className="bg-white p-4 border-t border-gray-200">
-              <Text className="text-gray-600 text-center">
+            <View 
+              className="bg-white border-t border-gray-200"
+              style={{ padding: responsivePadding(16) }}
+            >
+              <Text 
+                className="text-gray-600 text-center"
+                style={{ fontSize: responsiveFont(14) }}
+              >
                 Showing {filteredRecords.length} of {records.length} record{records.length !== 1 ? 's' : ''}
               </Text>
             </View>
           )}
+
+          {/* Trademark */}
+          <Trademark position="bottom" />
         </>
       ) : (
         <EmployeeManagement route={{ params: { user, openLeaveRequests } }} />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
