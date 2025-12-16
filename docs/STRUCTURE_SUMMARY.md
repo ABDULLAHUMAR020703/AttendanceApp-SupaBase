@@ -13,30 +13,40 @@ The codebase has been restructured from a flat organization to a **modular, feat
 
 ```
 AttendanceApp/
-├── core/                    # Core infrastructure
-│   ├── config/              # Firebase, app config
-│   ├── contexts/            # React contexts (Auth, Theme)
-│   ├── navigation/          # Navigation setup
-│   └── services/            # Core services (storage)
+├── apps/
+│   └── mobile/              # React Native Expo app
+│       ├── core/            # Core infrastructure
+│       │   ├── config/      # Firebase, API Gateway config
+│       │   ├── contexts/    # React contexts (Auth, Theme)
+│       │   ├── navigation/  # Navigation setup
+│       │   └── services/    # Core services (storage)
+│       │
+│       ├── features/        # Feature modules
+│       │   ├── auth/        # Authentication feature
+│       │   ├── attendance/  # Attendance tracking
+│       │   ├── tickets/     # Ticket management
+│       │   ├── leave/       # Leave management
+│       │   ├── employees/   # Employee management
+│       │   ├── notifications/ # Notifications
+│       │   ├── calendar/    # Calendar feature
+│       │   └── analytics/   # Analytics & dashboards
+│       │
+│       ├── shared/          # Shared code
+│       │   ├── components/   # Reusable UI components
+│       │   ├── utils/       # Shared utilities
+│       │   ├── constants/   # Constants & enums
+│       │   └── hooks/       # Shared hooks
+│       │
+│       ├── screens/         # Legacy screens (being migrated)
+│       └── utils/           # Legacy utils (being migrated)
 │
-├── features/                # Feature modules
-│   ├── auth/                # Authentication feature
-│   ├── attendance/          # Attendance tracking
-│   ├── tickets/             # Ticket management
-│   ├── leave/               # Leave management
-│   ├── employees/           # Employee management
-│   ├── notifications/       # Notifications
-│   ├── calendar/            # Calendar feature
-│   └── analytics/           # Analytics & dashboards
+├── services/                # Microservices
+│   ├── api-gateway/         # API Gateway (port 3000)
+│   ├── auth-service/       # Auth service (port 3001)
+│   ├── attendance-service/  # Placeholder
+│   ├── leave-service/       # Placeholder
+│   └── ticket-service/      # Placeholder
 │
-├── shared/                  # Shared code
-│   ├── components/          # Reusable UI components
-│   ├── utils/               # Shared utilities
-│   ├── constants/           # Constants & enums
-│   └── hooks/               # Shared hooks
-│
-├── screens/                 # Legacy screens (being migrated)
-├── utils/                   # Legacy utils (being migrated)
 └── docs/                    # Documentation
 ```
 

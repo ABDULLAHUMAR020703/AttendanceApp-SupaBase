@@ -605,13 +605,21 @@ For issues or questions:
 
 - **Auth Service** (`services/auth-service/`):
   - Express server running on port 3001
+  - **Firebase Admin SDK Integration**:
+    - Uses Firebase Admin SDK for Firestore operations (trusted backend)
+    - Service account credentials via environment variables
+    - Admin privileges for database access
+  - **Hybrid Authentication Approach**:
+    - **Admin SDK** for Firestore operations (username lookup, user data retrieval)
+    - **Firebase Auth REST API** for password verification (Admin SDK limitation)
+    - Secure password verification server-side
   - Auth API endpoints:
-    - `POST /api/auth/login` - User authentication
+    - `POST /api/auth/login` - User authentication with password verification
     - `GET /api/auth/check-username/:username` - Username availability check
     - `POST /api/auth/users` - User creation
     - `PATCH /api/auth/users/:username/role` - Role updates
     - `PATCH /api/auth/users/:username` - User info updates
-  - Placeholder implementations (Firebase integration pending)
+  - Complete Firebase integration with secure password verification
 
 #### 🔄 Frontend API Integration
 - **Login Flow Updated** (`apps/mobile/utils/auth.js`):
@@ -667,7 +675,13 @@ For issues or questions:
 - `mkdirp@^3.0.1` - Directory creation utility
 - `idb@^8.0.0` - IndexedDB wrapper (for Firebase compatibility)
 - `@firebase/webchannel-wrapper` - Firebase webchannel support
-- Express, CORS, dotenv, axios, http-proxy-middleware (for services)
+- **Backend Services:**
+  - `express@^5.2.1` - Web framework for API Gateway and Auth Service
+  - `cors@^2.8.5` - Cross-origin resource sharing
+  - `dotenv@^17.2.3` - Environment variable management
+  - `axios@^1.13.2` - HTTP client for service communication and password verification
+  - `firebase-admin@^13.6.0` - Firebase Admin SDK for backend operations
+  - `http-proxy-middleware` - Request proxying (API Gateway)
 
 #### 📁 Files Created
 - `apps/mobile/core/config/api.js` - API Gateway configuration
@@ -683,18 +697,26 @@ For issues or questions:
 - `apps/mobile/package.json` - Added new dependencies
 - All app files moved to `apps/mobile/` directory
 
+#### 🔐 Security & Authentication Fixes
+- **Password Verification Fixed** (2025-12-16):
+  - Fixed incomplete login endpoint that only checked user existence
+  - Implemented secure password verification using Firebase Auth REST API
+  - Hybrid approach: Admin SDK for Firestore, REST API for password verification
+  - All passwords now properly verified server-side before authentication
+  - Comprehensive error handling for authentication failures
+  - See `services/auth-service/LOGIN_IMPLEMENTATION.md` for details
+
 #### ⚠️ Known Issues
 - npm install failing with "Invalid Version" error (workaround: copying packages from root node_modules)
 - Some packages manually copied due to npm installation issues
-- API Gateway and Auth Service are placeholders (Firebase integration pending)
 
 #### 🔄 Migration Status
 - ✅ App moved to `apps/mobile/` directory
 - ✅ API Gateway service created
-- ✅ Auth service created
+- ✅ Auth service created with Firebase Admin SDK
 - ✅ Frontend login updated to use API Gateway
-- ⏳ Firebase integration in auth-service (pending)
-- ⏳ Complete microservices migration (pending)
+- ✅ Firebase integration in auth-service (complete with password verification)
+- ⏳ Complete microservices migration (pending - attendance, leave, ticket services)
 
 ### Recent Updates (v1.2.0)
 - ✅ Added Super Admin and Manager role system

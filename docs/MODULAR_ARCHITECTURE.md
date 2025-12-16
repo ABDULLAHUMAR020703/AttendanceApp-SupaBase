@@ -8,9 +8,23 @@ This document describes the modular architecture of the Attendance App, designed
 
 ```
 AttendanceApp/
-├── App.js                          # Main app entry point
-├── app.json                        # Expo configuration
-├── package.json                    # Dependencies
+├── apps/
+│   └── mobile/                     # React Native Expo app
+│       ├── App.js                  # Main app entry point
+│       ├── app.json                # Expo configuration
+│       ├── package.json            # Dependencies
+│       └── ...                     # All mobile app code
+│
+├── services/                       # Microservices
+│   ├── api-gateway/                # API Gateway service (port 3000)
+│   ├── auth-service/               # Authentication service (port 3001)
+│   ├── attendance-service/         # Placeholder for attendance service
+│   ├── leave-service/              # Placeholder for leave service
+│   └── ticket-service/             # Placeholder for ticket service
+│
+├── App.js                          # Legacy (moved to apps/mobile/)
+├── app.json                        # Legacy (moved to apps/mobile/)
+├── package.json                    # Legacy (moved to apps/mobile/)
 │
 ├── core/                           # Core application infrastructure
 │   ├── config/                     # Configuration files

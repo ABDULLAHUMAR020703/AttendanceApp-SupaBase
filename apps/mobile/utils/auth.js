@@ -65,7 +65,23 @@ export const authenticateUser = async (usernameOrEmail, password) => {
     if (error.name === 'AbortError') {
       console.log('API Gateway request timed out, falling back to Firebase');
     } else {
-      console.log('API Gateway request failed, falling back to Firebase:', error.message);
+      // More detailed error logging
+      const errorMessage = error.message || 'Unknown error';
+      console.log('API Gateway request failed, falling back to Firebase:', errorMessage);
+      
+      // Log helpful debugging info
+      if (__DEV__) {
+        console.log('API Gateway URL attempted:', API_GATEWAY_URL);
+        console.log('Error details:', {
+          name: error.name,
+          message: error.message,
+          stack: error.stack,
+        });
+        console.log('💡 Tip: Make sure API Gateway is running and URL is correct for your platform');
+        console.log('   - iOS Simulator: http://localhost:3000');
+        console.log('   - Android Emulator: http://10.0.2.2:3000');
+        console.log('   - Physical Device: http://<your-computer-ip>:3000');
+      }
     }
     // Continue to Firebase fallback below
   }

@@ -3,14 +3,15 @@
 ## Table of Contents
 1. [Overview](#overview)
 2. [Code Architecture](#code-architecture)
-3. [Authentication System](#authentication-system)
-4. [User Roles & Permissions](#user-roles--permissions)
-5. [Employee Data Structure](#employee-data-structure)
-6. [Firebase Integration](#firebase-integration)
-7. [Ticket Routing System](#ticket-routing-system)
-8. [Data Storage](#data-storage)
-9. [Login Flow](#login-flow)
-10. [Employee Management](#employee-management)
+3. [Microservices Architecture](#microservices-architecture)
+4. [Authentication System](#authentication-system)
+5. [User Roles & Permissions](#user-roles--permissions)
+6. [Employee Data Structure](#employee-data-structure)
+7. [Firebase Integration](#firebase-integration)
+8. [Ticket Routing System](#ticket-routing-system)
+9. [Data Storage](#data-storage)
+10. [Login Flow](#login-flow)
+11. [Employee Management](#employee-management)
 
 ---
 
@@ -19,6 +20,143 @@
 This attendance management system uses **Firebase Authentication** and **Firestore** for user management, with **AsyncStorage** for local data persistence. The system supports three authentication roles with different permission levels and automatic ticket routing based on departments.
 
 The codebase follows a **modular, feature-based architecture** where each feature is self-contained and isolated, ensuring features don't interfere with each other and the code is deployment-ready.
+
+---
+
+## Microservices Architecture
+
+### Overview
+
+The application has been restructured into a **microservices architecture** with a monorepo structure:
+
+```
+AttendanceApp/
+├── apps/
+│   └── mobile/              # React Native Expo app
+│
+└── services/
+    ├── api-gateway/        # API Gateway service (port 3000)
+    ├── auth-service/       # Authentication service (port 3001)
+    ├── attendance-service/ # Placeholder for attendance service
+    ├── leave-service/      # Placeholder for leave service
+    └── ticket-service/     # Placeholder for ticket service
+```
+
+### API Gateway Service
+
+**Location:** `services/api-gateway/`
+
+**Purpose:** Single entry point for all client requests, routing them to appropriate microservices.
+
+**Features:**
+- Express server running on port 3000
+- Health check endpoint (`/health`)
+- Auth routes that forward requests to auth-service
+- CORS enabled for cross-origin requests
+- Error handling for service unavailability
+- Request timeout handling (10 seconds)
+
+**Endpoints:**
+- `GET /health` - Health check
+- `POST /api/auth/login` - Forward to auth-service
+- `GET /api/auth/check-username/:username` - Forward to auth-service
+- `POST /api/auth/users` - Forward to auth-service
+- `PATCH /api/auth/users/:username/role` - Forward to auth-service
+- `PATCH /api/auth/users/:username` - Forward to auth-service
+
+### Auth Service
+
+**Location:** `services/auth-service/`
+
+**Purpose:** Handles all authentication and user management logic.
+
+**Architecture:**
+- **Firebase Admin SDK**: Used for Firestore operations (trusted backend with admin privileges)
+- **Firebase Auth REST API**: Used ONLY for password verification (Admin SDK limitation)
+
+**Why Hybrid Approach?**
+- Firebase Admin SDK **cannot verify passwords directly**
+- Admin SDK is used for Firestore access (username lookup, user data retrieval)
+- REST API is used for password verification (only operation Admin SDK cannot do)
+
+**Features:**
+- Express server running on port 3001
+- Firebase Admin SDK integration with service account credentials
+- Secure password verification using Firebase Auth REST API
+- Complete user management endpoints
+
+**Login Flow:**
+1. Accept username/email + password
+2. If username: Use Admin SDK to query Firestore and get email
+3. Verify password: Use Firebase Auth REST API (`signInWithPassword`)
+4. If correct: Use Admin SDK to get user data from Firestore
+5. Return user info or authentication error
+
+**Endpoints:**
+- `GET /health` - Health check
+- `POST /api/auth/login` - User authentication with password verification
+- `GET /api/auth/check-username/:username` - Username availability check
+- `POST /api/auth/users` - User creation
+- `PATCH /api/auth/users/:username/role` - Role updates
+- `PATCH /api/auth/users/:username` - User info updates
+
+**Configuration:**
+- Service account credentials via environment variables:
+  - `GOOGLE_APPLICATION_CREDENTIALS` (path to JSON file), OR
+  - `GOOGLE_CLIENT_EMAIL` + `GOOGLE_PRIVATE_KEY` + `GOOGLE_PROJECT_ID`
+- Firebase API key for REST API password verification
+
+**Security:**
+- ✅ Passwords verified server-side using Firebase Auth REST API
+- ✅ Firestore access uses Admin SDK (trusted backend)
+- ✅ No passwords stored or logged
+- ✅ Proper error handling for all authentication failures
+
+### Frontend Integration
+
+**Location:** `apps/mobile/`
+
+**API Gateway Configuration:** `apps/mobile/core/config/api.js`
+
+**Login Flow:**
+1. Frontend calls API Gateway (`/api/auth/login`)
+2. API Gateway forwards to Auth Service
+3. Auth Service verifies password and returns user data
+4. If API Gateway fails: Falls back to direct Firebase authentication (backward compatibility)
+
+**Platform-Aware URL Configuration:**
+- **iOS Simulator**: `http://localhost:3000`
+- **Android Emulator**: `http://10.0.2.2:3000` or uses `debuggerHost`
+- **Physical Device**: Uses computer's IP address (must be on same network)
+
+### Service Startup
+
+**Windows (PowerShell):**
+```powershell
+.\start-services.ps1
+```
+
+**Linux/macOS (Bash):**
+```bash
+./start-services.sh
+```
+
+**Manual Startup:**
+```bash
+# Terminal 1: API Gateway
+cd services/api-gateway
+npm start
+
+# Terminal 2: Auth Service
+cd services/auth-service
+npm start
+```
+
+### Future Services
+
+- **Attendance Service**: Handle attendance tracking and records
+- **Leave Service**: Manage leave requests and balances
+- **Ticket Service**: Handle support ticket system
 
 ---
 
@@ -346,23 +484,56 @@ db = initializeFirestore(app, {
 
 #### Authentication Flow
 
+**Frontend Flow (with API Gateway):**
 ```javascript
 // 1. User enters username or email
 authenticateUser(usernameOrEmail, password)
 
-// 2. If username, find email in Firestore
-if (!usernameOrEmail.includes('@')) {
-  const userDoc = await getDocs(
-    query(usersRef, where('username', '==', username))
-  );
-  email = userDoc.data().email;
+// 2. Try API Gateway first
+try {
+  const response = await fetch(`${API_GATEWAY_URL}/api/auth/login`, {
+    method: 'POST',
+    body: JSON.stringify({ usernameOrEmail, password })
+  });
+  
+  if (response.ok) {
+    // API Gateway authentication successful
+    return response.json();
+  }
+} catch (error) {
+  // Fallback to direct Firebase authentication
 }
 
-// 3. Authenticate with Firebase
+// 3. Fallback: Direct Firebase authentication
 const userCredential = await signInWithEmailAndPassword(auth, email, password);
+```
 
-// 4. Get user data from Firestore
-const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+**Backend Flow (Auth Service):**
+```javascript
+// 1. Accept username/email + password
+POST /api/auth/login
+
+// 2. If username, resolve email using Admin SDK + Firestore
+if (!usernameOrEmail.includes('@')) {
+  const querySnapshot = await db.collection('users')
+    .where('username', '==', usernameOrEmail)
+    .limit(1)
+    .get();
+  email = querySnapshot.docs[0].data().email;
+}
+
+// 3. Verify password using Firebase Auth REST API
+const authResponse = await axios.post(
+  'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword',
+  { email, password, returnSecureToken: true }
+);
+
+// 4. If password correct, get user data using Admin SDK
+const userDoc = await db.collection('users').doc(localId).get();
+const userData = userDoc.data();
+
+// 5. Return user info
+return { success: true, user: userData };
 ```
 
 #### Authentication Error Handling
@@ -751,120 +922,166 @@ When a user creates a ticket:
 
 ## Login Flow
 
-### Step-by-Step Process
+### Architecture Overview
+
+The login flow now uses a **microservices architecture** with API Gateway and Auth Service. The frontend first attempts to authenticate via the API Gateway, with a fallback to direct Firebase authentication for backward compatibility.
+
+### Step-by-Step Process (Microservices Architecture)
 
 ```
-1. User enters username/email + password
+1. User enters username/email + password (Frontend)
    ↓
-2. Check if input is username or email (contains '@'?)
+2. Frontend calls API Gateway: POST /api/auth/login
    ↓
-3a. If username → Query Firestore for email (requires allow list permission)
-    ↓
-3b. If email → Skip Firestore query, use email directly
-    ↓
-4. Authenticate with Firebase (email + password)
+3. API Gateway forwards to Auth Service: POST /api/auth/login
    ↓
-5. Get Firebase Auth UID
+4. Auth Service:
+   a. If username → Query Firestore using Admin SDK → Get email
+   b. Verify password using Firebase Auth REST API
+   c. If correct → Get user data using Admin SDK
+   d. Return user object
    ↓
-6. Fetch user document from Firestore (users/{uid}) (requires read permission)
+5. API Gateway returns response to Frontend
    ↓
-7. Optionally fetch employee data from AsyncStorage
+6. If API Gateway fails → Fallback to direct Firebase authentication
    ↓
-8. Combine data into user object
+7. Set user in AuthContext
    ↓
-9. Set user in AuthContext
-   ↓
-10. Navigate to appropriate dashboard:
+8. Navigate to appropriate dashboard:
     - employee → EmployeeDashboard
     - manager/super_admin → AdminDashboard
+```
+
+### Frontend Login Flow
+
+**Location:** `apps/mobile/utils/auth.js`
+
+**Flow:**
+1. User enters username/email + password
+2. Frontend calls API Gateway (`/api/auth/login`) with 10-second timeout
+3. If API Gateway succeeds → Use response
+4. If API Gateway fails (network error, timeout, service unavailable) → Fallback to direct Firebase authentication
+5. Maintains backward compatibility
+
+**Code:**
+```javascript
+// Try API Gateway first
+try {
+  const response = await fetch(`${API_GATEWAY_URL}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ usernameOrEmail, password }),
+    signal: controller.signal, // 10-second timeout
+  });
+  
+  if (response.ok) {
+    return await response.json(); // API Gateway success
+  }
+} catch (error) {
+  // Fallback to Firebase authentication
+}
+
+// Fallback: Direct Firebase authentication
+const userCredential = await signInWithEmailAndPassword(auth, email, password);
+```
+
+### Backend Login Flow (Auth Service)
+
+**Location:** `services/auth-service/routes/auth.js`
+
+**Flow:**
+1. Accept username/email + password
+2. **If username**: Use Admin SDK to query Firestore → Get email
+3. **Verify password**: Use Firebase Auth REST API (`signInWithPassword`)
+4. **If password correct**: Use Admin SDK to get user data from Firestore
+5. Return user info or authentication error
+
+**Why Hybrid Approach?**
+- Firebase Admin SDK **cannot verify passwords directly**
+- Admin SDK is used for Firestore operations (trusted backend)
+- REST API is used ONLY for password verification
+
+**Code:**
+```javascript
+// 1. If username, resolve email using Admin SDK
+if (!usernameOrEmail.includes('@')) {
+  const querySnapshot = await db.collection('users')
+    .where('username', '==', usernameOrEmail)
+    .limit(1)
+    .get();
+  email = querySnapshot.docs[0].data().email;
+}
+
+// 2. Verify password using Firebase Auth REST API
+const authResponse = await axios.post(
+  'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword',
+  { email, password, returnSecureToken: true }
+);
+
+// 3. Get user data using Admin SDK
+const userDoc = await db.collection('users').doc(localId).get();
+const userData = userDoc.data();
+
+// 4. Return user info
+return { success: true, user: userData };
 ```
 
 ### Username vs Email Login
 
 **Username Login:**
-1. App queries Firestore by `username` field (before authentication)
-2. Requires Firestore security rule: `allow list: if true;`
-3. If user not found in Firestore → fails with "Invalid username or password"
-4. If found → gets email → authenticates with Firebase Auth
-5. Then reads user document from Firestore
+1. Frontend sends username to API Gateway
+2. Auth Service queries Firestore by `username` field using Admin SDK
+3. Gets email from Firestore document
+4. Verifies password using Firebase Auth REST API
+5. Returns user data from Firestore
 
 **Email Login:**
-1. Skips Firestore query (uses email directly)
-2. Authenticates with Firebase Auth immediately
-3. After authentication → reads user document from Firestore
-4. Requires Firestore security rule: `allow read: if request.auth != null && request.auth.uid == userId;`
-5. If Firestore document missing → fails with "User data not found"
+1. Frontend sends email to API Gateway
+2. Auth Service uses email directly
+3. Verifies password using Firebase Auth REST API
+4. Returns user data from Firestore
 
-**Key Difference:**
-- Username login requires Firestore access BEFORE authentication
-- Email login requires Firestore access AFTER authentication
-- Both require users to exist in BOTH Firebase Auth AND Firestore
+**Key Differences:**
+- Username login requires Firestore query BEFORE password verification
+- Email login skips Firestore query (uses email directly)
+- Both use Firebase Auth REST API for password verification
+- Both use Admin SDK for Firestore access (trusted backend)
+- No security rules restrictions (Admin SDK bypasses rules)
 
-### Code Flow
+### Security Features
+
+**✅ Secure Password Verification:**
+- Passwords verified server-side using Firebase Auth REST API
+- No passwords stored or logged
+- Proper error handling for authentication failures
+
+**✅ Trusted Backend:**
+- Admin SDK used for Firestore operations
+- Admin privileges for database access
+- No security rules restrictions
+
+**✅ Error Handling:**
+- Invalid username/email → 401
+- Invalid password → 401
+- User disabled → 403
+- Too many attempts → 429
+- Network errors → 503 (service unavailable)
+
+### Fallback Authentication
+
+If the API Gateway is unavailable, the frontend automatically falls back to direct Firebase authentication:
 
 ```javascript
-// 1. User enters credentials
-authenticateUser(usernameOrEmail, password)
-
-// 2. Check if username or email
-if (!usernameOrEmail.includes('@')) {
-  // Username login: Query Firestore BEFORE authentication
-  // Requires: allow list: if true; in security rules
-  const userDoc = await getDocs(query(usersRef, where('username', '==', username)));
-  
-  if (querySnapshot.empty) {
-    return { success: false, error: 'Invalid username or password' };
-  }
-  
-  email = userDoc.data().email;
-} else {
-  // Email login: Use email directly, skip Firestore query
-  email = usernameOrEmail;
+// Fallback: Direct Firebase authentication
+try {
+  const userCredential = await signInWithEmailAndPassword(auth, email, password);
+  // ... get user data from Firestore
+} catch (error) {
+  // Handle authentication error
 }
-
-// 3. Firebase Authentication (works for both username and email login)
-const userCredential = await signInWithEmailAndPassword(auth, email, password);
-
-// 4. Get user data from Firestore (AFTER authentication)
-// Requires: allow read: if request.auth != null && request.auth.uid == userId;
-const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
-const userData = userDoc.data();
-
-// 5. Check if Firestore document exists
-if (!userData) {
-  return { success: false, error: 'User data not found' };
-}
-
-// 6. Return user object
-return {
-  success: true,
-  user: {
-    username: userData.username || email.split('@')[0],
-    role: userData.role || 'employee',
-    uid: userCredential.user.uid,
-    email: userCredential.user.email
-  }
-};
 ```
 
-### What Happens When Firestore is Empty?
-
-**Scenario 1: Username Login with Empty Firestore**
-- Step 3: Query Firestore by username → returns empty
-- Result: ❌ Fails immediately with "Invalid username or password"
-- User never reaches Firebase Authentication
-
-**Scenario 2: Email Login with Empty Firestore**
-- Step 3: Skips Firestore query, uses email directly
-- Step 4: Firebase Authentication succeeds (if user exists in Firebase Auth)
-- Step 5: Tries to read Firestore document → document doesn't exist
-- Result: ❌ Fails with "User data not found"
-- User authenticated but can't proceed
-
-**Solution:**
-- Users must exist in BOTH Firebase Authentication AND Firestore
-- Run migration script: `npm run migrate-users`
-- Or create users through the app's admin dashboard
+This ensures the app continues to work even if microservices are down.
 
 ---
 

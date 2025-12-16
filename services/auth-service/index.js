@@ -32,9 +32,10 @@ app.get('/', (req, res) => {
   });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Auth Service running on port ${PORT}`);
+// Start server - listen on all interfaces (0.0.0.0) to allow connections from devices
+const HOST = process.env.HOST || '0.0.0.0';
+app.listen(PORT, HOST, () => {
+  console.log(`Auth Service running on http://${HOST}:${PORT}`);
   console.log(`Health check available at http://localhost:${PORT}/health`);
 });
 
