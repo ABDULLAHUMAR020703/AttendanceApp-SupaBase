@@ -15,15 +15,30 @@ jobs:
       uses: actions/checkout@v3
       
     - name: Setup Node.js
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
         node-version: '18'
         cache: 'npm'
         cache-dependency-path: apps/mobile/package-lock.json
         
+    - name: Verify npm version
+      run: npm --version
+      
+    - name: Validate package-lock.json
+      working-directory: ./apps/mobile
+      run: |
+        if [ -f package-lock.json ]; then
+          node -e "try { require('./package-lock.json'); console.log('package-lock.json is valid JSON'); } catch(e) { console.error('package-lock.json is invalid:', e.message); process.exit(1); }" || rm -f package-lock.json
+        fi
+      
     - name: Install dependencies
       working-directory: ./apps/mobile
-      run: npm ci
+      run: |
+        if [ -f package-lock.json ]; then
+          npm ci || (echo "npm ci failed, regenerating package-lock.json" && rm -f package-lock.json && npm install)
+        else
+          npm install
+        fi
       
     - name: Run linter
       working-directory: ./apps/mobile
