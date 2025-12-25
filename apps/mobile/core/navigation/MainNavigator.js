@@ -21,6 +21,7 @@ import TicketManagementScreen from '../../screens/TicketManagementScreen';
 import ManualAttendanceScreen from '../../screens/ManualAttendanceScreen';
 import SignupApprovalScreen from '../../screens/SignupApprovalScreen';
 import CreateUserScreen from '../../screens/CreateUserScreen';
+import EmployeeManagement from '../../screens/EmployeeManagement';
 import LoginScreen from '../../screens/LoginScreen';
 
 const Stack = createStackNavigator();
@@ -148,6 +149,12 @@ export default function MainNavigator({ user }) {
           name={ROUTES.SIGNUP_APPROVAL} 
           component={SignupApprovalScreen}
           options={{ title: 'Signup Approvals' }}
+          initialParams={{ user }}
+        />
+        <Stack.Screen 
+          name={ROUTES.EMPLOYEE_MANAGEMENT} 
+          component={EmployeeManagement}
+          options={{ title: 'Employee Management' }}
           initialParams={{ user }}
         />
         {user.role === ROLES.SUPER_ADMIN && (

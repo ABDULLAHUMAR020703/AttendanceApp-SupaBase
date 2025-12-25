@@ -155,10 +155,21 @@ import { createTicket } from '../utils/ticketManagement';
 3. Remove legacy code after migration
 4. Add tests for each feature module
 
+## CI/CD & Deployment
+
+- **GitHub Actions**: Automated build and deployment workflow
+- **Workflow File**: `.github/workflows/deploy.yml`
+- **Features**:
+  - Automatic dependency installation with validation
+  - Package-lock.json corruption detection and recovery
+  - Multi-platform builds (Android & iOS)
+  - Environment variable support
+
 ## Documentation
 
 - `docs/MODULAR_ARCHITECTURE.md` - Detailed architecture guide
-- `docs/MIGRATION_GUIDE.md` - Step-by-step migration instructions
-- `docs/DEPLOYMENT.md` - Deployment procedures
-- `docs/SYSTEM_ARCHITECTURE.md` - System overview
+- `docs/SYSTEM_ARCHITECTURE.md` - System overview and user management
+- `docs/APP_FEATURES.md` - Complete feature documentation
+- `docs/STRUCTURE_SUMMARY.md` - Quick reference for code organization
+- `docs/TECHNICAL_DOCUMENTATION.md` - Comprehensive technical documentation
 

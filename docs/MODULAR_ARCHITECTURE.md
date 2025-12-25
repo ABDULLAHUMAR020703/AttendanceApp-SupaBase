@@ -133,7 +133,7 @@ AttendanceApp/
 │
 └── .github/                        # GitHub workflows (CI/CD)
     └── workflows/
-        └── deploy.yml
+        └── deploy.yml              # Build and deploy workflow with npm ci fixes
 ```
 
 ## Principles
@@ -252,6 +252,29 @@ import { createTicket } from '../utils/ticketManagement';
 5. **Deployment**: Clear structure for CI/CD pipelines
 6. **Code Reuse**: Shared code in one place
 
+## CI/CD Pipeline
+
+The project includes a GitHub Actions workflow (`.github/workflows/deploy.yml`) that:
+
+- **Builds on**: Push/PR to `master` or `main` branches
+- **Environment**: Ubuntu latest with Node.js 18
+- **Steps**:
+  1. Checkout code
+  2. Setup Node.js with npm caching
+  3. Verify npm version
+  4. Validate package-lock.json structure
+  5. Install dependencies (with fallback to regenerate lockfile if corrupted)
+  6. Run linter (optional)
+  7. Check code formatting (optional)
+  8. Build Android app
+  9. Build iOS app
+
+**Features**:
+- Automatic package-lock.json validation
+- Fallback to regenerate lockfile if npm ci fails
+- Environment variable support (EXPO_PUBLIC_ENV)
+- Graceful error handling for optional steps
+
 ## Notes
 
 - **Navigation**: Currently imports screens from `screens/` directory (legacy)
@@ -259,4 +282,5 @@ import { createTicket } from '../utils/ticketManagement';
 - **Most screens**: Still located in `screens/` directory (18 screens total)
 - **Most utils**: Still located in `utils/` directory (17 utility files)
 - **Migration is gradual**: New code should use feature modules, legacy code will be migrated over time
+- **CI/CD**: GitHub Actions workflow configured for automated builds and deployments
 

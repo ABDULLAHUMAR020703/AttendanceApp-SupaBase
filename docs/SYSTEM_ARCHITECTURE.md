@@ -1404,5 +1404,71 @@ For detailed Firebase setup, see `docs/FIREBASE_SETUP.md`.
 
 ---
 
-*Last Updated: 2025-01-27*
+---
+
+## CI/CD Pipeline
+
+### GitHub Actions Workflow
+
+**Location:** `.github/workflows/deploy.yml`
+
+**Triggers:**
+- Push to `master` or `main` branches
+- Pull requests to `master` or `main` branches
+
+**Workflow Steps:**
+
+1. **Checkout Code**
+   - Uses `actions/checkout@v3`
+
+2. **Setup Node.js**
+   - Uses `actions/setup-node@v4`
+   - Node.js version: 18
+   - Enables npm caching
+   - Cache dependency path: `apps/mobile/package-lock.json`
+
+3. **Verify npm Version**
+   - Displays npm version for debugging
+
+4. **Validate package-lock.json**
+   - Validates JSON structure
+   - Removes corrupted lockfile if invalid
+   - Prevents npm ci failures
+
+5. **Install Dependencies**
+   - Attempts `npm ci` first (faster, more reliable)
+   - Falls back to `npm install` if `npm ci` fails
+   - Automatically regenerates lockfile if needed
+
+6. **Run Linter** (Optional)
+   - Runs `npm run lint` with graceful failure
+
+7. **Check Code Formatting** (Optional)
+   - Runs `npm run format:check` with graceful failure
+
+8. **Build Android**
+   - Runs `npm run android:build`
+   - Environment: `EXPO_PUBLIC_ENV=production`
+   - Graceful failure if build skipped
+
+9. **Build iOS**
+   - Runs `npm run ios:build`
+   - Environment: `EXPO_PUBLIC_ENV=production`
+   - Graceful failure if build skipped
+
+**Key Features:**
+- ✅ Package-lock.json validation and auto-recovery
+- ✅ Fallback mechanisms for dependency installation
+- ✅ Environment variable support
+- ✅ Multi-platform build support
+- ✅ Graceful error handling
+
+**Troubleshooting:**
+- If `npm ci` fails with "Invalid Version" error, workflow automatically regenerates lockfile
+- Build steps are optional and won't fail the entire workflow
+- All steps include proper error handling
+
+---
+
+*Last Updated: 2025-12-16*
 

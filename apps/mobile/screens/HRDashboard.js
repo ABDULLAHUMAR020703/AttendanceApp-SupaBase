@@ -24,6 +24,7 @@ import {
 } from '../utils/ticketManagement';
 import { getEmployees } from '../utils/employees';
 import { generateAttendanceReport, generateLeaveReport } from '../utils/export';
+import { ROUTES } from '../shared/constants/routes';
 
 export default function HRDashboard({ navigation, route }) {
   const { user } = route.params;
@@ -359,7 +360,7 @@ export default function HRDashboard({ navigation, route }) {
                 shadowRadius: 4,
                 elevation: 3,
               }}
-              onPress={() => navigation.navigate('EmployeeManagement', { user })}
+              onPress={() => navigation.navigate(ROUTES.EMPLOYEE_MANAGEMENT, { user, openLeaveRequests: false })}
             >
               <View
                 style={{
