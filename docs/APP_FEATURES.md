@@ -42,9 +42,9 @@
 - Automatic fallback to password if biometric fails
 
 ### Security Features
-- Firebase Authentication integration
+- Supabase Authentication integration
 - Secure session management
-- AsyncStorage for local session persistence
+- AsyncStorage for local session persistence via custom adapter
 - Role-based access control
 - Protected routes based on user roles
 
@@ -579,9 +579,9 @@
 ## 🔧 Technical Features
 
 ### Data Storage
-- **Firebase Integration**
+- **Supabase Integration**
   - User authentication
-  - User profiles (Firestore)
+  - User profiles (PostgreSQL)
   - Real-time sync
   - Cloud storage
 

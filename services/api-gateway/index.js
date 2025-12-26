@@ -11,6 +11,17 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Request logging middleware
+app.use((req, res, next) => {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] ${req.method} ${req.path}`, {
+    ip: req.ip,
+    userAgent: req.get('user-agent'),
+    body: req.method !== 'GET' ? req.body : undefined
+  });
+  next();
+});
+
 // Routes
 app.use('/api/auth', authRoutes);
 
@@ -38,9 +49,15 @@ app.get('/', (req, res) => {
 // Start server - listen on all interfaces (0.0.0.0) to allow connections from devices
 const HOST = process.env.HOST || '0.0.0.0';
 app.listen(PORT, HOST, () => {
-  console.log(`API Gateway server running on http://${HOST}:${PORT}`);
-  console.log(`Health check available at http://localhost:${PORT}/health`);
-  console.log(`For physical devices, use: http://<your-computer-ip>:${PORT}`);
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] ========================================`);
+  console.log(`[${timestamp}] API Gateway server starting...`);
+  console.log(`[${timestamp}] Server running on http://${HOST}:${PORT}`);
+  console.log(`[${timestamp}] Health check: http://localhost:${PORT}/health`);
+  console.log(`[${timestamp}] For physical devices: http://<your-computer-ip>:${PORT}`);
+  console.log(`[${timestamp}] Auth Service URL: ${process.env.AUTH_SERVICE_URL || 'http://localhost:3001'}`);
+  console.log(`[${timestamp}] ========================================`);
+  console.log(`[${timestamp}] API Gateway ready to receive requests`);
 });
 
 module.exports = app;

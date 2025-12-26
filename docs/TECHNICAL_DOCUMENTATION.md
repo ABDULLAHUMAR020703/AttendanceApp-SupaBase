@@ -31,7 +31,7 @@
 - **Monorepo Structure**: Organized into apps and services
 - **Microservices**: API Gateway pattern with service-oriented architecture
 - **Cross-Platform**: React Native with Expo for iOS and Android
-- **Cloud Backend**: Firebase Authentication and Firestore
+- **Cloud Backend**: Supabase Authentication and PostgreSQL
 - **CI/CD**: Automated builds and deployments via GitHub Actions
 - **Modular Architecture**: Feature-based code organization
 
@@ -56,7 +56,7 @@
 |------------|---------|---------|
 | Node.js | 18+ | Runtime environment |
 | Express | ^5.2.1 | Web framework |
-| Firebase Admin SDK | ^13.6.0 | Backend Firebase operations |
+| @supabase/supabase-js | ^2.89.0 | Supabase client library |
 | Axios | ^1.13.2 | HTTP client |
 | CORS | ^2.8.5 | Cross-origin resource sharing |
 
@@ -64,7 +64,7 @@
 
 | Library | Version | Purpose |
 |---------|---------|---------|
-| Firebase | ^12.6.0 | Authentication & Firestore |
+| @supabase/supabase-js | ^2.89.0 | Authentication & PostgreSQL |
 | @react-native-async-storage/async-storage | 2.2.0 | Local data persistence |
 | expo-location | ~19.0.7 | GPS location tracking |
 | expo-local-authentication | ^17.0.7 | Biometric authentication |
@@ -121,10 +121,11 @@
         │
         ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    Firebase Services                         │
+│                    Supabase Services                         │
+│                    (Cloud Platform)                           │
 │                                                               │
 │  ┌──────────────┐              ┌──────────────┐            │
-│  │ Firebase     │              │  Firestore   │            │
+│  │ Supabase     │              │  PostgreSQL  │            │
 │  │ Authentication│              │   Database   │            │
 │  └──────────────┘              └──────────────┘            │
 └─────────────────────────────────────────────────────────────┘
@@ -152,7 +153,7 @@
 
 **Technology:**
 - Express.js 5.2.1
-- http-proxy-middleware 3.0.5
+- Axios 1.13.2
 - CORS 2.8.5
 
 **Port:** 3000
@@ -163,6 +164,7 @@
 - Request/response transformation
 - Health checks
 - Error handling
+- Request logging
 
 **Endpoints:**
 ```
@@ -176,10 +178,16 @@ PATCH /api/auth/users/:username - Forward to auth-service
 
 **Configuration:**
 ```javascript
-// Environment variables
+// Environment variables (optional - defaults provided)
 PORT=3000
 AUTH_SERVICE_URL=http://localhost:3001
+HOST=0.0.0.0  // Listen on all interfaces for device access
 ```
+
+**API Gateway URL Configuration:**
+- **iOS Simulator**: `http://localhost:3000`
+- **Android Emulator**: `http://10.0.2.2:3000`
+- **Physical Device**: `http://<your-computer-ip>:3000` (configured in `app.json`)
 
 #### 2. Auth Service
 
@@ -189,17 +197,18 @@ AUTH_SERVICE_URL=http://localhost:3001
 
 **Technology:**
 - Express.js 5.2.1
-- Firebase Admin SDK 13.6.0
-- Axios 1.13.2
+- @supabase/supabase-js 2.89.0
+- dotenv 17.2.3
 
 **Port:** 3001
 
 **Responsibilities:**
-- User authentication
+- User authentication via Supabase Auth
 - Password verification
 - User creation and management
 - Role management
 - Username validation
+- Database queries to Supabase PostgreSQL
 
 **Endpoints:**
 ```
@@ -213,21 +222,17 @@ PATCH /api/auth/users/:username - Update user info
 
 **Authentication Flow:**
 1. Receive username/email + password
-2. If username: Query Firestore to get email
-3. Verify password using Firebase Auth REST API
-4. Retrieve user data from Firestore using Admin SDK
+2. If username: Query Supabase PostgreSQL to get email
+3. Authenticate using Supabase Auth (`signInWithPassword`)
+4. Retrieve user data from Supabase PostgreSQL
 5. Return user object
 
 **Configuration:**
 ```javascript
-// Environment variables
+// Environment variables (services/auth-service/.env)
 PORT=3001
-GOOGLE_APPLICATION_CREDENTIALS=./serviceAccountKey.json
-// OR
-GOOGLE_CLIENT_EMAIL=...
-GOOGLE_PRIVATE_KEY=...
-GOOGLE_PROJECT_ID=...
-FIREBASE_API_KEY=...
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 
 #### 3. Future Services
@@ -264,7 +269,7 @@ apps/mobile/
 │
 ├── core/                       # Core infrastructure
 │   ├── config/                 # Configuration
-│   │   ├── firebase.js        # Firebase config
+│   │   ├── supabase.js        # Supabase config
 │   │   └── api.js             # API Gateway config
 │   ├── contexts/               # React Contexts
 │   │   ├── AuthContext.js     # Authentication state
@@ -382,42 +387,31 @@ Response: { status: "ok", service: "api-gateway", timestamp: "..." }
 
 ## Database & Storage
 
-### Firebase Firestore
+### Supabase PostgreSQL
 
-**Collection Structure:**
-```
-users/
-  {uid}/
-    - uid: string
-    - username: string
-    - email: string
-    - name: string
-    - role: "employee" | "manager" | "super_admin"
-    - department: string
-    - position: string
-    - workMode: "in_office" | "semi_remote" | "fully_remote"
-    - hireDate: string (YYYY-MM-DD)
-    - isActive: boolean
-    - createdAt: timestamp
-    - updatedAt: timestamp
+**Table Structure:**
+```sql
+CREATE TABLE users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  uid UUID UNIQUE NOT NULL,  -- Supabase Auth UID
+  username VARCHAR(255) UNIQUE NOT NULL,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  name VARCHAR(255),
+  role VARCHAR(50) NOT NULL,  -- 'employee', 'manager', 'super_admin'
+  department VARCHAR(255),
+  position VARCHAR(255),
+  work_mode VARCHAR(50),  -- 'in_office', 'semi_remote', 'fully_remote'
+  hire_date DATE,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
 ```
 
-**Security Rules:**
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /users/{userId} {
-      allow read: if request.auth != null && 
-                     (request.auth.uid == userId || 
-                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin');
-      allow list: if true; // Required for username login
-      allow write: if request.auth != null && 
-                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin';
-    }
-  }
-}
-```
+**Row Level Security (RLS):**
+- RLS policies control access at the database level
+- Backend uses Service Role Key (bypasses RLS)
+- Frontend uses Anon Key (respects RLS policies)
 
 ### AsyncStorage (Local)
 
@@ -443,8 +437,8 @@ service cloud.firestore {
 
 1. **Username/Email + Password**
    - Primary authentication method
-   - Server-side password verification
-   - Firebase Auth integration
+   - Server-side password verification via Supabase Auth
+   - Supports both username and email login
 
 2. **Biometric Authentication**
    - Face ID (iOS & Android)
@@ -454,14 +448,14 @@ service cloud.firestore {
 ### Security Implementation
 
 #### Password Security
-- Passwords hashed by Firebase Authentication
+- Passwords hashed by Supabase Authentication
 - Never stored in plain text
 - Server-side verification only
 - No password retrieval possible
 
 #### Session Management
-- Firebase Auth session tokens
-- AsyncStorage persistence
+- Supabase Auth session tokens
+- AsyncStorage persistence via custom adapter
 - Automatic session restoration
 - Secure token storage
 
@@ -619,27 +613,46 @@ Response:
    npm install
    ```
 
-5. **Configure Firebase**
-   - Create Firebase project
-   - Enable Authentication (Email/Password)
-   - Enable Firestore
-   - Copy Firebase config to `apps/mobile/core/config/firebase.js`
-   - Download service account key for auth-service
+5. **Configure Supabase**
+   - Create Supabase project at https://supabase.com
+   - Create `users` table (see database schema above)
+   - Get Supabase URL and API keys from project settings
+   - Copy Supabase config to `apps/mobile/core/config/supabase.js`
+   - Set up Row Level Security (RLS) policies
 
 6. **Configure Environment Variables**
 
-   **API Gateway** (`services/api-gateway/.env`):
+   **API Gateway** (`services/api-gateway/.env` - optional):
    ```env
    PORT=3000
    AUTH_SERVICE_URL=http://localhost:3001
+   HOST=0.0.0.0
    ```
 
    **Auth Service** (`services/auth-service/.env`):
    ```env
    PORT=3001
-   GOOGLE_APPLICATION_CREDENTIALS=./serviceAccountKey.json
-   FIREBASE_API_KEY=your_api_key
+   SUPABASE_URL=https://your-project.supabase.co
+   SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
    ```
+
+   **Mobile App** (`apps/mobile/.env`):
+   ```env
+   EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+   EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+   ```
+
+   **Mobile App** (`apps/mobile/app.json`):
+   ```json
+   {
+     "expo": {
+       "extra": {
+         "apiGatewayUrl": "http://192.168.18.38:3000"
+       }
+     }
+   }
+   ```
+   *Update with your computer's IP address for physical device testing*
 
 7. **Start Services**
 
@@ -874,15 +887,16 @@ npm test
 - Workflow automatically handles this
 - Manually: Delete `package-lock.json` and run `npm install`
 
-#### 2. Firebase Connection Issues
+#### 2. Supabase Connection Issues
 
-**Symptoms:** Cannot connect to Firebase
+**Symptoms:** Cannot connect to Supabase
 
 **Solution:**
-- Check Firebase configuration
-- Verify API keys
+- Check Supabase configuration
+- Verify API keys (URL and keys)
 - Check network connectivity
-- Verify Firestore security rules
+- Verify RLS policies are set correctly
+- Ensure Supabase project is active
 
 #### 3. API Gateway Connection Failed
 
@@ -899,11 +913,12 @@ npm test
 **Symptoms:** Login fails with various errors
 
 **Solution:**
-- Check Firebase Authentication is enabled
-- Verify user exists in Firebase Auth
-- Check Firestore document exists
+- Check Supabase Authentication is enabled
+- Verify user exists in Supabase Auth
+- Check PostgreSQL `users` table has matching record
 - Verify password is correct
-- Check service account credentials
+- Check Supabase service role key is correct
+- Verify `uid` in database matches Supabase Auth UID
 
 #### 5. Metro Bundler Issues
 
@@ -954,10 +969,10 @@ npm test
 ### External Resources
 - [Expo Documentation](https://docs.expo.dev/)
 - [React Native Documentation](https://reactnative.dev/)
-- [Firebase Documentation](https://firebase.google.com/docs)
+- [Supabase Documentation](https://supabase.com/docs)
 - [Express.js Documentation](https://expressjs.com/)
 
 ---
 
-*Last Updated: 2025-12-16*
+*Last Updated: 2025-12-26*
 

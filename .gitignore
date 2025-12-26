@@ -1,5 +1,130 @@
-# OSX
+# ============================================
+# Operating System Files
+# ============================================
+
+# macOS
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+.AppleDouble
+.LSOverride
+Icon
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ============================================
+# IDE and Editor Files
+# ============================================
+
+# Visual Studio Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# IntelliJ IDEA / Android Studio
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+.idea_modules/
+atlassian-ide-plugin.xml
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+.vim/
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# ============================================
+# Node.js
+# ============================================
+
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Package manager lock files (keep package-lock.json, ignore others)
+yarn.lock
+pnpm-lock.yaml
+
+# Node version managers
+.nvmrc
+.node-version
+
+# ============================================
+# React Native / Expo
+# ============================================
+
+# Expo
+.expo/
+.expo-shared/
+.expo/
+dist/
+web-build/
+
+# React Native
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+
+# Metro bundler
+.metro-health-check*
+
+# ============================================
+# iOS / Xcode
+# ============================================
 
 # Xcode
 build/
@@ -11,84 +136,274 @@ build/
 !default.mode2v3
 *.perspectivev3
 !default.perspectivev3
-xcuserdata
+xcuserdata/
 *.xccheckout
 *.moved-aside
-DerivedData
+DerivedData/
 *.hmap
 *.ipa
 *.xcuserstate
 project.xcworkspace
+*.xcworkspace
+!default.xcworkspace
+*.xcscmblueprint
+*.xccheckout
+*.xcuserstate
+ios/.xcode.env.local
 
-# Android/IntelliJ
+# CocoaPods
+/ios/Pods/
+/ios/Podfile.lock
+/ios/.symlinks/
+/ios/build/
+
+# ============================================
+# Android
+# ============================================
+
+# Android Studio / Gradle
+.gradle/
 build/
-.idea
-.gradle
 local.properties
 *.iml
 *.hprof
 .cxx/
 *.keystore
 !debug.keystore
+*.ap_
+*.apk
+*.aab
+*.dex
+*.class
+bin/
+gen/
+out/
+release/
+.gradle
+local.properties
+proguard/
 
-# node.js
-node_modules/
-npm-debug.log
-yarn-error.log
+# Android NDK
+obj/
+.externalNativeBuild
+.cxx/
 
-# fastlane
-**/fastlane/report.xml
-**/fastlane/Preview.html
-**/fastlane/screenshots
-**/fastlane/test_output
+# ============================================
+# Environment Variables
+# ============================================
 
-# Bundle artifact
-*.jsbundle
-
-# CocoaPods
-/ios/Pods/
-
-# Expo
-.expo/
-.expo-shared/
-dist/
-web-build/
-
-# Environment variables
 .env
 .env.local
 .env.production
 .env.development
+.env.test
+.env.staging
+.env.*
+!.env.example
+!.env.template
 
-# Firebase
+# ============================================
+# Supabase
+# ============================================
+
+# Supabase local development (if using Supabase CLI)
+.supabase/
+
+# ============================================
+# Firebase (Legacy - Migrated to Supabase)
+# ============================================
+
 firebase-debug.log
 .firebase/
+.firebaserc
+firebase.json
+.firebase/
 
+# ============================================
 # Testing
+# ============================================
+
 coverage/
 .nyc_output/
+*.lcov
+.jest/
+test-results/
+playwright-report/
+playwright/.cache/
 
-# Misc
-*.log
-*.pem
-.vscode/
-.idea/
+# ============================================
+# Build Artifacts
+# ============================================
 
-# Build artifacts
+# Mobile builds
 *.apk
 *.aab
 *.ipa
+*.app
+*.dSYM.zip
+*.dSYM
 
-# Temporary files
+# Web builds
+dist/
+build/
+out/
+.next/
+.nuxt/
+.output/
+
+# ============================================
+# Logs
+# ============================================
+
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+pm2.log
+pm2-error.log
+
+# ============================================
+# Temporary Files
+# ============================================
+
 *.tmp
 *.temp
+*.swp
+*.swo
+*.bak
+*.cache
 .cache/
+.temp/
+.tmp/
+*.pid
+*.seed
+*.pid.lock
 
-# Secret files and credentials
+# ============================================
+# Secret Files and Credentials
+# ============================================
+
+# Service account keys
+serviceAccountKey.json
+*-key.json
+*-credentials.json
+*.pem
+*.key
+*.p12
+*.p8
+
+# Secret directories
 secret-files/
-*.json
+secrets/
+.credentials/
+
+# ============================================
+# Migration and Data Files
+# ============================================
+
+# Migration data (contains sensitive user data and passwords)
+migrations/data/
+*.sql.backup
+*.sql.bak
+
+# User data files (legacy - contains sensitive data)
+users.txt
+users.json
+# Note: asyncStorage-users-example.json is kept as it's a template/example file
+
+# ============================================
+# Process Managers
+# ============================================
+
+# PM2
+.pm2/
+ecosystem.config.js
+
+# ============================================
+# EAS (Expo Application Services)
+# ============================================
+
+.eas/
+eas.json.local
+
+# ============================================
+# Fastlane
+# ============================================
+
+**/fastlane/report.xml
+**/fastlane/Preview.html
+**/fastlane/screenshots
+**/fastlane/test_output
+**/fastlane/.env
+
+# ============================================
+# Misc
+# ============================================
+
+# Bundle artifacts
+*.jsbundle
+
+# TypeScript
+*.tsbuildinfo
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional stylelint cache
+.stylelintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# parcel-bundler cache
+.parcel-cache
+
+# Stores VSCode versions used for testing VSCode extensions
+.vscode-test
+
+# yarn v2
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+# Turbo
+.turbo
+
+# ============================================
+# Keep These Files (Exceptions)
+# ============================================
+
+# Keep package files
 !package.json
 !package-lock.json
+!yarn.lock
+
+# Keep config files
 !tsconfig.json
+!jsconfig.json
 !app.json
-serviceAccountKey.json
+!eas.json
+
+# Keep example files
+!.env.example
+!.env.template

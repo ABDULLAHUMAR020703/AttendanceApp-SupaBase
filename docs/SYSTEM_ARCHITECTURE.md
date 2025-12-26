@@ -17,7 +17,7 @@
 
 ## Overview
 
-This attendance management system uses **Firebase Authentication** and **Firestore** for user management, with **AsyncStorage** for local data persistence. The system supports three authentication roles with different permission levels and automatic ticket routing based on departments.
+This attendance management system uses **Supabase Authentication** and **PostgreSQL** for user management, with **AsyncStorage** for local data persistence. The system supports three authentication roles with different permission levels and automatic ticket routing based on departments.
 
 The codebase follows a **modular, feature-based architecture** where each feature is self-contained and isolated, ensuring features don't interfere with each other and the code is deployment-ready.
 
@@ -71,13 +71,14 @@ AttendanceApp/
 **Purpose:** Handles all authentication and user management logic.
 
 **Architecture:**
-- **Firebase Admin SDK**: Used for Firestore operations (trusted backend with admin privileges)
-- **Firebase Auth REST API**: Used ONLY for password verification (Admin SDK limitation)
+- **Supabase Client**: Used for all database operations and authentication
+- **Service Role Key**: Used for backend operations (bypasses Row Level Security)
+- **Supabase Auth**: Handles authentication and password verification
 
-**Why Hybrid Approach?**
-- Firebase Admin SDK **cannot verify passwords directly**
-- Admin SDK is used for Firestore access (username lookup, user data retrieval)
-- REST API is used for password verification (only operation Admin SDK cannot do)
+**Why This Approach?**
+- Supabase provides unified client for both Auth and Database
+- Service Role Key allows backend to perform admin operations
+- Supabase Auth handles password verification natively
 
 **Features:**
 - Express server running on port 3001
@@ -87,9 +88,9 @@ AttendanceApp/
 
 **Login Flow:**
 1. Accept username/email + password
-2. If username: Use Admin SDK to query Firestore and get email
-3. Verify password: Use Firebase Auth REST API (`signInWithPassword`)
-4. If correct: Use Admin SDK to get user data from Firestore
+2. If username: Query Supabase PostgreSQL to get email
+3. Authenticate: Use Supabase Auth (`signInWithPassword`)
+4. If correct: Query Supabase PostgreSQL to get user data
 5. Return user info or authentication error
 
 **Endpoints:**
@@ -101,16 +102,16 @@ AttendanceApp/
 - `PATCH /api/auth/users/:username` - User info updates
 
 **Configuration:**
-- Service account credentials via environment variables:
-  - `GOOGLE_APPLICATION_CREDENTIALS` (path to JSON file), OR
-  - `GOOGLE_CLIENT_EMAIL` + `GOOGLE_PRIVATE_KEY` + `GOOGLE_PROJECT_ID`
-- Firebase API key for REST API password verification
+- Supabase credentials via environment variables:
+  - `SUPABASE_URL` - Your Supabase project URL
+  - `SUPABASE_SERVICE_ROLE_KEY` - Service role key (for backend operations)
 
 **Security:**
-- ✅ Passwords verified server-side using Firebase Auth REST API
-- ✅ Firestore access uses Admin SDK (trusted backend)
+- ✅ Passwords verified server-side using Supabase Auth
+- ✅ Database access uses Service Role Key (trusted backend, bypasses RLS)
 - ✅ No passwords stored or logged
 - ✅ Proper error handling for all authentication failures
+- ✅ Row Level Security (RLS) policies for frontend access
 
 ### Frontend Integration
 
@@ -121,13 +122,14 @@ AttendanceApp/
 **Login Flow:**
 1. Frontend calls API Gateway (`/api/auth/login`)
 2. API Gateway forwards to Auth Service
-3. Auth Service verifies password and returns user data
-4. If API Gateway fails: Falls back to direct Firebase authentication (backward compatibility)
+3. Auth Service authenticates via Supabase and returns user data
+4. If API Gateway fails: Falls back to direct Supabase authentication (backward compatibility)
 
 **Platform-Aware URL Configuration:**
 - **iOS Simulator**: `http://localhost:3000`
-- **Android Emulator**: `http://10.0.2.2:3000` or uses `debuggerHost`
-- **Physical Device**: Uses computer's IP address (must be on same network)
+- **Android Emulator**: `http://10.0.2.2:3000`
+- **Physical Device**: Configured in `app.json` as `http://<your-computer-ip>:3000` (e.g., `http://192.168.18.38:3000`)
+- **Configuration**: Set in `apps/mobile/app.json` under `extra.apiGatewayUrl`
 
 ### Service Startup
 
@@ -409,78 +411,71 @@ Every user/employee has the following structure:
 
 ---
 
-## Firebase Integration
+## Supabase Integration
 
 ### Overview
 
-The application uses **Firebase** as the primary backend service for authentication and user data management. Firebase provides secure, scalable, and real-time capabilities for the attendance management system.
+The application uses **Supabase** as the primary backend service for authentication and user data management. Supabase provides secure, scalable PostgreSQL database and authentication capabilities for the attendance management system.
 
-### Firebase Services Used
+### Supabase Services Used
 
-1. **Firebase Authentication** - User authentication and session management
-2. **Cloud Firestore** - NoSQL database for user profiles and data
-3. **Firebase Configuration** - Centralized app configuration
+1. **Supabase Authentication** - User authentication and session management
+2. **PostgreSQL Database** - SQL database for user profiles and data
+3. **Row Level Security (RLS)** - Database-level access control
 
-### Firebase Configuration
+### Supabase Configuration
 
-The Firebase configuration is located in `core/config/firebase.js`:
+The Supabase configuration is located in `core/config/supabase.js`:
 
 ```javascript
-const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID",
-  measurementId: "YOUR_MEASUREMENT_ID" // Optional
+import { createClient } from '@supabase/supabase-js';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+// Custom AsyncStorage adapter for session persistence
+const AsyncStorageAdapter = {
+  getItem: async (key) => await AsyncStorage.getItem(key),
+  setItem: async (key, value) => await AsyncStorage.setItem(key, value),
+  removeItem: async (key) => await AsyncStorage.removeItem(key),
 };
-```
 
-### Firebase Initialization
-
-The app initializes Firebase with React Native-specific settings:
-
-```javascript
-// Initialize Firebase App
-app = initializeApp(firebaseConfig);
-
-// Initialize Firebase Auth with AsyncStorage persistence
-auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(AsyncStorage)
-});
-
-// Initialize Firestore with React Native compatibility
-db = initializeFirestore(app, {
-  experimentalForceLongPolling: true
+const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    storage: AsyncStorageAdapter,
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: false,
+  },
 });
 ```
 
 **Key Features:**
-- **AsyncStorage Persistence**: Auth state persists across app restarts
-- **Long Polling**: Ensures Firestore works reliably in React Native
+- **AsyncStorage Persistence**: Auth state persists across app restarts via custom adapter
+- **PostgreSQL Database**: Relational database with SQL queries
 - **Error Handling**: Graceful fallbacks if initialization fails
 
-### Firebase Authentication
+### Supabase Authentication
 
-#### What is Stored in Firebase Auth?
+#### What is Stored in Supabase Auth?
 
 - **Email**: Used as the primary login identifier
 - **Password**: Hashed and encrypted (not retrievable)
-- **UID**: Unique user identifier (used as Firestore document ID)
-- **Session State**: Automatically managed by Firebase
+- **UID**: Unique user identifier (used as `uid` field in PostgreSQL `users` table)
+- **Session State**: Automatically managed by Supabase
 
 #### Authentication Methods Supported
 
 1. **Email/Password Authentication** (Primary)
    - Users can login with email or username
-   - If username is provided, system looks up email in Firestore
-   - Password is verified by Firebase Authentication
+   - If username is provided, system looks up email in PostgreSQL
+   - Password is verified by Supabase Authentication
 
 2. **Session Persistence**
-   - Uses AsyncStorage for offline persistence
+   - Uses AsyncStorage for offline persistence via custom adapter
    - Automatically restores session on app restart
-   - `onAuthStateChanged` listener updates app state
+   - `onAuthStateChange` listener updates app state
 
 #### Authentication Flow
 
@@ -504,8 +499,11 @@ try {
   // Fallback to direct Firebase authentication
 }
 
-// 3. Fallback: Direct Firebase authentication
-const userCredential = await signInWithEmailAndPassword(auth, email, password);
+// 3. Fallback: Direct Supabase authentication
+const { data, error } = await supabase.auth.signInWithPassword({
+  email: email,
+  password: password,
+});
 ```
 
 **Backend Flow (Auth Service):**
@@ -513,24 +511,28 @@ const userCredential = await signInWithEmailAndPassword(auth, email, password);
 // 1. Accept username/email + password
 POST /api/auth/login
 
-// 2. If username, resolve email using Admin SDK + Firestore
+// 2. If username, resolve email using Supabase PostgreSQL
 if (!usernameOrEmail.includes('@')) {
-  const querySnapshot = await db.collection('users')
-    .where('username', '==', usernameOrEmail)
-    .limit(1)
-    .get();
-  email = querySnapshot.docs[0].data().email;
+  const { data: userData } = await supabase
+    .from('users')
+    .select('email')
+    .eq('username', usernameOrEmail)
+    .single();
+  email = userData.email;
 }
 
-// 3. Verify password using Firebase Auth REST API
-const authResponse = await axios.post(
-  'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword',
-  { email, password, returnSecureToken: true }
-);
+// 3. Authenticate using Supabase Auth
+const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+  email: email,
+  password: password,
+});
 
-// 4. If password correct, get user data using Admin SDK
-const userDoc = await db.collection('users').doc(localId).get();
-const userData = userDoc.data();
+// 4. If password correct, get user data from PostgreSQL
+const { data: userData } = await supabase
+  .from('users')
+  .select('*')
+  .eq('uid', authData.user.id)
+  .single();
 
 // 5. Return user info
 return { success: true, user: userData };
@@ -538,191 +540,179 @@ return { success: true, user: userData };
 
 #### Authentication Error Handling
 
-The system handles various Firebase Auth errors:
+The system handles various Supabase Auth errors:
 
-- `auth/user-not-found`: User doesn't exist
-- `auth/wrong-password`: Incorrect password
-- `auth/invalid-email`: Invalid email format
-- `auth/user-disabled`: Account disabled
-- `auth/too-many-requests`: Rate limiting
-- `auth/email-already-in-use`: Email already registered
-- `auth/weak-password`: Password too weak
+- `Invalid login credentials`: User doesn't exist or wrong password
+- `Email not confirmed`: Email needs verification
+- `Email rate limit exceeded`: Too many login attempts
+- `User already registered`: Email already exists
+- `Invalid email address`: Invalid email format
 
-### Firestore Database
+### PostgreSQL Database
 
-#### Collection Structure
+#### Table Structure
 
-```
-Firestore Database
-└── users (collection)
-    ├── {uid_1} (document)
-    │   ├── uid: "firebase_auth_uid"
-    │   ├── username: "testuser"
-    │   ├── email: "testuser@company.com"
-    │   ├── name: "Test User"
-    │   ├── role: "employee"
-    │   ├── department: "Engineering"
-    │   ├── position: "AI Engineer"
-    │   ├── workMode: "in_office"
-    │   ├── hireDate: "2023-01-15"
-    │   ├── isActive: true
-    │   ├── createdAt: "2023-01-15T00:00:00.000Z"
-    │   └── updatedAt: "2023-01-15T00:00:00.000Z"
-    ├── {uid_2} (document)
-    └── ...
+```sql
+CREATE TABLE users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  uid UUID UNIQUE NOT NULL,  -- Supabase Auth UID
+  username VARCHAR(255) UNIQUE NOT NULL,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  name VARCHAR(255),
+  role VARCHAR(50) NOT NULL,  -- 'employee', 'manager', 'super_admin'
+  department VARCHAR(255),
+  position VARCHAR(255),
+  work_mode VARCHAR(50),  -- 'in_office', 'semi_remote', 'fully_remote'
+  hire_date DATE,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
 ```
 
 **Important Notes:**
-- **Document ID**: Always the Firebase Auth UID (not username)
-- **Username Field**: Stored as a field for querying
-- **Email Field**: Must match Firebase Auth email
+- **UID Field**: Stores Supabase Auth UID (not the primary key)
+- **Username Field**: Unique identifier for login
+- **Email Field**: Must match Supabase Auth email
 - **Role Field**: Controls access (`super_admin`, `manager`, `employee`)
+- **Snake_case**: Database uses snake_case (e.g., `work_mode`, `hire_date`)
 
-#### Firestore Security Rules
+#### Row Level Security (RLS)
 
-**Development Rules (Permissive):**
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /users/{userId} {
-      // Allow authenticated users to read
-      allow read: if request.auth != null;
-      
-      // Allow queries for username lookup (needed for username-based login)
-      allow list: if true;
-      
-      // Allow authenticated users to write
-      allow write: if request.auth != null;
-    }
-  }
-}
+**RLS Policies:**
+- Backend uses Service Role Key (bypasses RLS)
+- Frontend uses Anon Key (respects RLS policies)
+- Policies control read/write access based on authentication and roles
+
+**Example RLS Policy:**
+```sql
+-- Allow users to read their own data
+CREATE POLICY "Users can read own data"
+ON users FOR SELECT
+USING (auth.uid() = uid);
+
+-- Allow super_admin to read all
+CREATE POLICY "Super admins can read all"
+ON users FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1 FROM users
+    WHERE uid = auth.uid() AND role = 'super_admin'
+  )
+);
 ```
 
-**Production Rules (Recommended - with username login support):**
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /users/{userId} {
-      // Allow authenticated users to read their own data
-      allow read: if request.auth != null && request.auth.uid == userId;
-      
-      // Allow super_admin to read all
-      allow read: if request.auth != null && 
-                     get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin';
-      
-      // Allow queries for username lookup (needed for username-based login before authentication)
-      // This allows the app to query users by username to find their email
-      allow list: if true;
-      
-      // Only super_admin and managers can write
-      allow write: if request.auth != null && 
-                      (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin' ||
-                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'manager');
-    }
-  }
-}
-```
-
-**Important Notes:**
-- The `allow list: if true;` rule is required for username-based login, as the app queries Firestore by username before authentication
-- Without this rule, username login will fail with "Missing or insufficient permissions"
-- Email login works differently: it authenticates first, then reads Firestore (which requires `allow read` for authenticated users)
-
-### Firebase API Usage
+### Supabase API Usage
 
 #### Creating Users
 
 ```javascript
-// 1. Create in Firebase Authentication
-const userCredential = await createUserWithEmailAndPassword(
-  auth, 
-  email, 
-  password
-);
-
-// 2. Create Firestore document
-await setDoc(doc(db, 'users', userCredential.user.uid), {
-  uid: userCredential.user.uid,
-  username,
-  email,
-  name,
-  role,
-  department,
-  position,
-  workMode,
-  hireDate,
-  isActive: true,
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString()
+// 1. Create in Supabase Auth (using Admin API on backend)
+const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+  email: email,
+  password: password,
+  email_confirm: true,
 });
+
+// 2. Create PostgreSQL record
+const { data: userData, error: dbError } = await supabase
+  .from('users')
+  .insert({
+    uid: authUser.user.id,
+    username: username,
+    email: email,
+    name: name,
+    role: role,
+    department: department,
+    position: position,
+    work_mode: workMode,
+    hire_date: hireDate,
+    is_active: true,
+  })
+  .select()
+  .single();
 ```
 
 #### Querying Users
 
 ```javascript
 // Find user by username
-const usersRef = collection(db, 'users');
-const q = query(usersRef, where('username', '==', username));
-const querySnapshot = await getDocs(q);
+const { data: userData } = await supabase
+  .from('users')
+  .select('*')
+  .eq('username', username)
+  .single();
 
 // Get user by UID
-const userDoc = await getDoc(doc(db, 'users', uid));
-const userData = userDoc.data();
+const { data: userData } = await supabase
+  .from('users')
+  .select('*')
+  .eq('uid', uid)
+  .single();
 ```
 
 #### Updating Users
 
 ```javascript
 // Update user role
-await setDoc(doc(db, 'users', userId), {
-  role: newRole,
-  updatedAt: new Date().toISOString()
-}, { merge: true });
+const { data, error } = await supabase
+  .from('users')
+  .update({ 
+    role: newRole,
+    updated_at: new Date().toISOString()
+  })
+  .eq('username', username)
+  .select();
 
 // Update multiple fields
-await setDoc(doc(db, 'users', userId), {
-  department: newDepartment,
-  position: newPosition,
-  workMode: newWorkMode,
-  updatedAt: new Date().toISOString()
-}, { merge: true });
+const { data, error } = await supabase
+  .from('users')
+  .update({
+    department: newDepartment,
+    position: newPosition,
+    work_mode: newWorkMode,
+    updated_at: new Date().toISOString()
+  })
+  .eq('username', username)
+  .select();
 ```
 
-### Firebase Authentication State Management
+### Supabase Authentication State Management
 
-The app uses `onAuthStateChanged` listener to track authentication state:
+The app uses `onAuthStateChange` listener to track authentication state:
 
 ```javascript
 useEffect(() => {
-  const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-    if (firebaseUser) {
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    if (session?.user) {
       // User is signed in
-      const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-      const userData = userDoc.data();
-      setUser(combinedUser);
+      const { data: userData } = await supabase
+        .from('users')
+        .select('*')
+        .eq('uid', session.user.id)
+        .single();
+      setUser(userData);
     } else {
       // User is signed out
       setUser(null);
     }
   });
 
-  return () => unsubscribe();
+  return () => subscription.unsubscribe();
 }, []);
 ```
 
-### What Goes to Firebase?
+### What Goes to Supabase?
 
-#### ✅ Stored in Firebase
+#### ✅ Stored in Supabase
 
-1. **Firebase Authentication**
+1. **Supabase Authentication**
    - Email addresses
    - Hashed passwords
    - User UIDs
    - Session tokens
 
-2. **Firestore `users` Collection**
+2. **PostgreSQL `users` Table**
    - Complete user profiles
    - Username, email, name
    - Role, department, position
@@ -730,7 +720,7 @@ useEffect(() => {
    - Active status
    - Timestamps
 
-### What Does NOT Go to Firebase?
+### What Does NOT Go to Supabase?
 
 #### ❌ Stored Locally (AsyncStorage)
 
@@ -739,98 +729,95 @@ useEffect(() => {
 - **Notifications**: `@notifications`
 - **Signup Requests**: `@signup_requests`
 - **Leave Requests**: `@leave_requests`
-- **Employee List Cache**: `@company_employees` (synced from Firebase)
+- **Employee List Cache**: `@company_employees` (synced from Supabase)
 
 **Why?**
 - Attendance and tickets are device-specific
 - Notifications are local to each device
-- Reduces Firebase read/write costs
+- Reduces database read/write costs
 - Faster local access
 
-### Firebase Migration
+### Supabase Migration
 
-#### From Local Storage to Firebase
+#### From Firebase to Supabase
 
-The app has been fully migrated from local file storage:
+The app has been fully migrated from Firebase to Supabase:
 
-**Before (Legacy):**
-- `users.txt` file in device storage
-- FileSystem operations
-- Manual file parsing
+**Before (Firebase):**
+- Firebase Authentication
+- Firestore NoSQL database
+- Firebase Admin SDK for backend
 
-**After (Current):**
-- Firebase Authentication for credentials
-- Firestore for user data
-- Automatic sync across devices
-- Built-in offline support
+**After (Current - Supabase):**
+- Supabase Authentication
+- PostgreSQL SQL database
+- Supabase Client for all operations
 
-#### Migration Script
+#### Migration Scripts
 
-Use `scripts/migrate-users-to-firebase.mjs` to migrate from `users.txt`:
+User creation scripts available:
+- **`scripts/create-users-supabase.js`** - Programmatically create users via Supabase Admin API
+- **`migrations/manual-create-users.sql`** - SQL script for manual user creation
 
-```bash
-npm run migrate-users
-```
-
-The script:
-1. Reads `users.txt` from project root
-2. Parses user data
-3. Creates Firebase Auth accounts
-4. Creates Firestore documents
-5. Includes all user fields
-
-### Firebase Best Practices
+### Supabase Best Practices
 
 1. **Security**
-   - Use production security rules in production
-   - Never expose API keys in client code (use environment variables)
+   - Use Row Level Security (RLS) policies in production
+   - Never expose Service Role Key in client code (use environment variables)
    - Implement proper role-based access control
+   - Use Anon Key for frontend, Service Role Key for backend only
 
 2. **Performance**
-   - Use Firestore queries efficiently
+   - Use PostgreSQL indexes for frequently queried fields
    - Cache frequently accessed data in AsyncStorage
    - Implement pagination for large datasets
+   - Use `.select()` to limit returned fields
 
 3. **Error Handling**
-   - Always handle Firebase errors gracefully
+   - Always handle Supabase errors gracefully
+   - Check both `data` and `error` in responses
    - Provide user-friendly error messages
    - Log errors for debugging
 
 4. **Offline Support**
-   - Firebase Auth persists automatically
-   - Firestore has built-in offline cache
+   - Supabase Auth persists via AsyncStorage adapter
    - AsyncStorage provides additional offline storage
+   - Implement local caching for offline access
 
-### Firebase Troubleshooting
+### Supabase Troubleshooting
 
 #### Common Issues
 
 **1. "Missing or insufficient permissions"**
-- Check Firestore security rules
-- Verify rules are published
+- Check Row Level Security (RLS) policies
+- Verify policies are enabled on the table
 - Ensure user is authenticated
+- Check if Service Role Key is needed for backend operations
 
-**2. "Firebase: No Firebase App '[DEFAULT]' has been created"**
-- Check `core/config/firebase.js` initialization
-- Ensure `initializeApp()` is called before other services
-- Verify Firebase configuration is correct
+**2. "Supabase client not initialized"**
+- Check `core/config/supabase.js` initialization
+- Verify environment variables are set
+- Ensure Supabase URL and keys are correct
 
 **3. "User not found"**
-- Check if user exists in Firebase Authentication
-- Verify Firestore document exists
-- Check username field matches
+- Check if user exists in Supabase Authentication
+- Verify PostgreSQL `users` table has matching record
+- Check `uid` field matches Supabase Auth UID
+- Verify username field matches
 
 **4. Authentication not persisting**
 - Verify AsyncStorage is working
-- Check `getReactNativePersistence` is used
+- Check AsyncStorage adapter is configured correctly
 - Ensure app has storage permissions
+- Verify `autoRefreshToken` and `persistSession` are enabled
 
-### Firebase Setup Reference
+### Supabase Setup Reference
 
 For complete setup instructions, see:
-- **`docs/FIREBASE_SETUP.md`** - Step-by-step Firebase setup guide
-- **`core/config/firebase.js`** - Firebase configuration file
-- **`features/auth/services/authService.js`** - Authentication service implementation
+- **`SETUP.md`** - Step-by-step Supabase setup guide
+- **`core/config/supabase.js`** - Supabase configuration file
+- **`services/auth-service/config/supabase.js`** - Backend Supabase configuration
+- **`apps/mobile/utils/auth.js`** - Authentication service implementation
 
 ---
 
@@ -1030,35 +1017,35 @@ return { success: true, user: userData };
 
 **Username Login:**
 1. Frontend sends username to API Gateway
-2. Auth Service queries Firestore by `username` field using Admin SDK
-3. Gets email from Firestore document
-4. Verifies password using Firebase Auth REST API
-5. Returns user data from Firestore
+2. Auth Service queries PostgreSQL by `username` field using Supabase
+3. Gets email from PostgreSQL record
+4. Authenticates using Supabase Auth
+5. Returns user data from PostgreSQL
 
 **Email Login:**
 1. Frontend sends email to API Gateway
 2. Auth Service uses email directly
-3. Verifies password using Firebase Auth REST API
-4. Returns user data from Firestore
+3. Authenticates using Supabase Auth
+4. Returns user data from PostgreSQL
 
 **Key Differences:**
-- Username login requires Firestore query BEFORE password verification
-- Email login skips Firestore query (uses email directly)
-- Both use Firebase Auth REST API for password verification
-- Both use Admin SDK for Firestore access (trusted backend)
-- No security rules restrictions (Admin SDK bypasses rules)
+- Username login requires PostgreSQL query BEFORE password verification
+- Email login skips PostgreSQL query (uses email directly)
+- Both use Supabase Auth for password verification
+- Both use Service Role Key for database access (trusted backend, bypasses RLS)
+- No RLS restrictions (Service Role Key bypasses policies)
 
 ### Security Features
 
 **✅ Secure Password Verification:**
-- Passwords verified server-side using Firebase Auth REST API
+- Passwords verified server-side using Supabase Auth
 - No passwords stored or logged
 - Proper error handling for authentication failures
 
 **✅ Trusted Backend:**
-- Admin SDK used for Firestore operations
+- Service Role Key used for PostgreSQL operations
 - Admin privileges for database access
-- No security rules restrictions
+- Bypasses Row Level Security (RLS) policies
 
 **✅ Error Handling:**
 - Invalid username/email → 401
@@ -1069,13 +1056,16 @@ return { success: true, user: userData };
 
 ### Fallback Authentication
 
-If the API Gateway is unavailable, the frontend automatically falls back to direct Firebase authentication:
+If the API Gateway is unavailable, the frontend automatically falls back to direct Supabase authentication:
 
 ```javascript
-// Fallback: Direct Firebase authentication
+// Fallback: Direct Supabase authentication
 try {
-  const userCredential = await signInWithEmailAndPassword(auth, email, password);
-  // ... get user data from Firestore
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: email,
+    password: password,
+  });
+  // ... get user data from PostgreSQL
 } catch (error) {
   // Handle authentication error
 }
@@ -1095,8 +1085,8 @@ This ensures the app continues to work even if microservices are down.
 **Process:**
 1. Super admin fills form (username, password, name, email, role, department, position, etc.)
 2. System checks if username exists
-3. Creates user in Firebase Authentication
-4. Creates document in Firestore `users` collection
+3. Creates user in Supabase Authentication (via Admin API)
+4. Creates record in PostgreSQL `users` table
 5. Adds employee to AsyncStorage `@company_employees`
 6. If role is `manager`, can manage employees in their department
 
@@ -1151,16 +1141,16 @@ This ensures the app continues to work even if microservices are down.
 - Tickets routed to managers based on department
 - Managers can only manage employees in their department
 
-### 4. Firebase Structure
-- **Authentication**: Email/password (hashed, stored in Firebase Auth)
-- **Firestore**: User profile data (no passwords, document ID = Firebase Auth UID)
-- **Configuration**: `core/config/firebase.js`
-- **Initialization**: AsyncStorage persistence, long polling for React Native
-- **Security**: Firestore security rules for role-based access
+### 4. Supabase Structure
+- **Authentication**: Email/password (hashed, stored in Supabase Auth)
+- **PostgreSQL**: User profile data (no passwords, `uid` field = Supabase Auth UID)
+- **Configuration**: `core/config/supabase.js` (frontend), `services/auth-service/config/supabase.js` (backend)
+- **Initialization**: AsyncStorage persistence via custom adapter
+- **Security**: Row Level Security (RLS) policies for role-based access
 
 ### 5. Data Flow
-- Login → Firebase Auth → Firestore → AsyncStorage (optional)
-- Create User → Firebase Auth + Firestore + AsyncStorage
+- Login → Supabase Auth → PostgreSQL → AsyncStorage (optional)
+- Create User → Supabase Auth + PostgreSQL + AsyncStorage
 - Tickets → AsyncStorage → Auto-route to department manager
 
 ---
@@ -1212,12 +1202,12 @@ Example: testuser,password:testuser123,role:employee
 ```
 
 **Migration Process:**
-1. Parse `users.txt` file
+1. Parse `users.txt` file (if migrating from legacy format)
 2. For each user:
-   - Create in Firebase Authentication (email + password)
-   - Create document in Firestore `users` collection
+   - Create in Supabase Authentication (email + password)
+   - Create record in PostgreSQL `users` table
    - Add to AsyncStorage `@company_employees`
-3. Use migration script: `npm run migrate-users`
+3. Use migration script: `scripts/create-users-supabase.js` or SQL script: `migrations/manual-create-users.sql`
 
 ---
 
@@ -1226,34 +1216,34 @@ Example: testuser,password:testuser123,role:employee
 ### Common Issues
 
 **1. "Missing or insufficient permissions" error:**
-- **Cause**: Firestore security rules are blocking access
-- **For Username Login**: Rules must allow queries (`allow list`) before authentication
-- **For Email Login**: Rules must allow authenticated users to read their own document
-- **Solution**: Update Firestore security rules to include `allow list: if true;` and proper read permissions
-- See `docs/FIREBASE_SETUP.md` for complete security rules
+- **Cause**: Row Level Security (RLS) policies are blocking access
+- **For Username Login**: Policies must allow queries before authentication
+- **For Email Login**: Policies must allow authenticated users to read their own data
+- **Solution**: Update RLS policies or use Service Role Key for backend operations
+- See `SETUP.md` for complete RLS policy setup
 
 **2. "User not found" error:**
-- **For Username Login**: User doesn't exist in Firestore `users` collection
-- **For Email Login**: User exists in Firebase Auth but Firestore document is missing
+- **For Username Login**: User doesn't exist in PostgreSQL `users` table
+- **For Email Login**: User exists in Supabase Auth but PostgreSQL record is missing
 - **Solution**: 
-  - Check if user exists in both Firebase Authentication AND Firestore
-  - Run migration script if Firestore is empty: `npm run migrate-users`
+  - Check if user exists in both Supabase Authentication AND PostgreSQL
+  - Run migration script if database is empty: `scripts/create-users-supabase.js`
   - Users must exist in BOTH places for login to work
 
 **3. "User data not found" error:**
-- **Cause**: User authenticated successfully in Firebase Auth, but Firestore document doesn't exist
-- **Solution**: Create the Firestore document with the user's UID as document ID
-- This happens when users are created in Firebase Auth but not in Firestore
+- **Cause**: User authenticated successfully in Supabase Auth, but PostgreSQL record doesn't exist
+- **Solution**: Create the PostgreSQL record with the user's UID in the `uid` field
+- This happens when users are created in Supabase Auth but not in PostgreSQL
 
 **4. "Invalid password" error:**
-- Password is stored in Firebase Auth (hashed)
+- Password is stored in Supabase Auth (hashed)
 - Cannot retrieve original password
-- Use Firebase Console to reset password
+- Use Supabase Dashboard to reset password
 
-**5. Empty Firestore Database:**
+**5. Empty PostgreSQL Database:**
 - **Username Login**: Will fail immediately with "Invalid username or password"
-- **Email Login**: Will authenticate in Firebase Auth, but fail when reading Firestore with "User data not found"
-- **Solution**: Populate Firestore using migration script or create users through the app
+- **Email Login**: Will authenticate in Supabase Auth, but fail when reading PostgreSQL with "User data not found"
+- **Solution**: Populate database using migration script or create users through the app
 
 **6. Ticket not routing to manager:**
 - Verify manager exists with correct `role: "manager"`
@@ -1269,12 +1259,13 @@ Example: testuser,password:testuser123,role:employee
 
 ## Best Practices
 
-1. **Always use Firebase as source of truth** for authentication
-2. **Keep AsyncStorage synced** with Firestore for offline access
+1. **Always use Supabase as source of truth** for authentication
+2. **Keep AsyncStorage synced** with PostgreSQL for offline access
 3. **Use department field** to identify managers, not username
 4. **Position is descriptive only** - don't use for access control
 5. **Role determines permissions** - always check `role` field for access control
 6. **Tickets auto-route** - ensure managers have correct department
+7. **Use Service Role Key** only on backend, never expose in frontend
 
 ---
 
@@ -1300,7 +1291,8 @@ Example: testuser,password:testuser123,role:employee
 - **Core Theme Context**: `core/contexts/ThemeContext.js`
 - **Core Navigation**: `core/navigation/AppNavigator.js`, `core/navigation/MainNavigator.js`, `core/navigation/AuthNavigator.js`
 - **Core Storage**: `core/services/storage.js`
-- **Core Firebase Config**: `core/config/firebase.js`
+- **Core Supabase Config**: `core/config/supabase.js` (frontend)
+- **Backend Supabase Config**: `services/auth-service/config/supabase.js` (backend)
 - **Shared Constants**: `shared/constants/roles.js`, `shared/constants/workModes.js`, `shared/constants/routes.js`
 - **Shared Components**: `shared/components/Logo.js`, `shared/components/Trademark.js`, `shared/components/CustomDrawer.js`
 - **Shared Utils**: `shared/utils/responsive.js`
@@ -1327,28 +1319,28 @@ Example: testuser,password:testuser123,role:employee
 
 ## Firebase Quick Reference
 
-### Configuration File
-- **Location**: `core/config/firebase.js`
-- **Exports**: `auth`, `db`, `app`
+### Configuration Files
+- **Frontend**: `core/config/supabase.js` - Exports `supabase`, `supabaseUrl`
+- **Backend**: `services/auth-service/config/supabase.js` - Exports `supabase` (with Service Role Key)
 
 ### Authentication Service
-- **Location**: `features/auth/services/authService.js`
+- **Location**: `apps/mobile/utils/auth.js` (frontend), `services/auth-service/routes/auth.js` (backend)
 - **Functions**: `authenticateUser`, `createUser`, `updateUserRole`, `updateUserInfo`, `checkUsernameExists`
 
-### Firestore Collections
-- **`users`**: User profiles (document ID = Firebase Auth UID)
+### PostgreSQL Tables
+- **`users`**: User profiles (`uid` field = Supabase Auth UID)
 
-### Firebase Services
-- **Authentication**: Email/password with AsyncStorage persistence
-- **Firestore**: NoSQL database with React Native long polling
+### Supabase Services
+- **Authentication**: Email/password with AsyncStorage persistence via custom adapter
+- **PostgreSQL**: SQL database with Supabase client
 - **Error Handling**: Comprehensive error codes and messages
 
 ### Migration
-- **Script**: `scripts/migrate-users-to-firebase.mjs`
-- **Command**: `npm run migrate-users`
-- **Source**: `users.txt` → Firebase Auth + Firestore
+- **Script**: `scripts/create-users-supabase.js` - Programmatic user creation
+- **SQL Script**: `migrations/manual-create-users.sql` - Manual SQL user creation
+- **Source**: Create users directly in Supabase Auth + PostgreSQL
 
-For detailed Firebase setup, see `docs/FIREBASE_SETUP.md`.
+For detailed Supabase setup, see `SETUP.md`.
 
 ---
 
@@ -1470,5 +1462,5 @@ For detailed Firebase setup, see `docs/FIREBASE_SETUP.md`.
 
 ---
 
-*Last Updated: 2025-12-16*
+*Last Updated: 2025-12-26*
 

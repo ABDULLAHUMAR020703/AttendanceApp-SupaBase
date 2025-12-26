@@ -16,7 +16,7 @@ AttendanceApp/
 ├── apps/
 │   └── mobile/              # React Native Expo app
 │       ├── core/            # Core infrastructure
-│       │   ├── config/      # Firebase, API Gateway config
+│       │   ├── config/      # Supabase, API Gateway config
 │       │   ├── contexts/    # React contexts (Auth, Theme)
 │       │   ├── navigation/  # Navigation setup
 │       │   └── services/    # Core services (storage)

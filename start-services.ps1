@@ -1,8 +1,17 @@
 # PowerShell script to start all microservices
 # Run this from the project root directory
+# 
+# This script:
+# - Checks for required directories
+# - Verifies ports are available
+# - Installs dependencies if needed
+# - Starts API Gateway (port 3000)
+# - Starts Auth Service (port 3001)
+# - Connects to Supabase (cloud service)
 
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "  Starting Microservices" -ForegroundColor Green
+Write-Host "  (Supabase Backend)" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -98,12 +107,36 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "  Services Started!" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "API Gateway:  http://localhost:3000" -ForegroundColor Cyan
-Write-Host "Auth Service: http://localhost:3001" -ForegroundColor Cyan
+Write-Host "Backend Services:" -ForegroundColor Yellow
+Write-Host "  - API Gateway:  http://localhost:3000" -ForegroundColor Cyan
+Write-Host "  - Auth Service: http://localhost:3001" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Health Checks:" -ForegroundColor Yellow
 Write-Host "  - API Gateway:  http://localhost:3000/health" -ForegroundColor White
 Write-Host "  - Auth Service: http://localhost:3001/health" -ForegroundColor White
+Write-Host ""
+Write-Host "Supabase Connection:" -ForegroundColor Yellow
+Write-Host "  - Supabase is a cloud service (no local server needed)" -ForegroundColor White
+Write-Host "  - Backend services connect to Supabase automatically" -ForegroundColor White
+Write-Host "  - Make sure SUPABASE_URL and keys are set in .env files" -ForegroundColor White
+Write-Host ""
+Write-Host "Environment Check:" -ForegroundColor Yellow
+# Check if .env files exist
+if (Test-Path "services\auth-service\.env") {
+    Write-Host "  ✓ Auth Service .env found" -ForegroundColor Green
+} else {
+    Write-Host "  ⚠ Auth Service .env missing - create it with SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY" -ForegroundColor Yellow
+}
+if (Test-Path "apps\mobile\.env") {
+    Write-Host "  ✓ Mobile App .env found" -ForegroundColor Green
+} else {
+    Write-Host "  ⚠ Mobile App .env missing - create it with EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY" -ForegroundColor Yellow
+}
+Write-Host ""
+Write-Host "For Expo App:" -ForegroundColor Yellow
+Write-Host "  - iOS Simulator: http://localhost:3000" -ForegroundColor White
+Write-Host "  - Android Emulator: http://10.0.2.2:3000" -ForegroundColor White
+Write-Host "  - Physical Device: http://<your-computer-ip>:3000" -ForegroundColor White
 Write-Host ""
 Write-Host "Note: Services are running in separate windows." -ForegroundColor Yellow
 Write-Host "      Close those windows to stop the services." -ForegroundColor Yellow

@@ -15,9 +15,13 @@ import Constants from 'expo-constants';
  * Example: 'http://192.168.1.100:3000'
  */
 const getApiGatewayUrl = () => {
-  // Check if there's an environment variable override
-  if (Constants.expoConfig?.extra?.apiGatewayUrl) {
-    return Constants.expoConfig.extra.apiGatewayUrl;
+  // Check if there's a configured URL in app.json (for physical devices)
+  // Set this to your computer's IP address when testing on physical devices
+  // Set to null in app.json to use platform-specific defaults (for simulators/emulators)
+  const configuredUrl = Constants.expoConfig?.extra?.apiGatewayUrl;
+  if (configuredUrl && configuredUrl !== null && configuredUrl !== 'null') {
+    const url = configuredUrl;
+    return typeof url === 'string' ? url : String(url);
   }
 
   // Platform-specific defaults
@@ -39,14 +43,14 @@ const getApiGatewayUrl = () => {
 // Example: 'http://192.168.1.100:3000'
 // You can also set it in app.json under "extra.apiGatewayUrl"
 
-export const API_GATEWAY_URL = 'http://192.168.18.38:3000'; // Your IP
+export const API_GATEWAY_URL = getApiGatewayUrl();
 
 // API Gateway timeout in milliseconds
 export const API_TIMEOUT = 10000; // 10 seconds
 
 // Log the API Gateway URL being used (for debugging)
 if (__DEV__) {
-  console.log('API Gateway URL:', API_GATEWAY_URL);
+  console.log('API Gateway URL:', String(API_GATEWAY_URL));
   console.log('Platform:', Platform.OS);
 }
 

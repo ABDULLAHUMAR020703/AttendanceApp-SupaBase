@@ -1,759 +1,396 @@
-# Present - Complete Employee Management System
+# Present - Employee Attendance Management System
 
-A comprehensive attendance tracking and employee management application built with React Native and Expo SDK 54. Features role-based authentication, biometric authentication, advanced analytics, leave management, ticket system, and more.
+A comprehensive employee attendance management system built with React Native, Expo, and Supabase. Features role-based access control, real-time attendance tracking, leave management, ticket system, and comprehensive analytics.
 
-## 📱 Overview
-
-Present is a full-featured employee management system designed for organizations to track employee attendance, manage leaves, handle support tickets, and analyze workforce data. The app supports multiple authentication methods, provides detailed analytics, and offers a modern, responsive UI with dark mode support.
-
-## ✨ Key Features
-
-### 🔐 Authentication & Security
-- **Multiple Authentication Methods**:
-  - Face ID (iOS & Android) - Device native face recognition
-  - Biometric Authentication - Fingerprint/Face unlock
-- **Role-Based Access Control**:
-  - Employee role with personal dashboard
-  - Super Admin role with full system access across all departments
-  - Manager role with department-specific access (HR Manager, Tech Manager, etc.)
-  - HR role with analytics and management tools
-- **Session Management** - Secure session handling with AsyncStorage
-
-### 👤 Employee Features
-
-#### Attendance Management
-- **Check In/Check Out** with multiple authentication options
-- **Attendance History** - View all personal attendance records
-- **Filter Records** - Filter by check-in, check-out, or view all
-- **Location Tracking** - GPS coordinates captured with each attendance
-
-#### Personal Dashboard
-- **Current Status** - See last check-in/check-out status
-- **Personal Analytics**:
-  - Attendance rate (weekly, monthly, yearly)
-  - Average hours worked per day
-  - Total hours worked
-  - Days worked count
-- **Leave Management**:
-  - View leave balance (Annual, Sick, Casual)
-  - Submit leave requests (Full day or Half day)
-  - Half-day leave support (Morning/Afternoon)
-  - Track leave request status
-- **Work Mode Requests** - Request work mode changes (In Office, Semi Remote, Fully Remote)
-- **Notifications** - Real-time notifications for approvals, rejections, and updates
-- **Tickets** - Create and track support tickets
-
-#### Additional Features
-- **Calendar View** - View events and leave dates
-- **Theme Settings** - Light/Dark mode with system preference support
-- **Authentication Settings** - Choose preferred authentication method
-
-### 👨‍💼 Admin Features
-
-#### Dashboard
-- **Multi-Tab Interface** (horizontally scrollable):
-  - Attendance - View all employee attendance records
-  - Employees - Manage employee profiles and work modes
-  - Calendar - View company-wide calendar and events
-  - HR - Access HR dashboard with analytics
-
-#### Attendance Management
-- **View All Records** - See attendance from all employees (filtered by role)
-- **Search & Filter** - Search by username, filter by type (check-in/check-out)
-- **Statistics** - Total records, check-ins, check-outs
-- **Manual Attendance** - Add, edit, or delete attendance records for employees
-  - Create check-in/check-out records with custom date and time
-  - Edit existing attendance records
-  - Delete attendance records
-  - Calendar date picker for date selection
-  - Time input with validation
-- **CSV Export** - Export all attendance data to CSV format
-- **Data Management** - Clear all records functionality
-
-#### Employee Management
-- **Role-Based Access**:
-  - **Super Admins**: Can manage all employees across all departments
-  - **Managers**: Can only manage employees in their department (e.g., HR Manager manages HR employees, Tech Manager manages Engineering employees)
-- **Employee Profiles** - View and manage employee information (filtered by role)
-- **Work Mode Management** - Update employee work modes (with permission checks)
-- **Leave Management**:
-  - Set default leave balances
-  - Manage individual employee leave balances
-  - View and process leave requests (filtered by department for managers)
-  - Support for half-day leaves (Morning/Afternoon periods)
-- **Work Mode Requests** - Approve/reject work mode change requests
-- **Leave Requests** - Process employee leave requests (department-filtered for managers)
-
-### 📊 HR Dashboard Features
-
-#### Analytics Tab
-- **Employee Analytics** - View analytics for all employees:
-  - Attendance rate percentage
-  - Average hours per day
-  - Total hours worked
-  - Days worked count
-- **Period Filters** - Daily, Weekly, Monthly, Yearly, All-time
-- **Employee Comparison** - Sort by attendance rate
-
-#### Overview Tab
-- **Quick Stats**:
-  - Total employees count
-  - Total attendance records
-  - Pending leave requests
-  - Open tickets
-- **Quick Actions**:
-  - Manage employees
-  - Generate attendance reports
-  - Generate leave reports
-
-#### Additional Tabs
-- **Attendance** - Recent attendance records
-- **Leaves** - All leave requests with status
-- **Tickets** - Support ticket management
-- **Analytics** - Advanced analytics dashboard
-
-### 🎫 Ticket System
-- **Create Tickets** - Employees can create support tickets
-- **Ticket Categories** - Technical, HR, Finance, General
-- **Priority Levels** - Low, Medium, High, Urgent
-- **Status Tracking** - Open, In Progress, Resolved, Closed
-- **Ticket Management** - Admins can assign, respond, and update tickets
-- **Notifications** - Real-time updates on ticket status
-
-### 📅 Calendar & Events
-- **Calendar View** - Monthly calendar with event indicators
-- **Event Management** - Create, view, edit, and delete events
-- **Event Types** - Meeting, Holiday, Training, Other
-- **Leave Dates** - Visual indicators for employee leave dates
-- **Date Selection** - View events and leaves for specific dates
-
-### 📈 Advanced Analytics
-- **Attendance Rate Calculation**:
-  - Percentage of days with attendance
-  - Present days vs total working days
-  - Supports multiple time periods
-- **Average Hours Calculation**:
-  - Average hours worked per day
-  - Total hours worked in period
-  - Days worked count
-  - Daily breakdown available
-- **Period Support**:
-  - Daily
-  - Weekly
-  - Monthly
-  - Yearly
-  - All-time
-
-### 🎨 UI/UX Features
-- **Dark Mode Support** - Full dark mode with consistent theming
-- **Theme Settings** - Light, Dark, or System preference
-- **Responsive Design** - Works on all screen sizes
-- **Smooth Animations** - Modern UI with smooth transitions
-- **Back Navigation** - Consistent back buttons on all screens
-- **Horizontal Scrolling** - Scrollable tabs for better mobile experience
-
-### 🔔 Notifications
-- **Real-time Notifications** - Push notifications for:
-  - Leave request approvals/rejections
-  - Work mode request updates
-  - Ticket status changes
-  - Admin responses
-- **Smart Navigation** - Click notifications to navigate directly to relevant screens:
-  - Leave requests navigate to Employee Management with leave requests modal
-  - Ticket notifications navigate to Ticket Management or Ticket Screen
-  - Leave approvals navigate to Leave Request Screen
-- **Department-Based Notifications** - Managers receive notifications only for their department
-- **Notification Center** - View all notifications with filtering
-- **Unread Count** - Badge showing unread notifications
-
-### 📤 Data Export
-- **CSV Export** - Export attendance data to CSV
-- **Report Generation** - Generate attendance and leave reports
-- **Data Formatting** - Well-formatted export files
-
-## 🛠️ Tech Stack
-
-### Core Technologies
-- **React Native** 0.81.5
-- **Expo SDK** 54.0.22
-- **React** 19.1.0
-- **React Navigation** 6.x - Stack navigation
-
-### Key Libraries
-- **@react-native-async-storage/async-storage** - Local data persistence
-- **expo-location** - GPS location tracking
-- **expo-local-authentication** - Biometric and Face ID authentication
-- **expo-notifications** - Push notifications
-- **expo-file-system** - File operations and CSV export
-- **@expo/vector-icons** - Icon library
-- **nativewind** - Tailwind CSS for React Native
-- **tailwindcss** - Utility-first CSS framework
-
-### Architecture
-- **Context API** - AuthContext and ThemeContext for state management
-- **AsyncStorage** - Local data storage (Firebase disabled, using local storage)
-- **Modular Utilities** - Organized utility functions for different features
-
-## 📦 Installation & Setup
-
-### Prerequisites
-- Node.js (v14 or higher)
-- npm or yarn
-- Expo CLI (`npm install -g expo-cli`)
-- Expo Go app on your mobile device (for testing)
-- iOS Simulator (for iOS development) or Android Emulator (for Android development)
-
-### Installation Steps
-
-1. **Clone the Repository**
-   ```bash
-   git clone <repository-url>
-   cd AttendanceApp
-   ```
-
-2. **Install Dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Start the Development Server**
-   ```bash
-   npm start
-   # or
-   expo start
-   ```
-
-4. **Run on Device/Simulator**
-   - **iOS**: Press `i` in the terminal or scan QR code with Expo Go
-   - **Android**: Press `a` in the terminal or scan QR code with Expo Go
-   - **Web**: Press `w` in the terminal
-
-### Configuration
-
-#### User Authentication
-Users are stored in `users.txt` file. Format:
-```
-username,password:password123,role:employee
-username2,password:password456,role:admin
-```
-
-#### Firebase (Optional)
-Firebase is currently disabled. To enable:
-1. Uncomment code in `config/firebase.js`
-2. Add your Firebase configuration
-3. Update imports in relevant files
-
-#### Permissions
-The app requires the following permissions:
-- **Location** - For GPS tracking (optional)
-- **Biometric/Face ID** - For authentication (if enabled)
-- **Notifications** - For push notifications
-
-## 📁 Project Structure
-
-```
-AttendanceApp/
-├── App.js                      # Main app component with navigation
-├── app.json                    # Expo configuration
-├── package.json                # Dependencies and scripts
-├── babel.config.js             # Babel configuration
-├── tailwind.config.js          # Tailwind CSS configuration
-├── metro.config.js             # Metro bundler configuration
-├── users.txt                   # User credentials file
-│
-├── assets/                     # App assets
-│   ├── icon.png               # App icon
-│   ├── splash.png             # Splash screen
-│   └── faces/                 # Face verification images
-│
-├── config/                     # Configuration files
-│   └── firebase.js            # Firebase config (disabled)
-│
-├── contexts/                   # React Context providers
-│   ├── AuthContext.js         # Authentication context
-│   └── ThemeContext.js        # Theme management context
-│
-├── screens/                    # Screen components
-│   ├── LoginScreen.js         # Login/authentication screen
-│   ├── EmployeeDashboard.js   # Employee main dashboard
-│   ├── AdminDashboard.js      # Admin main dashboard
-│   ├── HRDashboard.js         # HR analytics dashboard
-│   ├── AttendanceHistory.js   # Attendance records list
-│   ├── AuthenticationScreen.js # Biometric and Face ID authentication
-│   ├── AuthMethodSelection.js # Authentication method selection
-│   ├── LeaveRequestScreen.js  # Leave request management
-│   ├── CalendarScreen.js      # Calendar and events
-│   ├── ThemeSettingsScreen.js # Theme settings
-│   ├── NotificationsScreen.js  # Notifications center
-│   ├── TicketScreen.js        # Employee ticket management
-│   ├── TicketManagementScreen.js # Admin ticket management
-│   ├── EmployeeManagement.js  # Employee profile management
-│   └── ManualAttendanceScreen.js # Manual attendance management
-│
-├── components/                 # Reusable components
-│   └── DatePickerCalendar.js  # Calendar date picker component
-│
-└── utils/                      # Utility functions
-    ├── analytics.js           # Analytics calculations
-    ├── auth.js                # Authentication logic
-    ├── authPreferences.js     # Auth method preferences
-    ├── biometricAuth.js       # Biometric authentication
-    ├── faceVerification.js    # Face ID verification
-    ├── storage.js             # AsyncStorage operations
-    ├── export.js              # CSV export functionality
-    ├── employees.js           # Employee management
-    ├── leaveManagement.js     # Leave request system
-    ├── ticketManagement.js    # Ticket system
-    ├── calendar.js            # Calendar and events
-    ├── notifications.js       # Notification system
-    ├── location.js            # Location services
-    ├── workModes.js           # Work mode management
-    ├── hrRoles.js             # HR role utilities
-    └── firestore.js           # Firestore utilities (disabled)
-```
-
-## 🚀 Usage Guide
-
-### For Employees
-
-1. **Login**
-   - Enter username and password
-   - Select your role (employee)
-
-2. **Check In/Out**
-   - Tap "Check In" or "Check Out" button
-   - Choose authentication method (Face ID or Biometric)
-   - Complete authentication
-   - Location is captured automatically
-
-3. **View Analytics**
-   - Navigate to Employee Dashboard
-   - View your attendance rate and average hours
-   - Filter by period (weekly, monthly, yearly)
-
-4. **Request Leave**
-   - Go to Leave Requests
-   - Tap "New Request"
-   - Select leave type (Annual/Sick/Casual)
-   - Choose duration (Full Day or Half Day)
-   - For half-day: Select Morning or Afternoon period
-   - Use calendar date picker to select date(s)
-   - For full-day: Select start date, then press "Select Start Date" button, then select end date and press "Select End Date" button
-   - For half-day: Select date, then press "Select Date" button
-   - Enter reason (optional)
-   - Submit request
-
-5. **Create Tickets**
-   - Go to My Tickets
-   - Tap "New Ticket"
-   - Fill in category, priority, subject, and description
-   - Submit ticket
-
-### For Super Admins
-
-1. **View Attendance**
-   - Navigate to Admin Dashboard
-   - Select "Attendance" tab
-   - View all employee records across all departments
-   - Use search and filters
-   - Click "Manual" button to add/edit/delete attendance records
-   - Export to CSV
-
-2. **Manage Employees**
-   - Select "Employees" tab
-   - View all employees across all departments
-   - Update work modes for any employee
-   - Manage leave balances for any employee
-   - Process all leave requests
-
-3. **HR Analytics**
-   - Navigate to HR Dashboard
-   - View analytics for all employees
-   - Filter by time period
-   - Generate reports
-
-4. **Manage Tickets**
-   - View all tickets
-   - Assign to employees
-   - Update status
-   - Respond to tickets
-
-### For Managers
-
-1. **View Attendance**
-   - Navigate to Admin Dashboard
-   - Select "Attendance" tab
-   - View attendance records for employees in your department only
-   - Click "Manual" button to add/edit/delete attendance for your department employees
-   - Export to CSV
-
-2. **Manage Employees**
-   - Select "Employees" tab
-   - View only employees in your department
-   - Update work modes for department employees
-   - Manage leave balances for department employees
-   - Process leave requests for department employees only
-
-3. **Notifications**
-   - Receive notifications for leave requests from your department employees
-   - Click notifications to navigate directly to relevant screens
-
-## 🔑 Demo Credentials
-
-```
-Super Admin:
-Username: testadmin
-Password: testadmin123
-(Can manage all employees across all departments)
-
-Managers:
-Username: hrmanager
-Password: hrmanager123
-(Can manage HR department employees only)
-
-Username: techmanager
-Password: techmanager123
-(Can manage Engineering department employees only)
-
-Username: salesmanager
-Password: salesmanager123
-(Can manage Sales department employees only)
-
-Employee:
-Username: testuser
-Password: testuser123
-(Engineering department)
-
-Other Employees:
-- john.doe / john123 (Engineering)
-- jane.smith / jane123 (Design)
-- mike.johnson / mike123 (Sales)
-- sarah.williams / sarah123 (Marketing)
-- david.brown / david123 (Engineering)
-- emily.davis / emily123 (HR)
-```
-
-## 📊 Features Breakdown
-
-### Authentication Methods
-
-1. **Face ID (Device Native)**
-   - iOS: Uses Face ID
-   - Android: Uses Face Unlock
-   - Requires device setup in settings
-   - Most secure method
-
-2. **Biometric Authentication**
-   - Fingerprint (Android)
-   - Face ID (iOS)
-   - Uses device-native authentication systems
-
-### Work Modes
-
-- **In Office** - Employee works from office
-- **Semi Remote** - Hybrid work arrangement
-- **Fully Remote** - Complete remote work
-
-### Leave Types
-
-- **Annual Leave** - Standard vacation days
-- **Sick Leave** - Medical leave
-- **Casual Leave** - Personal leave
-
-### Leave Duration Options
-
-- **Full Day** - Complete day leave (counts as 1 day)
-- **Half Day** - Partial day leave (counts as 0.5 days)
-  - **Morning** - First half of the day
-  - **Afternoon** - Second half of the day
-
-### Ticket Categories
-
-- **Technical** - IT and technical issues
-- **HR** - Human resources related
-- **Finance** - Financial matters
-- **General** - General inquiries
-
-### Ticket Priorities
-
-- **Low** - Non-urgent issues
-- **Medium** - Normal priority
-- **High** - Important issues
-- **Urgent** - Critical issues
-
-## 🎨 Theme System
-
-The app supports comprehensive theming:
-
-- **Light Mode** - Default light theme
-- **Dark Mode** - Dark theme with proper contrast
-- **System Preference** - Follows device theme
-- **Consistent Colors** - All UI elements adapt to theme
-- **Theme Context** - Centralized theme management
-
-## 📱 Platform Support
-
-- **iOS** - Full support with Face ID
-- **Android** - Full support with Face Unlock and Fingerprint
-- **Web** - Limited support (some features may not work)
-
-## 🔒 Security Features
-
-- **Secure Authentication** - Multiple authentication layers
-- **Biometric Security** - Device-native biometric authentication
-- **Location Verification** - GPS tracking for attendance
-- **Device-Native Authentication** - Uses device's built-in Face ID/Face Unlock or fingerprint sensors
-- **Session Management** - Secure session handling
-
-## 📈 Analytics Features
-
-### Attendance Rate
-- Calculates percentage of days with attendance
-- Excludes weekends from working days
-- Supports multiple time periods
-- Shows present days vs total days
-
-### Average Hours
-- Calculates average hours worked per day
-- Only counts days with complete check-in/check-out pairs
-- Provides total hours worked
-- Shows daily breakdown
-
-## 🐛 Known Limitations
-
-- Firebase is currently disabled (using AsyncStorage)
-- Some features may not work in Expo Go (biometric auth on Android)
-- Web platform has limited functionality
-- Data is stored locally (no cloud sync)
-
-## 🔮 Future Enhancements
-
-- Cloud sync with Firebase/backend
-- Push notifications for attendance reminders
-- Advanced reporting with charts and graphs
-- Multi-language support
-- Offline mode with sync
-- Export to PDF format
-- Email notifications
-- Integration with payroll systems
-- Shift management
-- Overtime tracking
-- Break time tracking
-
-## 📝 Development Notes
-
-### Code Structure
-- **Modular Design** - Separated concerns with utility functions
-- **Context API** - Global state management
-- **React Hooks** - Modern React patterns
-- **Error Handling** - Comprehensive error handling throughout
-- **Type Safety** - Consistent data structures
-
-### Best Practices
-- Clean code with comments
-- Consistent naming conventions
-- Reusable components
-- Proper error handling
-- User feedback for all actions
-
-## 🤝 Contributing
-
-This is an educational project. Contributions are welcome:
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
-
-## 📄 License
-
-This project is for educational and demonstration purposes.
-
-## 👥 Authors
-
-Developed as part of a university project for attendance management system.
-
-## 📞 Support
-
-For issues or questions:
-- Check existing documentation
-- Review code comments
-- Open an issue in the repository
-
-## 🎯 Version
-
-**Current Version:** 1.3.0
-
-### Latest Updates (2025-12-16) - v1.3.0
-
-#### 🏗️ Architecture Restructuring
-- **Monorepo Structure**: Reorganized codebase into microservices architecture
-  - Created `apps/mobile/` directory - Moved entire Expo app into mobile app directory
-  - Created `services/` directory structure for future microservices:
-    - `services/api-gateway/` - API Gateway service (Express server with health check)
-    - `services/auth-service/` - Authentication service (Express server with auth routes)
-    - `services/attendance-service/` - Placeholder for attendance service
-    - `services/leave-service/` - Placeholder for leave service
-    - `services/ticket-service/` - Placeholder for ticket service
-
-#### 🔌 API Gateway & Auth Service Implementation
-- **API Gateway Service** (`services/api-gateway/`):
-  - Express server running on port 3000
-  - Health check endpoint (`/health`)
-  - Auth routes that forward requests to auth-service
-  - CORS enabled for cross-origin requests
-  - Error handling for service unavailability
-
-- **Auth Service** (`services/auth-service/`):
-  - Express server running on port 3001
-  - **Firebase Admin SDK Integration**:
-    - Uses Firebase Admin SDK for Firestore operations (trusted backend)
-    - Service account credentials via environment variables
-    - Admin privileges for database access
-  - **Hybrid Authentication Approach**:
-    - **Admin SDK** for Firestore operations (username lookup, user data retrieval)
-    - **Firebase Auth REST API** for password verification (Admin SDK limitation)
-    - Secure password verification server-side
-  - Auth API endpoints:
-    - `POST /api/auth/login` - User authentication with password verification
-    - `GET /api/auth/check-username/:username` - Username availability check
-    - `POST /api/auth/users` - User creation
-    - `PATCH /api/auth/users/:username/role` - Role updates
-    - `PATCH /api/auth/users/:username` - User info updates
-  - Complete Firebase integration with secure password verification
-
-#### 🔄 Frontend API Integration
-- **Login Flow Updated** (`apps/mobile/utils/auth.js`):
-  - Modified `authenticateUser` function to call API Gateway first
-  - Falls back to Firebase authentication if API Gateway fails
-  - Maintains backward compatibility with existing Firebase login
-  - Added API Gateway configuration (`apps/mobile/core/config/api.js`)
-  - 10-second timeout for API requests
-  - Comprehensive error handling
-
-#### 🐛 Import Errors Fixed
-1. **Missing `mkdirp` Module**:
-   - Error: `Cannot find module 'mkdirp'` from chromium-edge-launcher
-   - Fix: Installed `mkdirp@3.0.1` in chromium-edge-launcher's node_modules
-   - Added to devDependencies in package.json
-
-2. **Missing `@react-navigation/core`**:
-   - Error: `Unable to resolve "@react-navigation/core"`
-   - Fix: Installed `@react-navigation/core@^7.13.6`
-   - Added to dependencies in package.json
-
-3. **Missing `@expo/vector-icons` Vendor Directory**:
-   - Error: `Unable to resolve "./vendor/react-native-vector-icons/Fonts/MaterialCommunityIcons.ttf"`
-   - Fix: Reinstalled `@expo/vector-icons` using `npx expo install`
-   - Font files now properly located in `build/vendor/` directory
-
-4. **Missing `@firebase/webchannel-wrapper`**:
-   - Error: `Unable to resolve "@firebase/webchannel-wrapper/bloom-blob"`
-   - Fix: Copied `@firebase` packages from root node_modules
-   - Updated Metro config to enable package exports
-
-5. **Missing `firebase/auth` Module**:
-   - Error: `Unable to resolve "firebase/auth"`
-   - Fix: Copied Firebase package from root node_modules
-   - Verified Firebase auth and firestore modules exist
-
-6. **Missing `idb` Package**:
-   - Error: `Unable to resolve "idb"` from `@firebase/app`
-   - Fix: Copied `idb` package from root node_modules
-   - Created Metro shim (`metro-idb-shim.js`) for React Native compatibility
-   - Updated Metro config to use shim for browser-only packages
-
-#### ⚙️ Metro Bundler Configuration Updates
-- **Updated `apps/mobile/metro.config.js`**:
-  - Added font file extensions (ttf, otf, woff, woff2)
-  - Added source extensions (mjs, cjs)
-  - Enabled package exports (`unstable_enablePackageExports = true`)
-  - Added custom resolver for `idb` package shim
-  - Proper error handling in resolver
-
-#### 📦 Dependencies Added
-- `@react-navigation/core@^7.13.6` - Navigation core library
-- `mkdirp@^3.0.1` - Directory creation utility
-- `idb@^8.0.0` - IndexedDB wrapper (for Firebase compatibility)
-- `@firebase/webchannel-wrapper` - Firebase webchannel support
-- **Backend Services:**
-  - `express@^5.2.1` - Web framework for API Gateway and Auth Service
-  - `cors@^2.8.5` - Cross-origin resource sharing
-  - `dotenv@^17.2.3` - Environment variable management
-  - `axios@^1.13.2` - HTTP client for service communication and password verification
-  - `firebase-admin@^13.6.0` - Firebase Admin SDK for backend operations
-  - `http-proxy-middleware` - Request proxying (API Gateway)
-
-#### 📁 Files Created
-- `apps/mobile/core/config/api.js` - API Gateway configuration
-- `apps/mobile/metro-idb-shim.js` - Empty shim for idb package
-- `services/api-gateway/index.js` - API Gateway Express server
-- `services/api-gateway/routes/auth.js` - Auth route handlers
-- `services/auth-service/index.js` - Auth service Express server
-- `services/auth-service/routes/auth.js` - Auth API endpoints
-
-#### 📝 Files Modified
-- `apps/mobile/utils/auth.js` - Updated login to use API Gateway with Firebase fallback
-- `apps/mobile/metro.config.js` - Enhanced Metro configuration
-- `apps/mobile/package.json` - Added new dependencies
-- All app files moved to `apps/mobile/` directory
-
-#### 🔐 Security & Authentication Fixes
-- **Password Verification Fixed** (2025-12-16):
-  - Fixed incomplete login endpoint that only checked user existence
-  - Implemented secure password verification using Firebase Auth REST API
-  - Hybrid approach: Admin SDK for Firestore, REST API for password verification
-  - All passwords now properly verified server-side before authentication
-  - Comprehensive error handling for authentication failures
-  - See `services/auth-service/LOGIN_IMPLEMENTATION.md` for details
-
-#### ⚠️ Known Issues
-- npm install failing with "Invalid Version" error (workaround: copying packages from root node_modules)
-- Some packages manually copied due to npm installation issues
-
-#### 🔄 Migration Status
-- ✅ App moved to `apps/mobile/` directory
-- ✅ API Gateway service created
-- ✅ Auth service created with Firebase Admin SDK
-- ✅ Frontend login updated to use API Gateway
-- ✅ Firebase integration in auth-service (complete with password verification)
-- ⏳ Complete microservices migration (pending - attendance, leave, ticket services)
-
-### Recent Updates (v1.2.0)
-- ✅ Added Super Admin and Manager role system
-- ✅ Department-based employee management
-- ✅ Manual attendance management (add/edit/delete records)
-- ✅ Calendar date picker for leave request form
-- ✅ Smart notification navigation
-- ✅ Department managers receive notifications only for their department
-- ✅ Permission-based access control throughout the app
-- ✅ Removed backward compatibility for regular admin role
-
-### Previous Updates (v1.1.0)
-- ✅ Added half-day leave functionality
-- ✅ Morning/Afternoon period selection for half-day leaves
-- ✅ Enhanced leave request UI with duration toggle
-- ✅ Updated all leave displays to show half-day information
-- ✅ Calendar integration for half-day leaves
-- ✅ HR Dashboard support for half-day leave tracking
-
-## 📚 Documentation
-
-### Complete Feature Documentation
-For a comprehensive overview of all app features, capabilities, and what each role can do, see:
-- **[Complete App Features Documentation](docs/APP_FEATURES.md)** - Detailed feature list, role permissions, use cases, and more
-
-### Additional Documentation
-- [Modular Architecture Guide](docs/MODULAR_ARCHITECTURE.md) - Architecture and code organization
-- [System Architecture](docs/SYSTEM_ARCHITECTURE.md) - System design and user management
-- [Firebase Setup Guide](docs/FIREBASE_SETUP.md) - Firebase configuration instructions
-- [Migration Guide](docs/MIGRATION_GUIDE.md) - Migration instructions
-- [Deployment Guide](docs/DEPLOYMENT.md) - Deployment procedures
-
-### External Resources
-- [Expo Documentation](https://docs.expo.dev/)
-- [React Native Documentation](https://reactnative.dev/)
-- [React Navigation](https://reactnavigation.org/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org/)
+[![React Native](https://img.shields.io/badge/react--native-0.81.5-blue.svg)](https://reactnative.dev/)
+[![GitHub Repository](https://img.shields.io/badge/GitHub-Repository-black?logo=github)](https://github.com/ABDULLAHUMAR020703/AttendanceApp-SupaBase)
 
 ---
 
-**Built with ❤️ using React Native and Expo**
+## ✨ Features
+
+### 🔐 Authentication & Security
+- **Multiple Authentication Methods**
+  - Username/Email + Password
+  - Biometric authentication (Face ID, Fingerprint)
+  - Session persistence with AsyncStorage
+- **Role-Based Access Control**
+  - Super Admin: Full system access
+  - Manager: Department-level management
+  - Employee: Self-service features
+
+### 📊 Core Features
+- **Attendance Tracking**
+  - GPS-based check-in/check-out
+  - Location verification
+  - Attendance history and analytics
+  - Manual attendance entry (for managers/admins)
+
+- **Leave Management**
+  - Annual, Sick, and Casual leave types
+  - Leave request workflow
+  - Manager approval system
+  - Leave balance tracking
+
+- **Ticket System**
+  - Support ticket creation
+  - Automatic department routing
+  - Priority levels and status tracking
+  - Manager assignment
+
+- **Analytics & Reporting**
+  - Personal attendance analytics
+  - Department-level statistics
+  - System-wide reports
+  - CSV export functionality
+
+### 🎨 User Experience
+- **Modern UI/UX**
+  - Dark mode support
+  - Responsive design
+  - Intuitive navigation
+  - Smooth animations
+
+- **Offline Support**
+  - Local data caching
+  - Offline-first approach
+  - Automatic sync when online
+
+---
+
+## 🏗️ Architecture
+
+### Technology Stack
+
+**Frontend:**
+- React Native 0.81.5
+- Expo SDK ~54.0.25
+- React Navigation 6.x
+- NativeWind (Tailwind CSS)
+- AsyncStorage for local persistence
+
+**Backend:**
+- Node.js 18+
+- Express.js 5.2.1
+- Microservices architecture (API Gateway + Auth Service)
+
+**Database & Auth:**
+- Supabase (PostgreSQL + Authentication)
+- Row Level Security (RLS) policies
+
+### System Architecture
+
+```
+Mobile App (React Native/Expo)
+    ↓
+API Gateway (Port 3000)
+    ↓
+Auth Service (Port 3001)
+    ↓
+Supabase (PostgreSQL + Auth)
+```
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Node.js 18 or higher
+- npm or yarn
+- Expo CLI (`npm install -g expo-cli`)
+- Supabase account ([sign up free](https://supabase.com))
+
+### Installation
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/ABDULLAHUMAR020703/AttendanceApp-SupaBase.git
+   cd AttendanceApp-SupaBase
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   # Root dependencies
+   npm install
+
+   # Backend services
+   cd services/api-gateway && npm install && cd ../..
+   cd services/auth-service && npm install && cd ../..
+
+   # Mobile app
+   cd apps/mobile && npm install && cd ../..
+   ```
+
+3. **Set up environment variables:**
+   
+   Copy `.env.example` files to `.env` and fill in your Supabase credentials:
+   
+   ```bash
+   # Backend
+   cd services/auth-service
+   copy .env.example .env    # Windows
+   # OR
+   cp .env.example .env      # Linux/macOS
+   
+   # Frontend
+   cd ../../apps/mobile
+   copy .env.example .env    # Windows
+   # OR
+   cp .env.example .env      # Linux/macOS
+   ```
+   
+   See [SETUP.md](SETUP.md) for detailed instructions on getting Supabase credentials.
+
+4. **Set up Supabase database:**
+   
+   Create users via script:
+   ```bash
+   node scripts/create-users-supabase.js
+   ```
+   
+   Or use SQL script: `migrations/manual-create-users.sql`
+
+5. **Start the services:**
+   
+   **Windows:**
+   ```powershell
+   .\start-services.ps1
+   ```
+   
+   **Linux/macOS:**
+   ```bash
+   ./start-services.sh
+   ```
+
+6. **Start the mobile app:**
+   ```bash
+   cd apps/mobile
+   npm start
+   ```
+
+For detailed setup instructions, see [SETUP.md](SETUP.md).
+
+---
+
+## 📱 Running the App
+
+### Development
+
+1. **Start backend services** (API Gateway + Auth Service)
+2. **Start Expo development server:**
+   ```bash
+   cd apps/mobile
+   npm start
+   ```
+3. **Open on device/simulator:**
+   - Press `i` for iOS Simulator
+   - Press `a` for Android Emulator
+   - Scan QR code with Expo Go app (physical device)
+   - Press `w` for web browser
+
+### Testing on Physical Device
+
+1. Ensure device and computer are on the same WiFi network
+2. Update `apps/mobile/app.json` with your computer's IP:
+   ```json
+   {
+     "expo": {
+       "extra": {
+         "apiGatewayUrl": "http://YOUR_IP_ADDRESS:3000"
+       }
+     }
+   }
+   ```
+3. Restart Expo server after updating `app.json`
+
+---
+
+## 🔧 Configuration
+
+### Environment Variables
+
+#### Backend (`services/auth-service/.env`)
+```env
+PORT=3001
+HOST=0.0.0.0
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+```
+
+#### Frontend (`apps/mobile/.env`)
+```env
+EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+```
+
+**Important:** 
+- Backend uses `service_role` key (secret, admin privileges)
+- Frontend uses `anon` key (public, safe for client)
+- Frontend variables must have `EXPO_PUBLIC_` prefix
+
+See `.env.example` files in each directory for detailed instructions.
+
+---
+
+## 📂 Project Structure
+
+```
+AttendanceApp-SupaBase/
+├── apps/
+│   └── mobile/              # React Native/Expo mobile app
+│       ├── core/            # Core infrastructure
+│       ├── features/        # Feature modules
+│       ├── shared/          # Shared components/utilities
+│       └── screens/         # Screen components
+│
+├── services/
+│   ├── api-gateway/         # API Gateway (port 3000)
+│   └── auth-service/        # Auth Service (port 3001)
+│
+├── scripts/
+│   └── create-users-supabase.js  # User creation script
+│
+├── migrations/
+│   └── manual-create-users.sql    # SQL migration script
+│
+├── docs/                    # Documentation
+├── SETUP.md                 # Detailed setup guide
+└── README.md                # This file
+```
+
+---
+
+## 👥 User Roles
+
+### Super Admin
+- Full system access
+- Create and manage all users
+- View all departments and employees
+- System-wide analytics
+
+### Manager
+- Department-level access
+- Manage employees in their department
+- Approve leave requests
+- View department analytics
+
+### Employee
+- Personal dashboard
+- Check in/out
+- Submit leave requests
+- Create support tickets
+- View personal analytics
+
+---
+
+## 🔐 Default Login Credentials
+
+After running the user creation script:
+
+- **Super Admin:** `testadmin` / `testadmin123`
+- **Manager:** `techmanager` / `techmanager123`
+- **Employee:** `testuser` / `testuser123`
+
+See `migrations/manual-create-users.sql` for all demo users.
+
+---
+
+## 📚 Documentation
+
+- **[SETUP.md](SETUP.md)** - Complete setup guide
+- **[docs/TECHNICAL_DOCUMENTATION.md](docs/TECHNICAL_DOCUMENTATION.md)** - Technical details
+- **[docs/SYSTEM_ARCHITECTURE.md](docs/SYSTEM_ARCHITECTURE.md)** - System architecture
+- **[docs/APP_FEATURES.md](docs/APP_FEATURES.md)** - Feature documentation
+
+---
+
+## 🛠️ Development
+
+### Running Services
+
+**Backend Services:**
+```bash
+# Using start script (recommended)
+.\start-services.ps1    # Windows
+./start-services.sh     # Linux/macOS
+
+# Or manually
+cd services/api-gateway && npm start
+cd services/auth-service && npm start
+```
+
+**Mobile App:**
+```bash
+cd apps/mobile
+npm start
+```
+
+### Code Structure
+
+- **Modular Architecture:** Feature-based code organization
+- **Microservices:** API Gateway pattern for backend services
+- **Type Safety:** Consistent data structures and error handling
+- **Best Practices:** Comprehensive error handling and logging
+
+---
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+**Backend services won't start:**
+- Check ports 3000 and 3001 are available
+- Verify `.env` files exist and have correct values
+- Ensure dependencies are installed
+
+**Mobile app can't connect:**
+- Verify backend services are running
+- Check API Gateway URL is correct for your platform
+- For physical devices: Ensure same WiFi network
+
+**Supabase connection fails:**
+- Verify credentials in `.env` files
+- Check Supabase project is active
+- Ensure users exist in Supabase Auth
+
+See [SETUP.md](SETUP.md) for detailed troubleshooting.
+
+---
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License.
+
+---
+
+## 🙏 Acknowledgments
+
+- [Supabase](https://supabase.com) - Backend as a Service
+- [Expo](https://expo.dev) - React Native development platform
+- [React Native](https://reactnative.dev) - Mobile framework
+
+---
+
+## 📞 Support
+
+For issues and questions:
+- Check [SETUP.md](SETUP.md) for setup help
+- Review [docs/](docs/) for detailed documentation
+- Open an issue on [GitHub](https://github.com/ABDULLAHUMAR020703/AttendanceApp-SupaBase/issues)
+
+---
+
+**Built with ❤️ using React Native, Expo, and Supabase**

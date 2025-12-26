@@ -1,12 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const axios = require('axios');
-const { db, auth } = require('../config/firebase');
-
-// Firebase Auth REST API configuration
-// Used ONLY for password verification (Admin SDK cannot verify passwords)
-const FIREBASE_API_KEY = 'AIzaSyByLF4IV7KNfVHkFywimANGoWo_2mpdb2E';
-const FIREBASE_AUTH_URL = 'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword';
+const { supabase } = require('../config/supabase');
 
 /**
  * POST /api/auth/login
@@ -14,21 +8,20 @@ const FIREBASE_AUTH_URL = 'https://identitytoolkit.googleapis.com/v1/accounts:si
  * Body: { usernameOrEmail: string, password: string }
  * 
  * Implementation:
- * 1. If username, resolve email using Admin SDK + Firestore (trusted backend operation)
- * 2. Verify password using Firebase Auth REST API (signInWithPassword)
- * 3. If authentication succeeds, fetch user data using Admin SDK + Firestore
+ * 1. If username, resolve email using Supabase database query
+ * 2. Authenticate using Supabase Auth (signInWithPassword)
+ * 3. Fetch user data from Supabase database
  * 4. Return user info
- * 
- * Why this approach:
- * - Admin SDK cannot verify passwords, so we use REST API for password verification
- * - Admin SDK is used for Firestore access (trusted backend with admin privileges)
- * - This maintains security while working within Firebase's limitations
  */
 router.post('/login', async (req, res) => {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] Auth Service: Login request received for:`, req.body.usernameOrEmail || 'unknown');
+  
   try {
     const { usernameOrEmail, password } = req.body;
 
     if (!usernameOrEmail || !password) {
+      console.log(`[${timestamp}] Auth Service: Login failed - missing credentials`);
       return res.status(400).json({
         success: false,
         error: 'Username/email and password are required',
@@ -37,18 +30,18 @@ router.post('/login', async (req, res) => {
 
     let email = usernameOrEmail.trim();
     
-    // Step 1: If input is a username (not an email), resolve email using Admin SDK + Firestore
-    // This is a trusted backend operation with admin privileges
+    // Step 1: If input is a username (not an email), resolve email using Supabase
     if (!usernameOrEmail.includes('@')) {
       try {
-        // Use Admin SDK to query Firestore (trusted backend operation)
-        const usersRef = db.collection('users');
-        const querySnapshot = await usersRef
-          .where('username', '==', usernameOrEmail)
+        // Query Supabase database for user by username
+        const { data: userData, error: queryError } = await supabase
+          .from('users')
+          .select('email, username')
+          .eq('username', usernameOrEmail)
           .limit(1)
-          .get();
+          .single();
         
-        if (querySnapshot.empty) {
+        if (queryError || !userData) {
           console.log('✗ Authentication failed: User not found');
           return res.status(401).json({
             success: false,
@@ -56,9 +49,6 @@ router.post('/login', async (req, res) => {
           });
         }
         
-        // Get the first matching user's email
-        const userDoc = querySnapshot.docs[0];
-        const userData = userDoc.data();
         email = userData.email;
         
         if (!email) {
@@ -68,8 +58,8 @@ router.post('/login', async (req, res) => {
             error: 'Invalid username or password',
           });
         }
-      } catch (firestoreError) {
-        console.error('Firestore query error:', firestoreError.message);
+      } catch (queryError) {
+        console.error('Database query error:', queryError.message);
         return res.status(500).json({
           success: false,
           error: 'Internal server error',
@@ -77,56 +67,17 @@ router.post('/login', async (req, res) => {
       }
     }
     
-    // Step 2: Verify password using Firebase Auth REST API
-    // Admin SDK cannot verify passwords, so we use REST API for this specific operation
+    // Step 2: Authenticate using Supabase Auth
     try {
-      const authResponse = await axios.post(
-        `${FIREBASE_AUTH_URL}?key=${FIREBASE_API_KEY}`,
-        {
-          email: email,
-          password: password,
-          returnSecureToken: true,
-        }
-      );
-      
-      // Password verification succeeded
-      const { localId, email: verifiedEmail } = authResponse.data;
-      
-      // Step 3: Fetch user data using Admin SDK + Firestore (trusted backend operation)
-      const userDoc = await db.collection('users').doc(localId).get();
-      
-      if (!userDoc.exists) {
-        console.log('✗ Authentication failed: User data not found in Firestore');
-        return res.status(401).json({
-          success: false,
-          error: 'User data not found',
-        });
-      }
-      
-      const userData = userDoc.data();
-      
-      console.log('✓ Authentication successful for:', userData.username || verifiedEmail, 'with role:', userData.role);
-      
-      // Step 4: Return user info
-      return res.status(200).json({
-        success: true,
-        user: {
-          uid: localId,
-          username: userData.username || verifiedEmail.split('@')[0],
-          email: verifiedEmail,
-          role: userData.role || 'employee',
-          name: userData.name,
-          department: userData.department,
-          position: userData.position,
-          workMode: userData.workMode,
-        },
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: password,
       });
-    } catch (authError) {
-      // Handle Firebase Auth REST API errors (password verification failures)
-      if (authError.response) {
-        const errorCode = authError.response.data?.error?.message;
-        
-        if (errorCode === 'EMAIL_NOT_FOUND' || errorCode === 'INVALID_PASSWORD') {
+      
+      if (authError || !authData.user) {
+        // Handle authentication errors
+        if (authError?.message?.includes('Invalid login credentials') || 
+            authError?.message?.includes('Email not confirmed')) {
           console.log('✗ Authentication failed: Invalid credentials');
           return res.status(401).json({
             success: false,
@@ -134,15 +85,7 @@ router.post('/login', async (req, res) => {
           });
         }
         
-        if (errorCode === 'USER_DISABLED') {
-          console.log('✗ Authentication failed: User disabled');
-          return res.status(403).json({
-            success: false,
-            error: 'This account has been disabled',
-          });
-        }
-        
-        if (errorCode === 'TOO_MANY_ATTEMPTS_TRY_LATER') {
+        if (authError?.message?.includes('Email rate limit exceeded')) {
           console.log('✗ Authentication failed: Too many attempts');
           return res.status(429).json({
             success: false,
@@ -150,15 +93,54 @@ router.post('/login', async (req, res) => {
           });
         }
         
-        console.error('Firebase Auth REST API error:', errorCode);
+        console.error('Supabase Auth error:', authError?.message);
         return res.status(401).json({
           success: false,
           error: 'Authentication failed',
-          message: errorCode,
+          message: authError?.message,
         });
       }
       
-      throw authError;
+      const userId = authData.user.id;
+      
+      // Step 3: Fetch user data from Supabase database
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('uid', userId)
+        .single();
+      
+      if (userError || !userData) {
+        console.log('✗ Authentication failed: User data not found in database');
+        return res.status(401).json({
+          success: false,
+          error: 'User data not found',
+        });
+      }
+      
+      console.log(`[${timestamp}] Auth Service: ✓ Authentication successful for:`, userData.username || email, 'with role:', userData.role);
+      
+      // Step 4: Return user info
+      return res.status(200).json({
+        success: true,
+        user: {
+          uid: userId,
+          username: userData.username || email.split('@')[0],
+          email: userData.email || email,
+          role: userData.role || 'employee',
+          name: userData.name,
+          department: userData.department || '',
+          position: userData.position || '',
+          workMode: userData.work_mode || 'in_office',
+        },
+      });
+    } catch (authError) {
+      console.error('Authentication error:', authError);
+      return res.status(500).json({
+        success: false,
+        error: 'Internal server error',
+        message: authError.message,
+      });
     }
   } catch (error) {
     console.error('Login error:', error);
@@ -176,26 +158,37 @@ router.post('/login', async (req, res) => {
  * Check if username exists
  */
 router.get('/check-username/:username', async (req, res) => {
+  const timestamp = new Date().toISOString();
+  const { username } = req.params;
+  console.log(`[${timestamp}] Auth Service: Check username request for: ${username}`);
+  
   try {
-    const { username } = req.params;
-
     if (!username) {
+      console.log(`[${timestamp}] Auth Service: Check username failed - username missing`);
       return res.status(400).json({
         success: false,
         error: 'Username is required',
       });
     }
 
-    // Query Firestore using Admin SDK
-    const usersRef = db.collection('users');
-    const querySnapshot = await usersRef
-      .where('username', '==', username)
-      .limit(1)
-      .get();
+    // Query Supabase database
+    const { data, error } = await supabase
+      .from('users')
+      .select('username')
+      .eq('username', username)
+      .limit(1);
+
+    if (error) {
+      console.error('Check username error:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Internal server error',
+      });
+    }
 
     return res.status(200).json({
       success: true,
-      exists: !querySnapshot.empty,
+      exists: data && data.length > 0,
     });
   } catch (error) {
     console.error('Check username error:', error);
@@ -212,6 +205,9 @@ router.get('/check-username/:username', async (req, res) => {
  * Body: { username, password, email, name, role, department, position, workMode, hireDate }
  */
 router.post('/users', async (req, res) => {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] Auth Service: Create user request received for:`, req.body.username || 'unknown');
+  
   try {
     const {
       username,
@@ -226,41 +222,85 @@ router.post('/users', async (req, res) => {
     } = req.body;
 
     if (!username || !password || !email || !role) {
+      console.log(`[${timestamp}] Auth Service: Create user failed - missing required fields`);
       return res.status(400).json({
         success: false,
         error: 'Username, password, email, and role are required',
       });
     }
 
-    // Create user in Firebase Auth using Admin SDK
-    const firebaseUser = await auth.createUser({
+    // Create user in Supabase Auth using Admin API
+    const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
       email: email,
       password: password,
-      displayName: name || username,
+      email_confirm: true, // Auto-confirm email
+      user_metadata: {
+        username: username,
+        name: name || username,
+      },
     });
 
-    // Create user document in Firestore
-    await db.collection('users').doc(firebaseUser.uid).set({
-      uid: firebaseUser.uid,
-      username: username,
-      email: email,
-      name: name || username,
-      role: role,
-      department: department || '',
-      position: position || '',
-      workMode: workMode || 'in_office',
-      hireDate: hireDate || new Date().toISOString(),
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
+    if (authError) {
+      // Handle Supabase Auth errors
+      if (authError.message?.includes('already registered') || 
+          authError.message?.includes('already exists')) {
+        return res.status(409).json({
+          success: false,
+          error: 'Email already exists',
+        });
+      }
+      
+      if (authError.message?.includes('Invalid email')) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid email address',
+        });
+      }
+      
+      console.error('Create user auth error:', authError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to create user',
+        message: authError.message,
+      });
+    }
 
-    console.log('✓ User created:', username, 'with role:', role);
+    // Create user document in Supabase database
+    const { data: userData, error: dbError } = await supabase
+      .from('users')
+      .insert({
+        uid: authUser.user.id,
+        username: username,
+        email: email,
+        name: name || username,
+        role: role,
+        department: department || '',
+        position: position || '',
+        work_mode: workMode || 'in_office',
+        hire_date: hireDate || new Date().toISOString().split('T')[0],
+        is_active: true,
+      })
+      .select()
+      .single();
+
+    if (dbError) {
+      // If database insert fails, try to delete the auth user
+      await supabase.auth.admin.deleteUser(authUser.user.id);
+      
+      console.error('Create user database error:', dbError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to create user profile',
+        message: dbError.message,
+      });
+    }
+
+    console.log(`[${timestamp}] Auth Service: ✓ User created:`, username, 'with role:', role);
 
     return res.status(201).json({
       success: true,
       user: {
-        uid: firebaseUser.uid,
+        uid: authUser.user.id,
         username: username,
         email: email,
         role: role,
@@ -272,21 +312,6 @@ router.post('/users', async (req, res) => {
     });
   } catch (error) {
     console.error('Create user error:', error);
-    
-    // Handle Firebase Auth errors
-    if (error.code === 'auth/email-already-exists') {
-      return res.status(409).json({
-        success: false,
-        error: 'Email already exists',
-      });
-    }
-    
-    if (error.code === 'auth/invalid-email') {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid email address',
-      });
-    }
     
     return res.status(500).json({
       success: false,
@@ -302,41 +327,46 @@ router.post('/users', async (req, res) => {
  * Body: { role: string }
  */
 router.patch('/users/:username/role', async (req, res) => {
+  const timestamp = new Date().toISOString();
+  const { username } = req.params;
+  const { role } = req.body;
+  console.log(`[${timestamp}] Auth Service: Update role request for: ${username} -> ${role}`);
+  
   try {
-    const { username } = req.params;
-    const { role } = req.body;
-
     if (!username || !role) {
+      console.log(`[${timestamp}] Auth Service: Update role failed - missing username or role`);
       return res.status(400).json({
         success: false,
         error: 'Username and role are required',
       });
     }
 
-    // Find user by username
-    const usersRef = db.collection('users');
-    const querySnapshot = await usersRef
-      .where('username', '==', username)
-      .limit(1)
-      .get();
+    // Update role in Supabase database
+    const { data, error } = await supabase
+      .from('users')
+      .update({ 
+        role: role,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('username', username)
+      .select();
 
-    if (querySnapshot.empty) {
+    if (error) {
+      console.error('Update role error:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Internal server error',
+      });
+    }
+
+    if (!data || data.length === 0) {
       return res.status(404).json({
         success: false,
         error: 'User not found',
       });
     }
 
-    const userDoc = querySnapshot.docs[0];
-    const userUid = userDoc.id;
-
-    // Update role in Firestore
-    await db.collection('users').doc(userUid).update({
-      role: role,
-      updatedAt: new Date().toISOString(),
-    });
-
-    console.log('✓ User role updated:', username, 'to', role);
+    console.log(`[${timestamp}] Auth Service: ✓ User role updated:`, username, 'to', role);
 
     return res.status(200).json({
       success: true,
@@ -357,11 +387,14 @@ router.patch('/users/:username/role', async (req, res) => {
  * Body: { ...updates }
  */
 router.patch('/users/:username', async (req, res) => {
+  const timestamp = new Date().toISOString();
+  const { username } = req.params;
+  const updates = req.body;
+  console.log(`[${timestamp}] Auth Service: Update user request for: ${username}`, { updates: Object.keys(updates) });
+  
   try {
-    const { username } = req.params;
-    const updates = req.body;
-
     if (!username) {
+      console.log(`[${timestamp}] Auth Service: Update user failed - username missing`);
       return res.status(400).json({
         success: false,
         error: 'Username is required',
@@ -369,34 +402,57 @@ router.patch('/users/:username', async (req, res) => {
     }
 
     if (!updates || Object.keys(updates).length === 0) {
+      console.log(`[${timestamp}] Auth Service: Update user failed - no update data`);
       return res.status(400).json({
         success: false,
         error: 'Update data is required',
       });
     }
 
-    // Find user by username
-    const usersRef = db.collection('users');
-    const querySnapshot = await usersRef
-      .where('username', '==', username)
-      .limit(1)
-      .get();
+    // Convert camelCase to snake_case for database fields
+    const dbUpdates = {};
+    if (updates.workMode !== undefined) {
+      dbUpdates.work_mode = updates.workMode;
+    }
+    if (updates.hireDate !== undefined) {
+      dbUpdates.hire_date = updates.hireDate;
+    }
+    if (updates.isActive !== undefined) {
+      dbUpdates.is_active = updates.isActive;
+    }
+    
+    // Copy other fields as-is (they should already be in correct format)
+    Object.keys(updates).forEach(key => {
+      if (!['workMode', 'hireDate', 'isActive'].includes(key)) {
+        dbUpdates[key] = updates[key];
+      }
+    });
+    
+    dbUpdates.updated_at = new Date().toISOString();
 
-    if (querySnapshot.empty) {
+    // Update user data in Supabase database
+    const { data, error } = await supabase
+      .from('users')
+      .update(dbUpdates)
+      .eq('username', username)
+      .select();
+
+    if (error) {
+      console.error('Update user error:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Internal server error',
+      });
+    }
+
+    if (!data || data.length === 0) {
       return res.status(404).json({
         success: false,
         error: 'User not found',
       });
     }
 
-    const userDoc = querySnapshot.docs[0];
-    const userUid = userDoc.id;
-
-    // Update user data in Firestore
-    updates.updatedAt = new Date().toISOString();
-    await db.collection('users').doc(userUid).update(updates);
-
-    console.log('✓ User info updated:', username);
+    console.log(`[${timestamp}] Auth Service: ✓ User info updated:`, username);
 
     return res.status(200).json({
       success: true,

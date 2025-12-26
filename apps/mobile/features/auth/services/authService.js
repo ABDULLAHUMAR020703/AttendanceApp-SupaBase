@@ -1,10 +1,10 @@
 // Authentication Service - Business logic for authentication
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDoc, setDoc, query, collection, where, getDocs } from 'firebase/firestore';
-import { auth, db } from '../../../core/config/firebase';
+// Migrated to Supabase
+import { supabase } from '../../../core/config/supabase';
+import { API_GATEWAY_URL } from '../../../core/config/api';
 
 /**
- * Authenticate user with Firebase
+ * Authenticate user with Supabase (via API Gateway preferred)
  * Supports both username and email login
  * @param {string} usernameOrEmail - Username or email to authenticate
  * @param {string} password - Password to authenticate
@@ -12,23 +12,59 @@ import { auth, db } from '../../../core/config/firebase';
  */
 export const authenticateUser = async (usernameOrEmail, password) => {
   try {
-    let email = usernameOrEmail;
+    // Try API Gateway first (recommended - uses backend service)
+    try {
+      const response = await fetch(`${API_GATEWAY_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          usernameOrEmail: usernameOrEmail.trim(),
+          password: password,
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        console.log('✓ Authentication successful via API Gateway for:', data.user?.username || usernameOrEmail);
+        return {
+          success: true,
+          user: {
+            username: data.user?.username || usernameOrEmail.split('@')[0],
+            role: data.user?.role || 'employee',
+            uid: data.user?.uid || '',
+            email: data.user?.email || usernameOrEmail,
+            name: data.user?.name,
+            department: data.user?.department || '',
+            position: data.user?.position || '',
+            workMode: data.user?.workMode || 'in_office',
+          }
+        };
+      }
+    } catch (apiError) {
+      console.log('API Gateway authentication failed, using Supabase directly:', apiError.message);
+    }
+    
+    // Fallback: Direct Supabase authentication
+    let email = usernameOrEmail.trim();
     
     // Check if input is a username (not an email)
     if (!usernameOrEmail.includes('@')) {
-      // Find user by username in Firestore
-      const usersRef = collection(db, 'users');
-      const q = query(usersRef, where('username', '==', usernameOrEmail));
-      const querySnapshot = await getDocs(q);
+      // Find user by username in Supabase database
+      const { data: userData, error: queryError } = await supabase
+        .from('users')
+        .select('email, username')
+        .eq('username', usernameOrEmail)
+        .limit(1)
+        .single();
       
-      if (querySnapshot.empty) {
+      if (queryError || !userData) {
         console.log('✗ Authentication failed: User not found');
         return { success: false, error: 'Invalid username or password' };
       }
       
-      // Get the first matching user's email
-      const userDoc = querySnapshot.docs[0];
-      const userData = userDoc.data();
       email = userData.email;
       
       if (!email) {
@@ -37,15 +73,35 @@ export const authenticateUser = async (usernameOrEmail, password) => {
       }
     }
     
-    // Authenticate with Firebase using email
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    const firebaseUser = userCredential.user;
+    // Authenticate with Supabase using email
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email: email,
+      password: password,
+    });
     
-    // Get user data from Firestore
-    const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-    const userData = userDoc.data();
+    if (authError || !authData.user) {
+      console.error('Supabase authentication error:', authError?.message);
+      let errorMessage = 'Invalid username or password';
+      
+      if (authError?.message?.includes('Invalid login credentials')) {
+        errorMessage = 'Invalid username or password';
+      } else if (authError?.message?.includes('Email not confirmed')) {
+        errorMessage = 'Please verify your email address';
+      } else if (authError?.message?.includes('Email rate limit exceeded')) {
+        errorMessage = 'Too many failed attempts. Please try again later';
+      }
+      
+      return { success: false, error: errorMessage };
+    }
     
-    if (!userData) {
+    // Get user data from Supabase database
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('uid', authData.user.id)
+      .single();
+    
+    if (userError || !userData) {
       console.log('✗ Authentication failed: User data not found');
       return { success: false, error: 'User data not found' };
     }
@@ -56,49 +112,57 @@ export const authenticateUser = async (usernameOrEmail, password) => {
       user: {
         username: userData.username || email.split('@')[0],
         role: userData.role || 'employee',
-        uid: firebaseUser.uid,
-        email: firebaseUser.email
+        uid: authData.user.id,
+        email: authData.user.email || email,
+        name: userData.name,
+        department: userData.department || '',
+        position: userData.position || '',
+        workMode: userData.work_mode || 'in_office',
       }
     };
   } catch (error) {
     console.error('Authentication error:', error);
-    let errorMessage = 'Invalid username or password';
-    
-    switch (error.code) {
-      case 'auth/user-not-found':
-        errorMessage = 'No account found with this username/email';
-        break;
-      case 'auth/wrong-password':
-        errorMessage = 'Incorrect password';
-        break;
-      case 'auth/invalid-email':
-        errorMessage = 'Invalid email address';
-        break;
-      case 'auth/user-disabled':
-        errorMessage = 'This account has been disabled';
-        break;
-      case 'auth/too-many-requests':
-        errorMessage = 'Too many failed attempts. Please try again later';
-        break;
-      default:
-        errorMessage = error.message || 'Authentication failed';
-    }
-    
-    return { success: false, error: errorMessage };
+    return { success: false, error: error.message || 'Authentication failed' };
   }
 };
 
 /**
- * Check if username exists in Firebase
+ * Check if username exists in Supabase
  * @param {string} username
  * @returns {Promise<boolean>}
  */
 export const checkUsernameExists = async (username) => {
   try {
-    const usersRef = collection(db, 'users');
-    const q = query(usersRef, where('username', '==', username));
-    const querySnapshot = await getDocs(q);
-    return !querySnapshot.empty;
+    // Try API Gateway first
+    try {
+      const response = await fetch(`${API_GATEWAY_URL}/api/auth/check-username/${username}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        return data.exists || false;
+      }
+    } catch (apiError) {
+      console.log('API Gateway check failed, using Supabase directly');
+    }
+    
+    // Fallback to Supabase
+    const { data, error } = await supabase
+      .from('users')
+      .select('username')
+      .eq('username', username)
+      .limit(1);
+    
+    if (error) {
+      console.error('Error checking username:', error);
+      return false;
+    }
+    
+    return data && data.length > 0;
   } catch (error) {
     console.error('Error checking username:', error);
     return false;
@@ -106,7 +170,7 @@ export const checkUsernameExists = async (username) => {
 };
 
 /**
- * Create user in Firebase
+ * Create user in Supabase (via API Gateway)
  * @param {Object} userData - {username, password, email, name, role, department, position, workMode, hireDate}
  * @returns {Promise<{success: boolean, error?: string, uid?: string}>}
  */
@@ -129,7 +193,7 @@ export const createUser = async (userData) => {
     }
     
     if (!email) {
-      return { success: false, error: 'Email is required for Firebase authentication' };
+      return { success: false, error: 'Email is required' };
     }
     
     // Check if username already exists
@@ -138,72 +202,135 @@ export const createUser = async (userData) => {
       return { success: false, error: 'Username already exists' };
     }
     
-    // Create user in Firebase Authentication
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    const firebaseUser = userCredential.user;
-    
-    // Create user document in Firestore with all fields
-    const userDocData = {
-      uid: firebaseUser.uid,
-      username,
-      email,
-      name: name || username,
-      role,
-      department: department || '',
-      position: position || '',
-      workMode: workMode || 'in_office',
-      hireDate: hireDate || new Date().toISOString().split('T')[0],
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    
-    await setDoc(doc(db, 'users', firebaseUser.uid), userDocData);
-    
-    console.log('✓ User created in Firebase:', username, `(${role}, ${department || 'No dept'})`);
-    return { success: true, uid: firebaseUser.uid };
-  } catch (error) {
-    console.error('Error creating Firebase user:', error);
-    let errorMessage = 'Failed to create user';
-    
-    if (error.code === 'auth/email-already-in-use') {
-      errorMessage = 'Email already exists';
-    } else if (error.code === 'auth/invalid-email') {
-      errorMessage = 'Invalid email address';
-    } else if (error.code === 'auth/weak-password') {
-      errorMessage = 'Password should be at least 6 characters';
+    // Create user via API Gateway (recommended)
+    try {
+      const response = await fetch(`${API_GATEWAY_URL}/api/auth/users`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username,
+          password,
+          email,
+          name,
+          role,
+          department,
+          position,
+          workMode,
+          hireDate,
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        console.log('✓ User created via API Gateway:', username, `(${role}, ${department || 'No dept'})`);
+        return { success: true, uid: data.user?.uid };
+      } else {
+        return { success: false, error: data.error || 'Failed to create user' };
+      }
+    } catch (apiError) {
+      console.log('API Gateway create failed, using Supabase directly');
+      
+      // Fallback: Create user directly in Supabase
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: email,
+        password: password,
+        options: {
+          data: {
+            username: username,
+            name: name || username,
+          }
+        }
+      });
+      
+      if (authError || !authData.user) {
+        let errorMessage = 'Failed to create user';
+        if (authError?.message?.includes('already registered')) {
+          errorMessage = 'Email already exists';
+        } else if (authError?.message?.includes('Invalid email')) {
+          errorMessage = 'Invalid email address';
+        }
+        return { success: false, error: errorMessage };
+      }
+      
+      // Create user document in Supabase database
+      const { error: dbError } = await supabase
+        .from('users')
+        .insert({
+          uid: authData.user.id,
+          username: username,
+          email: email,
+          name: name || username,
+          role: role,
+          department: department || '',
+          position: position || '',
+          work_mode: workMode || 'in_office',
+          hire_date: hireDate || new Date().toISOString().split('T')[0],
+          is_active: true,
+        });
+      
+      if (dbError) {
+        // Try to delete the auth user if database insert fails
+        await supabase.auth.admin.deleteUser(authData.user.id).catch(() => {});
+        return { success: false, error: 'Failed to create user profile' };
+      }
+      
+      console.log('✓ User created in Supabase:', username, `(${role}, ${department || 'No dept'})`);
+      return { success: true, uid: authData.user.id };
     }
-    
-    return { success: false, error: errorMessage };
+  } catch (error) {
+    console.error('Error creating user:', error);
+    return { success: false, error: error.message || 'Failed to create user' };
   }
 };
 
 /**
- * Update user role in Firebase
+ * Update user role in Supabase (via API Gateway)
  * @param {string} username - Username to update
  * @param {string} newRole - New role
  * @returns {Promise<{success: boolean, error?: string}>}
  */
 export const updateUserRole = async (username, newRole) => {
   try {
-    // Find user by username in Firestore
-    const usersRef = collection(db, 'users');
-    const q = query(usersRef, where('username', '==', username));
-    const querySnapshot = await getDocs(q);
-    
-    if (querySnapshot.empty) {
-      return { success: false, error: 'User not found' };
+    // Use API Gateway (recommended)
+    try {
+      const response = await fetch(`${API_GATEWAY_URL}/api/auth/users/${username}/role`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ role: newRole }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        console.log('✓ User role updated via API Gateway:', username, '->', newRole);
+        return { success: true };
+      } else {
+        return { success: false, error: data.error || 'Failed to update user role' };
+      }
+    } catch (apiError) {
+      console.log('API Gateway update failed, using Supabase directly');
+      
+      // Fallback: Update directly in Supabase
+      const { error } = await supabase
+        .from('users')
+        .update({ 
+          role: newRole,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('username', username);
+      
+      if (error) {
+        return { success: false, error: error.message || 'Failed to update user role' };
+      }
+      
+      console.log('✓ User role updated in Supabase:', username, '->', newRole);
+      return { success: true };
     }
-    
-    // Update the user's role
-    const userDoc = querySnapshot.docs[0];
-    await setDoc(doc(db, 'users', userDoc.id), {
-      role: newRole,
-      updatedAt: new Date().toISOString()
-    }, { merge: true });
-    
-    console.log('✓ User role updated in Firebase:', username, '->', newRole);
-    return { success: true };
   } catch (error) {
     console.error('Error updating user role:', error);
     return { success: false, error: error.message || 'Failed to update user role' };
@@ -211,34 +338,69 @@ export const updateUserRole = async (username, newRole) => {
 };
 
 /**
- * Update user information in Firebase
+ * Update user information in Supabase (via API Gateway)
  * @param {string} username - Username to update
  * @param {Object} updates - Fields to update
  * @returns {Promise<{success: boolean, error?: string}>}
  */
 export const updateUserInfo = async (username, updates) => {
   try {
-    // Find user by username in Firestore
-    const usersRef = collection(db, 'users');
-    const q = query(usersRef, where('username', '==', username));
-    const querySnapshot = await getDocs(q);
-    
-    if (querySnapshot.empty) {
-      return { success: false, error: 'User not found' };
+    // Convert camelCase to snake_case for database
+    const dbUpdates = {};
+    if (updates.workMode !== undefined) {
+      dbUpdates.work_mode = updates.workMode;
+    }
+    if (updates.hireDate !== undefined) {
+      dbUpdates.hire_date = updates.hireDate;
+    }
+    if (updates.isActive !== undefined) {
+      dbUpdates.is_active = updates.isActive;
     }
     
-    // Update the user's information
-    const userDoc = querySnapshot.docs[0];
-    await setDoc(doc(db, 'users', userDoc.id), {
-      ...updates,
-      updatedAt: new Date().toISOString()
-    }, { merge: true });
+    // Copy other fields
+    Object.keys(updates).forEach(key => {
+      if (!['workMode', 'hireDate', 'isActive'].includes(key)) {
+        dbUpdates[key] = updates[key];
+      }
+    });
     
-    console.log('✓ User info updated in Firebase:', username);
-    return { success: true };
+    // Use API Gateway (recommended)
+    try {
+      const response = await fetch(`${API_GATEWAY_URL}/api/auth/users/${username}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updates), // API Gateway handles conversion
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        console.log('✓ User info updated via API Gateway:', username);
+        return { success: true };
+      } else {
+        return { success: false, error: data.error || 'Failed to update user info' };
+      }
+    } catch (apiError) {
+      console.log('API Gateway update failed, using Supabase directly');
+      
+      // Fallback: Update directly in Supabase
+      dbUpdates.updated_at = new Date().toISOString();
+      const { error } = await supabase
+        .from('users')
+        .update(dbUpdates)
+        .eq('username', username);
+      
+      if (error) {
+        return { success: false, error: error.message || 'Failed to update user info' };
+      }
+      
+      console.log('✓ User info updated in Supabase:', username);
+      return { success: true };
+    }
   } catch (error) {
     console.error('Error updating user info:', error);
     return { success: false, error: error.message || 'Failed to update user info' };
   }
 };
-

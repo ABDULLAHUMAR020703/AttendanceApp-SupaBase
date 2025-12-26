@@ -1,7 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { auth, db } from '../config/firebase';
+import { supabase } from '../config/supabase';
 import { getEmployeeByUsername } from '../../utils/employees';
 
 const AuthContext = createContext();
@@ -11,78 +9,109 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    // Listen to Firebase auth state changes
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        try {
-          // Get user data from Firestore
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-          const userData = userDoc.data();
-          
-          if (userData) {
-            // Try to get employee data for additional info
-            let employee = null;
-            if (userData.username) {
-              try {
-                employee = await getEmployeeByUsername(userData.username);
-              } catch (error) {
-                console.log('Employee not found, using Firestore data only');
-              }
-            }
-            
-            // Combine Firebase user with Firestore data and employee data
-            // Firestore now contains all fields, so prioritize Firestore data
-            const combinedUser = {
-              uid: firebaseUser.uid,
-              email: firebaseUser.email,
-              username: userData.username || firebaseUser.email?.split('@')[0],
-              role: userData.role || 'employee',
-              name: userData.name || employee?.name || firebaseUser.displayName,
-              department: userData.department || employee?.department || '',
-              position: userData.position || employee?.position || '',
-              workMode: userData.workMode || employee?.workMode || 'in_office',
-              hireDate: userData.hireDate || employee?.hireDate,
-              id: employee?.id || firebaseUser.uid,
-            };
-            
-            setUser(combinedUser);
-          } else {
-            // Fallback if Firestore document doesn't exist
-            setUser({
-              uid: firebaseUser.uid,
-              email: firebaseUser.email,
-              username: firebaseUser.email?.split('@')[0],
-              role: 'employee',
-            });
-          }
-        } catch (error) {
-          console.error('Error loading user data:', error);
-          // Fallback to basic Firebase user
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        loadUserData(session.user.id);
+      } else {
+        setIsLoading(false);
+      }
+    });
+
+    // Listen to Supabase auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        await loadUserData(session.user.id);
+      } else {
+        setUser(null);
+        setIsLoading(false);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const loadUserData = async (userId) => {
+    try {
+      // Get user data from Supabase database
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('uid', userId)
+        .single();
+      
+      if (userError || !userData) {
+        console.error('Error loading user data:', userError);
+        // Fallback to basic user info from auth
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (authUser) {
           setUser({
-            uid: firebaseUser.uid,
-            email: firebaseUser.email,
-            username: firebaseUser.email?.split('@')[0],
+            uid: authUser.id,
+            email: authUser.email,
+            username: authUser.email?.split('@')[0],
             role: 'employee',
           });
         }
-      } else {
-        setUser(null);
+        setIsLoading(false);
+        return;
       }
+      
+      // Try to get employee data for additional info
+      let employee = null;
+      if (userData.username) {
+        try {
+          employee = await getEmployeeByUsername(userData.username);
+        } catch (error) {
+          console.log('Employee not found, using database data only');
+        }
+      }
+      
+      // Get current auth user for email
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      
+      // Combine Supabase user with database data and employee data
+      const combinedUser = {
+        uid: userId,
+        email: authUser?.email || userData.email,
+        username: userData.username || authUser?.email?.split('@')[0],
+        role: userData.role || 'employee',
+        name: userData.name || employee?.name || authUser?.user_metadata?.name,
+        department: userData.department || employee?.department || '',
+        position: userData.position || employee?.position || '',
+        workMode: userData.work_mode || employee?.workMode || 'in_office',
+        hireDate: userData.hire_date || employee?.hireDate,
+        id: employee?.id || userId,
+      };
+      
+      setUser(combinedUser);
+    } catch (error) {
+      console.error('Error loading user data:', error);
+      // Fallback to basic user info
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (authUser) {
+        setUser({
+          uid: authUser.id,
+          email: authUser.email,
+          username: authUser.email?.split('@')[0],
+          role: 'employee',
+        });
+      }
+    } finally {
       setIsLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
+    }
+  };
 
   const handleLogin = async (userData) => {
-    // Login is handled by Firebase Auth, this is just for compatibility
-    // The actual login happens in LoginScreen using Firebase
+    // Login is handled by Supabase Auth, this is just for compatibility
+    // The actual login happens in LoginScreen using Supabase
     setUser(userData);
   };
 
   const handleLogout = async () => {
     try {
-      await firebaseSignOut(auth);
+      await supabase.auth.signOut();
       setUser(null);
     } catch (error) {
       console.error('Logout error:', error);

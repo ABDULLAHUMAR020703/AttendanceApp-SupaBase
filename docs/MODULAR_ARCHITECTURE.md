@@ -28,7 +28,7 @@ AttendanceApp/
 │
 ├── core/                           # Core application infrastructure
 │   ├── config/                     # Configuration files
-│   │   └── firebase.js            # Firebase configuration
+│   │   └── supabase.js            # Supabase configuration
 │   ├── contexts/                   # React Context providers
 │   │   ├── AuthContext.js         # Authentication context
 │   │   └── ThemeContext.js        # Theme context
@@ -42,7 +42,7 @@ AttendanceApp/
 ├── features/                       # Feature modules (self-contained)
 │   ├── auth/                       # ✅ Authentication feature (PARTIALLY MIGRATED)
 │   │   ├── services/              # Auth services
-│   │   │   └── authService.js    # Auth business logic (Firebase integration)
+│   │   │   └── authService.js    # Auth business logic (Supabase integration)
 │   │   ├── utils/                 # Auth utilities
 │   │   │   ├── biometricAuth.js
 │   │   │   └── authPreferences.js

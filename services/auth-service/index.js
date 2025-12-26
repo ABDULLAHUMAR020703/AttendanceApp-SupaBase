@@ -12,6 +12,17 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Request logging middleware
+app.use((req, res, next) => {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] Auth Service: ${req.method} ${req.path}`, {
+    ip: req.ip,
+    userAgent: req.get('user-agent'),
+    body: req.method !== 'GET' ? req.body : undefined
+  });
+  next();
+});
+
 // Routes
 app.use('/api/auth', authRoutes);
 
@@ -35,8 +46,14 @@ app.get('/', (req, res) => {
 // Start server - listen on all interfaces (0.0.0.0) to allow connections from devices
 const HOST = process.env.HOST || '0.0.0.0';
 app.listen(PORT, HOST, () => {
-  console.log(`Auth Service running on http://${HOST}:${PORT}`);
-  console.log(`Health check available at http://localhost:${PORT}/health`);
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] ========================================`);
+  console.log(`[${timestamp}] Auth Service starting...`);
+  console.log(`[${timestamp}] Server running on http://${HOST}:${PORT}`);
+  console.log(`[${timestamp}] Health check: http://localhost:${PORT}/health`);
+  console.log(`[${timestamp}] Supabase URL: ${process.env.SUPABASE_URL || 'NOT SET'}`);
+  console.log(`[${timestamp}] ========================================`);
+  console.log(`[${timestamp}] Auth Service ready to receive requests`);
 });
 
 module.exports = app;
