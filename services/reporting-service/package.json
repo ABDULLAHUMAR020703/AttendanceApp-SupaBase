@@ -1,0 +1,24 @@
+{
+  "name": "reporting-service",
+  "version": "1.0.0",
+  "description": "Reporting service for generating attendance, leave, and ticket reports",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js",
+    "test:report": "node test-trigger-report.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.89.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "node-cron": "^3.0.3",
+    "pdfkit": "^0.15.0",
+    "nodemailer": "^6.9.8"
+  }
+}
+

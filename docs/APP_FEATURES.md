@@ -1,16 +1,18 @@
-# Present - Complete Application Features Documentation
+# Hadir.AI - Complete Application Features Documentation
 
 ## 📱 Application Overview
 
-**Present** is a comprehensive employee management and attendance tracking system built with React Native and Expo. The app provides a complete solution for organizations to manage employee attendance, leaves, support tickets, analytics, and workforce administration.
+**Hadir.AI** is a comprehensive employee management and attendance tracking system built with React Native and Expo. The app provides a complete solution for organizations to manage employee attendance, leaves, support tickets, analytics, and workforce administration.
 
 ### Key Highlights
 - **Multi-Platform**: iOS and Android support via React Native
 - **Role-Based Access**: Three distinct user roles with tailored permissions
-- **Modern UI**: Dark mode support, responsive design, intuitive navigation
-- **Secure Authentication**: Multiple authentication methods including biometric
+- **Modern UI**: Dark mode support, responsive design, intuitive navigation, app logo on login screen
+- **Secure Authentication**: Multiple authentication methods including biometric (Face ID on iOS, Fingerprint on Android)
 - **Real-Time Tracking**: GPS-based attendance with location verification
 - **Comprehensive Analytics**: Detailed reports and insights for management
+- **Department-Based Management**: Separate Engineering and Technical departments with dedicated managers
+- **Direct Leave Management**: Managers can approve/reject leave requests directly from HR Dashboard
 
 ---
 
@@ -20,7 +22,7 @@
 
 #### 1. **Username/Email Login**
 - Login using either username or email address
-- Secure password authentication via Firebase
+- Secure password authentication via Supabase
 - Automatic session persistence
 - Remember me functionality
 
@@ -228,6 +230,12 @@
   - Half day options: Morning or Afternoon
   - Add reason/description
   - View leave balance before submitting
+  - **Category Selection** (for routing):
+    - HR category (always enabled for all employees)
+    - Finance, Engineering, Sales, Technical categories
+    - Employee's own department category is always enabled
+    - Other categories are disabled (grayed out) based on employee's department
+    - Example: Engineering employee can send to Engineering or HR, but other options are disabled
 
 - **Leave Request Status**
   - **Pending**: Awaiting approval
@@ -243,13 +251,16 @@
 
 #### Leave Approval Workflow
 - **For Managers:**
-  - View pending leave requests for department
-  - Approve or reject requests
-  - Add comments/notes
-  - Automatic notification to employee
+  - View pending leave requests for department in HR Dashboard
+  - Approve or reject requests directly from HR Dashboard Leaves section
+  - View all leave requests (pending, approved, rejected) in HR Dashboard
+  - See leave request details including employee name, dates, reason, and status
+  - Add comments/notes (optional)
+  - Automatic notification to employee upon approval/rejection
+  - Permission checks ensure managers only manage requests assigned to them or from their department
 
 - **For Super Admins:**
-  - View all pending leave requests
+  - View all pending leave requests across all departments
   - Approve or reject any request
   - Override manager decisions
   - System-wide leave management
@@ -271,11 +282,12 @@
 ### 3. **Ticket Management System**
 
 #### Ticket Categories
-- **Technical**: IT/Engineering issues
 - **HR**: Human resources inquiries
 - **Finance**: Financial matters
-- **Facilities**: Office/facility requests
-- **Other**: General inquiries
+- **Engineering**: Engineering department issues
+- **Sales**: Sales department inquiries
+- **Technical**: Technical department issues (separate from Engineering)
+- All categories are accessible to all employees when creating tickets
 
 #### Ticket Priorities
 - **Low**: Non-urgent issues
@@ -291,11 +303,13 @@
 
 #### Automatic Ticket Routing
 - **Smart Department Assignment**
-  - Technical tickets → Engineering department manager
+  - Engineering tickets → Engineering department manager
+  - Technical tickets → Technical department manager (separate from Engineering)
   - HR tickets → HR department manager
   - Finance tickets → Finance department manager
-  - Facilities tickets → Facilities department manager
-  - Other tickets → Super Admin only
+  - Sales tickets → Sales department manager
+  - Each category routes to its respective department manager
+  - If no manager found, ticket is assigned to super admin as fallback
 
 - **Notification System**
   - Super Admin notified of all tickets
@@ -347,7 +361,18 @@
 
 - **Semi Remote**
   - Employee can work from home or office
-  - Flexible location
+  - Flexible location options
+
+#### Work Mode Distribution Statistics
+- **For Managers:**
+  - Statistics show only employees from their department
+  - Displays counts for In Office, Semi Remote, and Fully Remote
+  - Automatically filters based on manageable employees
+  - Updates in real-time when employee work modes change
+
+- **For Super Admins:**
+  - Statistics show all employees across all departments
+  - Complete system-wide work mode overview
 
 - **Fully Remote**
   - Employee works remotely from any location
@@ -429,14 +454,26 @@
 
 #### HR Dashboard
 - **Overview Statistics**
-  - Total employees count
+  - Total employees count (department-filtered for managers)
   - Total attendance records
-  - Pending leave requests
+  - Pending leave requests count
   - Open tickets count
+
+- **Leaves Section**
+  - View all leave requests (pending, approved, rejected)
+  - Filter by status
+  - **Approve/Reject Functionality:**
+    - Approve or reject leave requests directly from HR Dashboard
+    - Approve/Reject buttons appear for pending requests
+    - View leave request details: employee name, dates, reason, leave type
+    - See processed by information for approved/rejected requests
+    - Permission checks ensure managers only manage assigned requests or from their department
+    - Automatic notification sent to employee upon approval/rejection
+    - Leave balance automatically updated when request is approved
 
 - **Attendance Analytics**
   - Attendance trends
-  - Department-wise statistics
+  - Department-wise statistics (filtered by department for managers)
   - Employee attendance rates
   - Time-based analysis
 
@@ -633,6 +670,8 @@
 | Export Data | ❌ | ✅ | ✅ |
 | Approve Signups | ❌ | ✅ | ✅ |
 | HR Dashboard | ❌ | ✅ | ✅ |
+| HR Dashboard - Leave Approval | ❌ | ✅ (Dept) | ✅ (All) |
+| Work Mode Distribution (Dept Filtered) | ❌ | ✅ (Dept) | ✅ (All) |
 | Employee Management | ❌ | ❌ | ✅ |
 
 ---
@@ -727,7 +766,7 @@
 
 ## 📝 Summary
 
-**Present** is a comprehensive employee management solution offering:
+**Hadir.AI** is a comprehensive employee management solution offering:
 
 ✅ **Complete Attendance Tracking** with biometric authentication  
 ✅ **Flexible Leave Management** with approval workflows  

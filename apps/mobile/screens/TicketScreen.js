@@ -34,7 +34,7 @@ export default function TicketScreen({ navigation, route }) {
   const [filter, setFilter] = useState('all'); // all, open, in_progress, resolved, closed
   
   // Form state
-  const [category, setCategory] = useState(TICKET_CATEGORIES.TECHNICAL);
+  const [category, setCategory] = useState(TICKET_CATEGORIES.HR);
   const [priority, setPriority] = useState(TICKET_PRIORITIES.MEDIUM);
   const [subject, setSubject] = useState('');
   const [description, setDescription] = useState('');
@@ -93,7 +93,7 @@ export default function TicketScreen({ navigation, route }) {
         setShowCreateModal(false);
         setSubject('');
         setDescription('');
-        setCategory(TICKET_CATEGORIES.TECHNICAL);
+        setCategory(TICKET_CATEGORIES.HR);
         setPriority(TICKET_PRIORITIES.MEDIUM);
         await loadTickets();
       } else {
@@ -425,32 +425,46 @@ export default function TicketScreen({ navigation, route }) {
               {/* Category */}
               <View style={{ marginBottom: 16 }}>
                 <Text style={{ color: colors.text, marginBottom: 8, fontWeight: '500' }}>Category *</Text>
+                <Text style={{ color: colors.textSecondary, marginBottom: 8, fontSize: 12 }}>
+                  Select the department manager who should handle this ticket
+                </Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                  {Object.values(TICKET_CATEGORIES).map((cat) => (
-                    <TouchableOpacity
-                      key={cat}
-                      style={{
-                        borderRadius: 8,
-                        padding: 12,
-                        borderWidth: 2,
-                        borderColor: category === cat ? colors.primary : colors.border,
-                        backgroundColor: category === cat ? colors.primaryLight : 'transparent',
-                        minWidth: '30%',
-                      }}
-                      onPress={() => setCategory(cat)}
-                    >
-                      <Text
+                  {/* Show only: HR, Finance, Engineering, Sales, Technical (all enabled for everyone) */}
+                  {[
+                    TICKET_CATEGORIES.HR,
+                    TICKET_CATEGORIES.FINANCE,
+                    TICKET_CATEGORIES.ENGINEERING,
+                    TICKET_CATEGORIES.SALES,
+                    TICKET_CATEGORIES.TECHNICAL,
+                  ].map((cat) => {
+                    const isSelected = category === cat;
+                    
+                    return (
+                      <TouchableOpacity
+                        key={cat}
                         style={{
-                          textAlign: 'center',
-                          fontSize: 12,
-                          fontWeight: '500',
-                          color: category === cat ? colors.primary : colors.text,
+                          borderRadius: 8,
+                          padding: 12,
+                          borderWidth: 2,
+                          borderColor: isSelected ? colors.primary : colors.border,
+                          backgroundColor: isSelected ? colors.primaryLight : 'transparent',
+                          minWidth: '30%',
                         }}
+                        onPress={() => setCategory(cat)}
                       >
-                        {getCategoryLabel(cat)}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                        <Text
+                          style={{
+                            textAlign: 'center',
+                            fontSize: 12,
+                            fontWeight: '500',
+                            color: isSelected ? colors.primary : colors.text,
+                          }}
+                        >
+                          {getCategoryLabel(cat)}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </View>
 

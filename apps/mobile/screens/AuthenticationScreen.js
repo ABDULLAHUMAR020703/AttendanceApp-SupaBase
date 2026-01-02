@@ -44,11 +44,34 @@ export default function AuthenticationScreen({ navigation, route }) {
 
   const getLocation = async () => {
     try {
+      console.log('Fetching location...');
       const currentLocation = await getCurrentLocationWithAddress();
-      setLocation(currentLocation);
+      if (currentLocation) {
+        console.log('Location fetched successfully:', {
+          latitude: currentLocation.latitude,
+          longitude: currentLocation.longitude,
+          address: currentLocation.address ? currentLocation.address.substring(0, 50) + '...' : 'N/A'
+        });
+        setLocation(currentLocation);
+      } else {
+        console.warn('Location fetch returned null - location may not be available');
+        // Set a default location object so the UI doesn't break
+        setLocation({
+          latitude: null,
+          longitude: null,
+          accuracy: null,
+          address: 'Location unavailable'
+        });
+      }
     } catch (error) {
       console.error('Error getting location:', error);
-      // Continue without location
+      // Set a default location object so the UI doesn't break
+      setLocation({
+        latitude: null,
+        longitude: null,
+        accuracy: null,
+        address: 'Location unavailable'
+      });
     }
   };
 
@@ -137,9 +160,24 @@ export default function AuthenticationScreen({ navigation, route }) {
     setAuthStatus(null);
 
     try {
-      // Get location first
-      const currentLocation = await getCurrentLocationWithAddress();
-      setLocation(currentLocation);
+      // Get location first (with error handling)
+      let currentLocation = location; // Use existing location if available
+      if (!currentLocation) {
+        console.log('Fetching location for Face ID authentication...');
+        currentLocation = await getCurrentLocationWithAddress();
+        if (currentLocation) {
+          setLocation(currentLocation);
+        } else {
+          // Continue without location if it fails
+          console.warn('Location fetch failed, continuing without location');
+          currentLocation = {
+            latitude: null,
+            longitude: null,
+            accuracy: null,
+            address: 'Location unavailable'
+          };
+        }
+      }
 
       // Authenticate with Face ID
       const verificationResult = await verifyFace(
@@ -207,9 +245,24 @@ export default function AuthenticationScreen({ navigation, route }) {
     setAuthStatus(null);
 
     try {
-      // Get location first
-      const currentLocation = await getCurrentLocationWithAddress();
-      setLocation(currentLocation);
+      // Get location first (with error handling)
+      let currentLocation = location; // Use existing location if available
+      if (!currentLocation) {
+        console.log('Fetching location for biometric authentication...');
+        currentLocation = await getCurrentLocationWithAddress();
+        if (currentLocation) {
+          setLocation(currentLocation);
+        } else {
+          // Continue without location if it fails
+          console.warn('Location fetch failed, continuing without location');
+          currentLocation = {
+            latitude: null,
+            longitude: null,
+            accuracy: null,
+            address: 'Location unavailable'
+          };
+        }
+      }
 
       // Authenticate with biometric
       const authResult = await authenticateWithBiometric(
@@ -293,15 +346,30 @@ export default function AuthenticationScreen({ navigation, route }) {
 
   const saveAttendance = async (photoUri, locationData) => {
     try {
+      // Ensure location is properly formatted (handle null/undefined)
+      const location = locationData || {
+        latitude: null,
+        longitude: null,
+        accuracy: null,
+        address: 'Location unavailable'
+      };
+
       const attendanceRecord = {
         id: Date.now().toString(),
         username: user.username,
         type: type,
         timestamp: new Date().toISOString(),
         photo: null, // No photo needed for device-native authentication
-        location: locationData,
+        location: location,
         authMethod: authMethod, // Store which authentication method was used
       };
+
+      console.log('Saving attendance record:', {
+        username: attendanceRecord.username,
+        type: attendanceRecord.type,
+        hasLocation: !!attendanceRecord.location,
+        locationAddress: attendanceRecord.location?.address || 'N/A'
+      });
 
       await saveAttendanceRecord(attendanceRecord);
       

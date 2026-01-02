@@ -8,13 +8,15 @@ import {
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../contexts/AuthContext';
-import { useTheme } from '../contexts/ThemeContext';
-import { getPendingSignupCount } from '../utils/signupRequests';
-import { getUnreadNotificationCount } from '../utils/notifications';
-import { fontSize, spacing, iconSize, componentSize, responsivePadding, responsiveFont, wp } from '../utils/responsive';
+import { useAuth } from '../../core/contexts/AuthContext';
+import { useTheme } from '../../core/contexts/ThemeContext';
+import { getPendingSignupCount } from '../../utils/signupRequests';
+import { getUnreadNotificationCount } from '../../utils/notifications';
+import { fontSize, spacing, iconSize, componentSize, responsivePadding, responsiveFont, wp } from '../../utils/responsive';
+import { ROUTES } from '../constants/routes';
 import Logo from './Logo';
 import Trademark from './Trademark';
+import HelpButton from './HelpButton';
 
 export default function CustomDrawer({ navigation, state }) {
   const { user, handleLogout } = useAuth();
@@ -54,7 +56,7 @@ export default function CustomDrawer({ navigation, state }) {
       {
         name: 'Dashboard',
         icon: 'home-outline',
-        screen: user.role === 'employee' ? 'EmployeeDashboard' : 'AdminDashboard',
+        screen: user.role === 'employee' ? ROUTES.EMPLOYEE_DASHBOARD : ROUTES.ADMIN_DASHBOARD,
         roles: ['employee', 'super_admin', 'manager'],
       },
     ];
@@ -65,38 +67,38 @@ export default function CustomDrawer({ navigation, state }) {
         {
           name: 'Attendance History',
           icon: 'time-outline',
-          screen: 'AttendanceHistory',
+          screen: ROUTES.ATTENDANCE_HISTORY,
           roles: ['employee'],
         },
         {
           name: 'Leave Requests',
           icon: 'calendar-outline',
-          screen: 'LeaveRequestScreen',
+          screen: ROUTES.LEAVE_REQUEST,
           roles: ['employee'],
         },
         {
           name: 'My Tickets',
           icon: 'ticket-outline',
-          screen: 'TicketScreen',
+          screen: ROUTES.TICKET_SCREEN,
           roles: ['employee'],
         },
         {
           name: 'Calendar',
           icon: 'calendar-outline',
-          screen: 'CalendarScreen',
+          screen: ROUTES.CALENDAR,
           roles: ['employee'],
         },
         {
           name: 'Notifications',
           icon: 'notifications-outline',
-          screen: 'NotificationsScreen',
+          screen: ROUTES.NOTIFICATIONS,
           roles: ['employee'],
           badge: unreadNotificationCount,
         },
         {
           name: 'Theme Settings',
           icon: 'color-palette-outline',
-          screen: 'ThemeSettingsScreen',
+          screen: ROUTES.THEME_SETTINGS,
           roles: ['employee'],
         },
       ];
@@ -107,39 +109,37 @@ export default function CustomDrawer({ navigation, state }) {
       {
         name: 'Employee Management',
         icon: 'people-outline',
-        screen: 'AdminDashboard',
-        params: { initialTab: 'employees' },
-        roles: ['super_admin', 'manager'],
-      },
-      {
-        name: 'Attendance Records',
-        icon: 'list-outline',
-        screen: 'AdminDashboard',
-        params: { initialTab: 'attendance' },
-        roles: ['super_admin', 'manager'],
-      },
-      {
-        name: 'Calendar View',
-        icon: 'calendar-outline',
-        screen: 'CalendarScreen',
+        screen: ROUTES.EMPLOYEE_MANAGEMENT,
         roles: ['super_admin', 'manager'],
       },
       {
         name: 'HR Dashboard',
         icon: 'briefcase-outline',
-        screen: 'HRDashboard',
+        screen: ROUTES.HR_DASHBOARD,
         roles: ['super_admin', 'manager'],
       },
       {
         name: 'Ticket Management',
         icon: 'ticket-outline',
-        screen: 'TicketManagement',
+        screen: ROUTES.TICKET_MANAGEMENT,
+        roles: ['super_admin', 'manager'],
+      },
+      {
+        name: 'Manual Attendance',
+        icon: 'create-outline',
+        screen: ROUTES.MANUAL_ATTENDANCE,
+        roles: ['super_admin', 'manager'],
+      },
+      {
+        name: 'Calendar View',
+        icon: 'calendar-outline',
+        screen: ROUTES.CALENDAR,
         roles: ['super_admin', 'manager'],
       },
       {
         name: 'Notifications',
         icon: 'notifications-outline',
-        screen: 'NotificationsScreen',
+        screen: ROUTES.NOTIFICATIONS,
         roles: ['super_admin', 'manager'],
         badge: unreadNotificationCount,
       },
@@ -150,15 +150,21 @@ export default function CustomDrawer({ navigation, state }) {
       {
         name: 'Create User',
         icon: 'person-add-outline',
-        screen: 'CreateUser',
+        screen: ROUTES.CREATE_USER,
         roles: ['super_admin'],
       },
       {
         name: 'Signup Approvals',
         icon: 'checkmark-circle-outline',
-        screen: 'SignupApproval',
+        screen: ROUTES.SIGNUP_APPROVAL,
         roles: ['super_admin'],
         badge: pendingSignupCount,
+      },
+      {
+        name: 'Reports',
+        icon: 'document-text-outline',
+        screen: 'ReportsScreen',
+        roles: ['super_admin'],
       },
     ];
 
@@ -173,7 +179,7 @@ export default function CustomDrawer({ navigation, state }) {
       {
         name: 'Theme Settings',
         icon: 'color-palette-outline',
-        screen: 'ThemeSettingsScreen',
+        screen: ROUTES.THEME_SETTINGS,
         roles: ['super_admin', 'manager'],
       },
     ];
@@ -184,11 +190,42 @@ export default function CustomDrawer({ navigation, state }) {
 
   const handleNavigation = (item) => {
     if (item.screen) {
-      if (item.params) {
-        navigation.navigate(item.screen, { user, ...item.params });
-      } else {
-        navigation.navigate(item.screen, { user });
-      }
+      // Close drawer first
+      navigation.closeDrawer();
+      
+      // Navigate after a small delay to ensure drawer closes smoothly
+      setTimeout(() => {
+        try {
+          // Navigate to nested screen through MainStack
+          // The drawer contains MainStack, which contains the Stack Navigator with all screens
+          if (item.params) {
+            navigation.navigate('MainStack', {
+              screen: item.screen,
+              params: { user, ...item.params }
+            });
+          } else {
+            navigation.navigate('MainStack', {
+              screen: item.screen,
+              params: { user }
+            });
+          }
+        } catch (error) {
+          console.error('Navigation error:', error);
+          // Alternative: Try getting the parent navigator
+          try {
+            const parent = navigation.getParent();
+            if (parent) {
+              if (item.params) {
+                parent.navigate(item.screen, { user, ...item.params });
+              } else {
+                parent.navigate(item.screen, { user });
+              }
+            }
+          } catch (fallbackError) {
+            console.error('Fallback navigation error:', fallbackError);
+          }
+        }
+      }, 100);
     }
   };
 
@@ -269,6 +306,12 @@ export default function CustomDrawer({ navigation, state }) {
               </TouchableOpacity>
             );
           })}
+          
+          {/* Help & Support */}
+          <HelpButton 
+            variant="menu" 
+            onPress={() => navigation.closeDrawer()}
+          />
         </View>
       </ScrollView>
 

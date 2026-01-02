@@ -45,19 +45,41 @@ export const authenticateUser = async (usernameOrEmail, password) => {
     if (response.ok && data.success) {
       console.log('✓ Authentication successful via API Gateway for:', data.user?.username || usernameOrEmail);
       
-      // Store session in Supabase for consistency
-      // Note: The backend already authenticated, but we store the session token
-      if (data.user?.uid) {
-        try {
-          // Set session manually (backend already authenticated)
-          await supabase.auth.setSession({
-            access_token: '', // Backend handles auth, we just store user info
-            refresh_token: '',
-          });
-        } catch (sessionError) {
-          // Session storage is optional, continue anyway
-          console.log('Note: Could not store session, continuing with API Gateway auth');
+      // IMPORTANT: We need to establish a Supabase session for RLS policies to work
+      // API Gateway authenticates on the backend, but we need client-side session for database operations
+      try {
+        // Get email from API Gateway response or resolve from username
+        let email = data.user?.email || usernameOrEmail;
+        
+        // If email is not provided and input is a username, look it up
+        if (!email.includes('@') || !data.user?.email) {
+          const { data: userData } = await supabase
+            .from('users')
+            .select('email')
+            .eq('username', data.user?.username || usernameOrEmail)
+            .single();
+          
+          if (userData?.email) {
+            email = userData.email;
+          }
         }
+        
+        // Establish Supabase session with the same credentials
+        // This is needed for RLS policies (auth.uid()) to work
+        const { data: authData, error: sessionError } = await supabase.auth.signInWithPassword({
+          email: email,
+          password: password,
+        });
+        
+        if (sessionError) {
+          console.warn('⚠️ Could not establish Supabase session after API Gateway login:', sessionError.message);
+          console.warn('⚠️ Database operations requiring RLS may fail. Consider using direct Supabase authentication.');
+        } else if (authData?.user) {
+          console.log('✓ Supabase session established for RLS policies');
+        }
+      } catch (sessionError) {
+        console.warn('⚠️ Error establishing Supabase session:', sessionError.message);
+        // Continue anyway - user is authenticated via API Gateway
       }
       
       return {
@@ -161,11 +183,32 @@ export const authenticateUser = async (usernameOrEmail, password) => {
     }
     
     // Get user data from Supabase database
-    const { data: userData, error: userError } = await supabase
+    // First try by uid (should match Supabase Auth user ID)
+    let { data: userData, error: userError } = await supabase
       .from('users')
       .select('*')
       .eq('uid', authData.user.id)
       .single();
+    
+    // If uid query fails, try by email as fallback
+    if (userError || !userData) {
+      console.log('Query by uid failed, trying by email...', userError?.message);
+      if (authData.user.email) {
+        const { data: userDataByEmail, error: emailError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', authData.user.email)
+          .single();
+        
+        if (!emailError && userDataByEmail) {
+          console.log('Found user by email:', userDataByEmail.username);
+          userData = userDataByEmail;
+          userError = null;
+        } else {
+          console.error('Error loading user data by email:', emailError);
+        }
+      }
+    }
     
     if (userError || !userData) {
       console.log('✗ Authentication failed: User data not found');

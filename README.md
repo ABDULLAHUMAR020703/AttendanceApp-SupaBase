@@ -1,4 +1,4 @@
-# Present - Employee Attendance Management System
+# Hadir.AI - Employee Attendance Management System
 
 A comprehensive employee attendance management system built with React Native, Expo, and Supabase. Features role-based access control, real-time attendance tracking, leave management, ticket system, and comprehensive analytics.
 

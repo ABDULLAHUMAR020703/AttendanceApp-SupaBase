@@ -1,24 +1,27 @@
-// Ticket Management Utilities using AsyncStorage
-import AsyncStorage from '@react-native-async-storage/async-storage';
+// Ticket Management Utilities using Supabase
+import { supabase } from '../core/config/supabase';
 import { createNotification } from './notifications';
 import { getAdminUsers, getSuperAdminUsers, getManagersByDepartment } from './employees';
 
-const TICKETS_KEY = 'tickets';
-
 // Ticket Categories
 export const TICKET_CATEGORIES = {
+  ENGINEERING: 'engineering',
   TECHNICAL: 'technical',
   HR: 'hr',
   FINANCE: 'finance',
+  SALES: 'sales',
   FACILITIES: 'facilities',
   OTHER: 'other'
 };
 
 // Map ticket categories to departments
-const CATEGORY_TO_DEPARTMENT_MAP = {
-  [TICKET_CATEGORIES.TECHNICAL]: 'Engineering',
+// Engineering and Technical are separate departments
+export const CATEGORY_TO_DEPARTMENT_MAP = {
+  [TICKET_CATEGORIES.ENGINEERING]: 'Engineering', // Routes to Engineering Manager
+  [TICKET_CATEGORIES.TECHNICAL]: 'Technical',     // Routes to Technical Manager (separate department)
   [TICKET_CATEGORIES.HR]: 'HR',
   [TICKET_CATEGORIES.FINANCE]: 'Finance',
+  [TICKET_CATEGORIES.SALES]: 'Sales',
   [TICKET_CATEGORIES.FACILITIES]: 'Facilities',
   [TICKET_CATEGORIES.OTHER]: null // No specific department, goes to super_admin only
 };
@@ -42,9 +45,11 @@ export const TICKET_STATUS = {
 // Category Labels
 export const getCategoryLabel = (category) => {
   const labels = {
+    [TICKET_CATEGORIES.ENGINEERING]: 'Engineering',
     [TICKET_CATEGORIES.TECHNICAL]: 'Technical',
     [TICKET_CATEGORIES.HR]: 'HR',
     [TICKET_CATEGORIES.FINANCE]: 'Finance',
+    [TICKET_CATEGORIES.SALES]: 'Sales',
     [TICKET_CATEGORIES.FACILITIES]: 'Facilities',
     [TICKET_CATEGORIES.OTHER]: 'Other'
   };
@@ -95,6 +100,30 @@ export const getStatusColor = (status) => {
   return colors[status] || '#6b7280';
 };
 
+
+/**
+ * Convert database ticket format to app format
+ * @param {Object} dbTicket - Ticket from database
+ * @returns {Object} Ticket in app format
+ */
+const convertTicketFromDb = (dbTicket) => {
+  return {
+    id: dbTicket.id,
+    createdBy: dbTicket.created_by,
+    category: dbTicket.category,
+    priority: dbTicket.priority,
+    subject: dbTicket.subject,
+    description: dbTicket.description,
+    status: dbTicket.status,
+    assignedTo: dbTicket.assigned_to,
+    createdAt: dbTicket.created_at,
+    updatedAt: dbTicket.updated_at,
+    resolvedAt: dbTicket.resolved_at,
+    closedAt: dbTicket.closed_at,
+    responses: dbTicket.responses || []
+  };
+};
+
 /**
  * Create a new ticket
  * @param {string} createdBy - Username of the person creating the ticket
@@ -129,54 +158,144 @@ export const createTicket = async (createdBy, category, priority, subject, descr
       };
     }
 
-    // Create ticket
-    const ticketId = `ticket_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const ticket = {
-      id: ticketId,
-      createdBy,
-      category,
-      priority,
-      subject: subject.trim(),
-      description: description.trim(),
-      status: TICKET_STATUS.OPEN,
-      assignedTo: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      resolvedAt: null,
-      closedAt: null,
-      responses: []
-    };
+    // Get user UID for database reference
+    // MUST use auth.uid() from current Supabase session for RLS policy to work
+    // RLS policy requires: created_by_uid = auth.uid()
+    let createdByUid = null;
+    try {
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+      if (authError) {
+        console.error('Error getting Supabase session:', authError);
+        return {
+          success: false,
+          error: 'Unable to verify user session. Please log in again.'
+        };
+      }
+      
+      if (authUser && authUser.id) {
+        createdByUid = authUser.id;
+        console.log('✓ Using UID from current Supabase session (auth.uid()):', createdByUid);
+      } else {
+        // No active session
+        console.error('No active Supabase session found');
+        return {
+          success: false,
+          error: 'Please ensure you are logged in. Session not found.'
+        };
+      }
+    } catch (error) {
+      console.error('Error getting Supabase session:', error);
+      return {
+        success: false,
+        error: 'Unable to verify user session. Please log in again.'
+      };
+    }
 
-    // Get all tickets and add new one
-    const ticketsJson = await AsyncStorage.getItem(TICKETS_KEY);
-    const allTickets = ticketsJson ? JSON.parse(ticketsJson) : [];
-    allTickets.push(ticket);
+    // If still no UID, we cannot proceed (RLS requires it)
+    if (!createdByUid) {
+      console.error('Cannot create ticket: created_by_uid is required for RLS policy');
+      return {
+        success: false,
+        error: 'Unable to verify user identity. Please ensure you are logged in correctly.'
+      };
+    }
 
     // Auto-assign to department manager based on category
     let assignedManager = null;
     const department = CATEGORY_TO_DEPARTMENT_MAP[category];
+    let initialStatus = TICKET_STATUS.OPEN;
+    
+    console.log(`[Ticket Routing] Category: ${category}, Department: ${department || 'N/A'}`);
     
     if (department) {
       try {
+        console.log(`[Ticket Routing] Looking for managers in department: ${department}`);
         const departmentManagers = await getManagersByDepartment(department);
+        console.log(`[Ticket Routing] Found ${departmentManagers.length} manager(s) for ${department}:`, 
+          departmentManagers.map(m => m.username));
+        
         if (departmentManagers.length > 0) {
-          // Assign to first manager found (you can add logic to distribute evenly)
+          // Direct routing: Each category maps to its own department
+          // - "technical" category → Technical department → Technical Manager
           assignedManager = departmentManagers[0];
-          ticket.assignedTo = assignedManager.username;
-          ticket.status = TICKET_STATUS.IN_PROGRESS;
-          
-          // Update the ticket in the array
-          const ticketIndex = allTickets.length - 1;
-          allTickets[ticketIndex] = ticket;
-          
-          console.log(`✓ Ticket auto-assigned to ${assignedManager.username} (${department} Manager)`);
+          initialStatus = TICKET_STATUS.IN_PROGRESS;
+          console.log(`✓ Ticket (${category}) will be assigned to ${assignedManager.username} (${assignedManager.position || department} Manager)`);
+        } else {
+          console.warn(`⚠️ No manager found for department: ${department}. Ticket will not be auto-assigned.`);
+          // Fallback: Try to assign to a super_admin if no manager found
+          try {
+            const superAdmins = await getSuperAdminUsers();
+            if (superAdmins.length > 0) {
+              assignedManager = superAdmins[0];
+              console.log(`✓ Fallback: Assigning ticket to super_admin: ${assignedManager.username}`);
+            }
+          } catch (fallbackError) {
+            console.error('Error getting super_admin for fallback assignment:', fallbackError);
+          }
         }
       } catch (error) {
         console.error('Error finding department manager:', error);
+        // Fallback: Try to assign to a super_admin on error
+        try {
+          const superAdmins = await getSuperAdminUsers();
+          if (superAdmins.length > 0) {
+            assignedManager = superAdmins[0];
+            console.log(`✓ Fallback (on error): Assigning ticket to super_admin: ${assignedManager.username}`);
+          }
+        } catch (fallbackError) {
+          console.error('Error getting super_admin for fallback assignment:', fallbackError);
+        }
+      }
+    } else {
+      console.log(`[Ticket Routing] No department mapping for category: ${category}. Assigning to super_admin.`);
+      // For "other" category or unmapped categories, assign to super_admin
+      try {
+        const superAdmins = await getSuperAdminUsers();
+        if (superAdmins.length > 0) {
+          assignedManager = superAdmins[0];
+          console.log(`✓ Assigning ticket to super_admin: ${assignedManager.username}`);
+        }
+      } catch (fallbackError) {
+        console.error('Error getting super_admin for assignment:', fallbackError);
       }
     }
+    
+    if (assignedManager) {
+      console.log(`✓ Final assignment: ${assignedManager.username} (${assignedManager.role}, ${assignedManager.department || 'N/A'})`);
+    } else {
+      console.warn(`⚠️ WARNING: Ticket will be created with assigned_to = null`);
+    }
 
-    await AsyncStorage.setItem(TICKETS_KEY, JSON.stringify(allTickets));
+    // Create ticket in Supabase
+    const ticketData = {
+      created_by_uid: createdByUid,
+      created_by: createdBy,
+      category: category,
+      priority: priority,
+      subject: subject.trim(),
+      description: description.trim(),
+      status: initialStatus,
+      assigned_to: assignedManager?.username || null,
+      resolved_at: null,
+      closed_at: null,
+      responses: []
+    };
+
+    const { data: insertedTicket, error: insertError } = await supabase
+      .from('tickets')
+      .insert(ticketData)
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error('Error inserting ticket to Supabase:', insertError);
+      return {
+        success: false,
+        error: insertError.message || 'Failed to create ticket in database'
+      };
+    }
+
+    const ticketId = insertedTicket.id;
 
     // Send notification to super_admins first
     try {
@@ -303,10 +422,20 @@ export const createTicket = async (createdBy, category, priority, subject, descr
  */
 export const getUserTickets = async (username) => {
   try {
-    const ticketsJson = await AsyncStorage.getItem(TICKETS_KEY);
-    const allTickets = ticketsJson ? JSON.parse(ticketsJson) : [];
-    
-    return allTickets.filter(ticket => ticket.createdBy === username);
+    // Query from Supabase
+    const { data: tickets, error } = await supabase
+      .from('tickets')
+      .select('*')
+      .eq('created_by', username)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error getting user tickets from Supabase:', error);
+      return [];
+    }
+
+    // Convert database format to app format
+    return tickets.map(convertTicketFromDb);
   } catch (error) {
     console.error('Error getting user tickets:', error);
     return [];
@@ -319,8 +448,19 @@ export const getUserTickets = async (username) => {
  */
 export const getAllTickets = async () => {
   try {
-    const ticketsJson = await AsyncStorage.getItem(TICKETS_KEY);
-    return ticketsJson ? JSON.parse(ticketsJson) : [];
+    // Query from Supabase (RLS policies will filter based on user role)
+    const { data: tickets, error } = await supabase
+      .from('tickets')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error getting all tickets from Supabase:', error);
+      return [];
+    }
+
+    // Convert database format to app format
+    return tickets.map(convertTicketFromDb);
   } catch (error) {
     console.error('Error getting all tickets:', error);
     return [];
@@ -334,10 +474,20 @@ export const getAllTickets = async () => {
  */
 export const getTicketById = async (ticketId) => {
   try {
-    const ticketsJson = await AsyncStorage.getItem(TICKETS_KEY);
-    const allTickets = ticketsJson ? JSON.parse(ticketsJson) : [];
-    
-    return allTickets.find(ticket => ticket.id === ticketId) || null;
+    // Query from Supabase
+    const { data: ticket, error } = await supabase
+      .from('tickets')
+      .select('*')
+      .eq('id', ticketId)
+      .single();
+
+    if (error || !ticket) {
+      console.error('Error getting ticket by ID from Supabase:', error);
+      return null;
+    }
+
+    // Convert database format to app format
+    return convertTicketFromDb(ticket);
   } catch (error) {
     console.error('Error getting ticket by ID:', error);
     return null;
@@ -360,29 +510,44 @@ export const updateTicketStatus = async (ticketId, status, updatedBy) => {
       };
     }
 
-    const ticketsJson = await AsyncStorage.getItem(TICKETS_KEY);
-    const allTickets = ticketsJson ? JSON.parse(ticketsJson) : [];
-    
-    const ticketIndex = allTickets.findIndex(ticket => ticket.id === ticketId);
-    if (ticketIndex === -1) {
+    // Get the ticket from Supabase first
+    const { data: ticket, error: fetchError } = await supabase
+      .from('tickets')
+      .select('*')
+      .eq('id', ticketId)
+      .single();
+
+    if (fetchError || !ticket) {
       return {
         success: false,
         error: 'Ticket not found'
       };
     }
 
-    const ticket = allTickets[ticketIndex];
-    ticket.status = status;
-    ticket.updatedAt = new Date().toISOString();
+    // Prepare update data
+    const updateData = {
+      status: status
+    };
 
     if (status === TICKET_STATUS.RESOLVED) {
-      ticket.resolvedAt = new Date().toISOString();
+      updateData.resolved_at = new Date().toISOString();
     } else if (status === TICKET_STATUS.CLOSED) {
-      ticket.closedAt = new Date().toISOString();
+      updateData.closed_at = new Date().toISOString();
     }
 
-    allTickets[ticketIndex] = ticket;
-    await AsyncStorage.setItem(TICKETS_KEY, JSON.stringify(allTickets));
+    // Update ticket in Supabase
+    const { error: updateError } = await supabase
+      .from('tickets')
+      .update(updateData)
+      .eq('id', ticketId);
+
+    if (updateError) {
+      console.error('Error updating ticket status in Supabase:', updateError);
+      return {
+        success: false,
+        error: updateError.message || 'Failed to update ticket status'
+      };
+    }
 
     // Send notification to ticket creator
     try {
@@ -390,7 +555,7 @@ export const updateTicketStatus = async (ticketId, status, updatedBy) => {
       const notificationBody = `Your ticket "${ticket.subject}" has been ${getStatusLabel(status).toLowerCase()}`;
       
       await createNotification(
-        ticket.createdBy,
+        ticket.created_by,
         notificationTitle,
         notificationBody,
         'ticket_updated',
@@ -402,7 +567,7 @@ export const updateTicketStatus = async (ticketId, status, updatedBy) => {
           navigation: {
             screen: 'TicketScreen',
             params: {
-              user: { username: ticket.createdBy },
+              user: { username: ticket.created_by },
               ticketId: ticketId
             }
           }
@@ -431,28 +596,43 @@ export const updateTicketStatus = async (ticketId, status, updatedBy) => {
  */
 export const assignTicket = async (ticketId, assignedTo, assignedBy) => {
   try {
-    const ticketsJson = await AsyncStorage.getItem(TICKETS_KEY);
-    const allTickets = ticketsJson ? JSON.parse(ticketsJson) : [];
-    
-    const ticketIndex = allTickets.findIndex(ticket => ticket.id === ticketId);
-    if (ticketIndex === -1) {
+    // Get the ticket from Supabase first
+    const { data: ticket, error: fetchError } = await supabase
+      .from('tickets')
+      .select('*')
+      .eq('id', ticketId)
+      .single();
+
+    if (fetchError || !ticket) {
       return {
         success: false,
         error: 'Ticket not found'
       };
     }
 
-    const ticket = allTickets[ticketIndex];
-    ticket.assignedTo = assignedTo;
-    ticket.updatedAt = new Date().toISOString();
+    // Prepare update data
+    const updateData = {
+      assigned_to: assignedTo
+    };
 
     // If status is open, change to in progress
     if (ticket.status === TICKET_STATUS.OPEN) {
-      ticket.status = TICKET_STATUS.IN_PROGRESS;
+      updateData.status = TICKET_STATUS.IN_PROGRESS;
     }
 
-    allTickets[ticketIndex] = ticket;
-    await AsyncStorage.setItem(TICKETS_KEY, JSON.stringify(allTickets));
+    // Update ticket in Supabase
+    const { error: updateError } = await supabase
+      .from('tickets')
+      .update(updateData)
+      .eq('id', ticketId);
+
+    if (updateError) {
+      console.error('Error assigning ticket in Supabase:', updateError);
+      return {
+        success: false,
+        error: updateError.message || 'Failed to assign ticket'
+      };
+    }
 
     // Send notification to assigned admin
     try {
@@ -508,18 +688,21 @@ export const addTicketResponse = async (ticketId, respondedBy, message) => {
       };
     }
 
-    const ticketsJson = await AsyncStorage.getItem(TICKETS_KEY);
-    const allTickets = ticketsJson ? JSON.parse(ticketsJson) : [];
-    
-    const ticketIndex = allTickets.findIndex(ticket => ticket.id === ticketId);
-    if (ticketIndex === -1) {
+    // Get the ticket from Supabase first
+    const { data: ticket, error: fetchError } = await supabase
+      .from('tickets')
+      .select('*')
+      .eq('id', ticketId)
+      .single();
+
+    if (fetchError || !ticket) {
       return {
         success: false,
         error: 'Ticket not found'
       };
     }
 
-    const ticket = allTickets[ticketIndex];
+    // Create new response
     const response = {
       id: `response_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       respondedBy,
@@ -527,12 +710,25 @@ export const addTicketResponse = async (ticketId, respondedBy, message) => {
       createdAt: new Date().toISOString()
     };
 
-    ticket.responses = ticket.responses || [];
-    ticket.responses.push(response);
-    ticket.updatedAt = new Date().toISOString();
+    // Get existing responses and add new one
+    const existingResponses = ticket.responses || [];
+    const updatedResponses = [...existingResponses, response];
 
-    allTickets[ticketIndex] = ticket;
-    await AsyncStorage.setItem(TICKETS_KEY, JSON.stringify(allTickets));
+    // Update ticket in Supabase
+    const { error: updateError } = await supabase
+      .from('tickets')
+      .update({
+        responses: updatedResponses
+      })
+      .eq('id', ticketId);
+
+    if (updateError) {
+      console.error('Error adding ticket response in Supabase:', updateError);
+      return {
+        success: false,
+        error: updateError.message || 'Failed to add response'
+      };
+    }
 
     // Send notification
     try {
@@ -540,9 +736,9 @@ export const addTicketResponse = async (ticketId, respondedBy, message) => {
       const notificationBody = `${respondedBy} responded to ticket: ${ticket.subject}`;
       
       // Notify ticket creator if not the one responding
-      if (respondedBy !== ticket.createdBy) {
+      if (respondedBy !== ticket.created_by) {
         await createNotification(
-          ticket.createdBy,
+          ticket.created_by,
           notificationTitle,
           notificationBody,
           'ticket_response',
@@ -555,9 +751,9 @@ export const addTicketResponse = async (ticketId, respondedBy, message) => {
       }
 
       // Notify assigned admin if different from responder
-      if (ticket.assignedTo && ticket.assignedTo !== respondedBy && ticket.assignedTo !== ticket.createdBy) {
+      if (ticket.assigned_to && ticket.assigned_to !== respondedBy && ticket.assigned_to !== ticket.created_by) {
         await createNotification(
-          ticket.assignedTo,
+          ticket.assigned_to,
           notificationTitle,
           notificationBody,
           'ticket_response',
@@ -569,7 +765,7 @@ export const addTicketResponse = async (ticketId, respondedBy, message) => {
             navigation: {
               screen: 'TicketManagement',
               params: {
-                user: { username: ticket.assignedTo },
+                user: { username: ticket.assigned_to },
                 ticketId: ticketId
               }
             }
@@ -634,7 +830,3 @@ export const getAssignedTickets = async (username) => {
     return [];
   }
 };
-
-
-
-

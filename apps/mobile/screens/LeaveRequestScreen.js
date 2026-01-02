@@ -15,7 +15,9 @@ import {
   getEmployeeLeaveBalance,
   calculateRemainingLeaves,
   createLeaveRequest,
-  getEmployeeLeaveRequests
+  getEmployeeLeaveRequests,
+  LEAVE_CATEGORIES,
+  getCategoryLabel
 } from '../utils/leaveManagement';
 import { getEmployeeByUsername } from '../utils/employees';
 import DatePickerCalendar from '../components/DatePickerCalendar';
@@ -35,6 +37,7 @@ export default function LeaveRequestScreen({ navigation, route }) {
   const [isHalfDay, setIsHalfDay] = useState(false);
   const [halfDayPeriod, setHalfDayPeriod] = useState('morning');
   const [selectedPreviewDate, setSelectedPreviewDate] = useState(null); // Date selected in calendar but not yet assigned
+  const [category, setCategory] = useState(null); // Category for routing (null = auto-detect from department)
 
   useEffect(() => {
     loadData();
@@ -104,6 +107,7 @@ export default function LeaveRequestScreen({ navigation, route }) {
     setIsHalfDay(false);
     setHalfDayPeriod('morning');
     setSelectedPreviewDate(null);
+    setCategory(null); // Reset to auto-detect
   };
 
   const handleSubmitRequest = async () => {
@@ -131,7 +135,8 @@ export default function LeaveRequestScreen({ navigation, route }) {
         isHalfDay ? startDate : endDate, // For half-day, end date = start date
         reason,
         isHalfDay,
-        isHalfDay ? halfDayPeriod : null
+        isHalfDay ? halfDayPeriod : null,
+        category // Pass category for routing
       );
 
       if (result.success) {
@@ -225,6 +230,22 @@ export default function LeaveRequestScreen({ navigation, route }) {
           )}
         </View>
       </View>
+      {item.category && (
+        <View className="flex-row items-center mt-2">
+          <Ionicons name="business-outline" size={14} color="#6b7280" />
+          <Text className="text-gray-600 text-sm ml-1">
+            Category: {getCategoryLabel(item.category)}
+          </Text>
+        </View>
+      )}
+      {item.assignedTo && (
+        <View className="flex-row items-center mt-1">
+          <Ionicons name="person-outline" size={14} color="#6b7280" />
+          <Text className="text-gray-600 text-sm ml-1">
+            Assigned to: {item.assignedTo}
+          </Text>
+        </View>
+      )}
       {item.reason && (
         <Text className="text-gray-600 text-sm mt-2">
           Reason: {item.reason}
@@ -378,6 +399,92 @@ export default function LeaveRequestScreen({ navigation, route }) {
                     </TouchableOpacity>
                   ))}
                 </View>
+              </View>
+
+              {/* Category Selection (for routing to appropriate manager) */}
+              <View className="mb-4">
+                <Text className="text-gray-700 mb-2 font-medium">Department/Category</Text>
+                <Text className="text-gray-500 text-xs mb-2">
+                  Select the department manager who should review this request
+                </Text>
+                <View className="flex-row flex-wrap gap-2">
+                  {/* Define allowed categories: HR, Finance, Engineering, Sales, Technical */}
+                  {(() => {
+                    // Define the categories to show (in order: HR, Finance, Engineering, Sales, Technical)
+                    const allowedCategories = [
+                      { value: LEAVE_CATEGORIES.HR, label: 'HR', mapsTo: LEAVE_CATEGORIES.HR, department: 'HR' },
+                      { value: LEAVE_CATEGORIES.FINANCE, label: 'Finance', mapsTo: LEAVE_CATEGORIES.FINANCE, department: 'Finance' },
+                      { value: LEAVE_CATEGORIES.ENGINEERING, label: 'Engineering', mapsTo: LEAVE_CATEGORIES.ENGINEERING, department: 'Engineering' },
+                      { value: LEAVE_CATEGORIES.SALES, label: 'Sales', mapsTo: LEAVE_CATEGORIES.SALES, department: 'Sales' },
+                      { value: LEAVE_CATEGORIES.TECHNICAL, label: 'Technical', mapsTo: LEAVE_CATEGORIES.TECHNICAL, department: 'Technical' },
+                    ];
+                    
+                    return allowedCategories.map((cat) => {
+                      // Determine if this category should be enabled
+                      const isEnabled = (() => {
+                        if (!employee || !employee.department) return false;
+                        
+                        const department = employee.department;
+                        
+                        // HR is always enabled for all employees
+                        if (cat.value === LEAVE_CATEGORIES.HR) return true;
+                        
+                        // Enable if employee's department matches this category's department
+                        // Engineering employees can select: Engineering, HR
+                        // Technical employees can select: Technical, HR
+                        // Sales employees can select: Sales, HR
+                        // Finance employees can select: Finance, HR
+                        // HR employees can select: HR only
+                        return department === cat.department;
+                      })();
+                      
+                      const routingCategory = cat.mapsTo;
+                      const isSelected = category === routingCategory;
+                      
+                      return (
+                        <TouchableOpacity
+                          key={cat.value}
+                          className={`rounded-lg p-3 border-2 ${
+                            isSelected
+                              ? 'border-primary-500 bg-primary-50'
+                              : isEnabled
+                              ? 'border-gray-200 bg-white'
+                              : 'border-gray-200 bg-gray-100 opacity-50'
+                          }`}
+                          style={{ minWidth: '30%' }}
+                          onPress={() => {
+                            if (isEnabled) {
+                              setCategory(routingCategory);
+                            }
+                          }}
+                          disabled={!isEnabled}
+                        >
+                          <Text
+                            className={`text-center font-medium text-sm ${
+                              isSelected
+                                ? 'text-primary-600'
+                                : isEnabled
+                                ? 'text-gray-600'
+                                : 'text-gray-400'
+                            }`}
+                          >
+                            {cat.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    });
+                  })()}
+                </View>
+                {category && (
+                  <Text className="text-xs text-gray-500 mt-2">
+                    Will be routed to {getCategoryLabel(category)} manager
+                  </Text>
+                )}
+                {!category && employee && employee.department && (
+                  <Text className="text-xs text-gray-500 mt-2">
+                    Please select a department category (HR is always available)
+                  </Text>
+                )}
               </View>
 
               {/* Half Day Toggle */}

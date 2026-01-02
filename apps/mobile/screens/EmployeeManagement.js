@@ -21,13 +21,15 @@ import {
   processWorkModeRequest,
   getManageableEmployees,
   canManageEmployee,
-  updateEmployee
+  updateEmployee,
+  isHRManager
 } from '../utils/employees';
 import { 
   getAllWorkModes, 
   getWorkModeLabel, 
   getWorkModeColor,
-  getWorkModeIcon 
+  getWorkModeIcon,
+  WORK_MODES
 } from '../utils/workModes';
 import {
   getDefaultLeaveSettings,
@@ -84,19 +86,21 @@ export default function EmployeeManagement({ route }) {
     loadData();
   }, []);
 
-  // Reload leave requests when employees change
+  // Reload leave requests and statistics when employees change
   useEffect(() => {
     if (employees.length > 0) {
       loadPendingLeaveRequests();
+      loadStatistics();
     }
   }, [employees]);
 
   const loadData = async () => {
+    // Load employees first, then other data
+    await loadEmployees();
+    // Statistics will be loaded via useEffect when employees state updates
     await Promise.all([
-      loadEmployees(),
       loadPendingRequests(),
       loadPendingLeaveRequests(),
-      loadStatistics(),
       loadDefaultLeaveSettings()
     ]);
     // Load leave balances after employees are loaded
@@ -153,11 +157,26 @@ export default function EmployeeManagement({ route }) {
   const loadPendingLeaveRequests = async () => {
     try {
       const allRequests = await getPendingLeaveRequests();
-      // Filter leave requests to only show those for employees the user can manage
+      
+      // For super admins and HR managers, show all requests
+      if (user.role === 'super_admin' || isHRManager(user)) {
+        setPendingLeaveRequests(allRequests);
+        return;
+      }
+      
+      // For regular managers, show requests assigned to them OR from employees in their department
       const manageableEmployeeIds = new Set(employees.map(emp => emp.id));
-      const filteredRequests = allRequests.filter(req => 
-        manageableEmployeeIds.has(req.employeeId)
-      );
+      const filteredRequests = allRequests.filter(req => {
+        // Show if assigned to this manager
+        if (req.assignedTo === user.username) {
+          return true;
+        }
+        // Show if from an employee in their department
+        if (manageableEmployeeIds.has(req.employeeId)) {
+          return true;
+        }
+        return false;
+      });
       setPendingLeaveRequests(filteredRequests);
     } catch (error) {
       console.error('Error loading pending leave requests:', error);
@@ -166,8 +185,29 @@ export default function EmployeeManagement({ route }) {
 
   const loadStatistics = async () => {
     try {
-      const statistics = await getWorkModeStatistics();
-      setStats(statistics);
+      // Calculate statistics from the filtered employees (already filtered by department for managers)
+      const stats = {
+        total: employees.length,
+        inOffice: 0,
+        semiRemote: 0,
+        fullyRemote: 0
+      };
+      
+      employees.forEach(emp => {
+        switch (emp.workMode) {
+          case WORK_MODES.IN_OFFICE:
+            stats.inOffice++;
+            break;
+          case WORK_MODES.SEMI_REMOTE:
+            stats.semiRemote++;
+            break;
+          case WORK_MODES.FULLY_REMOTE:
+            stats.fullyRemote++;
+            break;
+        }
+      });
+      
+      setStats(stats);
     } catch (error) {
       console.error('Error loading statistics:', error);
     }
@@ -243,10 +283,18 @@ export default function EmployeeManagement({ route }) {
     // Check if user can manage this leave request
     const request = pendingLeaveRequests.find(req => req.id === requestId);
     if (request) {
-      const employee = employees.find(emp => emp.id === request.employeeId);
-      if (employee && !canManageEmployee(user, employee)) {
-        Alert.alert('Permission Denied', 'You can only manage leave requests for employees in your department.');
-        return;
+      // Super admins and HR managers can process any request
+      if (user.role === 'super_admin' || isHRManager(user)) {
+        // Allow processing
+      } else if (request.assignedTo === user.username) {
+        // Manager is assigned to this request - allow processing
+      } else {
+        // Check if employee is in manager's department
+        const employee = employees.find(emp => emp.id === request.employeeId);
+        if (employee && !canManageEmployee(user, employee)) {
+          Alert.alert('Permission Denied', 'You can only manage leave requests assigned to you or from employees in your department.');
+          return;
+        }
       }
     }
     try {

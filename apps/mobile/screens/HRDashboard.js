@@ -11,7 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { getAttendanceRecords } from '../utils/storage';
-import { getAllLeaveRequests, getPendingLeaveRequests } from '../utils/leaveManagement';
+import { getAllLeaveRequests, getPendingLeaveRequests, processLeaveRequest } from '../utils/leaveManagement';
 import {
   getAllTickets,
   getTicketsByStatus,
@@ -21,8 +21,11 @@ import {
   getPriorityLabel,
   getPriorityColor,
   getCategoryLabel,
+  CATEGORY_TO_DEPARTMENT_MAP,
+  updateTicketStatus,
+  getTicketById,
 } from '../utils/ticketManagement';
-import { getEmployees } from '../utils/employees';
+import { getEmployees, getManageableEmployees, canManageEmployee, isHRManager } from '../utils/employees';
 import { generateAttendanceReport, generateLeaveReport } from '../utils/export';
 import { ROUTES } from '../shared/constants/routes';
 
@@ -70,10 +73,34 @@ export default function HRDashboard({ navigation, route }) {
 
   const loadOverviewStats = async () => {
     try {
-      const employees = await getEmployees();
+      // Get employees based on user role
+      // HR managers and super admins see all employees
+      const employees = (user.role === 'super_admin' || isHRManager(user))
+        ? await getEmployees() 
+        : await getManageableEmployees(user);
+      
       const attendance = await getAttendanceRecords();
+      
+      // Get pending leave requests (already filtered by role in getPendingLeaveRequests)
       const pending = await getPendingLeaveRequests();
-      const allTickets = await getAllTickets();
+      
+      // Get tickets (filtered by role)
+      let allTickets = await getAllTickets();
+      // HR managers and super admins see all tickets
+      if (user.role !== 'super_admin' && !isHRManager(user)) {
+        // Filter tickets for regular managers (same logic as loadTicketData)
+        const manageableEmployees = await getManageableEmployees(user);
+        const manageableEmployeeUsernames = new Set(manageableEmployees.map(emp => emp.username));
+        const managerDepartment = user.department;
+        
+        allTickets = allTickets.filter(ticket => {
+          if (ticket.assignedTo === user.username) return true;
+          if (manageableEmployeeUsernames.has(ticket.createdBy)) return true;
+          const ticketDepartment = CATEGORY_TO_DEPARTMENT_MAP[ticket.category];
+          if (ticketDepartment && ticketDepartment === managerDepartment) return true;
+          return false;
+        });
+      }
       const openTickets = allTickets.filter(t => t.status === TICKET_STATUS.OPEN || t.status === TICKET_STATUS.IN_PROGRESS);
 
       setStats({
@@ -124,6 +151,34 @@ export default function HRDashboard({ navigation, route }) {
     try {
       let allTicketsData = await getAllTickets();
       
+      // For super admins and HR managers, show all tickets
+      if (user.role !== 'super_admin' && !isHRManager(user)) {
+        // For other managers, show tickets assigned to them OR tickets from their department category
+        const manageableEmployees = await getManageableEmployees(user);
+        const manageableEmployeeUsernames = new Set(manageableEmployees.map(emp => emp.username));
+        
+        // Get manager's department
+        const managerDepartment = user.department;
+        
+        allTicketsData = allTicketsData.filter(ticket => {
+          // Show if assigned to this manager
+          if (ticket.assignedTo === user.username) {
+            return true;
+          }
+          // Show if created by an employee in their department
+          if (manageableEmployeeUsernames.has(ticket.createdBy)) {
+            return true;
+          }
+          // Show if ticket category matches manager's department
+          const ticketDepartment = CATEGORY_TO_DEPARTMENT_MAP[ticket.category];
+          if (ticketDepartment && ticketDepartment === managerDepartment) {
+            return true;
+          }
+          return false;
+        });
+      }
+      
+      // Apply status filter
       if (ticketFilter !== 'all') {
         allTicketsData = allTicketsData.filter(t => t.status === ticketFilter);
       }
@@ -184,6 +239,158 @@ export default function HRDashboard({ navigation, route }) {
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const getLeaveStatusColor = (status) => {
+    switch (status) {
+      case 'approved':
+        return '#10b981'; // green
+      case 'rejected':
+        return '#ef4444'; // red
+      case 'pending':
+        return '#f59e0b'; // amber
+      default:
+        return '#6b7280'; // gray
+    }
+  };
+
+  const handleProcessLeaveRequest = async (requestId, status) => {
+    // Find the request
+    const request = leaveRequests.find(req => req.id === requestId);
+    if (!request) {
+      Alert.alert('Error', 'Leave request not found');
+      return;
+    }
+
+    // Check permissions
+    // HR managers and super admins can manage all leave requests
+    if (user.role !== 'super_admin' && !isHRManager(user)) {
+      // For regular managers, check if they can manage this request
+      let canManage = false;
+      
+      // Check if request is assigned to this manager
+      if (request.assignedTo === user.username) {
+        canManage = true;
+      } else {
+        // Check if employee is in manager's department
+        const employees = await getEmployees();
+        const employee = employees.find(emp => emp.id === request.employeeId);
+        if (employee && canManageEmployee(user, employee)) {
+          canManage = true;
+        }
+      }
+      
+      if (!canManage) {
+        Alert.alert('Permission Denied', 'You can only manage leave requests assigned to you or from employees in your department.');
+        return;
+      }
+    }
+
+    // Confirm action
+    const actionText = status === 'approved' ? 'approve' : 'reject';
+    Alert.alert(
+      `${status === 'approved' ? 'Approve' : 'Reject'} Leave Request`,
+      `Are you sure you want to ${actionText} this leave request?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: status === 'approved' ? 'Approve' : 'Reject',
+          style: status === 'approved' ? 'default' : 'destructive',
+          onPress: async () => {
+            try {
+              const result = await processLeaveRequest(
+                requestId,
+                status,
+                user.username,
+                status === 'approved' ? 'Leave request approved' : 'Leave request rejected'
+              );
+
+              if (result.success) {
+                Alert.alert(
+                  'Success',
+                  `Leave request ${status} successfully`
+                );
+                await loadLeaveData();
+                await loadOverviewStats(); // Refresh stats
+              } else {
+                Alert.alert('Error', result.error || 'Failed to process leave request');
+              }
+            } catch (error) {
+              console.error('Error processing leave request:', error);
+              Alert.alert('Error', 'Failed to process leave request');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleCloseTicket = async (ticketId) => {
+    // Find the ticket
+    const ticket = tickets.find(t => t.id === ticketId);
+    if (!ticket) {
+      Alert.alert('Error', 'Ticket not found');
+      return;
+    }
+
+    // Check permissions
+    // HR managers and super admins can manage all tickets
+    if (user.role !== 'super_admin' && !isHRManager(user)) {
+      // For regular managers, check if they can manage this ticket
+      let canManage = false;
+      
+      // Check if ticket is assigned to this manager
+      if (ticket.assignedTo === user.username) {
+        canManage = true;
+      } else {
+        // Check if ticket category matches manager's department
+        const ticketDepartment = CATEGORY_TO_DEPARTMENT_MAP[ticket.category];
+        if (ticketDepartment && ticketDepartment === user.department) {
+          canManage = true;
+        }
+      }
+      
+      if (!canManage) {
+        Alert.alert('Permission Denied', 'You can only close tickets assigned to you or from your department.');
+        return;
+      }
+    }
+
+    // Confirm action
+    Alert.alert(
+      'Close Ticket',
+      'Are you sure you want to close this ticket?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Close',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const result = await updateTicketStatus(
+                ticketId,
+                TICKET_STATUS.CLOSED,
+                user.username
+              );
+
+              if (result.success) {
+                Alert.alert(
+                  'Success',
+                  'Ticket closed successfully'
+                );
+                await loadTicketData();
+                await loadOverviewStats(); // Refresh stats
+              } else {
+                Alert.alert('Error', result.error || 'Failed to close ticket');
+              }
+            } catch (error) {
+              console.error('Error closing ticket:', error);
+              Alert.alert('Error', 'Failed to close ticket');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const renderOverview = () => (
@@ -583,7 +790,7 @@ export default function HRDashboard({ navigation, route }) {
                 </View>
                 <View
                   style={{
-                    backgroundColor: getStatusColor(item.status) + '20',
+                    backgroundColor: getLeaveStatusColor(item.status) + '20',
                     borderRadius: 12,
                     paddingHorizontal: 12,
                     paddingVertical: 6,
@@ -593,7 +800,7 @@ export default function HRDashboard({ navigation, route }) {
                     style={{
                       fontSize: 12,
                       fontWeight: '600',
-                      color: getStatusColor(item.status),
+                      color: getLeaveStatusColor(item.status),
                       textTransform: 'capitalize',
                     }}
                   >
@@ -601,9 +808,56 @@ export default function HRDashboard({ navigation, route }) {
                   </Text>
                 </View>
               </View>
-              <Text style={{ fontSize: 12, color: colors.textSecondary, textTransform: 'capitalize' }}>
+              <Text style={{ fontSize: 12, color: colors.textSecondary, textTransform: 'capitalize', marginBottom: 8 }}>
                 {item.leaveType} Leave
               </Text>
+              {item.reason && (
+                <Text style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 8, fontStyle: 'italic' }}>
+                  Reason: {item.reason}
+                </Text>
+              )}
+              {item.status === 'pending' && (
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                  <TouchableOpacity
+                    onPress={() => handleProcessLeaveRequest(item.id, 'approved')}
+                    style={{
+                      flex: 1,
+                      backgroundColor: '#10b981',
+                      borderRadius: 8,
+                      paddingVertical: 10,
+                      paddingHorizontal: 16,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Ionicons name="checkmark-circle" size={18} color="#fff" style={{ marginRight: 6 }} />
+                    <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>Approve</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => handleProcessLeaveRequest(item.id, 'rejected')}
+                    style={{
+                      flex: 1,
+                      backgroundColor: '#ef4444',
+                      borderRadius: 8,
+                      paddingVertical: 10,
+                      paddingHorizontal: 16,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Ionicons name="close-circle" size={18} color="#fff" style={{ marginRight: 6 }} />
+                    <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>Reject</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              {item.status !== 'pending' && item.processedBy && (
+                <Text style={{ fontSize: 11, color: colors.textTertiary, marginTop: 8 }}>
+                  {item.status === 'approved' ? 'Approved' : 'Rejected'} by {item.processedBy}
+                  {item.processedAt && ` on ${formatDate(item.processedAt)}`}
+                </Text>
+              )}
             </View>
           )}
           refreshControl={
@@ -731,6 +985,42 @@ export default function HRDashboard({ navigation, route }) {
                       {item.assignedTo}
                     </Text>
                   </>
+                )}
+              </View>
+              {/* Action Buttons */}
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('TicketManagement', { user, ticket: item })}
+                  style={{
+                    flex: 1,
+                    backgroundColor: colors.primary,
+                    borderRadius: 8,
+                    paddingVertical: 10,
+                    paddingHorizontal: 16,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Ionicons name="eye-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
+                  <Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>View Details</Text>
+                </TouchableOpacity>
+                {item.status !== TICKET_STATUS.CLOSED && (
+                  <TouchableOpacity
+                    onPress={() => handleCloseTicket(item.id)}
+                    style={{
+                      backgroundColor: '#6b7280',
+                      borderRadius: 8,
+                      paddingVertical: 10,
+                      paddingHorizontal: 16,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Ionicons name="close-circle-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
+                    <Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>Close</Text>
+                  </TouchableOpacity>
                 )}
               </View>
             </TouchableOpacity>

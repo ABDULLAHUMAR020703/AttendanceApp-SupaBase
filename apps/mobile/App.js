@@ -1,4 +1,9 @@
+// IMPORTANT: Import gesture handler FIRST, before any other imports
+// This ensures proper initialization for React Navigation Drawer with Reanimated 3
+import 'react-native-gesture-handler';
+
 import React, { useEffect } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 // Core providers
 import { AuthProvider } from './core/contexts/AuthContext';
@@ -32,10 +37,12 @@ export default function App() {
   }, []);
 
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <AppNavigator />
-      </AuthProvider>
-    </ThemeProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ThemeProvider>
+        <AuthProvider>
+          <AppNavigator />
+        </AuthProvider>
+      </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }

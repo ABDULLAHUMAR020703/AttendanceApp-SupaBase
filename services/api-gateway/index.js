@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 
 const authRoutes = require('./routes/auth');
+const reportRoutes = require('./routes/reports');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -24,6 +25,7 @@ app.use((req, res, next) => {
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/reports', reportRoutes);
 
 // Health check route
 app.get('/health', (req, res) => {
@@ -41,6 +43,7 @@ app.get('/', (req, res) => {
     version: '1.0.0',
     endpoints: {
       auth: '/api/auth',
+      reports: '/api/reports',
       health: '/health',
     },
   });
@@ -56,6 +59,7 @@ app.listen(PORT, HOST, () => {
   console.log(`[${timestamp}] Health check: http://localhost:${PORT}/health`);
   console.log(`[${timestamp}] For physical devices: http://<your-computer-ip>:${PORT}`);
   console.log(`[${timestamp}] Auth Service URL: ${process.env.AUTH_SERVICE_URL || 'http://localhost:3001'}`);
+  console.log(`[${timestamp}] Reporting Service URL: ${process.env.REPORTING_SERVICE_URL || 'http://localhost:3002'}`);
   console.log(`[${timestamp}] ========================================`);
   console.log(`[${timestamp}] API Gateway ready to receive requests`);
 });

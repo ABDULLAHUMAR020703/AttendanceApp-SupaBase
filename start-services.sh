@@ -1,6 +1,15 @@
 #!/bin/bash
 # Bash script to start all microservices
 # Run this from the project root directory
+#
+# This script:
+# - Checks for required directories
+# - Verifies ports are available
+# - Installs dependencies if needed
+# - Starts API Gateway (port 3000)
+# - Starts Auth Service (port 3001)
+# - Starts Reporting Service (port 3002)
+# - Connects to Supabase (cloud service)
 
 echo "========================================"
 echo "  Starting Microservices"
@@ -8,7 +17,7 @@ echo "========================================"
 echo ""
 
 # Check if we're in the project root
-if [ ! -d "services/api-gateway" ] || [ ! -d "services/auth-service" ]; then
+if [ ! -d "services/api-gateway" ] || [ ! -d "services/auth-service" ] || [ ! -d "services/reporting-service" ]; then
     echo "Error: Please run this script from the project root directory"
     echo "Current directory: $(pwd)"
     exit 1
@@ -37,6 +46,15 @@ fi
 
 if check_port 3001; then
     echo "Warning: Port 3001 is already in use (Auth Service)"
+    read -p "Continue anyway? (y/n) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        exit 1
+    fi
+fi
+
+if check_port 3002; then
+    echo "Warning: Port 3002 is already in use (Reporting Service)"
     read -p "Continue anyway? (y/n) " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -77,6 +95,22 @@ else
     echo "Auth Service dependencies already installed"
 fi
 
+# Check and install dependencies for Reporting Service
+echo "Checking Reporting Service dependencies..."
+if [ ! -d "services/reporting-service/node_modules" ]; then
+    echo "Installing Reporting Service dependencies..."
+    cd services/reporting-service
+    npm install
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to install Reporting Service dependencies"
+        cd ../..
+        exit 1
+    fi
+    cd ../..
+else
+    echo "Reporting Service dependencies already installed"
+fi
+
 echo ""
 echo "========================================"
 echo "  Starting Services"
@@ -103,6 +137,16 @@ cd ../..
 # Wait a bit for Auth Service to start
 sleep 2
 
+# Start Reporting Service in background
+echo "Starting Reporting Service on port 3002..."
+cd services/reporting-service
+npm start > ../reporting-service.log 2>&1 &
+REPORTING_SERVICE_PID=$!
+cd ../..
+
+# Wait a bit for Reporting Service to start
+sleep 2
+
 # Check if services started successfully
 if ! kill -0 $API_GATEWAY_PID 2>/dev/null; then
     echo "Error: API Gateway failed to start. Check services/api-gateway.log"
@@ -115,21 +159,30 @@ if ! kill -0 $AUTH_SERVICE_PID 2>/dev/null; then
     exit 1
 fi
 
+if ! kill -0 $REPORTING_SERVICE_PID 2>/dev/null; then
+    echo "Error: Reporting Service failed to start. Check services/reporting-service.log"
+    kill $API_GATEWAY_PID $AUTH_SERVICE_PID 2>/dev/null
+    exit 1
+fi
+
 echo ""
 echo "========================================"
 echo "  Services Started!"
 echo "========================================"
 echo ""
-echo "API Gateway:  http://localhost:3000"
-echo "Auth Service: http://localhost:3001"
+echo "API Gateway:      http://localhost:3000"
+echo "Auth Service:      http://localhost:3001"
+echo "Reporting Service: http://localhost:3002"
 echo ""
 echo "Health Checks:"
-echo "  - API Gateway:  http://localhost:3000/health"
-echo "  - Auth Service: http://localhost:3001/health"
+echo "  - API Gateway:      http://localhost:3000/health"
+echo "  - Auth Service:      http://localhost:3001/health"
+echo "  - Reporting Service: http://localhost:3002/health"
 echo ""
 echo "Logs:"
-echo "  - API Gateway:  tail -f services/api-gateway.log"
-echo "  - Auth Service: tail -f services/auth-service.log"
+echo "  - API Gateway:      tail -f services/api-gateway.log"
+echo "  - Auth Service:      tail -f services/auth-service.log"
+echo "  - Reporting Service: tail -f services/reporting-service.log"
 echo ""
 echo "Press Ctrl+C to stop all services"
 echo ""
@@ -138,8 +191,8 @@ echo ""
 cleanup() {
     echo ""
     echo "Stopping services..."
-    kill $API_GATEWAY_PID $AUTH_SERVICE_PID 2>/dev/null
-    wait $API_GATEWAY_PID $AUTH_SERVICE_PID 2>/dev/null
+    kill $API_GATEWAY_PID $AUTH_SERVICE_PID $REPORTING_SERVICE_PID 2>/dev/null
+    wait $API_GATEWAY_PID $AUTH_SERVICE_PID $REPORTING_SERVICE_PID 2>/dev/null
     echo "Services stopped."
     exit 0
 }

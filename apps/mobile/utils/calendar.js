@@ -1,7 +1,30 @@
-// Calendar and Events Management Utilities using AsyncStorage
+// Calendar and Events Management Utilities using Supabase (with AsyncStorage fallback)
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '../core/config/supabase';
 
-const CALENDAR_EVENTS_KEY = 'calendar_events';
+const CALENDAR_EVENTS_KEY = 'calendar_events'; // For fallback only
+
+/**
+ * Convert database calendar event format to app format
+ * @param {Object} dbEvent - Event from database
+ * @returns {Object} Event in app format
+ */
+const convertCalendarEventFromDb = (dbEvent) => {
+  return {
+    id: dbEvent.id,
+    title: dbEvent.title,
+    description: dbEvent.description || '',
+    date: dbEvent.date,
+    time: dbEvent.time || '',
+    type: dbEvent.type,
+    color: dbEvent.color || '#3b82f6',
+    createdBy: dbEvent.created_by,
+    createdByUid: dbEvent.created_by_uid,
+    assignedTo: dbEvent.assigned_to || [],
+    createdAt: dbEvent.created_at,
+    updatedAt: dbEvent.updated_at
+  };
+};
 
 /**
  * Create a calendar event (meeting, reminder, etc.)
@@ -55,7 +78,63 @@ export const createCalendarEvent = async (eventData) => {
       };
     }
 
-    // Create event
+    // Get user UID from current Supabase session
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+    const createdByUid = authUser?.id || null;
+
+    // Create event in Supabase
+    const eventDataDb = {
+      title,
+      description: description || null,
+      date,
+      time: time || null,
+      type,
+      color,
+      created_by: createdBy,
+      created_by_uid: createdByUid,
+      assigned_to: assignedTo.length > 0 ? assignedTo : [] // Empty array = visible to all
+    };
+
+    const { data, error } = await supabase
+      .from('calendar_events')
+      .insert(eventDataDb)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating calendar event in Supabase:', error);
+      // Fallback to AsyncStorage
+      return await createCalendarEventFallback(eventData);
+    }
+
+    console.log('✓ Calendar event created in Supabase:', data.id);
+    return {
+      success: true,
+      eventId: data.id
+    };
+  } catch (error) {
+    console.error('Error creating calendar event:', error);
+    // Fallback to AsyncStorage
+    return await createCalendarEventFallback(eventData);
+  }
+};
+
+/**
+ * Fallback: Create calendar event in AsyncStorage
+ */
+const createCalendarEventFallback = async (eventData) => {
+  try {
+    const {
+      title,
+      description = '',
+      date,
+      time = '',
+      type = 'other',
+      createdBy,
+      assignedTo = [],
+      color = '#3b82f6'
+    } = eventData;
+
     const eventId = `event_${Date.now()}_${createdBy}`;
     const event = {
       id: eventId,
@@ -65,26 +144,25 @@ export const createCalendarEvent = async (eventData) => {
       time,
       type,
       createdBy,
-      assignedTo, // Empty array = visible to all employees
+      assignedTo,
       color,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
 
-    // Get all events and add new one
     const eventsJson = await AsyncStorage.getItem(CALENDAR_EVENTS_KEY);
     const allEvents = eventsJson ? JSON.parse(eventsJson) : [];
     allEvents.push(event);
 
     await AsyncStorage.setItem(CALENDAR_EVENTS_KEY, JSON.stringify(allEvents));
 
-    console.log(`Calendar event created: ${eventId}`);
+    console.log('⚠️ Calendar event created in AsyncStorage (fallback):', eventId);
     return {
       success: true,
       eventId: eventId
     };
   } catch (error) {
-    console.error('Error creating calendar event:', error);
+    console.error('Error creating calendar event in AsyncStorage:', error);
     return {
       success: false,
       error: error.message || 'Failed to create calendar event'
@@ -101,27 +179,80 @@ export const createCalendarEvent = async (eventData) => {
  */
 export const getCalendarEvents = async (employeeId = null, startDate = null, endDate = null) => {
   try {
+    // Get current user info for RLS filtering
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    const currentUsername = employeeId || authUser?.user_metadata?.username || null;
+
+    let query = supabase
+      .from('calendar_events')
+      .select('*')
+      .order('date', { ascending: true })
+      .order('time', { ascending: true });
+
+    // Apply date filters
+    if (startDate) {
+      query = query.gte('date', startDate);
+    }
+    if (endDate) {
+      query = query.lte('date', endDate);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error getting calendar events from Supabase:', error);
+      // Fallback to AsyncStorage
+      return await getCalendarEventsFallback(employeeId, startDate, endDate);
+    }
+
+    // Convert to app format
+    let events = data.map(convertCalendarEventFromDb);
+
+    // Filter by employee if provided (RLS handles most of this, but we filter assignedTo here)
+    if (currentUsername) {
+      events = events.filter(event => {
+        // Show event if:
+        // 1. Assigned to all (empty assignedTo array)
+        // 2. Assigned to this employee specifically
+        // 3. Created by this employee
+        return (
+          (!event.assignedTo || event.assignedTo.length === 0) ||
+          event.assignedTo.includes(currentUsername) ||
+          event.assignedTo.includes(employeeId) ||
+          event.createdBy === currentUsername ||
+          event.createdBy === employeeId
+        );
+      });
+    }
+
+    return events;
+  } catch (error) {
+    console.error('Error getting calendar events:', error);
+    // Fallback to AsyncStorage
+    return await getCalendarEventsFallback(employeeId, startDate, endDate);
+  }
+};
+
+/**
+ * Fallback: Get calendar events from AsyncStorage
+ */
+const getCalendarEventsFallback = async (employeeId = null, startDate = null, endDate = null) => {
+  try {
     const eventsJson = await AsyncStorage.getItem(CALENDAR_EVENTS_KEY);
     const allEvents = eventsJson ? JSON.parse(eventsJson) : [];
 
-    // Filter events based on employee
     let filteredEvents = allEvents;
     
     if (employeeId) {
       filteredEvents = allEvents.filter(event => {
-        // Show event if:
-        // 1. Assigned to this employee specifically
-        // 2. Assigned to all (empty assignedTo array)
-        // 3. Created by this employee
         return (
-          event.assignedTo.length === 0 || // Visible to all
+          (!event.assignedTo || event.assignedTo.length === 0) ||
           event.assignedTo.includes(employeeId) ||
           event.createdBy === employeeId
         );
       });
     }
 
-    // Filter by date range if provided
     if (startDate || endDate) {
       filteredEvents = filteredEvents.filter(event => {
         const eventDate = event.date;
@@ -131,7 +262,6 @@ export const getCalendarEvents = async (employeeId = null, startDate = null, end
       });
     }
 
-    // Sort by date and time
     filteredEvents.sort((a, b) => {
       const dateCompare = a.date.localeCompare(b.date);
       if (dateCompare !== 0) return dateCompare;
@@ -140,7 +270,7 @@ export const getCalendarEvents = async (employeeId = null, startDate = null, end
 
     return filteredEvents;
   } catch (error) {
-    console.error('Error getting calendar events:', error);
+    console.error('Error getting calendar events from AsyncStorage:', error);
     return [];
   }
 };
@@ -169,6 +299,45 @@ export const getEventsByDate = async (date, employeeId = null) => {
  */
 export const updateCalendarEvent = async (eventId, updates) => {
   try {
+    const updateData = {
+      ...updates,
+      updated_at: new Date().toISOString()
+    };
+
+    // Convert app format to db format
+    if (updates.createdBy) updateData.created_by = updates.createdBy;
+    if (updates.assignedTo) updateData.assigned_to = updates.assignedTo;
+    if (updates.createdAt) updateData.created_at = updates.createdAt;
+    
+    // Remove app-format fields
+    delete updateData.createdBy;
+    delete updateData.createdAt;
+    delete updateData.updatedAt;
+
+    const { error } = await supabase
+      .from('calendar_events')
+      .update(updateData)
+      .eq('id', eventId);
+
+    if (error) {
+      console.error('Error updating calendar event in Supabase:', error);
+      // Fallback to AsyncStorage
+      return await updateCalendarEventFallback(eventId, updates);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating calendar event:', error);
+    // Fallback to AsyncStorage
+    return await updateCalendarEventFallback(eventId, updates);
+  }
+};
+
+/**
+ * Fallback: Update calendar event in AsyncStorage
+ */
+const updateCalendarEventFallback = async (eventId, updates) => {
+  try {
     const eventsJson = await AsyncStorage.getItem(CALENDAR_EVENTS_KEY);
     const allEvents = eventsJson ? JSON.parse(eventsJson) : [];
 
@@ -180,7 +349,6 @@ export const updateCalendarEvent = async (eventId, updates) => {
       };
     }
 
-    // Update event
     allEvents[eventIndex] = {
       ...allEvents[eventIndex],
       ...updates,
@@ -191,7 +359,7 @@ export const updateCalendarEvent = async (eventId, updates) => {
 
     return { success: true };
   } catch (error) {
-    console.error('Error updating calendar event:', error);
+    console.error('Error updating calendar event in AsyncStorage:', error);
     return {
       success: false,
       error: error.message || 'Failed to update calendar event'
@@ -207,6 +375,31 @@ export const updateCalendarEvent = async (eventId, updates) => {
  */
 export const deleteCalendarEvent = async (eventId, deletedBy) => {
   try {
+    const { error } = await supabase
+      .from('calendar_events')
+      .delete()
+      .eq('id', eventId);
+
+    if (error) {
+      console.error('Error deleting calendar event from Supabase:', error);
+      // Fallback to AsyncStorage
+      return await deleteCalendarEventFallback(eventId, deletedBy);
+    }
+
+    console.log(`✓ Calendar event deleted from Supabase: ${eventId} by ${deletedBy}`);
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting calendar event:', error);
+    // Fallback to AsyncStorage
+    return await deleteCalendarEventFallback(eventId, deletedBy);
+  }
+};
+
+/**
+ * Fallback: Delete calendar event from AsyncStorage
+ */
+const deleteCalendarEventFallback = async (eventId, deletedBy) => {
+  try {
     const eventsJson = await AsyncStorage.getItem(CALENDAR_EVENTS_KEY);
     const allEvents = eventsJson ? JSON.parse(eventsJson) : [];
 
@@ -218,20 +411,14 @@ export const deleteCalendarEvent = async (eventId, deletedBy) => {
       };
     }
 
-    // Check if user has permission to delete (creator or admin)
-    const event = allEvents[eventIndex];
-    // Note: In a real app, you'd check if deletedBy is admin or creator
-    // For now, we'll allow deletion if user is the creator
-
-    // Remove event
     allEvents.splice(eventIndex, 1);
 
     await AsyncStorage.setItem(CALENDAR_EVENTS_KEY, JSON.stringify(allEvents));
 
-    console.log(`Calendar event deleted: ${eventId} by ${deletedBy}`);
+    console.log(`⚠️ Calendar event deleted from AsyncStorage (fallback): ${eventId} by ${deletedBy}`);
     return { success: true };
   } catch (error) {
-    console.error('Error deleting calendar event:', error);
+    console.error('Error deleting calendar event from AsyncStorage:', error);
     return {
       success: false,
       error: error.message || 'Failed to delete calendar event'
@@ -246,12 +433,37 @@ export const deleteCalendarEvent = async (eventId, deletedBy) => {
  */
 export const getEventById = async (eventId) => {
   try {
+    const { data, error } = await supabase
+      .from('calendar_events')
+      .select('*')
+      .eq('id', eventId)
+      .single();
+
+    if (error) {
+      console.error('Error getting event by ID from Supabase:', error);
+      // Fallback to AsyncStorage
+      return await getEventByIdFallback(eventId);
+    }
+
+    return data ? convertCalendarEventFromDb(data) : null;
+  } catch (error) {
+    console.error('Error getting event by ID:', error);
+    // Fallback to AsyncStorage
+    return await getEventByIdFallback(eventId);
+  }
+};
+
+/**
+ * Fallback: Get event by ID from AsyncStorage
+ */
+const getEventByIdFallback = async (eventId) => {
+  try {
     const eventsJson = await AsyncStorage.getItem(CALENDAR_EVENTS_KEY);
     const allEvents = eventsJson ? JSON.parse(eventsJson) : [];
 
     return allEvents.find(event => event.id === eventId) || null;
   } catch (error) {
-    console.error('Error getting event by ID:', error);
+    console.error('Error getting event by ID from AsyncStorage:', error);
     return null;
   }
 };
@@ -326,4 +538,3 @@ export const getEventTypeLabel = (type) => {
   };
   return labels[type] || labels.other;
 };
-

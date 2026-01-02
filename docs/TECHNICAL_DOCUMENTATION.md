@@ -24,7 +24,7 @@
 
 ## Overview
 
-**Present** is a comprehensive employee attendance management system built with modern web technologies. The application follows a microservices architecture with a React Native mobile frontend and Node.js backend services.
+**Hadir.AI** is a comprehensive employee attendance management system built with modern web technologies. The application follows a microservices architecture with a React Native mobile frontend and Node.js backend services.
 
 ### Key Technical Highlights
 
@@ -340,7 +340,7 @@ AppNavigator
 - **Context API**: Global state (auth, theme)
 - **Local State**: Component-level state (useState)
 - **AsyncStorage**: Persistent local storage
-- **Firebase**: Cloud state synchronization
+- **Supabase**: Cloud state synchronization (Auth + PostgreSQL)
 
 ---
 
@@ -349,7 +349,7 @@ AppNavigator
 ### Service Communication
 
 ```
-Client → API Gateway → Microservice → Firebase
+Client → API Gateway → Microservice → Supabase
          (Port 3000)   (Port 3001+)
 ```
 
@@ -358,7 +358,7 @@ Client → API Gateway → Microservice → Firebase
 1. **Client Request**: Mobile app sends HTTP request to API Gateway
 2. **Routing**: API Gateway routes to appropriate service
 3. **Processing**: Service processes request
-4. **Database**: Service queries/updates Firebase
+4. **Database**: Service queries/updates Supabase PostgreSQL
 5. **Response**: Service returns response to API Gateway
 6. **Client Response**: API Gateway returns response to client
 
@@ -413,6 +413,11 @@ CREATE TABLE users (
 - Backend uses Service Role Key (bypasses RLS)
 - Frontend uses Anon Key (respects RLS policies)
 
+**Important Notes:**
+- **UID Field**: The `uid` column must match the Supabase Auth User ID (`auth.uid()`)
+- If `uid` values don't match, the system falls back to email-based lookup
+- See `migrations/UPDATE_UID_TO_MATCH_AUTH.md` for instructions on updating UIDs
+
 ### AsyncStorage (Local)
 
 **Storage Keys:**
@@ -441,9 +446,13 @@ CREATE TABLE users (
    - Supports both username and email login
 
 2. **Biometric Authentication**
-   - Face ID (iOS & Android)
-   - Fingerprint (Android)
-   - Device-native security
+   - **Face ID** (iOS): Native device face recognition, automatically used on iOS devices
+   - **Fingerprint** (Android): Fingerprint scanner support, automatically used on Android devices
+   - Device-native security with platform-specific implementation
+   - Available for login after initial password authentication with "Remember Me"
+   - Uses `expo-local-authentication` library
+   - Automatic fallback to password if biometric fails
+   - Platform detection: iOS uses Face ID/Touch ID, Android uses Fingerprint
 
 ### Security Implementation
 
@@ -525,7 +534,7 @@ Response (Success):
 {
   "success": true,
   "user": {
-    "uid": "firebase_uid",
+    "uid": "supabase_auth_uid",
     "username": "testuser",
     "email": "testuser@company.com",
     "name": "Test User",
@@ -585,7 +594,7 @@ Response:
 - npm or yarn
 - Expo CLI (`npm install -g expo-cli`)
 - iOS Simulator (for iOS) or Android Emulator (for Android)
-- Firebase project with Authentication and Firestore enabled
+- Supabase project with Authentication and PostgreSQL enabled
 
 ### Installation Steps
 
@@ -694,13 +703,48 @@ Response:
 
 ### Mobile App Build
 
-#### Android Build
+#### EAS Build (Recommended for Production)
+
+**Prerequisites:**
+1. Install EAS CLI: `npm install -g eas-cli`
+2. Login: `eas login`
+3. Set environment variables as secrets:
+   ```bash
+   cd apps/mobile
+   eas env:create --name EXPO_PUBLIC_SUPABASE_URL --value "https://your-project.supabase.co" --scope project
+   eas env:create --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value "your-anon-key" --scope project
+   ```
+
+**Build Commands:**
+```bash
+cd apps/mobile
+
+# Preview build (APK)
+eas build -p android --profile preview
+
+# Production build (APK/AAB)
+eas build -p android --profile production
+
+# iOS build
+eas build -p ios --profile production
+```
+
+**Build Profiles:**
+- `development`: Development client
+- `preview`: Internal testing APK
+- `production`: Production APK/AAB
+
+For detailed setup, see `apps/mobile/EAS_BUILD_SETUP.md`.
+
+#### Local Build (Alternative)
+
+**Android Build:**
 ```bash
 cd apps/mobile
 npm run android:build
 ```
 
-#### iOS Build
+**iOS Build:**
 ```bash
 cd apps/mobile
 npm run ios:build
@@ -726,12 +770,16 @@ pm2 start index.js --name auth-service
 
 ### Production Considerations
 
-1. **Environment Variables**: Use secure environment variable management
-2. **Service Account**: Secure Firebase service account credentials
+1. **Environment Variables**: 
+   - Use EAS secrets for mobile app builds (`eas env:create`)
+   - Use secure `.env` files for backend services (never commit)
+   - Never expose Service Role Key in client code
+2. **Service Role Key**: Secure Supabase service role key (backend only)
 3. **HTTPS**: Use HTTPS for all API endpoints
 4. **Monitoring**: Set up logging and monitoring
 5. **Scaling**: Use load balancers for multiple instances
-6. **Database**: Configure Firestore indexes for production queries
+6. **Database**: Configure PostgreSQL indexes for production queries
+7. **Row Level Security**: Enable RLS policies in Supabase for data protection
 
 ---
 
@@ -803,7 +851,7 @@ pm2 start index.js --name auth-service
 #### Integration Tests
 - Test API endpoints
 - Test service communication
-- Test Firebase integration
+- Test Supabase integration
 
 #### E2E Tests
 - Test complete user flows
@@ -868,7 +916,7 @@ npm test
 
 ### Data Security
 
-1. **Password Hashing**: Firebase handles password hashing
+1. **Password Hashing**: Supabase handles password hashing
 2. **Encryption**: Encrypt sensitive data at rest
 3. **Secure Storage**: Use secure storage for tokens
 4. **Data Validation**: Validate data before storage

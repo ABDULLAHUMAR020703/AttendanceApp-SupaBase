@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { responsiveFont, spacing } from '../utils/responsive';
-import { useTheme } from '../contexts/ThemeContext';
+import { responsiveFont, spacing } from '../../utils/responsive';
+import { useTheme } from '../../core/contexts/ThemeContext';
 
 export default function Trademark({ position = 'bottom', style }) {
   const { colors } = useTheme();

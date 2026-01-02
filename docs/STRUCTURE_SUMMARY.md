@@ -76,7 +76,7 @@ AttendanceApp/
 
 ### ✅ Completed
 - **Core Infrastructure**: Fully implemented
-  - ✅ `core/config/` - Firebase configuration
+  - ✅ `core/config/` - Supabase configuration
   - ✅ `core/contexts/` - Auth and Theme contexts
   - ✅ `core/navigation/` - App, Auth, and Main navigators
   - ✅ `core/services/` - Storage abstraction layer

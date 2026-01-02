@@ -7,7 +7,7 @@ import { View, ActivityIndicator } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import AuthNavigator from './AuthNavigator';
-import MainNavigator from './MainNavigator';
+import DrawerNavigator from './DrawerNavigator';
 
 const Stack = createStackNavigator();
 
@@ -26,7 +26,7 @@ export default function AppNavigator() {
   return (
     <NavigationContainer>
       <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
-      {!user ? <AuthNavigator /> : <MainNavigator user={user} />}
+      {!user ? <AuthNavigator /> : <DrawerNavigator user={user} />}
     </NavigationContainer>
   );
 }

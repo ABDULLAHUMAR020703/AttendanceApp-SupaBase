@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Image, StyleSheet, Text } from 'react-native';
-import { wp } from '../utils/responsive';
+import { wp } from '../../utils/responsive';
 
 export default function Logo({ size = 'medium', style }) {
   const sizes = {
@@ -14,7 +14,7 @@ export default function Logo({ size = 'medium', style }) {
   return (
     <View style={[styles.container, style]}>
       <Image
-        source={require('../assets/logo.png')}
+        source={require('../../assets/logo.png')}
         style={[
           styles.logoImage,
           {

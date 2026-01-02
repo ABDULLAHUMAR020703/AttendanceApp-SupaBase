@@ -124,12 +124,12 @@ AttendanceApp/
 │   └── DatePickerCalendar.js      # Calendar component (legacy - use features/calendar)
 │
 ├── scripts/                        # Build and deployment scripts
-│   └── migrate-users-to-firebase.mjs
+│   └── create-users-supabase.js
 │
 ├── docs/                           # Documentation
 │   ├── MODULAR_ARCHITECTURE.md
 │   ├── SYSTEM_ARCHITECTURE.md
-│   └── FIREBASE_SETUP.md
+│   └── EAS_BUILD_SETUP.md
 │
 └── .github/                        # GitHub workflows (CI/CD)
     └── workflows/
@@ -170,7 +170,7 @@ Each feature is self-contained with:
 
 ### ✅ Completed
 - **Core Infrastructure**: `core/` directory fully implemented
-  - ✅ Firebase configuration (`core/config/firebase.js`)
+  - ✅ Supabase configuration (`core/config/supabase.js`)
   - ✅ Context providers (`core/contexts/AuthContext.js`, `ThemeContext.js`)
   - ✅ Navigation setup (`core/navigation/`)
   - ✅ Storage service (`core/services/storage.js`)

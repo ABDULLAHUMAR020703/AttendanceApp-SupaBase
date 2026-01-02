@@ -1,5 +1,6 @@
 // Employee management utilities
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '../core/config/supabase';
 import { WORK_MODES } from './workModes';
 
 const EMPLOYEES_KEY = 'company_employees';
@@ -103,19 +104,6 @@ export const initializeDefaultEmployees = async () => {
           department: 'Engineering',
           position: 'DevOps Engineer',
           hireDate: '2022-11-05',
-          isActive: true,
-          createdAt: new Date().toISOString()
-        },
-        {
-          id: 'emp_008',
-          username: 'emily.davis',
-          name: 'Emily Davis',
-          email: 'emily.davis@company.com',
-          role: 'employee',
-          workMode: WORK_MODES.IN_OFFICE,
-          department: 'HR',
-          position: 'HR Coordinator',
-          hireDate: '2023-04-12',
           isActive: true,
           createdAt: new Date().toISOString()
         },
@@ -239,8 +227,45 @@ export const getEmployees = async () => {
  */
 export const getEmployeeByUsername = async (username) => {
   try {
+    // First, try to get from Supabase (source of truth)
+    try {
+      const { data: user, error } = await supabase
+        .from('users')
+        .select('uid, username, email, name, role, department, position, work_mode, hire_date, is_active')
+        .eq('username', username)
+        .eq('is_active', true)
+        .maybeSingle();
+      
+      if (!error && user) {
+        // Convert Supabase format to app format
+        const formattedEmployee = {
+          id: `emp_${user.uid}`,
+          uid: user.uid,
+          username: user.username,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          department: user.department,
+          position: user.position,
+          workMode: user.work_mode,
+          hireDate: user.hire_date,
+          isActive: user.is_active
+        };
+        
+        console.log(`✓ Found employee ${username} from Supabase (Department: ${user.department})`);
+        return formattedEmployee;
+      }
+    } catch (supabaseError) {
+      console.log('Could not get employee from Supabase, falling back to AsyncStorage:', supabaseError.message);
+    }
+    
+    // Fallback to AsyncStorage
     const employees = await getEmployees();
-    return employees.find(emp => emp.username === username) || null;
+    const employee = employees.find(emp => emp.username === username) || null;
+    if (employee) {
+      console.log(`✓ Found employee ${username} from AsyncStorage (Department: ${employee.department || 'N/A'})`);
+    }
+    return employee;
   } catch (error) {
     console.error('Error getting employee by username:', error);
     return null;
@@ -249,13 +274,72 @@ export const getEmployeeByUsername = async (username) => {
 
 /**
  * Get employee by ID
- * @param {string} employeeId - Employee ID to search for
+ * @param {string} employeeId - Employee ID to search for (can be 'emp_xxx' or just 'xxx' or UID)
  * @returns {Promise<Object|null>} Employee object or null
  */
 export const getEmployeeById = async (employeeId) => {
   try {
+    // Extract UID from employeeId (handle formats like 'emp_xxx' or just 'xxx' or full UID)
+    let uid = employeeId;
+    if (employeeId.startsWith('emp_')) {
+      uid = employeeId.replace('emp_', '');
+    }
+    
+    // First, try to get from Supabase (source of truth)
+    try {
+      // Try querying by UID (without 'emp_' prefix)
+      let { data: user, error } = await supabase
+        .from('users')
+        .select('uid, username, email, name, role, department, position, work_mode, hire_date, is_active')
+        .eq('uid', uid)
+        .eq('is_active', true)
+        .maybeSingle();
+      
+      // If not found, try the original employeeId (in case it's already a UID)
+      if (error || !user) {
+        const { data: user2, error: error2 } = await supabase
+          .from('users')
+          .select('uid, username, email, name, role, department, position, work_mode, hire_date, is_active')
+          .eq('uid', employeeId)
+          .eq('is_active', true)
+          .maybeSingle();
+        
+        if (!error2 && user2) {
+          user = user2;
+          error = null;
+        }
+      }
+      
+      if (!error && user) {
+        // Convert Supabase format to app format
+        const formattedEmployee = {
+          id: `emp_${user.uid}`,
+          uid: user.uid,
+          username: user.username,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          department: user.department,
+          position: user.position,
+          workMode: user.work_mode,
+          hireDate: user.hire_date,
+          isActive: user.is_active
+        };
+        
+        console.log(`✓ Found employee by ID ${employeeId} from Supabase (Username: ${user.username}, Department: ${user.department})`);
+        return formattedEmployee;
+      }
+    } catch (supabaseError) {
+      console.log('Could not get employee from Supabase, falling back to AsyncStorage:', supabaseError.message);
+    }
+    
+    // Fallback to AsyncStorage
     const employees = await getEmployees();
-    return employees.find(emp => emp.id === employeeId) || null;
+    const employee = employees.find(emp => emp.id === employeeId || emp.uid === uid) || null;
+    if (employee) {
+      console.log(`✓ Found employee by ID ${employeeId} from AsyncStorage (Username: ${employee.username}, Department: ${employee.department || 'N/A'})`);
+    }
+    return employee;
   } catch (error) {
     console.error('Error getting employee by ID:', error);
     return null;
@@ -284,6 +368,38 @@ export const getAdminUsers = async () => {
  */
 export const getSuperAdminUsers = async () => {
   try {
+    // First, try to get from Supabase (source of truth)
+    try {
+      const { data: superAdmins, error } = await supabase
+        .from('users')
+        .select('uid, username, email, name, role, department, position, work_mode, hire_date, is_active')
+        .eq('role', 'super_admin')
+        .eq('is_active', true);
+      
+      if (!error && superAdmins && superAdmins.length > 0) {
+        // Convert Supabase format to app format
+        const formattedAdmins = superAdmins.map(admin => ({
+          id: `emp_${admin.uid}`,
+          uid: admin.uid,
+          username: admin.username,
+          name: admin.name,
+          email: admin.email,
+          role: admin.role,
+          department: admin.department,
+          position: admin.position,
+          workMode: admin.work_mode,
+          hireDate: admin.hire_date,
+          isActive: admin.is_active
+        }));
+        
+        console.log(`✓ Found ${formattedAdmins.length} super_admin(s) from Supabase`);
+        return formattedAdmins;
+      }
+    } catch (supabaseError) {
+      console.log('Could not get super_admins from Supabase, falling back to AsyncStorage:', supabaseError.message);
+    }
+    
+    // Fallback to AsyncStorage
     const employees = await getEmployees();
     return employees.filter(emp => emp.role === 'super_admin' && emp.isActive);
   } catch (error) {
@@ -299,16 +415,66 @@ export const getSuperAdminUsers = async () => {
  */
 export const getManagersByDepartment = async (department) => {
   try {
+    // First, try to get from Supabase (source of truth)
+    try {
+      const { data: managers, error } = await supabase
+        .from('users')
+        .select('uid, username, email, name, role, department, position, work_mode, hire_date, is_active')
+        .eq('role', 'manager')
+        .eq('department', department)
+        .eq('is_active', true);
+      
+      if (!error && managers && managers.length > 0) {
+        // Convert Supabase format to app format
+        const formattedManagers = managers.map(manager => ({
+          id: `emp_${manager.uid}`,
+          uid: manager.uid,
+          username: manager.username,
+          name: manager.name,
+          email: manager.email,
+          role: manager.role,
+          department: manager.department,
+          position: manager.position,
+          workMode: manager.work_mode,
+          hireDate: manager.hire_date,
+          isActive: manager.is_active
+        }));
+        
+        console.log(`✓ Found ${formattedManagers.length} manager(s) in ${department} from Supabase`);
+        return formattedManagers;
+      }
+    } catch (supabaseError) {
+      console.log('Could not get managers from Supabase, falling back to AsyncStorage:', supabaseError.message);
+    }
+    
+    // Fallback to AsyncStorage
     const employees = await getEmployees();
-    return employees.filter(emp => 
+    const managers = employees.filter(emp => 
       emp.role === 'manager' && 
       emp.department === department && 
       emp.isActive
     );
+    
+    if (managers.length > 0) {
+      console.log(`✓ Found ${managers.length} manager(s) in ${department} from AsyncStorage`);
+    } else {
+      console.warn(`⚠️ No managers found for department: ${department}`);
+    }
+    
+    return managers;
   } catch (error) {
     console.error('Error getting managers by department:', error);
     return [];
   }
+};
+
+/**
+ * Check if user is HR manager (special privileges)
+ * @param {Object} user - User object with role and department
+ * @returns {boolean} Whether user is HR manager
+ */
+export const isHRManager = (user) => {
+  return user && user.role === 'manager' && user.department === 'HR';
 };
 
 /**
@@ -318,11 +484,69 @@ export const getManagersByDepartment = async (department) => {
  */
 export const getManageableEmployees = async (user) => {
   try {
+    // First, try to get from Supabase (source of truth)
+    try {
+      let query = supabase
+        .from('users')
+        .select('uid, username, email, name, role, department, position, work_mode, hire_date, is_active')
+        .eq('is_active', true);
+      
+      // Super admins can manage everyone (except other super admins)
+      if (user.role === 'super_admin') {
+        query = query.neq('role', 'super_admin');
+      } 
+      // HR managers can manage all employees (except super admins)
+      else if (isHRManager(user)) {
+        query = query.neq('role', 'super_admin');
+      }
+      // Managers can only manage employees in their department
+      else if (user.role === 'manager') {
+        query = query
+          .eq('department', user.department)
+          .neq('role', 'super_admin')
+          .neq('role', 'manager'); // Managers can't manage other managers
+      } 
+      // Employees and regular admins can't manage anyone
+      else {
+        return [];
+      }
+      
+      const { data: employees, error } = await query;
+      
+      if (!error && employees && employees.length > 0) {
+        // Convert Supabase format to app format
+        const formattedEmployees = employees.map(emp => ({
+          id: `emp_${emp.uid}`,
+          uid: emp.uid,
+          username: emp.username,
+          name: emp.name,
+          email: emp.email,
+          role: emp.role,
+          department: emp.department,
+          position: emp.position,
+          workMode: emp.work_mode,
+          hireDate: emp.hire_date,
+          isActive: emp.is_active
+        }));
+        
+        console.log(`✓ Found ${formattedEmployees.length} manageable employee(s) from Supabase for ${user.username} (${user.role}, ${user.department})`);
+        return formattedEmployees;
+      }
+    } catch (supabaseError) {
+      console.log('Could not get employees from Supabase, falling back to AsyncStorage:', supabaseError.message);
+    }
+    
+    // Fallback to AsyncStorage
     const employees = await getEmployees();
     
     // Super admins can manage everyone
     if (user.role === 'super_admin') {
-      return employees.filter(emp => emp.isActive);
+      return employees.filter(emp => emp.isActive && emp.role !== 'super_admin');
+    }
+    
+    // HR managers can manage all employees (except super admins)
+    if (isHRManager(user)) {
+      return employees.filter(emp => emp.isActive && emp.role !== 'super_admin');
     }
     
     // Managers can only manage employees in their department
@@ -330,7 +554,8 @@ export const getManageableEmployees = async (user) => {
       return employees.filter(emp => 
         emp.isActive && 
         emp.department === user.department &&
-        emp.role !== 'super_admin' // Managers can't manage super admins
+        emp.role !== 'super_admin' &&
+        emp.role !== 'manager' // Managers can't manage other managers
       );
     }
     
@@ -356,7 +581,12 @@ export const canManageEmployee = (user, employee) => {
     return true;
   }
   
-  // Managers can only manage employees in their department
+  // HR managers can manage all employees (special case)
+  if (user.role === 'manager' && user.department === 'HR') {
+    return employee.role !== 'super_admin';
+  }
+  
+  // Other managers can only manage employees in their department
   if (user.role === 'manager') {
     return employee.department === user.department && employee.role !== 'super_admin';
   }

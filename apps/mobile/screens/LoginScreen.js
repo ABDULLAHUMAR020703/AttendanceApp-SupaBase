@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,12 @@ import { authenticateUser } from '../utils/auth';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { fontSize, spacing, iconSize, componentSize, responsivePadding, responsiveFont, wp } from '../utils/responsive';
+import { saveCredentials, loadCredentials, clearCredentials } from '../utils/credentialsStorage';
+import { 
+  checkBiometricAvailability, 
+  authenticateWithBiometric, 
+  getBiometricTypeName 
+} from '../utils/biometricAuth';
 import Logo from '../components/Logo';
 import Trademark from '../components/Trademark';
 
@@ -26,20 +32,64 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricType, setBiometricType] = useState('');
+  const [hasSavedCredentials, setHasSavedCredentials] = useState(false);
 
-  const handleLogin = async () => {
-    if (!username.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please enter both username and password');
-      return;
-    }
+  // Load saved credentials and check biometric availability on mount
+  useEffect(() => {
+    const initializeLogin = async () => {
+      try {
+        // Load saved credentials
+        const saved = await loadCredentials();
+        if (saved.rememberMe && saved.username) {
+          setUsername(saved.username);
+          setRememberMe(true);
+          setHasSavedCredentials(true);
+          // Optionally load password if saved
+          if (saved.password) {
+            setPassword(saved.password);
+          }
+        } else {
+          setHasSavedCredentials(false);
+        }
 
+        // Check biometric availability
+        const biometricCheck = await checkBiometricAvailability();
+        if (biometricCheck.available) {
+          setBiometricAvailable(true);
+          const typeName = getBiometricTypeName(biometricCheck.types);
+          setBiometricType(typeName);
+          console.log(`✓ Biometric available: ${typeName}`);
+        } else {
+          setBiometricAvailable(false);
+          console.log('Biometric not available:', biometricCheck.error);
+        }
+      } catch (error) {
+        console.error('Error initializing login:', error);
+      }
+    };
+    initializeLogin();
+  }, []);
+
+  const performLogin = async (usernameToUse, passwordToUse) => {
     setIsLoading(true);
     try {
-      console.log('Attempting login for:', username.trim());
-      const result = await authenticateUser(username.trim(), password);
+      console.log('Attempting login for:', usernameToUse.trim());
+      const result = await authenticateUser(usernameToUse.trim(), passwordToUse);
       console.log('Authentication result:', result);
       
       if (result.success) {
+        // Save or clear credentials based on Remember Me checkbox
+        if (rememberMe) {
+          await saveCredentials(usernameToUse.trim(), passwordToUse);
+          setHasSavedCredentials(true);
+        } else {
+          await clearCredentials();
+          setHasSavedCredentials(false);
+        }
+
         // Ensure employees are initialized first
         const { initializeDefaultEmployees, getEmployeeByUsername } = await import('../utils/employees');
         await initializeDefaultEmployees();
@@ -81,6 +131,56 @@ export default function LoginScreen() {
     }
   };
 
+  const handleLogin = async () => {
+    if (!username.trim() || !password.trim()) {
+      Alert.alert('Error', 'Please enter both username and password');
+      return;
+    }
+
+    await performLogin(username, password);
+  };
+
+  const handleBiometricLogin = async () => {
+    if (!hasSavedCredentials) {
+      Alert.alert('No Saved Credentials', 'Please login with username and password first, and enable "Remember Me" to use biometric login.');
+      return;
+    }
+
+    if (!biometricAvailable) {
+      Alert.alert('Biometric Not Available', 'Biometric authentication is not available on this device. Please use username and password to login.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // First, authenticate with biometric
+      const biometricResult = await authenticateWithBiometric(
+        `Authenticate with ${biometricType} to login`
+      );
+
+      if (!biometricResult.success) {
+        Alert.alert('Biometric Authentication Failed', biometricResult.error || 'Please try again');
+        setIsLoading(false);
+        return;
+      }
+
+      // Biometric authentication successful, now login with saved credentials
+      const saved = await loadCredentials();
+      if (!saved.username || !saved.password) {
+        Alert.alert('Error', 'Saved credentials not found. Please login with username and password.');
+        setIsLoading(false);
+        return;
+      }
+
+      console.log('Biometric authentication successful, proceeding with login...');
+      await performLogin(saved.username, saved.password);
+    } catch (error) {
+      console.error('Biometric login error:', error);
+      Alert.alert('Error', `Biometric login failed: ${error.message || 'Unknown error'}`);
+      setIsLoading(false);
+    }
+  };
+
   return (
     <KeyboardAvoidingView 
       className="flex-1"
@@ -100,7 +200,7 @@ export default function LoginScreen() {
             className="items-center"
             style={{ marginBottom: spacing['3xl'] }}
           >
-            <Logo size="large" style={{ marginBottom: spacing.md }} />
+            <Logo size="medium" style={{ marginBottom: spacing.lg }} />
             <Text 
               className="font-bold"
               style={{ 
@@ -109,7 +209,7 @@ export default function LoginScreen() {
                 marginBottom: spacing.xs,
               }}
             >
-              Present
+              Hadir.AI
             </Text>
             <Text 
               className="text-center"
@@ -224,6 +324,50 @@ export default function LoginScreen() {
               </View>
             </View>
 
+            {/* Remember Me Checkbox */}
+            <View 
+              style={{ 
+                flexDirection: 'row', 
+                alignItems: 'center', 
+                marginBottom: spacing.md 
+              }}
+            >
+              <TouchableOpacity
+                onPress={() => setRememberMe(!rememberMe)}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                }}
+                activeOpacity={0.7}
+              >
+                <View
+                  style={{
+                    width: 20,
+                    height: 20,
+                    borderRadius: 4,
+                    borderWidth: 2,
+                    borderColor: rememberMe ? colors.primary : '#9ca3af',
+                    backgroundColor: rememberMe ? colors.primary : 'transparent',
+                    marginRight: spacing.sm,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}
+                >
+                  {rememberMe && (
+                    <Ionicons name="checkmark" size={14} color="white" />
+                  )}
+                </View>
+                <Text
+                  style={{
+                    color: colors.text,
+                    fontSize: responsiveFont(14),
+                  }}
+                >
+                  Remember Me
+                </Text>
+              </TouchableOpacity>
+            </View>
+
             {/* Login Button */}
             <TouchableOpacity
               style={{
@@ -231,7 +375,7 @@ export default function LoginScreen() {
                 borderRadius: 12,
                 paddingVertical: componentSize.buttonHeight / 2,
                 alignItems: 'center',
-                marginBottom: spacing.base,
+                marginBottom: spacing.md,
                 opacity: isLoading ? 0.5 : 1,
                 minHeight: componentSize.buttonHeight,
                 justifyContent: 'center',
@@ -262,48 +406,43 @@ export default function LoginScreen() {
                 </Text>
               )}
             </TouchableOpacity>
-          </View>
 
-          {/* Test Users Info */}
-          <View 
-            className="bg-blue-50 rounded-xl"
-            style={{
-              marginTop: spacing['2xl'],
-              padding: responsivePadding(16),
-            }}
-          >
-            <Text 
-              className="text-blue-800 font-semibold text-center"
-              style={{ 
-                fontSize: responsiveFont(14),
-                marginBottom: spacing.xs,
-              }}
-            >
-              Test Credentials
-            </Text>
-            <View style={{ gap: spacing.xs / 2 }}>
-              <Text 
-                className="text-blue-700"
-                style={{ fontSize: responsiveFont(12) }}
-              >
-                Employee: testuser / testuser123
-              </Text>
-              <Text 
-                className="text-blue-700"
-                style={{ fontSize: responsiveFont(12) }}
-              >
-                Admin: testadmin / testadmin123
-              </Text>
-              <Text 
-                className="text-blue-600 text-center"
-                style={{ 
-                  fontSize: responsiveFont(10),
-                  marginTop: spacing.xs,
+            {/* Biometric Login Button */}
+            {biometricAvailable && hasSavedCredentials && (
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: 12,
+                  paddingVertical: spacing.md,
+                  marginBottom: spacing.base,
+                  borderWidth: 2,
+                  borderColor: colors.primary,
+                  backgroundColor: 'transparent',
+                  opacity: isLoading ? 0.5 : 1,
                 }}
+                onPress={handleBiometricLogin}
+                disabled={isLoading}
+                activeOpacity={0.8}
               >
-                See TEST_CREDENTIALS.md for more test accounts
-              </Text>
-            </View>
+                <Ionicons 
+                  name={biometricType.toLowerCase().includes('face') ? 'face-recognition' : 'finger-print'} 
+                  size={iconSize.lg} 
+                  color={colors.primary} 
+                  style={{ marginRight: spacing.sm }}
+                />
+                <Text 
+                  style={{ 
+                    color: colors.primary, 
+                    fontWeight: '600', 
+                    fontSize: responsiveFont(16),
+                  }}
+                >
+                  Login with {biometricType}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Sign Up Link */}

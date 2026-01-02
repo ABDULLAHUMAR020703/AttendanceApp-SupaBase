@@ -1,11 +1,49 @@
-// Leave Management Utilities using AsyncStorage
+// Leave Management Utilities using Supabase
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '../core/config/supabase';
 import { createNotification } from './notifications';
 import { getEmployeeById, getAdminUsers, getSuperAdminUsers, getManagersByDepartment } from './employees';
 
 const LEAVE_SETTINGS_KEY = 'leave_settings';
 const EMPLOYEE_LEAVES_KEY = 'employee_leaves';
 const LEAVE_REQUESTS_KEY = 'leave_requests';
+
+// Leave Request Categories (same as ticket categories for routing)
+export const LEAVE_CATEGORIES = {
+  ENGINEERING: 'engineering',
+  TECHNICAL: 'technical',
+  HR: 'hr',
+  FINANCE: 'finance',
+  SALES: 'sales',
+  FACILITIES: 'facilities',
+  OTHER: 'other'
+};
+
+// Map leave categories to departments (same as tickets)
+// Engineering and Technical are separate departments with separate managers
+const CATEGORY_TO_DEPARTMENT_MAP = {
+  [LEAVE_CATEGORIES.ENGINEERING]: 'Engineering', // Routes to Engineering Manager
+  [LEAVE_CATEGORIES.TECHNICAL]: 'Technical',     // Routes to Technical Manager (separate department)
+  [LEAVE_CATEGORIES.HR]: 'HR',
+  [LEAVE_CATEGORIES.FINANCE]: 'Finance',
+  [LEAVE_CATEGORIES.SALES]: 'Sales',
+  [LEAVE_CATEGORIES.FACILITIES]: 'Facilities',
+  [LEAVE_CATEGORIES.OTHER]: null // No specific department, goes to super_admin only
+};
+
+// Category Labels
+export const getCategoryLabel = (category) => {
+  const labels = {
+    [LEAVE_CATEGORIES.ENGINEERING]: 'Engineering',
+    [LEAVE_CATEGORIES.TECHNICAL]: 'Technical',
+    [LEAVE_CATEGORIES.HR]: 'HR',
+    [LEAVE_CATEGORIES.FINANCE]: 'Finance',
+    [LEAVE_CATEGORIES.SALES]: 'Sales',
+    [LEAVE_CATEGORIES.FACILITIES]: 'Facilities',
+    [LEAVE_CATEGORIES.OTHER]: 'Other'
+  };
+  return labels[category] || category;
+};
 
 /**
  * Get default leave settings
@@ -66,21 +104,18 @@ export const updateDefaultLeaveSettings = async (settings) => {
 
 /**
  * Get employee leave balance
+ * Calculates used leaves from approved requests in Supabase (source of truth)
  * @param {string} employeeId - Employee ID
  * @returns {Promise<Object>} Employee leave balance
  */
 export const getEmployeeLeaveBalance = async (employeeId) => {
   try {
+    // Get base leave balance from AsyncStorage (or defaults)
     const leavesJson = await AsyncStorage.getItem(EMPLOYEE_LEAVES_KEY);
     const allLeaves = leavesJson ? JSON.parse(leavesJson) : {};
     
-    if (allLeaves[employeeId]) {
-      return allLeaves[employeeId];
-    }
-    
-    // If no custom leave balance, return default settings
     const defaultSettings = await getDefaultLeaveSettings();
-    return {
+    const baseBalance = allLeaves[employeeId] || {
       employeeId,
       annualLeaves: defaultSettings.defaultAnnualLeaves,
       sickLeaves: defaultSettings.defaultSickLeaves,
@@ -92,6 +127,48 @@ export const getEmployeeLeaveBalance = async (employeeId) => {
       createdAt: new Date().toISOString(),
       updatedAt: null
     };
+
+    // Calculate used leaves from approved requests in Supabase (source of truth)
+    try {
+      const { data: approvedRequests, error } = await supabase
+        .from('leave_requests')
+        .select('leave_type, days, status')
+        .eq('employee_id', employeeId)
+        .eq('status', 'approved');
+
+      if (!error && approvedRequests && approvedRequests.length > 0) {
+        // Calculate used leaves from approved requests
+        let usedAnnual = 0;
+        let usedSick = 0;
+        let usedCasual = 0;
+
+        approvedRequests.forEach(request => {
+          const days = parseFloat(request.days) || 0;
+          if (request.leave_type === 'annual') {
+            usedAnnual += days;
+          } else if (request.leave_type === 'sick') {
+            usedSick += days;
+          } else if (request.leave_type === 'casual') {
+            usedCasual += days;
+          }
+        });
+
+        // Use calculated values from Supabase (source of truth)
+        return {
+          ...baseBalance,
+          usedAnnualLeaves: usedAnnual,
+          usedSickLeaves: usedSick,
+          usedCasualLeaves: usedCasual,
+          updatedAt: new Date().toISOString()
+        };
+      }
+    } catch (supabaseError) {
+      console.error('Error calculating used leaves from Supabase:', supabaseError);
+      // Fall back to AsyncStorage values if Supabase query fails
+    }
+
+    // Return base balance (from AsyncStorage or defaults)
+    return baseBalance;
   } catch (error) {
     console.error('Error getting employee leave balance:', error);
     const defaultSettings = await getDefaultLeaveSettings();
@@ -253,9 +330,10 @@ export const calculateRemainingLeaves = (leaveBalance) => {
  * @param {string} reason - Reason for leave
  * @param {boolean} isHalfDay - Whether this is a half-day leave (default: false)
  * @param {string} halfDayPeriod - For half-day: 'morning' or 'afternoon' (optional)
+ * @param {string} category - Category for routing: 'engineering', 'technical', 'hr', 'finance', 'sales', 'facilities', 'other' (optional, defaults to employee's department)
  * @returns {Promise<{success: boolean, requestId?: string, error?: string}>}
  */
-export const createLeaveRequest = async (employeeId, leaveType, startDate, endDate, reason = '', isHalfDay = false, halfDayPeriod = null) => {
+export const createLeaveRequest = async (employeeId, leaveType, startDate, endDate, reason = '', isHalfDay = false, halfDayPeriod = null, category = null) => {
   try {
     // Validate leave type
     const validTypes = ['annual', 'sick', 'casual'];
@@ -322,37 +400,186 @@ export const createLeaveRequest = async (employeeId, leaveType, startDate, endDa
       };
     }
 
-    // Create leave request
-    const requestId = `leave_${Date.now()}_${employeeId}`;
-    const request = {
-      id: requestId,
-      employeeId,
-      leaveType,
-      startDate,
-      endDate,
-      days,
-      reason,
-      isHalfDay: isHalfDay || false,
-      halfDayPeriod: isHalfDay ? (halfDayPeriod || 'morning') : null,
-      status: 'pending', // pending, approved, rejected
-      requestedAt: new Date().toISOString(),
-      processedAt: null,
-      processedBy: null,
-      adminNotes: null
+    // Get employee data for routing (from Supabase - source of truth)
+    const employee = await getEmployeeById(employeeId);
+    
+    if (!employee) {
+      console.error(`⚠️ Employee not found for ID: ${employeeId}`);
+      return {
+        success: false,
+        error: 'Employee not found. Please ensure you are logged in correctly.'
+      };
+    }
+    
+    console.log(`[Leave Routing] Employee: ${employee.username} (${employeeId}), Department: ${employee.department || 'N/A'}`);
+    
+    // Determine category - use provided category or default based on employee department
+    let finalCategory = category;
+    if (!finalCategory && employee && employee.department) {
+      // Map department to category (reverse mapping)
+      // Engineering department defaults to Engineering category
+      // Technical department defaults to Technical category
+      const departmentToCategory = {
+        'Engineering': LEAVE_CATEGORIES.ENGINEERING,
+        'Technical': LEAVE_CATEGORIES.TECHNICAL,
+        'HR': LEAVE_CATEGORIES.HR,
+        'Finance': LEAVE_CATEGORIES.FINANCE,
+        'Sales': LEAVE_CATEGORIES.SALES,
+        'Facilities': LEAVE_CATEGORIES.FACILITIES
+      };
+      finalCategory = departmentToCategory[employee.department] || LEAVE_CATEGORIES.OTHER;
+      console.log(`[Leave Routing] Auto-detected category from department: ${employee.department} → ${finalCategory}`);
+    }
+    if (!finalCategory) {
+      finalCategory = LEAVE_CATEGORIES.OTHER;
+      console.log(`[Leave Routing] No category provided and no department found, defaulting to: ${finalCategory}`);
+    }
+
+    // Validate category
+    const validCategories = Object.values(LEAVE_CATEGORIES);
+    if (!validCategories.includes(finalCategory)) {
+      return {
+        success: false,
+        error: 'Invalid category. Must be: engineering, technical, hr, finance, sales, facilities, or other'
+      };
+    }
+
+    // Route to appropriate manager based on category
+    let assignedManager = null;
+    const department = CATEGORY_TO_DEPARTMENT_MAP[finalCategory];
+    
+    console.log(`[Leave Routing] Category: ${finalCategory}, Target Department: ${department || 'N/A'}`);
+    
+    if (department) {
+      try {
+        const departmentManagers = await getManagersByDepartment(department);
+        console.log(`[Leave Routing] Found ${departmentManagers.length} manager(s) for department: ${department}`);
+        
+        if (departmentManagers.length > 0) {
+          // Direct routing: Each category maps to its own department
+          // - "engineering" category → Engineering department → Engineering Manager
+          // - "technical" category → Technical department → Technical Manager
+          assignedManager = departmentManagers[0];
+          console.log(`✓ Leave request (${finalCategory}) will be assigned to ${assignedManager.username} (${assignedManager.position || department} Manager)`);
+        } else {
+          console.warn(`⚠️ No manager found for department: ${department}. Leave request will not be auto-assigned.`);
+          // Fallback: Try to assign to a super_admin if no manager found
+          try {
+            const superAdmins = await getSuperAdminUsers();
+            if (superAdmins.length > 0) {
+              assignedManager = superAdmins[0];
+              console.log(`✓ Fallback: Assigning leave request to super_admin: ${assignedManager.username}`);
+            }
+          } catch (fallbackError) {
+            console.error('Error getting super_admin for fallback assignment:', fallbackError);
+          }
+        }
+      } catch (error) {
+        console.error('Error finding department manager:', error);
+        // Fallback: Try to assign to a super_admin on error
+        try {
+          const superAdmins = await getSuperAdminUsers();
+          if (superAdmins.length > 0) {
+            assignedManager = superAdmins[0];
+            console.log(`✓ Fallback (on error): Assigning leave request to super_admin: ${assignedManager.username}`);
+          }
+        } catch (fallbackError) {
+          console.error('Error getting super_admin for fallback assignment:', fallbackError);
+        }
+      }
+    } else {
+      console.log(`[Leave Routing] No department mapping for category: ${finalCategory}, assigning to super_admin`);
+      // For 'other' category, assign to super_admin
+      try {
+        const superAdmins = await getSuperAdminUsers();
+        if (superAdmins.length > 0) {
+          assignedManager = superAdmins[0];
+          console.log(`✓ Assigning leave request to super_admin: ${assignedManager.username}`);
+        }
+      } catch (fallbackError) {
+        console.error('Error getting super_admin for assignment:', fallbackError);
+      }
+    }
+
+    // Get employee UID for database reference
+    // MUST use auth.uid() from current Supabase session for RLS policy to work
+    // RLS policy requires: employee_uid = auth.uid()
+    let employeeUid = null;
+    try {
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+      if (authError) {
+        console.error('Error getting Supabase session:', authError);
+        return {
+          success: false,
+          error: 'Unable to verify user session. Please log in again.'
+        };
+      }
+      
+      if (authUser && authUser.id) {
+        employeeUid = authUser.id;
+        console.log('✓ Using UID from current Supabase session (auth.uid()):', employeeUid);
+      } else {
+        // No active session
+        console.error('No active Supabase session found');
+        return {
+          success: false,
+          error: 'Please ensure you are logged in. Session not found.'
+        };
+      }
+    } catch (error) {
+      console.error('Error getting Supabase session:', error);
+      return {
+        success: false,
+        error: 'Unable to verify user session. Please log in again.'
+      };
+    }
+
+    // If still no UID, we cannot proceed (RLS requires it)
+    if (!employeeUid) {
+      console.error('Cannot create leave request: employee_uid is required for RLS policy');
+      return {
+        success: false,
+        error: 'Unable to verify user identity. Please ensure you are logged in correctly.'
+      };
+    }
+
+    // Create leave request in Supabase
+    const requestData = {
+      employee_id: employeeId,
+      employee_uid: employeeUid,
+      leave_type: leaveType,
+      start_date: startDate,
+      end_date: endDate,
+      days: days,
+      reason: reason || null,
+      category: finalCategory,
+      is_half_day: isHalfDay || false,
+      half_day_period: isHalfDay ? (halfDayPeriod || 'morning') : null,
+      status: 'pending',
+      assigned_to: assignedManager?.username || null,
+      processed_at: null,
+      processed_by: null,
+      admin_notes: null
     };
 
-    // Get all requests and add new one
-    const requestsJson = await AsyncStorage.getItem(LEAVE_REQUESTS_KEY);
-    const allRequests = requestsJson ? JSON.parse(requestsJson) : [];
-    allRequests.push(request);
+    const { data: insertedRequest, error: insertError } = await supabase
+      .from('leave_requests')
+      .insert(requestData)
+      .select()
+      .single();
 
-    await AsyncStorage.setItem(LEAVE_REQUESTS_KEY, JSON.stringify(allRequests));
+    if (insertError) {
+      console.error('Error inserting leave request to Supabase:', insertError);
+      return {
+        success: false,
+        error: insertError.message || 'Failed to create leave request in database'
+      };
+    }
 
-    // Send notification to all admins
+    const requestId = insertedRequest.id;
+
+    // Send notification to super admins and assigned manager
     try {
-      const employee = await getEmployeeById(employeeId);
-      const admins = await getAdminUsers();
-      
       const leaveTypeLabels = {
         annual: 'Annual Leave',
         sick: 'Sick Leave',
@@ -362,16 +589,21 @@ export const createLeaveRequest = async (employeeId, leaveType, startDate, endDa
       const halfDayText = isHalfDay ? ` (Half Day - ${halfDayPeriod || 'morning'})` : '';
       const daysText = isHalfDay ? 'half day' : `${days} day${days !== 1 ? 's' : ''}`;
       const notificationTitle = 'New Leave Request';
-      const notificationBody = `${employee ? employee.name : 'An employee'} has submitted a ${leaveTypeLabels[leaveType]} request for ${daysText}${halfDayText} (${startDate}${startDate !== endDate ? ` to ${endDate}` : ''})`;
+      const categoryLabel = getCategoryLabel(finalCategory);
+      const notificationBody = `${employee ? employee.name : 'An employee'} has submitted a ${leaveTypeLabels[leaveType]} request for ${daysText}${halfDayText} (${startDate}${startDate !== endDate ? ` to ${endDate}` : ''})${assignedManager ? ` (Assigned to ${assignedManager.name} - ${categoryLabel})` : ` (${categoryLabel})`}`;
       
-      // Get super admins and department managers
+      // Get super admins (always notified)
       const superAdmins = await getSuperAdminUsers();
-      const departmentManagers = employee && employee.department 
-        ? await getManagersByDepartment(employee.department)
-        : [];
       
-      // Combine all recipients (super admins + department managers)
-      const recipients = [...superAdmins, ...departmentManagers];
+      // Combine recipients (super admins + assigned manager if exists)
+      const recipients = [...superAdmins];
+      if (assignedManager) {
+        // Add assigned manager if not already a super admin
+        const isSuperAdmin = superAdmins.some(admin => admin.username === assignedManager.username);
+        if (!isSuperAdmin) {
+          recipients.push(assignedManager);
+        }
+      }
       
       // Remove duplicates based on username
       const uniqueRecipients = recipients.filter((admin, index, self) =>
@@ -390,9 +622,11 @@ export const createLeaveRequest = async (employeeId, leaveType, startDate, endDa
             employeeId,
             employeeName: employee ? employee.name : 'Unknown',
             leaveType,
+            category: finalCategory,
             days,
             startDate,
             endDate,
+            assignedTo: assignedManager?.username || null,
             // Navigation data
             navigation: {
               screen: 'AdminDashboard',
@@ -431,10 +665,37 @@ export const createLeaveRequest = async (employeeId, leaveType, startDate, endDa
  */
 export const getEmployeeLeaveRequests = async (employeeId) => {
   try {
-    const requestsJson = await AsyncStorage.getItem(LEAVE_REQUESTS_KEY);
-    const allRequests = requestsJson ? JSON.parse(requestsJson) : [];
-    
-    return allRequests.filter(request => request.employeeId === employeeId);
+    // Query from Supabase
+    const { data: requests, error } = await supabase
+      .from('leave_requests')
+      .select('*')
+      .eq('employee_id', employeeId)
+      .order('requested_at', { ascending: false });
+
+    if (error) {
+      console.error('Error getting employee leave requests from Supabase:', error);
+      return [];
+    }
+
+    // Convert database format to app format
+    return requests.map(req => ({
+      id: req.id,
+      employeeId: req.employee_id,
+      leaveType: req.leave_type,
+      startDate: req.start_date,
+      endDate: req.end_date,
+      days: req.days,
+      reason: req.reason,
+      category: req.category,
+      isHalfDay: req.is_half_day,
+      halfDayPeriod: req.half_day_period,
+      status: req.status,
+      requestedAt: req.requested_at,
+      processedAt: req.processed_at,
+      processedBy: req.processed_by,
+      adminNotes: req.admin_notes,
+      assignedTo: req.assigned_to
+    }));
   } catch (error) {
     console.error('Error getting employee leave requests:', error);
     return [];
@@ -442,15 +703,63 @@ export const getEmployeeLeaveRequests = async (employeeId) => {
 };
 
 /**
- * Get all pending leave requests (for admin)
+ * Get all pending leave requests (for admin/managers)
+ * RLS policies automatically filter based on user role:
+ * - Employees see only their own requests
+ * - Managers see requests assigned to them or from their department
+ * - Super admins see all requests
  * @returns {Promise<Array>} Array of pending leave requests
  */
 export const getPendingLeaveRequests = async () => {
   try {
-    const requestsJson = await AsyncStorage.getItem(LEAVE_REQUESTS_KEY);
-    const allRequests = requestsJson ? JSON.parse(requestsJson) : [];
-    
-    return allRequests.filter(request => request.status === 'pending');
+    // Get current user info for debugging
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+    if (authUser) {
+      console.log(`[Leave Requests] Fetching pending requests for user: ${authUser.user_metadata?.username || authUser.email}, UID: ${authUser.id}`);
+    }
+
+    // Query from Supabase - RLS policies will automatically filter
+    const { data: requests, error } = await supabase
+      .from('leave_requests')
+      .select('*')
+      .eq('status', 'pending')
+      .order('requested_at', { ascending: false });
+
+    if (error) {
+      console.error('Error getting pending leave requests from Supabase:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      return [];
+    }
+
+    console.log(`[Leave Requests] Found ${requests?.length || 0} pending request(s) for current user`);
+    if (requests && requests.length > 0) {
+      console.log(`[Leave Requests] Sample request:`, {
+        id: requests[0].id,
+        employee_id: requests[0].employee_id,
+        assigned_to: requests[0].assigned_to,
+        category: requests[0].category
+      });
+    }
+
+    // Convert database format to app format
+    return (requests || []).map(req => ({
+      id: req.id,
+      employeeId: req.employee_id,
+      leaveType: req.leave_type,
+      startDate: req.start_date,
+      endDate: req.end_date,
+      days: req.days,
+      reason: req.reason,
+      category: req.category,
+      isHalfDay: req.is_half_day,
+      halfDayPeriod: req.half_day_period,
+      status: req.status,
+      requestedAt: req.requested_at,
+      processedAt: req.processed_at,
+      processedBy: req.processed_by,
+      adminNotes: req.admin_notes,
+      assignedTo: req.assigned_to
+    }));
   } catch (error) {
     console.error('Error getting pending leave requests:', error);
     return [];
@@ -458,13 +767,51 @@ export const getPendingLeaveRequests = async () => {
 };
 
 /**
- * Get all leave requests (for admin)
+ * Get all leave requests (for admin/managers)
+ * RLS policies automatically filter based on user role
  * @returns {Promise<Array>} Array of all leave requests
  */
 export const getAllLeaveRequests = async () => {
   try {
-    const requestsJson = await AsyncStorage.getItem(LEAVE_REQUESTS_KEY);
-    return requestsJson ? JSON.parse(requestsJson) : [];
+    // Get current user info for debugging
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (authUser) {
+      console.log(`[Leave Requests] Fetching all requests for user: ${authUser.user_metadata?.username || authUser.email}`);
+    }
+
+    // Query from Supabase - RLS policies will automatically filter
+    const { data: requests, error } = await supabase
+      .from('leave_requests')
+      .select('*')
+      .order('requested_at', { ascending: false });
+
+    if (error) {
+      console.error('Error getting all leave requests from Supabase:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      return [];
+    }
+
+    console.log(`[Leave Requests] Found ${requests?.length || 0} total request(s) for current user`);
+
+    // Convert database format to app format
+    return (requests || []).map(req => ({
+      id: req.id,
+      employeeId: req.employee_id,
+      leaveType: req.leave_type,
+      startDate: req.start_date,
+      endDate: req.end_date,
+      days: req.days,
+      reason: req.reason,
+      category: req.category,
+      isHalfDay: req.is_half_day,
+      halfDayPeriod: req.half_day_period,
+      status: req.status,
+      requestedAt: req.requested_at,
+      processedAt: req.processed_at,
+      processedBy: req.processed_by,
+      adminNotes: req.admin_notes,
+      assignedTo: req.assigned_to
+    }));
   } catch (error) {
     console.error('Error getting all leave requests:', error);
     return [];
@@ -488,19 +835,20 @@ export const processLeaveRequest = async (requestId, status, processedBy, adminN
       };
     }
 
-    const requestsJson = await AsyncStorage.getItem(LEAVE_REQUESTS_KEY);
-    const allRequests = requestsJson ? JSON.parse(requestsJson) : [];
-    
-    const requestIndex = allRequests.findIndex(req => req.id === requestId);
-    if (requestIndex === -1) {
+    // Get the request from Supabase first
+    const { data: request, error: fetchError } = await supabase
+      .from('leave_requests')
+      .select('*')
+      .eq('id', requestId)
+      .single();
+
+    if (fetchError || !request) {
       return {
         success: false,
         error: 'Leave request not found'
       };
     }
 
-    const request = allRequests[requestIndex];
-    
     // Check if already processed
     if (request.status !== 'pending') {
       return {
@@ -509,37 +857,35 @@ export const processLeaveRequest = async (requestId, status, processedBy, adminN
       };
     }
 
-    // Update request status
-    request.status = status;
-    request.processedAt = new Date().toISOString();
-    request.processedBy = processedBy;
-    request.adminNotes = adminNotes;
-
-    // If approved, update employee's used leaves
+    // If approved, the balance will be automatically recalculated from Supabase
+    // No need to manually update AsyncStorage - getEmployeeLeaveBalance now calculates from Supabase
+    // This ensures consistency across all devices
     if (status === 'approved') {
-      const leaveBalance = await getEmployeeLeaveBalance(request.employeeId);
-      const updatedUsedLeaves = {
-        ...leaveBalance
-      };
-
-      if (request.leaveType === 'annual') {
-        updatedUsedLeaves.usedAnnualLeaves = (updatedUsedLeaves.usedAnnualLeaves || 0) + request.days;
-      } else if (request.leaveType === 'sick') {
-        updatedUsedLeaves.usedSickLeaves = (updatedUsedLeaves.usedSickLeaves || 0) + request.days;
-      } else if (request.leaveType === 'casual') {
-        updatedUsedLeaves.usedCasualLeaves = (updatedUsedLeaves.usedCasualLeaves || 0) + request.days;
-      }
-
-      await updateEmployeeLeaveBalance(request.employeeId, updatedUsedLeaves);
+      console.log(`✓ Leave request approved. Balance will be recalculated from Supabase for ${request.employee_id}`);
     }
 
-    // Save updated requests
-    allRequests[requestIndex] = request;
-    await AsyncStorage.setItem(LEAVE_REQUESTS_KEY, JSON.stringify(allRequests));
+    // Update request in Supabase
+    const { error: updateError } = await supabase
+      .from('leave_requests')
+      .update({
+        status: status,
+        processed_at: new Date().toISOString(),
+        processed_by: processedBy,
+        admin_notes: adminNotes || null
+      })
+      .eq('id', requestId);
+
+    if (updateError) {
+      console.error('Error updating leave request in Supabase:', updateError);
+      return {
+        success: false,
+        error: updateError.message || 'Failed to update leave request'
+      };
+    }
 
     // Send notification to employee
     try {
-      const employee = await getEmployeeById(request.employeeId);
+      const employee = await getEmployeeById(request.employee_id);
       
       if (employee) {
         const leaveTypeLabels = {
@@ -552,8 +898,8 @@ export const processLeaveRequest = async (requestId, status, processedBy, adminN
           ? 'Leave Request Approved' 
           : 'Leave Request Rejected';
         const notificationBody = status === 'approved'
-          ? `Your ${leaveTypeLabels[request.leaveType]} request for ${request.days} day${request.days !== 1 ? 's' : ''} (${request.startDate} to ${request.endDate}) has been approved.`
-          : `Your ${leaveTypeLabels[request.leaveType]} request for ${request.days} day${request.days !== 1 ? 's' : ''} (${request.startDate} to ${request.endDate}) has been rejected.${adminNotes ? `\n\nNote: ${adminNotes}` : ''}`;
+          ? `Your ${leaveTypeLabels[request.leave_type]} request for ${request.days} day${request.days !== 1 ? 's' : ''} (${request.start_date} to ${request.end_date}) has been approved.`
+          : `Your ${leaveTypeLabels[request.leave_type]} request for ${request.days} day${request.days !== 1 ? 's' : ''} (${request.start_date} to ${request.end_date}) has been rejected.${adminNotes ? `\n\nNote: ${adminNotes}` : ''}`;
         
         await createNotification(
           employee.username,
@@ -562,11 +908,11 @@ export const processLeaveRequest = async (requestId, status, processedBy, adminN
           status === 'approved' ? 'leave_approved' : 'leave_rejected',
           {
             requestId,
-            employeeId: request.employeeId,
-            leaveType: request.leaveType,
+            employeeId: request.employee_id,
+            leaveType: request.leave_type,
             days: request.days,
-            startDate: request.startDate,
-            endDate: request.endDate,
+            startDate: request.start_date,
+            endDate: request.end_date,
             status,
             processedBy,
             adminNotes,
@@ -625,10 +971,37 @@ const calculateWorkingDays = (startDate, endDate) => {
  */
 export const getLeaveRequestById = async (requestId) => {
   try {
-    const requestsJson = await AsyncStorage.getItem(LEAVE_REQUESTS_KEY);
-    const allRequests = requestsJson ? JSON.parse(requestsJson) : [];
-    
-    return allRequests.find(request => request.id === requestId) || null;
+    // Query from Supabase
+    const { data: request, error } = await supabase
+      .from('leave_requests')
+      .select('*')
+      .eq('id', requestId)
+      .single();
+
+    if (error || !request) {
+      console.error('Error getting leave request by ID from Supabase:', error);
+      return null;
+    }
+
+    // Convert database format to app format
+    return {
+      id: request.id,
+      employeeId: request.employee_id,
+      leaveType: request.leave_type,
+      startDate: request.start_date,
+      endDate: request.end_date,
+      days: request.days,
+      reason: request.reason,
+      category: request.category,
+      isHalfDay: request.is_half_day,
+      halfDayPeriod: request.half_day_period,
+      status: request.status,
+      requestedAt: request.requested_at,
+      processedAt: request.processed_at,
+      processedBy: request.processed_by,
+      adminNotes: request.admin_notes,
+      assignedTo: request.assigned_to
+    };
   } catch (error) {
     console.error('Error getting leave request by ID:', error);
     return null;

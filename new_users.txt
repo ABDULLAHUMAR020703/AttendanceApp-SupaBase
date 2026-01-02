@@ -1,0 +1,23 @@
+hammad bakhtiar super admin 
+Abdullah bin ali Engineering manager
+    Hasnain Ibrar Associate Engineer
+Abdul Rehman Batt Technical manager
+    Abdullah Bin Umar Senior Technical Associate
+    Samad Kiani Technical Associate
+Bilawal Cheema Sales manager
+    Zidane Asghar sales Associate
+Moiz Kazi HR manager 
+Balaj Nadeem Kiani Finance manager
+
+
+
+hammad.bakhtiar           / hammadbakhtiar123    (super_admin)
+   abdullah.bin.ali          / abdullahbinali123    (manager)
+   hasnain.ibrar             / hasnainibrar123      (employee)
+   abdul.rehman.batt         / abdulrehmanbatt123   (manager)
+   abdullah.bin.umar         / abdullahbinumar123   (employee)
+   samad.kiani               / samadkiani123        (employee)
+   bilawal.cheema            / bilawalcheema123     (manager)
+   zidane.asghar             / zidaneasghar123      (employee)
+   moiz.kazi                 / moizkazi123          (manager)
+   balaj.nadeem.kiani        / balajnadeemkiani123  (manager)

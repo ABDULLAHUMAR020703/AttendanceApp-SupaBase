@@ -1,6 +1,8 @@
 // Main Application Navigation - Routes based on user role
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
+import { TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { ROLES } from '../../shared/constants/roles';
 import { ROUTES } from '../../shared/constants/routes';
 import { useTheme } from '../contexts/ThemeContext';
@@ -22,6 +24,7 @@ import ManualAttendanceScreen from '../../screens/ManualAttendanceScreen';
 import SignupApprovalScreen from '../../screens/SignupApprovalScreen';
 import CreateUserScreen from '../../screens/CreateUserScreen';
 import EmployeeManagement from '../../screens/EmployeeManagement';
+import ReportsScreen from '../../screens/ReportsScreen';
 import LoginScreen from '../../screens/LoginScreen';
 
 const Stack = createStackNavigator();
@@ -29,7 +32,18 @@ const Stack = createStackNavigator();
 export default function MainNavigator({ user }) {
   const { colors } = useTheme();
 
-  const screenOptions = {
+  // Hamburger menu icon component
+  const HamburgerMenu = ({ navigation }) => (
+    <TouchableOpacity
+      onPress={() => navigation.openDrawer()}
+      style={{ marginLeft: 16 }}
+      activeOpacity={0.7}
+    >
+      <Ionicons name="menu" size={28} color="#fff" />
+    </TouchableOpacity>
+  );
+
+  const screenOptions = ({ navigation }) => ({
     headerStyle: {
       backgroundColor: colors.primary,
     },
@@ -37,7 +51,8 @@ export default function MainNavigator({ user }) {
     headerTitleStyle: {
       fontWeight: 'bold',
     },
-  };
+    headerLeft: () => <HamburgerMenu navigation={navigation} />,
+  });
 
   if (user.role === ROLES.EMPLOYEE) {
     return (
@@ -158,12 +173,20 @@ export default function MainNavigator({ user }) {
           initialParams={{ user }}
         />
         {user.role === ROLES.SUPER_ADMIN && (
-          <Stack.Screen 
-            name={ROUTES.CREATE_USER} 
-            component={CreateUserScreen}
-            options={{ title: 'Create User' }}
-            initialParams={{ user }}
-          />
+          <>
+            <Stack.Screen 
+              name={ROUTES.CREATE_USER} 
+              component={CreateUserScreen}
+              options={{ title: 'Create User' }}
+              initialParams={{ user }}
+            />
+            <Stack.Screen 
+              name="ReportsScreen" 
+              component={ReportsScreen}
+              options={{ title: 'Reports' }}
+              initialParams={{ user }}
+            />
+          </>
         )}
       </Stack.Navigator>
     );
@@ -176,7 +199,7 @@ export default function MainNavigator({ user }) {
         name={ROUTES.LOGIN} 
         component={LoginScreen}
         options={{ 
-          title: 'Present',
+          title: 'Hadir.AI',
           headerShown: false 
         }}
       />

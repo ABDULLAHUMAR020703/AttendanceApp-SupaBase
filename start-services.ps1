@@ -7,6 +7,7 @@
 # - Installs dependencies if needed
 # - Starts API Gateway (port 3000)
 # - Starts Auth Service (port 3001)
+# - Starts Reporting Service (port 3002)
 # - Connects to Supabase (cloud service)
 
 Write-Host "========================================" -ForegroundColor Cyan
@@ -16,7 +17,7 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
 # Check if we're in the project root
-if (-not (Test-Path "services\api-gateway") -or -not (Test-Path "services\auth-service")) {
+if (-not (Test-Path "services\api-gateway") -or -not (Test-Path "services\auth-service") -or -not (Test-Path "services\reporting-service")) {
     Write-Host "Error: Please run this script from the project root directory" -ForegroundColor Red
     Write-Host "Current directory: $(Get-Location)" -ForegroundColor Yellow
     exit 1
@@ -41,6 +42,14 @@ if (Test-Port -Port 3000) {
 
 if (Test-Port -Port 3001) {
     Write-Host "Warning: Port 3001 is already in use (Auth Service)" -ForegroundColor Yellow
+    $continue = Read-Host "Continue anyway? (y/n)"
+    if ($continue -ne "y") {
+        exit 1
+    }
+}
+
+if (Test-Port -Port 3002) {
+    Write-Host "Warning: Port 3002 is already in use (Reporting Service)" -ForegroundColor Yellow
     $continue = Read-Host "Continue anyway? (y/n)"
     if ($continue -ne "y") {
         exit 1
@@ -80,6 +89,22 @@ if (-not (Test-Path "services\auth-service\node_modules")) {
     Write-Host "Auth Service dependencies already installed" -ForegroundColor Green
 }
 
+# Check and install dependencies for Reporting Service
+Write-Host "Checking Reporting Service dependencies..." -ForegroundColor Yellow
+if (-not (Test-Path "services\reporting-service\node_modules")) {
+    Write-Host "Installing Reporting Service dependencies..." -ForegroundColor Yellow
+    Set-Location "services\reporting-service"
+    npm install
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Error: Failed to install Reporting Service dependencies" -ForegroundColor Red
+        Set-Location ..\..
+        exit 1
+    }
+    Set-Location ..\..
+} else {
+    Write-Host "Reporting Service dependencies already installed" -ForegroundColor Green
+}
+
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "  Starting Services" -ForegroundColor Green
@@ -102,18 +127,28 @@ Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$authServiceP
 # Wait a bit for Auth Service to start
 Start-Sleep -Seconds 2
 
+# Start Reporting Service
+Write-Host "Starting Reporting Service on port 3002..." -ForegroundColor Yellow
+$reportingServicePath = (Resolve-Path "services\reporting-service").Path
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$reportingServicePath'; Write-Host 'Reporting Service starting...' -ForegroundColor Green; npm start" -WindowStyle Normal
+
+# Wait a bit for Reporting Service to start
+Start-Sleep -Seconds 2
+
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "  Services Started!" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Backend Services:" -ForegroundColor Yellow
-Write-Host "  - API Gateway:  http://localhost:3000" -ForegroundColor Cyan
-Write-Host "  - Auth Service: http://localhost:3001" -ForegroundColor Cyan
+Write-Host "  - API Gateway:      http://localhost:3000" -ForegroundColor Cyan
+Write-Host "  - Auth Service:      http://localhost:3001" -ForegroundColor Cyan
+Write-Host "  - Reporting Service: http://localhost:3002" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Health Checks:" -ForegroundColor Yellow
-Write-Host "  - API Gateway:  http://localhost:3000/health" -ForegroundColor White
-Write-Host "  - Auth Service: http://localhost:3001/health" -ForegroundColor White
+Write-Host "  - API Gateway:      http://localhost:3000/health" -ForegroundColor White
+Write-Host "  - Auth Service:      http://localhost:3001/health" -ForegroundColor White
+Write-Host "  - Reporting Service: http://localhost:3002/health" -ForegroundColor White
 Write-Host ""
 Write-Host "Supabase Connection:" -ForegroundColor Yellow
 Write-Host "  - Supabase is a cloud service (no local server needed)" -ForegroundColor White
@@ -123,20 +158,25 @@ Write-Host ""
 Write-Host "Environment Check:" -ForegroundColor Yellow
 # Check if .env files exist
 if (Test-Path "services\auth-service\.env") {
-    Write-Host "  ✓ Auth Service .env found" -ForegroundColor Green
+    Write-Host "  [OK] Auth Service .env found" -ForegroundColor Green
 } else {
-    Write-Host "  ⚠ Auth Service .env missing - create it with SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY" -ForegroundColor Yellow
+    Write-Host "  [WARNING] Auth Service .env missing - create it with SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY" -ForegroundColor Yellow
+}
+if (Test-Path "services\reporting-service\.env") {
+    Write-Host "  [OK] Reporting Service .env found" -ForegroundColor Green
+} else {
+    Write-Host "  [WARNING] Reporting Service .env missing - create it with SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and EMAIL config" -ForegroundColor Yellow
 }
 if (Test-Path "apps\mobile\.env") {
-    Write-Host "  ✓ Mobile App .env found" -ForegroundColor Green
+    Write-Host "  [OK] Mobile App .env found" -ForegroundColor Green
 } else {
-    Write-Host "  ⚠ Mobile App .env missing - create it with EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY" -ForegroundColor Yellow
+    Write-Host "  [WARNING] Mobile App .env missing - create it with EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY" -ForegroundColor Yellow
 }
 Write-Host ""
 Write-Host "For Expo App:" -ForegroundColor Yellow
 Write-Host "  - iOS Simulator: http://localhost:3000" -ForegroundColor White
 Write-Host "  - Android Emulator: http://10.0.2.2:3000" -ForegroundColor White
-Write-Host "  - Physical Device: http://<your-computer-ip>:3000" -ForegroundColor White
+Write-Host "  - Physical Device: http://YOUR-COMPUTER-IP:3000" -ForegroundColor White
 Write-Host ""
 Write-Host "Note: Services are running in separate windows." -ForegroundColor Yellow
 Write-Host "      Close those windows to stop the services." -ForegroundColor Yellow

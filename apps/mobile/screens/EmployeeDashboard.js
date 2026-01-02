@@ -42,6 +42,7 @@ import {
 import { fontSize, spacing, iconSize, componentSize, responsivePadding, responsiveFont, wp, normalize } from '../utils/responsive';
 import Logo from '../components/Logo';
 import Trademark from '../components/Trademark';
+import HamburgerButton from '../shared/components/HamburgerButton';
 import { useNavigation } from '@react-navigation/native';
 
 export default function EmployeeDashboard({ route }) {
@@ -260,6 +261,7 @@ export default function EmployeeDashboard({ route }) {
           }}
         >
           <View className="flex-row items-center justify-between" style={{ padding: responsivePadding(24) }}>
+            <HamburgerButton color={colors.text} size={28} style={{ marginRight: spacing.sm }} />
             <View className="flex-row items-center flex-1" style={{ flexShrink: 1 }}>
               <Logo size="small" style={{ marginRight: spacing.md }} />
               <View className="flex-1" style={{ flexShrink: 1 }}>

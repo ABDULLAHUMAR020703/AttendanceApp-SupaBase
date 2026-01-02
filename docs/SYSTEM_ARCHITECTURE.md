@@ -7,7 +7,7 @@
 4. [Authentication System](#authentication-system)
 5. [User Roles & Permissions](#user-roles--permissions)
 6. [Employee Data Structure](#employee-data-structure)
-7. [Firebase Integration](#firebase-integration)
+7. [Supabase Integration](#supabase-integration)
 8. [Ticket Routing System](#ticket-routing-system)
 9. [Data Storage](#data-storage)
 10. [Login Flow](#login-flow)
@@ -82,8 +82,8 @@ AttendanceApp/
 
 **Features:**
 - Express server running on port 3001
-- Firebase Admin SDK integration with service account credentials
-- Secure password verification using Firebase Auth REST API
+- Supabase Client integration with service role key
+- Secure password verification using Supabase Auth
 - Complete user management endpoints
 
 **Login Flow:**
@@ -170,7 +170,7 @@ The application is organized into three main layers:
 
 #### 1. Core (`core/`)
 Core infrastructure that the entire app depends on:
-- **`config/`**: Firebase and app configuration
+- **`config/`**: Supabase and app configuration
 - **`contexts/`**: React Context providers (Auth, Theme)
 - **`navigation/`**: Navigation setup and routing
 - **`services/`**: Core services (storage abstraction)
@@ -180,7 +180,7 @@ Self-contained feature modules (PARTIALLY MIGRATED):
 
 **✅ Migrated Features:**
 - **`auth/`**: Authentication service and utilities
-  - `services/authService.js` - Firebase authentication logic
+  - `services/authService.js` - Supabase authentication logic
   - `utils/biometricAuth.js` - Biometric authentication
   - `utils/authPreferences.js` - Auth preferences
   - `index.js` - Public API exports
@@ -264,19 +264,19 @@ For detailed architecture documentation, see `docs/MODULAR_ARCHITECTURE.md`.
 1. **User Login Process:**
    - User enters username or email + password
    - System checks if input is username (no `@`) or email
-   - If username: Queries Firestore to find user's email
-   - Authenticates with Firebase using email + password
-   - Retrieves user data from Firestore
+   - If username: Queries Supabase PostgreSQL to find user's email
+   - Authenticates with Supabase Auth using email + password
+   - Retrieves user data from Supabase PostgreSQL
    - Combines with employee data from AsyncStorage (if available)
    - Sets user session in AuthContext
 
 2. **Authentication Methods:**
-   - **Username Login**: `testuser` → System finds email → Firebase Auth
-   - **Email Login**: `testuser@company.com` → Direct Firebase Auth
+   - **Username Login**: `testuser` → System finds email → Supabase Auth
+   - **Email Login**: `testuser@company.com` → Direct Supabase Auth
 
 3. **Password Storage:**
-   - Passwords are **NOT stored in Firestore** (security best practice)
-   - Passwords are hashed and stored in **Firebase Authentication**
+   - Passwords are **NOT stored in PostgreSQL** (security best practice)
+   - Passwords are hashed and stored in **Supabase Authentication**
    - Cannot retrieve original passwords (by design)
 
 ---
@@ -376,9 +376,9 @@ Every user/employee has the following structure:
 ```json
 {
   "id": "emp_001",                    // Unique employee ID
-  "uid": "firebase_auth_uid",         // Firebase Authentication UID
+  "uid": "supabase_auth_uid",         // Supabase Authentication UID
   "username": "testuser",             // Login username (unique)
-  "email": "testuser@company.com",    // Email (unique, for Firebase Auth)
+  "email": "testuser@company.com",    // Email (unique, for Supabase Auth)
   "name": "Test User",                // Full name
   "role": "employee",                 // Auth role: super_admin, manager, employee
   "department": "Engineering",        // Department name
@@ -396,9 +396,9 @@ Every user/employee has the following structure:
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `id` | string | Yes | Unique employee identifier (e.g., `emp_001`) |
-| `uid` | string | Yes* | Firebase Auth UID (if using Firebase) |
+| `uid` | string | Yes* | Supabase Auth UID |
 | `username` | string | Yes | Login username, must be unique |
-| `email` | string | Yes | Email address, must be unique, used for Firebase Auth |
+| `email` | string | Yes | Email address, must be unique, used for Supabase Auth |
 | `name` | string | Yes | Full name of the employee |
 | `role` | string | Yes | `super_admin`, `manager`, or `employee` |
 | `department` | string | No | Department name (e.g., `Engineering`, `HR`, `Sales`) |
@@ -496,7 +496,7 @@ try {
     return response.json();
   }
 } catch (error) {
-  // Fallback to direct Firebase authentication
+  // Fallback to direct Supabase authentication
 }
 
 // 3. Fallback: Direct Supabase authentication
@@ -855,24 +855,40 @@ When a user creates a ticket:
 
 ```javascript
 {
-  "technical": "Engineering",    // → techmanager
-  "hr": "HR",                    // → hrmanager
-  "finance": "Finance",          // → Finance manager
-  "facilities": "Facilities",    // → Facilities manager
-  "other": null                  // → No auto-assignment
+  "engineering": "Engineering",  // → Engineering Manager
+  "technical": "Technical",       // → Technical Manager (separate department)
+  "hr": "HR",                    // → HR Manager
+  "finance": "Finance",          // → Finance Manager
+  "sales": "Sales",              // → Sales Manager
+  "other": null                  // → No auto-assignment (super admin only)
 }
 ```
 
+**Important:** Engineering and Technical are **separate departments** with separate managers:
+- Engineering category routes to Engineering Manager
+- Technical category routes to Technical Manager
+- Each has its own department and manager
+
 ### Ticket Flow Example
 
-**Scenario:** Employee creates a Technical ticket
+**Scenario 1:** Employee creates an Engineering ticket
 
-1. Employee (`testuser`) creates ticket with category `Technical`
-2. Super admin (`testadmin`) gets notification
+1. Employee creates ticket with category `Engineering`
+2. Super admin gets notification
 3. System finds `Engineering` department
-4. System finds manager with `role: "manager"` AND `department: "Engineering"` → `techmanager`
-5. Ticket auto-assigned to `techmanager`
-6. `techmanager` receives notification
+4. System finds manager with `role: "manager"` AND `department: "Engineering"` → Engineering Manager
+5. Ticket auto-assigned to Engineering Manager
+6. Engineering Manager receives notification
+7. Ticket status: `in_progress`
+
+**Scenario 2:** Employee creates a Technical ticket
+
+1. Employee creates ticket with category `Technical`
+2. Super admin gets notification
+3. System finds `Technical` department
+4. System finds manager with `role: "manager"` AND `department: "Technical"` → Technical Manager
+5. Ticket auto-assigned to Technical Manager
+6. Technical Manager receives notification
 7. Ticket status: `in_progress`
 
 ---
@@ -881,13 +897,14 @@ When a user creates a ticket:
 
 ### Storage Locations
 
-#### 1. Firebase (Cloud)
-- **Authentication**: Email/password credentials
-- **Firestore `users` collection**: Complete user profile data
+#### 1. Supabase (Cloud)
+- **Authentication**: Email/password credentials via Supabase Auth
+- **PostgreSQL `users` table**: Complete user profile data
+- **Database**: PostgreSQL with Row Level Security (RLS) policies
 
 #### 2. AsyncStorage (Local Device)
 - **Key**: `@company_employees`
-- **Data**: Array of employee objects (same structure as Firestore)
+- **Data**: Array of employee objects (same structure as PostgreSQL)
 - **Purpose**: Local cache, offline access, employee management
 
 #### 3. AsyncStorage (Other Data)
@@ -898,11 +915,11 @@ When a user creates a ticket:
 
 ### Data Synchronization
 
-- **Firebase** is the source of truth for user authentication
-- **AsyncStorage** employee list is synced with Firebase
+- **Supabase** is the source of truth for user authentication and data
+- **AsyncStorage** employee list is synced with Supabase PostgreSQL
 - When user is created:
-  1. Created in Firebase Authentication
-  2. Document created in Firestore `users` collection
+  1. Created in Supabase Authentication
+  2. Record created in PostgreSQL `users` table
   3. Employee added to AsyncStorage `@company_employees`
 
 ---
@@ -911,7 +928,7 @@ When a user creates a ticket:
 
 ### Architecture Overview
 
-The login flow now uses a **microservices architecture** with API Gateway and Auth Service. The frontend first attempts to authenticate via the API Gateway, with a fallback to direct Firebase authentication for backward compatibility.
+The login flow uses a **microservices architecture** with API Gateway and Auth Service. The frontend first attempts to authenticate via the API Gateway, with a fallback to direct Supabase authentication for backward compatibility.
 
 ### Step-by-Step Process (Microservices Architecture)
 
@@ -923,14 +940,14 @@ The login flow now uses a **microservices architecture** with API Gateway and Au
 3. API Gateway forwards to Auth Service: POST /api/auth/login
    ↓
 4. Auth Service:
-   a. If username → Query Firestore using Admin SDK → Get email
-   b. Verify password using Firebase Auth REST API
-   c. If correct → Get user data using Admin SDK
+   a. If username → Query Supabase PostgreSQL → Get email
+   b. Verify password using Supabase Auth (signInWithPassword)
+   c. If correct → Get user data from Supabase PostgreSQL
    d. Return user object
    ↓
 5. API Gateway returns response to Frontend
    ↓
-6. If API Gateway fails → Fallback to direct Firebase authentication
+6. If API Gateway fails → Fallback to direct Supabase authentication
    ↓
 7. Set user in AuthContext
    ↓
@@ -947,7 +964,7 @@ The login flow now uses a **microservices architecture** with API Gateway and Au
 1. User enters username/email + password
 2. Frontend calls API Gateway (`/api/auth/login`) with 10-second timeout
 3. If API Gateway succeeds → Use response
-4. If API Gateway fails (network error, timeout, service unavailable) → Fallback to direct Firebase authentication
+4. If API Gateway fails (network error, timeout, service unavailable) → Fallback to direct Supabase authentication
 5. Maintains backward compatibility
 
 **Code:**
@@ -965,11 +982,14 @@ try {
     return await response.json(); // API Gateway success
   }
 } catch (error) {
-  // Fallback to Firebase authentication
+  // Fallback to Supabase authentication
 }
 
-// Fallback: Direct Firebase authentication
-const userCredential = await signInWithEmailAndPassword(auth, email, password);
+// Fallback: Direct Supabase authentication
+const { data, error } = await supabase.auth.signInWithPassword({
+  email: email,
+  password: password,
+});
 ```
 
 ### Backend Login Flow (Auth Service)
@@ -978,36 +998,45 @@ const userCredential = await signInWithEmailAndPassword(auth, email, password);
 
 **Flow:**
 1. Accept username/email + password
-2. **If username**: Use Admin SDK to query Firestore → Get email
-3. **Verify password**: Use Firebase Auth REST API (`signInWithPassword`)
-4. **If password correct**: Use Admin SDK to get user data from Firestore
+2. **If username**: Query Supabase PostgreSQL by `username` field → Get email
+3. **Verify password**: Use Supabase Auth (`signInWithPassword`)
+4. **If password correct**: Query Supabase PostgreSQL to get user data
 5. Return user info or authentication error
 
-**Why Hybrid Approach?**
-- Firebase Admin SDK **cannot verify passwords directly**
-- Admin SDK is used for Firestore operations (trusted backend)
-- REST API is used ONLY for password verification
+**Why This Approach?**
+- Supabase provides unified client for both Auth and Database
+- Service Role Key allows backend to perform admin operations (bypasses RLS)
+- Supabase Auth handles password verification natively
+- Single client simplifies code and reduces dependencies
 
 **Code:**
 ```javascript
-// 1. If username, resolve email using Admin SDK
+// 1. If username, resolve email using Supabase
 if (!usernameOrEmail.includes('@')) {
-  const querySnapshot = await db.collection('users')
-    .where('username', '==', usernameOrEmail)
-    .limit(1)
-    .get();
-  email = querySnapshot.docs[0].data().email;
+  const { data: userData } = await supabase
+    .from('users')
+    .select('email')
+    .eq('username', usernameOrEmail)
+    .single();
+  email = userData.email;
 }
 
-// 2. Verify password using Firebase Auth REST API
-const authResponse = await axios.post(
-  'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword',
-  { email, password, returnSecureToken: true }
-);
+// 2. Verify password using Supabase Auth
+const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+  email: email,
+  password: password,
+});
 
-// 3. Get user data using Admin SDK
-const userDoc = await db.collection('users').doc(localId).get();
-const userData = userDoc.data();
+if (authError) {
+  return { success: false, error: authError.message };
+}
+
+// 3. Get user data from PostgreSQL
+const { data: userData } = await supabase
+  .from('users')
+  .select('*')
+  .eq('uid', authData.user.id)
+  .single();
 
 // 4. Return user info
 return { success: true, user: userData };
@@ -1107,21 +1136,25 @@ This ensures the app continues to work even if microservices are down.
 ### Employee Roles by Department
 
 **Engineering Department:**
-- Manager: `techmanager` (role: `manager`)
-- Employees: `testuser`, `john.doe`, `david.brown`
+- Manager: Engineering Manager (role: `manager`, department: `Engineering`)
+- Employees: All employees with `department: "Engineering"`
+
+**Technical Department:**
+- Manager: Technical Manager (role: `manager`, department: `Technical`)
+- Employees: All employees with `department: "Technical"`
+- **Note:** Technical is a separate department from Engineering, each with its own manager
 
 **HR Department:**
-- Manager: `hrmanager` (role: `manager`)
-- Employees: `emily.davis`
+- Manager: `hrmanager` (role: `manager`, department: `HR`)
+- Employees: All employees with `department: "HR"`
 
 **Sales Department:**
-- Manager: `salesmanager` (role: `manager`)
-- Employees: `mike.johnson`
+- Manager: `salesmanager` (role: `manager`, department: `Sales`)
+- Employees: All employees with `department: "Sales"`
 
-**Other Departments:**
-- Design: `jane.smith`
-- Marketing: `sarah.williams`
-- Management: `testadmin` (super_admin)
+**Finance Department:**
+- Manager: Finance Manager (role: `manager`, department: `Finance`)
+- Employees: All employees with `department: "Finance"`
 
 ---
 
@@ -1138,8 +1171,11 @@ This ensures the app continues to work even if microservices are down.
 
 ### 3. Department-Based Routing
 - Managers identified by: `role: "manager"` + `department: "X"`
-- Tickets routed to managers based on department
+- Tickets routed to managers based on category-to-department mapping
+- Leave requests routed to managers based on category-to-department mapping
+- Engineering and Technical are separate departments with separate managers
 - Managers can only manage employees in their department
+- Work Mode Distribution statistics filtered by department for managers
 
 ### 4. Supabase Structure
 - **Authentication**: Email/password (hashed, stored in Supabase Auth)
@@ -1276,9 +1312,9 @@ Example: testuser,password:testuser123,role:employee
 
 ### Documentation
 - **Modular Architecture**: `docs/MODULAR_ARCHITECTURE.md`
-- **Firebase Setup**: `docs/FIREBASE_SETUP.md`
-- **Deployment Guide**: `docs/DEPLOYMENT.md`
-- **Migration Guide**: `docs/MIGRATION_GUIDE.md`
+- **Setup Guide**: `SETUP.md`
+- **EAS Build Setup**: `apps/mobile/EAS_BUILD_SETUP.md`
+- **Technical Documentation**: `docs/TECHNICAL_DOCUMENTATION.md`
 
 ### Code Locations (Current Structure)
 
@@ -1311,13 +1347,14 @@ Example: testuser,password:testuser123,role:employee
 - **Legacy Screens**: All 18 screens in `screens/` directory (to be migrated to respective feature modules)
 
 ### Scripts
-- **Migration Script**: `scripts/migrate-users-to-firebase.mjs`
+- **User Creation Script**: `scripts/create-users-supabase.js` - Programmatic user creation via Supabase Admin API
+- **SQL Script**: `migrations/manual-create-users.sql` - Manual SQL user creation
 
 ---
 
 ---
 
-## Firebase Quick Reference
+## Supabase Quick Reference
 
 ### Configuration Files
 - **Frontend**: `core/config/supabase.js` - Exports `supabase`, `supabaseUrl`
@@ -1344,12 +1381,99 @@ For detailed Supabase setup, see `SETUP.md`.
 
 ---
 
+## EAS Build & Deployment
+
+### Overview
+
+The mobile app uses **Expo Application Services (EAS)** for building production APKs and IPAs. EAS handles the build process in the cloud and requires environment variables to be set as secrets.
+
+### Prerequisites
+
+1. **Install EAS CLI:**
+   ```bash
+   npm install -g eas-cli
+   ```
+
+2. **Login to EAS:**
+   ```bash
+   eas login
+   ```
+
+### Setting Up Environment Variables
+
+Environment variables must be set as **EAS secrets** (not `.env` files) for production builds:
+
+```bash
+cd apps/mobile
+
+# Set Supabase URL
+eas env:create --name EXPO_PUBLIC_SUPABASE_URL --value "https://your-project.supabase.co" --scope project
+
+# Set Supabase Anon Key
+eas env:create --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value "your-anon-key-here" --scope project
+```
+
+**When prompted:**
+- **Visibility**: Select `Sensitive` (hides in logs but accessible for builds)
+- **Environment**: Select all three (`development`, `preview`, `production`)
+
+### Building APK
+
+**Preview Build (APK):**
+```bash
+cd apps/mobile
+eas build -p android --profile preview
+```
+
+**Production Build (APK):**
+```bash
+cd apps/mobile
+eas build -p android --profile production
+```
+
+### Build Profiles
+
+Configured in `apps/mobile/eas.json`:
+
+- **development**: Development client build
+- **preview**: APK for internal testing
+- **production**: Production APK/AAB
+
+### Troubleshooting APK Crashes
+
+If the APK crashes on installation:
+
+1. **Check Environment Variables:**
+   ```bash
+   eas env:list
+   ```
+   Verify both `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` are set.
+
+2. **Check Crash Logs:**
+   ```bash
+   adb logcat | grep -i "error\|exception\|crash"
+   ```
+
+3. **Verify API Gateway URL:**
+   - For physical devices, ensure `app.json` has correct IP address
+   - Or deploy backend services to a public URL
+
+### Local Development vs Production
+
+- **Local Development**: Uses `.env` file in `apps/mobile/`
+- **EAS Builds**: Uses EAS secrets (set via `eas env:create`)
+- **Never commit `.env` files** - they're in `.gitignore`
+
+For detailed EAS build setup, see `apps/mobile/EAS_BUILD_SETUP.md`.
+
+---
+
 ## Current Implementation Status
 
 ### What's Actually Implemented
 
 **Core Infrastructure (✅ Complete)**
-- Firebase configuration and initialization
+- Supabase configuration and initialization
 - Auth and Theme contexts
 - Navigation structure (AppNavigator, AuthNavigator, MainNavigator)
 - Storage abstraction service

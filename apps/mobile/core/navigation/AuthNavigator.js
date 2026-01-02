@@ -17,7 +17,7 @@ export default function AuthNavigator() {
       <Stack.Screen 
         name={ROUTES.LOGIN} 
         component={LoginScreen}
-        options={{ title: 'Present' }}
+        options={{ title: 'Hadir.AI' }}
       />
       <Stack.Screen 
         name={ROUTES.SIGNUP} 

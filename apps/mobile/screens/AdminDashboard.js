@@ -24,6 +24,7 @@ import { getPendingSignupCount } from '../utils/signupRequests';
 import { fontSize, spacing, iconSize, componentSize, responsivePadding, responsiveFont, wp, isSmallScreen, normalize } from '../utils/responsive';
 import Logo from '../components/Logo';
 import Trademark from '../components/Trademark';
+import HamburgerButton from '../shared/components/HamburgerButton';
 import { useNavigation } from '@react-navigation/native';
 
 export default function AdminDashboard({ route }) {
@@ -363,6 +364,7 @@ export default function AdminDashboard({ route }) {
       >
         {/* Welcome Header */}
         <View className="flex-row items-center justify-between" style={{ padding: responsivePadding(24), paddingBottom: spacing.md }}>
+          <HamburgerButton color={colors.text} size={28} style={{ marginRight: spacing.sm }} />
           <View className="flex-row items-center flex-1" style={{ flexShrink: 1 }}>
             <Logo size="small" style={{ marginRight: spacing.md }} />
             <View className="flex-1" style={{ flexShrink: 1 }}>

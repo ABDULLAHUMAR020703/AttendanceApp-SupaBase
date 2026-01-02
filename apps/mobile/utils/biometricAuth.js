@@ -132,13 +132,23 @@ export const authenticateWithBiometric = async (promptMessage = 'Authenticate to
       };
     }
 
-    // Attempt authentication
-    const result = await LocalAuth.authenticateAsync({
+    // Get platform-specific settings
+    const Platform = require('react-native').Platform;
+    const isIOS = Platform.OS === 'ios';
+    
+    // Platform-specific authentication options
+    // The system will automatically use the available biometric (Face ID on iOS, Fingerprint/Face on Android)
+    const authOptions = {
       promptMessage: promptMessage,
       cancelLabel: 'Cancel',
       disableDeviceFallback: false, // Allow fallback to device PIN/password
-      fallbackLabel: 'Use Passcode',
-    });
+      fallbackLabel: isIOS ? 'Use Passcode' : 'Use Password',
+    };
+
+    // Attempt authentication
+    // iOS will automatically use Face ID (iPhone X+) or Touch ID (older devices)
+    // Android will use Fingerprint or Face Unlock based on device capabilities
+    const result = await LocalAuth.authenticateAsync(authOptions);
 
     if (result.success) {
       return {
