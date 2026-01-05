@@ -26,9 +26,53 @@ export default function CustomDrawer({ navigation, state }) {
 
   useEffect(() => {
     loadCounts();
+    
+    // Refresh when drawer opens (navigation state changes)
+    // Safely check if navigation and addListener exist
+    let unsubscribe = null;
+    if (navigation && typeof navigation.addListener === 'function') {
+      try {
+        unsubscribe = navigation.addListener('state', () => {
+          loadCounts();
+        });
+      } catch (error) {
+        if (__DEV__) {
+          console.warn('[CustomDrawer] Failed to add navigation listener:', error);
+        }
+      }
+    } else {
+      if (__DEV__) {
+        console.warn('[CustomDrawer] Navigation or addListener not available');
+      }
+    }
+    
     const interval = setInterval(loadCounts, 30000); // Update every 30 seconds
-    return () => clearInterval(interval);
-  }, []);
+    
+    // Listen for app state changes (foreground/background) - CRITICAL for notification reliability
+    const { AppState } = require('react-native');
+    const handleAppStateChange = (nextAppState) => {
+      if (nextAppState === 'active') {
+        // App came to foreground - refresh notifications immediately
+        loadCounts();
+      }
+    };
+    const appStateSubscription = AppState.addEventListener('change', handleAppStateChange);
+    
+    return () => {
+      // Only call unsubscribe if it's a function
+      if (typeof unsubscribe === 'function') {
+        try {
+          unsubscribe();
+        } catch (error) {
+          if (__DEV__) {
+            console.warn('[CustomDrawer] Error unsubscribing navigation listener:', error);
+          }
+        }
+      }
+      clearInterval(interval);
+      appStateSubscription?.remove();
+    };
+  }, [navigation]);
 
   const loadCounts = async () => {
     if (user && (user.role === 'super_admin' || user.role === 'manager')) {

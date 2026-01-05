@@ -119,7 +119,8 @@ export const getAddressFromCoordinates = async (latitude, longitude) => {
   } catch (error) {
     console.error('Error getting address from coordinates:', error);
     // Fallback to coordinates if address lookup fails
-    return `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+    // Defensive: Handle null/undefined values
+    return `${(latitude ?? 0).toFixed(6)}, ${(longitude ?? 0).toFixed(6)}`;
   }
 };
 
@@ -149,7 +150,8 @@ export const getCurrentLocationWithAddress = async () => {
     } catch (addressError) {
       console.warn('Error getting address, using coordinates:', addressError.message);
       // Fallback to coordinates if address lookup fails or times out
-      address = `${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`;
+      // Defensive: Handle null/undefined values
+      address = `${(location.latitude ?? 0).toFixed(6)}, ${(location.longitude ?? 0).toFixed(6)}`;
     }
     
     return {

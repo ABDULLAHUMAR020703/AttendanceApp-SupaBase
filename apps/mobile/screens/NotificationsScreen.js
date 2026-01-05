@@ -14,9 +14,11 @@ import {
   markAllNotificationsAsRead,
   deleteNotification,
   deleteAllUserNotifications,
-  getUnreadNotificationCount
+  getUnreadNotificationCount,
+  clearReadNotifications
 } from '../utils/notifications';
 import { useTheme } from '../contexts/ThemeContext';
+import { handleNotificationNavigation } from '../utils/notificationNavigation';
 
 export default function NotificationsScreen({ navigation, route }) {
   const { user } = route.params;
@@ -28,10 +30,33 @@ export default function NotificationsScreen({ navigation, route }) {
 
   useEffect(() => {
     loadNotifications();
-    const unsubscribe = navigation.addListener('focus', () => {
-      loadNotifications();
-    });
-    return unsubscribe;
+    
+    // Safely check if navigation and addListener exist
+    let unsubscribe = null;
+    if (navigation && typeof navigation.addListener === 'function') {
+      try {
+        unsubscribe = navigation.addListener('focus', () => {
+          loadNotifications();
+        });
+      } catch (error) {
+        if (__DEV__) {
+          console.warn('[NotificationsScreen] Failed to add navigation listener:', error);
+        }
+      }
+    }
+    
+    return () => {
+      // Only call unsubscribe if it's a function
+      if (typeof unsubscribe === 'function') {
+        try {
+          unsubscribe();
+        } catch (error) {
+          if (__DEV__) {
+            console.warn('[NotificationsScreen] Error unsubscribing navigation listener:', error);
+          }
+        }
+      }
+    };
   }, [navigation, filter]);
 
   const loadNotifications = async () => {
@@ -40,12 +65,12 @@ export default function NotificationsScreen({ navigation, route }) {
       const unread = await getUnreadNotificationCount(user.username);
       setUnreadCount(unread);
       
-      // Apply filter
+      // Apply filter - check both read and isRead for compatibility
       let filtered = allNotifications;
       if (filter === 'unread') {
-        filtered = allNotifications.filter(n => !n.read);
+        filtered = allNotifications.filter(n => !n.read && !n.isRead);
       } else if (filter === 'read') {
-        filtered = allNotifications.filter(n => n.read);
+        filtered = allNotifications.filter(n => n.read || n.isRead);
       }
       
       setNotifications(filtered);
@@ -62,22 +87,79 @@ export default function NotificationsScreen({ navigation, route }) {
 
   const handleMarkAsRead = async (notificationId) => {
     try {
-      await markNotificationAsRead(notificationId);
-      await loadNotifications();
+      const result = await markNotificationAsRead(notificationId);
+      if (result.success) {
+        // Reload notifications and update badge count immediately
+        await loadNotifications();
+      } else {
+        if (__DEV__) {
+          console.warn('[NotificationsScreen] Failed to mark notification as read:', result.error);
+        }
+      }
     } catch (error) {
-      console.error('Error marking notification as read:', error);
+      console.error('[NotificationsScreen] Error marking notification as read:', error);
     }
   };
 
   const handleMarkAllAsRead = async () => {
     try {
-      await markAllNotificationsAsRead(user.username);
-      await loadNotifications();
-      Alert.alert('Success', 'All notifications marked as read');
+      const result = await markAllNotificationsAsRead(user.username);
+      if (result.success) {
+        // Reload notifications and update badge count immediately
+        await loadNotifications();
+        if (__DEV__) {
+          console.log(`[NotificationsScreen] Marked ${result.count || 0} notification(s) as read`);
+        }
+        // Show success message only if notifications were actually marked
+        if (result.count > 0) {
+          Alert.alert('Success', `Marked ${result.count} notification${result.count !== 1 ? 's' : ''} as read`);
+        }
+      } else {
+        Alert.alert('Error', result.error || 'Failed to mark all notifications as read');
+      }
     } catch (error) {
-      console.error('Error marking all as read:', error);
+      console.error('[NotificationsScreen] Error marking all as read:', error);
       Alert.alert('Error', 'Failed to mark all notifications as read');
     }
+  };
+
+  const handleClearRead = async () => {
+    // Light confirmation - just show what will happen
+    const readCount = notifications.filter(n => n.read || n.isRead).length;
+    if (readCount === 0) {
+      Alert.alert('Info', 'No read notifications to clear');
+      return;
+    }
+
+    Alert.alert(
+      'Clear Read Notifications',
+      `This will remove ${readCount} read notification${readCount !== 1 ? 's' : ''}. Unread notifications will be preserved.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const result = await clearReadNotifications(user.username);
+              if (result.success) {
+                // Reload notifications and update badge count immediately
+                await loadNotifications();
+                if (__DEV__) {
+                  console.log(`[NotificationsScreen] Cleared ${result.count || 0} read notification(s)`);
+                }
+                Alert.alert('Success', `Cleared ${result.count || 0} read notification${result.count !== 1 ? 's' : ''}`);
+              } else {
+                Alert.alert('Error', result.error || 'Failed to clear read notifications');
+              }
+            } catch (error) {
+              console.error('[NotificationsScreen] Error clearing read notifications:', error);
+              Alert.alert('Error', 'Failed to clear read notifications');
+            }
+          }
+        }
+      ]
+    );
   };
 
   const handleDelete = async (notificationId) => {
@@ -155,89 +237,30 @@ export default function NotificationsScreen({ navigation, route }) {
   };
 
   const handleNotificationPress = async (notification) => {
-    // Mark as read if unread
-    if (!notification.read) {
-      await handleMarkAsRead(notification.id);
-    }
-
-    // Navigate based on notification type and data
-    // Check if navigation data exists in notification.data
-    const navData = notification.data?.navigation;
-    
-    if (navData) {
-      const { screen, params } = navData;
-      
-      try {
-        // Navigate to the specified screen
-        navigation.navigate(screen, params);
-        return;
-      } catch (error) {
-        console.error('Error navigating from notification:', error);
-        // Fall through to fallback navigation
-      }
-    }
-    
-    // Fallback navigation based on notification type
-    switch (notification.type) {
-      case 'leave_request':
-        // For admins, navigate to EmployeeManagement
-        if (user.role === 'admin') {
-          navigation.navigate('AdminDashboard', {
-            user: user,
-            initialTab: 'employees',
-            openLeaveRequests: true
-          });
-        }
-        break;
-      case 'ticket_created':
-      case 'ticket_assigned':
-        // For admins, navigate to TicketManagement
-        if (user.role === 'admin') {
-          navigation.navigate('TicketManagement', {
-            user: user,
-            ticketId: notification.data?.ticketId
-          });
-        }
-        break;
-      case 'leave_approved':
-      case 'leave_rejected':
-        // For employees, navigate to LeaveRequestScreen
-        if (user.role === 'employee') {
-          navigation.navigate('LeaveRequestScreen', {
-            user: user
-          });
-        }
-        break;
-      case 'ticket_updated':
-      case 'ticket_response':
-        // Navigate to TicketScreen for employees, TicketManagement for admins
-        if (user.role === 'employee') {
-          navigation.navigate('TicketScreen', {
-            user: user,
-            ticketId: notification.data?.ticketId
-          });
-        } else if (user.role === 'admin') {
-          navigation.navigate('TicketManagement', {
-            user: user,
-            ticketId: notification.data?.ticketId
-          });
-        }
-        break;
-      default:
-        // No navigation for other types
-        break;
-    }
+    // Use centralized navigation handler
+    // This ensures:
+    // - Role-aware routing
+    // - Safe navigation (no crashes)
+    // - Proper fallbacks
+    // - Notification marked as read AFTER successful navigation
+    await handleNotificationNavigation(
+      notification,
+      navigation,
+      user,
+      handleMarkAsRead
+    );
   };
 
   const renderNotification = ({ item }) => (
     <TouchableOpacity
       style={{
-        backgroundColor: item.read ? colors.surface : colors.primaryLight + '20',
+        backgroundColor: (item.read || item.isRead) ? colors.surface : colors.primaryLight + '20',
         borderRadius: 12,
         padding: 16,
         marginBottom: 12,
         borderLeftWidth: 4,
         borderLeftColor: getNotificationColor(item.type),
+        opacity: (item.read || item.isRead) ? 0.7 : 1, // Visual distinction for read notifications
       }}
       onPress={() => handleNotificationPress(item)}
     >
@@ -262,10 +285,10 @@ export default function NotificationsScreen({ navigation, route }) {
         
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-            <Text style={{ fontSize: 16, fontWeight: item.read ? '400' : '600', color: colors.text, flex: 1 }}>
+            <Text style={{ fontSize: 16, fontWeight: (item.read || item.isRead) ? '400' : '600', color: colors.text, flex: 1 }}>
               {item.title}
             </Text>
-            {!item.read && (
+            {!(item.read || item.isRead) && (
               <View
                 style={{
                   width: 8,
@@ -338,6 +361,14 @@ export default function NotificationsScreen({ navigation, route }) {
                 style={{ padding: 8 }}
               >
                 <Ionicons name="checkmark-done" size={20} color={colors.primary} />
+              </TouchableOpacity>
+            )}
+            {notifications.filter(n => n.read || n.isRead).length > 0 && (
+              <TouchableOpacity
+                onPress={handleClearRead}
+                style={{ padding: 8 }}
+              >
+                <Ionicons name="broom-outline" size={20} color={colors.textSecondary} />
               </TouchableOpacity>
             )}
             <TouchableOpacity

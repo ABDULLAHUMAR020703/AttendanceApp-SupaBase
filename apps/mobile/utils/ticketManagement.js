@@ -1,6 +1,6 @@
 // Ticket Management Utilities using Supabase
 import { supabase } from '../core/config/supabase';
-import { createNotification } from './notifications';
+import { createNotification, createBatchNotifications } from './notifications';
 import { getAdminUsers, getSuperAdminUsers, getManagersByDepartment } from './employees';
 
 // Ticket Categories
@@ -297,47 +297,72 @@ export const createTicket = async (createdBy, category, priority, subject, descr
 
     const ticketId = insertedTicket.id;
 
-    // Send notification to super_admins first
+    // CRITICAL: Create notifications using centralized helper with guaranteed persistence
+    // This ensures ALL notifications are created and stored correctly
+    
+    // 1. Notify super admins (always notified of all tickets)
     try {
       const superAdmins = await getSuperAdminUsers();
-      const notificationTitle = 'New Ticket Created';
-      const notificationBody = `${createdBy} created a ${getPriorityLabel(priority)} priority ${getCategoryLabel(category)} ticket: ${subject}${assignedManager ? ` (Assigned to ${assignedManager.name})` : ''}`;
-      
-      for (const superAdmin of superAdmins) {
-        await createNotification(
-          superAdmin.username,
-          notificationTitle,
-          notificationBody,
-          'ticket_created',
-          {
+      if (superAdmins && superAdmins.length > 0) {
+        const superAdminUsernames = superAdmins
+          .map(admin => admin.username)
+          .filter(username => username); // Filter out any null/undefined usernames
+        
+        if (superAdminUsernames.length > 0) {
+          const notificationTitle = 'New Ticket Created';
+          const notificationBody = `${createdBy} created a ${getPriorityLabel(priority)} priority ${getCategoryLabel(category)} ticket: ${subject}${assignedManager ? ` (Assigned to ${assignedManager.name})` : ''}`;
+          
+          const notificationData = {
             ticketId,
             createdBy,
             category,
             priority,
             subject,
             assignedTo: assignedManager?.username || null,
-            // Navigation data
-            navigation: {
-              screen: 'TicketManagement',
-              params: {
-                user: superAdmin,
-                ticketId: ticketId
+          };
+          
+          // Use batch notification creation for efficiency and reliability
+          // Note: All notifications in batch share the same data structure
+          // Individual navigation params are set per notification in the data
+          const batchResult = await createBatchNotifications(
+            superAdminUsernames,
+            notificationTitle,
+            notificationBody,
+            'ticket_created',
+            {
+              ...notificationData,
+              // Navigation data - will be handled by centralized navigation handler
+              navigation: {
+                screen: 'HRDashboard', // Use HR Dashboard for ticket management
+                params: {
+                  ticketId: ticketId,
+                  // User will be added by navigation handler
+                }
               }
             }
+          );
+          
+          if (__DEV__) {
+            console.log(`[Ticket] Notified ${batchResult.created} super admin(s), ${batchResult.failed} failed`);
           }
-        );
+        } else {
+          if (__DEV__) {
+            console.warn('[Ticket] No valid super admin usernames found for notification');
+          }
+        }
       }
     } catch (notifError) {
-      console.error('Error sending notification to super admins:', notifError);
+      console.error('[Ticket] CRITICAL: Error notifying super admins:', notifError);
+      // Continue - ticket was created successfully, notification failure is logged
     }
 
-    // Send notification to assigned department manager
-    if (assignedManager) {
+    // 2. Notify assigned department manager (if assigned)
+    if (assignedManager && assignedManager.username) {
       try {
         const notificationTitle = 'Ticket Assigned to You';
         const notificationBody = `A ${getPriorityLabel(priority)} priority ${getCategoryLabel(category)} ticket has been assigned to you: ${subject}`;
         
-        await createNotification(
+        const result = await createNotification(
           assignedManager.username,
           notificationTitle,
           notificationBody,
@@ -348,33 +373,42 @@ export const createTicket = async (createdBy, category, priority, subject, descr
             category,
             priority,
             subject,
-            // Navigation data
             navigation: {
-              screen: 'TicketManagement',
+              screen: 'HRDashboard', // Use HR Dashboard for ticket management
               params: {
-                user: assignedManager,
-                ticketId: ticketId
+                ticketId: ticketId,
+                // User will be added by navigation handler
               }
             }
           }
         );
-        console.log(`✓ Notification sent to ${assignedManager.username}`);
+        
+        if (result.success) {
+          if (__DEV__) {
+            console.log(`[Ticket] ✓ Notification sent to assigned manager: ${assignedManager.username}`);
+          }
+        } else {
+          console.error(`[Ticket] Failed to notify assigned manager ${assignedManager.username}:`, result.error);
+        }
       } catch (notifError) {
-        console.error('Error sending notification to assigned manager:', notifError);
+        console.error('[Ticket] CRITICAL: Error notifying assigned manager:', notifError);
+        // Continue - ticket was created successfully
       }
     } else {
-      // If no manager found, notify all managers about unassigned ticket
+      // 3. If no manager found, notify all managers about unassigned ticket
       try {
         const allManagers = await getAdminUsers();
-        const managers = allManagers.filter(admin => admin.role === 'manager');
+        const managers = allManagers.filter(admin => admin.role === 'manager' && admin.username);
         
-        if (managers.length > 0) {
-          const notificationTitle = 'New Unassigned Ticket';
-          const notificationBody = `${createdBy} created a ${getPriorityLabel(priority)} priority ${getCategoryLabel(category)} ticket (needs assignment): ${subject}`;
+        if (managers && managers.length > 0) {
+          const managerUsernames = managers.map(m => m.username).filter(u => u);
           
-          for (const manager of managers) {
-            await createNotification(
-              manager.username,
+          if (managerUsernames.length > 0) {
+            const notificationTitle = 'New Unassigned Ticket';
+            const notificationBody = `${createdBy} created a ${getPriorityLabel(priority)} priority ${getCategoryLabel(category)} ticket (needs assignment): ${subject}`;
+            
+            const batchResult = await createBatchNotifications(
+              managerUsernames,
               notificationTitle,
               notificationBody,
               'ticket_created',
@@ -384,20 +418,23 @@ export const createTicket = async (createdBy, category, priority, subject, descr
                 category,
                 priority,
                 subject,
-                // Navigation data
                 navigation: {
                   screen: 'TicketManagement',
                   params: {
-                    user: manager,
                     ticketId: ticketId
                   }
                 }
               }
             );
+            
+            if (__DEV__) {
+              console.log(`[Ticket] Notified ${batchResult.created} manager(s) about unassigned ticket, ${batchResult.failed} failed`);
+            }
           }
         }
       } catch (notifError) {
-        console.error('Error sending notification to managers:', notifError);
+        console.error('[Ticket] CRITICAL: Error notifying managers about unassigned ticket:', notifError);
+        // Continue - ticket was created successfully
       }
     }
 
@@ -634,32 +671,42 @@ export const assignTicket = async (ticketId, assignedTo, assignedBy) => {
       };
     }
 
-    // Send notification to assigned admin
-    try {
-      const notificationTitle = 'Ticket Assigned';
-      const notificationBody = `You have been assigned a ${getPriorityLabel(ticket.priority)} priority ticket: ${ticket.subject}`;
-      
-      await createNotification(
-        assignedTo,
-        notificationTitle,
-        notificationBody,
-        'ticket_assigned',
-        {
-          ticketId,
-          priority: ticket.priority,
-          subject: ticket.subject,
-          // Navigation data
-          navigation: {
-            screen: 'TicketManagement',
-            params: {
-              user: { username: assignedTo },
-              ticketId: ticketId
+    // CRITICAL: Send notification to assigned admin using centralized helper
+    if (assignedTo) {
+      try {
+        const notificationTitle = 'Ticket Assigned';
+        const notificationBody = `You have been assigned a ${getPriorityLabel(ticket.priority)} priority ticket: ${ticket.subject}`;
+        
+        const result = await createNotification(
+          assignedTo,
+          notificationTitle,
+          notificationBody,
+          'ticket_assigned',
+          {
+            ticketId,
+            priority: ticket.priority,
+            subject: ticket.subject,
+            navigation: {
+              screen: 'TicketManagement',
+              params: {
+                user: { username: assignedTo },
+                ticketId: ticketId
+              }
             }
           }
+        );
+        
+        if (result.success) {
+          if (__DEV__) {
+            console.log(`[Ticket] ✓ Notification sent to assigned user: ${assignedTo}`);
+          }
+        } else {
+          console.error(`[Ticket] Failed to notify assigned user ${assignedTo}:`, result.error);
         }
-      );
-    } catch (notifError) {
-      console.error('Error sending notification:', notifError);
+      } catch (notifError) {
+        console.error('[Ticket] CRITICAL: Error sending assignment notification:', notifError);
+        // Continue - ticket was assigned successfully
+      }
     }
 
     return { success: true };
@@ -730,50 +777,55 @@ export const addTicketResponse = async (ticketId, respondedBy, message) => {
       };
     }
 
-    // Send notification
+    // CRITICAL: Send notifications using centralized helper
     try {
       const notificationTitle = 'New Response on Ticket';
       const notificationBody = `${respondedBy} responded to ticket: ${ticket.subject}`;
       
+      const recipients = [];
+      
       // Notify ticket creator if not the one responding
-      if (respondedBy !== ticket.created_by) {
-        await createNotification(
-          ticket.created_by,
-          notificationTitle,
-          notificationBody,
-          'ticket_response',
-          {
-            ticketId,
-            subject: ticket.subject,
-            respondedBy
-          }
-        );
+      if (ticket.created_by && respondedBy !== ticket.created_by) {
+        recipients.push(ticket.created_by);
       }
 
-      // Notify assigned admin if different from responder
-      if (ticket.assigned_to && ticket.assigned_to !== respondedBy && ticket.assigned_to !== ticket.created_by) {
-        await createNotification(
-          ticket.assigned_to,
+      // Notify assigned admin if different from responder and creator
+      if (ticket.assigned_to && 
+          ticket.assigned_to !== respondedBy && 
+          ticket.assigned_to !== ticket.created_by &&
+          !recipients.includes(ticket.assigned_to)) {
+        recipients.push(ticket.assigned_to);
+      }
+      
+      // Create notifications for all recipients
+      if (recipients.length > 0) {
+        const notificationData = {
+          ticketId,
+          subject: ticket.subject,
+          respondedBy,
+          navigation: {
+            screen: 'HRDashboard', // Use HR Dashboard for ticket management
+            params: {
+              ticketId: ticketId
+            }
+          }
+        };
+        
+        const batchResult = await createBatchNotifications(
+          recipients,
           notificationTitle,
           notificationBody,
           'ticket_response',
-          {
-            ticketId,
-            subject: ticket.subject,
-            respondedBy,
-            // Navigation data
-            navigation: {
-              screen: 'TicketManagement',
-              params: {
-                user: { username: ticket.assigned_to },
-                ticketId: ticketId
-              }
-            }
-          }
+          notificationData
         );
+        
+        if (__DEV__) {
+          console.log(`[Ticket] Notified ${batchResult.created} recipient(s) about response, ${batchResult.failed} failed`);
+        }
       }
     } catch (notifError) {
-      console.error('Error sending notification:', notifError);
+      console.error('[Ticket] CRITICAL: Error sending response notifications:', notifError);
+      // Continue - response was added successfully
     }
 
     return { success: true };

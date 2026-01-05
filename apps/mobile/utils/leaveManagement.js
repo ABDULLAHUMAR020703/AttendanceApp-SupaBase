@@ -1,7 +1,7 @@
 // Leave Management Utilities using Supabase
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../core/config/supabase';
-import { createNotification } from './notifications';
+import { createNotification, createBatchNotifications } from './notifications';
 import { getEmployeeById, getAdminUsers, getSuperAdminUsers, getManagersByDepartment } from './employees';
 
 const LEAVE_SETTINGS_KEY = 'leave_settings';
@@ -610,38 +610,54 @@ export const createLeaveRequest = async (employeeId, leaveType, startDate, endDa
         index === self.findIndex(a => a.username === admin.username)
       );
       
-      // Send notification to each recipient
-      for (const recipient of uniqueRecipients) {
-        await createNotification(
-          recipient.username,
+      // CRITICAL: Use batch notification creation for reliability
+      const recipientUsernames = uniqueRecipients
+        .map(r => r.username)
+        .filter(u => u); // Filter out any null/undefined usernames
+      
+      if (recipientUsernames.length > 0) {
+        const notificationData = {
+          requestId,
+          employeeId,
+          employeeName: employee ? employee.name : 'Unknown',
+          leaveType,
+          category: finalCategory,
+          days,
+          startDate,
+          endDate,
+          assignedTo: assignedManager?.username || null,
+          navigation: {
+            screen: 'HRDashboard', // Use HR Dashboard for leave management
+            params: {
+              initialTab: 'leaves', // Open leaves tab
+              openLeaveRequests: true
+            }
+          }
+        };
+        
+        const batchResult = await createBatchNotifications(
+          recipientUsernames,
           notificationTitle,
           notificationBody,
           'leave_request',
-          {
-            requestId,
-            employeeId,
-            employeeName: employee ? employee.name : 'Unknown',
-            leaveType,
-            category: finalCategory,
-            days,
-            startDate,
-            endDate,
-            assignedTo: assignedManager?.username || null,
-            // Navigation data
-            navigation: {
-              screen: 'AdminDashboard',
-              params: {
-                user: recipient,
-                initialTab: 'employees',
-                openLeaveRequests: true
-              }
-            }
-          }
+          notificationData
         );
+        
+        if (__DEV__) {
+          console.log(`[Leave] Notified ${batchResult.created} recipient(s), ${batchResult.failed} failed`);
+          if (batchResult.errors && batchResult.errors.length > 0) {
+            console.warn('[Leave] Notification errors:', batchResult.errors);
+          }
+        }
+      } else {
+        if (__DEV__) {
+          console.warn('[Leave] No valid recipients found for notification');
+        }
       }
+      
     } catch (notifError) {
-      console.error('Error sending notification to admins:', notifError);
-      // Don't fail the request if notification fails
+      console.error('[Leave] CRITICAL: Error sending notification to admins:', notifError);
+      // Don't fail the request if notification fails - ticket was created successfully
     }
 
     console.log(`Leave request created: ${requestId}`);
@@ -901,7 +917,7 @@ export const processLeaveRequest = async (requestId, status, processedBy, adminN
           ? `Your ${leaveTypeLabels[request.leave_type]} request for ${request.days} day${request.days !== 1 ? 's' : ''} (${request.start_date} to ${request.end_date}) has been approved.`
           : `Your ${leaveTypeLabels[request.leave_type]} request for ${request.days} day${request.days !== 1 ? 's' : ''} (${request.start_date} to ${request.end_date}) has been rejected.${adminNotes ? `\n\nNote: ${adminNotes}` : ''}`;
         
-        await createNotification(
+        const result = await createNotification(
           employee.username,
           notificationTitle,
           notificationBody,
@@ -916,7 +932,6 @@ export const processLeaveRequest = async (requestId, status, processedBy, adminN
             status,
             processedBy,
             adminNotes,
-            // Navigation data
             navigation: {
               screen: 'LeaveRequestScreen',
               params: {
@@ -925,10 +940,22 @@ export const processLeaveRequest = async (requestId, status, processedBy, adminN
             }
           }
         );
+        
+        if (result.success) {
+          if (__DEV__) {
+            console.log(`[Leave] ✓ Notification sent to employee: ${employee.username}`);
+          }
+        } else {
+          console.error(`[Leave] Failed to notify employee ${employee.username}:`, result.error);
+        }
+      } else {
+        if (__DEV__) {
+          console.warn('[Leave] Cannot send notification - employee not found');
+        }
       }
     } catch (notifError) {
-      console.error('Error sending notification to employee:', notifError);
-      // Don't fail the processing if notification fails
+      console.error('[Leave] CRITICAL: Error sending notification to employee:', notifError);
+      // Don't fail the processing if notification fails - leave was processed successfully
     }
 
     console.log(`Leave request ${requestId} ${status} by ${processedBy}`);

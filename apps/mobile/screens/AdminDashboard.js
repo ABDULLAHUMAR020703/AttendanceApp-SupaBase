@@ -29,9 +29,31 @@ import { useNavigation } from '@react-navigation/native';
 
 export default function AdminDashboard({ route }) {
   const navigation = useNavigation();
-  const { user, initialTab, openLeaveRequests } = route.params || {};
-  const { handleLogout } = useAuth();
+  const { user: routeUser, initialTab, openLeaveRequests } = route.params || {};
+  const { user: authUser, handleLogout } = useAuth();
   const { colors } = useTheme();
+  
+  // CRITICAL FIX: Role guard - prevent rendering if user is not manager/super_admin
+  // Use authUser from context (most up-to-date) with fallback to route params
+  const user = authUser || routeUser;
+  
+  // Guard: Redirect if user doesn't have manager/super_admin role
+  useEffect(() => {
+    if (!user || (user.role !== 'manager' && user.role !== 'super_admin')) {
+      if (navigation) {
+        if (user && user.role === 'employee') {
+          navigation.replace('EmployeeDashboard', { user });
+        } else {
+          navigation.replace('LoginScreen');
+        }
+      }
+    }
+  }, [user, navigation]);
+  
+  // Guard: Only render if user has manager or super_admin role
+  if (!user || (user.role !== 'manager' && user.role !== 'super_admin')) {
+    return null;
+  }
   const [activeTab, setActiveTab] = useState(initialTab || 'attendance'); // 'attendance', 'employees', 'calendar', or 'hr'
   const [records, setRecords] = useState([]);
   const [filteredRecords, setFilteredRecords] = useState([]);
@@ -53,7 +75,10 @@ export default function AdminDashboard({ route }) {
       loadPendingSignupCount();
     }, 30000);
 
-    return () => clearInterval(notificationInterval);
+    return () => {
+      // Only cleanup what was actually created
+      clearInterval(notificationInterval);
+    };
   }, []);
 
   // Handle navigation params for opening leave requests
@@ -273,7 +298,7 @@ export default function AdminDashboard({ route }) {
                   style={{ fontSize: responsiveFont(12), flexShrink: 1 }}
                   numberOfLines={1}
                 >
-                  {item.location.latitude.toFixed(4)}, {item.location.longitude.toFixed(4)}
+                  {(item.location.latitude ?? 0).toFixed(4)}, {(item.location.longitude ?? 0).toFixed(4)}
                 </Text>
               </View>
             )}
@@ -782,7 +807,7 @@ export default function AdminDashboard({ route }) {
               data={filteredRecords}
               renderItem={renderRecord}
               keyExtractor={(item) => item.id}
-              contentContainerStyle={{ padding: 16 }}
+              contentContainerStyle={{ padding: responsivePadding(16), paddingBottom: spacing['2xl'] }}
               refreshControl={
                 <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
               }

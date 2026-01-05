@@ -137,7 +137,7 @@ export default function AttendanceHistory({ route }) {
                 >
                   {item.location.address || 
                    (item.location.latitude !== undefined && item.location.longitude !== undefined
-                     ? `${item.location.latitude.toFixed(4)}, ${item.location.longitude.toFixed(4)}`
+                     ? `${(item.location.latitude ?? 0).toFixed(4)}, ${(item.location.longitude ?? 0).toFixed(4)}`
                      : 'Location unavailable')}
                 </Text>
               </View>

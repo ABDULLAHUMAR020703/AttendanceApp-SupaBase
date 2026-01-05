@@ -327,10 +327,15 @@ export const getAllUsersAnalytics = async (period = 'monthly') => {
 
 /**
  * Format hours for display
- * @param {number} hours - Hours to format
+ * @param {number|null|undefined} hours - Hours to format
  * @returns {string} Formatted string (e.g., "8.5h" or "8h 30m")
  */
 export const formatHours = (hours) => {
+  // Defensive: Handle null/undefined values
+  if (hours == null || isNaN(hours)) {
+    return '0h';
+  }
+  
   if (hours === 0) return '0h';
   
   const wholeHours = Math.floor(hours);
@@ -345,10 +350,14 @@ export const formatHours = (hours) => {
 
 /**
  * Format percentage for display
- * @param {number} percentage - Percentage to format
+ * @param {number|null|undefined} percentage - Percentage to format
  * @returns {string} Formatted string (e.g., "85.5%")
  */
 export const formatPercentage = (percentage) => {
-  return `${percentage.toFixed(1)}%`;
+  // Defensive: Handle null/undefined values to prevent "Cannot read property 'toFixed' of null"
+  if (percentage == null || isNaN(percentage)) {
+    return '0.0%';
+  }
+  return `${(percentage ?? 0).toFixed(1)}%`;
 };
 

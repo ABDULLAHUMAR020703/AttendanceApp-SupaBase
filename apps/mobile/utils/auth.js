@@ -10,6 +10,31 @@ import { supabase } from '../core/config/supabase';
  * @returns {Promise<{success: boolean, user?: {username: string, role: string}}>}
  */
 export const authenticateUser = async (usernameOrEmail, password) => {
+  // ===== CRITICAL FIX: Clear existing session before new login =====
+  // This prevents crashes when switching users (especially manager → employee)
+  try {
+    const { data: { session: existingSession } } = await supabase.auth.getSession();
+    if (existingSession) {
+      console.log('[AUTH] Existing session found, signing out:', existingSession.user.email);
+      await supabase.auth.signOut();
+      // Wait for signOut to complete and clear AsyncStorage
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // Defensive: Clear AsyncStorage session keys
+      try {
+        const { clearSupabaseSession } = await import('./sessionHelper');
+        await clearSupabaseSession();
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (clearError) {
+        console.warn('[AUTH] Error clearing session storage:', clearError);
+      }
+    }
+  } catch (clearError) {
+    console.warn('[AUTH] Error clearing existing session:', clearError);
+    // Continue anyway - try to proceed with login
+  }
+  // ===== END FIX =====
+  
   // First, try API Gateway (recommended - uses backend service)
   try {
     // Ensure API_GATEWAY_URL is a string

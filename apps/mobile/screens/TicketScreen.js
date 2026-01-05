@@ -24,6 +24,7 @@ import {
   TICKET_STATUS,
 } from '../utils/ticketManagement';
 import { useTheme } from '../contexts/ThemeContext';
+import { spacing, fontSize, responsivePadding, responsiveFont, iconSize } from '../shared/utils/responsive';
 
 export default function TicketScreen({ navigation, route }) {
   const { user } = route.params;
@@ -42,10 +43,33 @@ export default function TicketScreen({ navigation, route }) {
 
   useEffect(() => {
     loadTickets();
-    const unsubscribe = navigation.addListener('focus', () => {
-      loadTickets();
-    });
-    return unsubscribe;
+    
+    // Safely check if navigation and addListener exist
+    let unsubscribe = null;
+    if (navigation && typeof navigation.addListener === 'function') {
+      try {
+        unsubscribe = navigation.addListener('focus', () => {
+          loadTickets();
+        });
+      } catch (error) {
+        if (__DEV__) {
+          console.warn('[TicketScreen] Failed to add navigation listener:', error);
+        }
+      }
+    }
+    
+    return () => {
+      // Only call unsubscribe if it's a function
+      if (typeof unsubscribe === 'function') {
+        try {
+          unsubscribe();
+        } catch (error) {
+          if (__DEV__) {
+            console.warn('[TicketScreen] Error unsubscribing navigation listener:', error);
+          }
+        }
+      }
+    };
   }, [navigation, filter]);
 
   const loadTickets = async () => {
@@ -117,8 +141,8 @@ export default function TicketScreen({ navigation, route }) {
       style={{
         backgroundColor: colors.surface,
         borderRadius: 12,
-        padding: 16,
-        marginBottom: 12,
+        padding: responsivePadding(16),
+        marginBottom: spacing.md,
         shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
@@ -126,40 +150,40 @@ export default function TicketScreen({ navigation, route }) {
         elevation: 3,
       }}
     >
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-        <View style={{ flex: 1 }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.xs }}>
+        <View style={{ flex: 1, flexShrink: 1 }}>
           <Text
             style={{
-              fontSize: 18,
+              fontSize: responsiveFont(18),
               fontWeight: '600',
               color: colors.text,
-              marginBottom: 4,
+              marginBottom: spacing.xs / 2,
             }}
           >
             {item.subject}
           </Text>
           <Text
             style={{
-              fontSize: 12,
+              fontSize: fontSize.sm,
               color: colors.textTertiary,
             }}
           >
             Created {formatDate(item.createdAt)}
           </Text>
         </View>
-        <View style={{ alignItems: 'flex-end' }}>
+        <View style={{ alignItems: 'flex-end', marginLeft: spacing.xs }}>
           <View
             style={{
               backgroundColor: getStatusColor(item.status) + '20',
               borderRadius: 12,
-              paddingHorizontal: 12,
-              paddingVertical: 4,
-              marginBottom: 4,
+              paddingHorizontal: spacing.md,
+              paddingVertical: spacing.xs / 2,
+              marginBottom: spacing.xs / 2,
             }}
           >
             <Text
               style={{
-                fontSize: 12,
+                fontSize: fontSize.sm,
                 fontWeight: '600',
                 color: getStatusColor(item.status),
               }}
@@ -171,13 +195,13 @@ export default function TicketScreen({ navigation, route }) {
             style={{
               backgroundColor: getPriorityColor(item.priority) + '20',
               borderRadius: 12,
-              paddingHorizontal: 12,
-              paddingVertical: 4,
+              paddingHorizontal: spacing.md,
+              paddingVertical: spacing.xs / 2,
             }}
           >
             <Text
               style={{
-                fontSize: 12,
+                fontSize: fontSize.sm,
                 fontWeight: '600',
                 color: getPriorityColor(item.priority),
               }}
@@ -188,26 +212,26 @@ export default function TicketScreen({ navigation, route }) {
         </View>
       </View>
 
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-        <Ionicons name="pricetag-outline" size={14} color={colors.textSecondary} />
+      <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginBottom: spacing.xs }}>
+        <Ionicons name="pricetag-outline" size={iconSize.sm} color={colors.textSecondary} />
         <Text
           style={{
-            fontSize: 14,
+            fontSize: fontSize.base,
             color: colors.textSecondary,
-            marginLeft: 6,
+            marginLeft: spacing.xs,
           }}
         >
           {getCategoryLabel(item.category)}
         </Text>
         {item.assignedTo && (
           <>
-            <Text style={{ color: colors.textTertiary, marginHorizontal: 8 }}>•</Text>
-            <Ionicons name="person-outline" size={14} color={colors.textSecondary} />
+            <Text style={{ color: colors.textTertiary, marginHorizontal: spacing.xs }}>•</Text>
+            <Ionicons name="person-outline" size={iconSize.sm} color={colors.textSecondary} />
             <Text
               style={{
-                fontSize: 14,
+                fontSize: fontSize.base,
                 color: colors.textSecondary,
-                marginLeft: 6,
+                marginLeft: spacing.xs,
               }}
             >
               Assigned to {item.assignedTo}
@@ -218,9 +242,9 @@ export default function TicketScreen({ navigation, route }) {
 
       <Text
         style={{
-          fontSize: 14,
+          fontSize: fontSize.base,
           color: colors.textSecondary,
-          marginBottom: 8,
+          marginBottom: spacing.xs,
         }}
       >
         {item.description}
@@ -231,25 +255,25 @@ export default function TicketScreen({ navigation, route }) {
           style={{
             backgroundColor: colors.background,
             borderRadius: 8,
-            padding: 12,
-            marginTop: 8,
+            padding: spacing.md,
+            marginTop: spacing.xs,
           }}
         >
           <Text
             style={{
-              fontSize: 12,
+              fontSize: fontSize.sm,
               fontWeight: '600',
               color: colors.text,
-              marginBottom: 4,
+              marginBottom: spacing.xs / 2,
             }}
           >
             {item.responses.length} Response{item.responses.length !== 1 ? 's' : ''}
           </Text>
           {item.responses.slice(-1).map((response) => (
-            <View key={response.id} style={{ marginTop: 4 }}>
+            <View key={response.id} style={{ marginTop: spacing.xs / 2 }}>
               <Text
                 style={{
-                  fontSize: 12,
+                  fontSize: fontSize.sm,
                   color: colors.textSecondary,
                 }}
               >
@@ -268,8 +292,8 @@ export default function TicketScreen({ navigation, route }) {
       <View
         style={{
           backgroundColor: colors.surface,
-          paddingHorizontal: 16,
-          paddingVertical: 12,
+          paddingHorizontal: responsivePadding(16),
+          paddingVertical: spacing.md,
           shadowColor: colors.shadow,
           shadowOffset: { width: 0, height: 2 },
           shadowOpacity: 0.1,
@@ -277,10 +301,10 @@ export default function TicketScreen({ navigation, route }) {
           elevation: 3,
         }}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
           <Text
             style={{
-              fontSize: 20,
+              fontSize: responsiveFont(20),
               fontWeight: 'bold',
               color: colors.text,
             }}
@@ -291,18 +315,20 @@ export default function TicketScreen({ navigation, route }) {
             style={{
               backgroundColor: colors.primary,
               borderRadius: 12,
-              paddingHorizontal: 16,
-              paddingVertical: 8,
+              paddingHorizontal: responsivePadding(16),
+              paddingVertical: spacing.xs,
+              marginTop: spacing.xs,
             }}
             onPress={() => setShowCreateModal(true)}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Ionicons name="add" size={18} color="white" />
+              <Ionicons name="add" size={iconSize.md} color="white" />
               <Text
                 style={{
                   color: 'white',
                   fontWeight: '600',
-                  marginLeft: 4,
+                  marginLeft: spacing.xs / 2,
+                  fontSize: fontSize.sm,
                 }}
               >
                 New Ticket
@@ -311,15 +337,15 @@ export default function TicketScreen({ navigation, route }) {
           </TouchableOpacity>
         </View>
 
-        {/* Filter Tabs */}
-        <View style={{ flexDirection: 'row', marginTop: 12, gap: 8 }}>
+        {/* Filter Tabs - Responsive: wraps on small screens */}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing.md, gap: spacing.xs }}>
           {['all', TICKET_STATUS.OPEN, TICKET_STATUS.IN_PROGRESS, TICKET_STATUS.RESOLVED, TICKET_STATUS.CLOSED].map((filterType) => (
             <TouchableOpacity
               key={filterType}
               onPress={() => setFilter(filterType)}
               style={{
-                paddingHorizontal: 12,
-                paddingVertical: 6,
+                paddingHorizontal: spacing.md,
+                paddingVertical: spacing.xs,
                 borderRadius: 16,
                 backgroundColor: filter === filterType ? colors.primary : colors.background,
               }}
@@ -328,7 +354,7 @@ export default function TicketScreen({ navigation, route }) {
                 style={{
                   color: filter === filterType ? 'white' : colors.textSecondary,
                   fontWeight: filter === filterType ? '600' : '400',
-                  fontSize: 12,
+                  fontSize: fontSize.sm,
                   textTransform: 'capitalize',
                 }}
               >
@@ -345,34 +371,34 @@ export default function TicketScreen({ navigation, route }) {
           data={tickets}
           renderItem={renderTicket}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ padding: 16 }}
+          contentContainerStyle={{ padding: responsivePadding(16), paddingBottom: spacing['2xl'] }}
           refreshControl={
             <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
           }
         />
       ) : (
         <ScrollView
-          contentContainerStyle={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 }}
+          contentContainerStyle={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing['2xl'] }}
           refreshControl={
             <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
           }
         >
-          <Ionicons name="ticket-outline" size={64} color={colors.textTertiary} />
+          <Ionicons name="ticket-outline" size={iconSize['4xl']} color={colors.textTertiary} />
           <Text
             style={{
-              fontSize: 18,
+              fontSize: responsiveFont(18),
               fontWeight: '600',
               color: colors.text,
-              marginTop: 16,
+              marginTop: spacing.base,
             }}
           >
             No tickets
           </Text>
           <Text
             style={{
-              fontSize: 14,
+              fontSize: fontSize.base,
               color: colors.textSecondary,
-              marginTop: 8,
+              marginTop: spacing.xs,
               textAlign: 'center',
             }}
           >
@@ -402,15 +428,15 @@ export default function TicketScreen({ navigation, route }) {
               backgroundColor: colors.surface,
               borderTopLeftRadius: 24,
               borderTopRightRadius: 24,
-              padding: 24,
+              padding: responsivePadding(24),
               maxHeight: '90%',
             }}
           >
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing['2xl'] }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.base }}>
                 <Text
                   style={{
-                    fontSize: 20,
+                    fontSize: responsiveFont(20),
                     fontWeight: 'bold',
                     color: colors.text,
                   }}
@@ -418,17 +444,17 @@ export default function TicketScreen({ navigation, route }) {
                   Create New Ticket
                 </Text>
                 <TouchableOpacity onPress={() => setShowCreateModal(false)}>
-                  <Ionicons name="close" size={24} color={colors.textSecondary} />
+                  <Ionicons name="close" size={iconSize.lg} color={colors.textSecondary} />
                 </TouchableOpacity>
               </View>
 
               {/* Category */}
-              <View style={{ marginBottom: 16 }}>
-                <Text style={{ color: colors.text, marginBottom: 8, fontWeight: '500' }}>Category *</Text>
-                <Text style={{ color: colors.textSecondary, marginBottom: 8, fontSize: 12 }}>
+              <View style={{ marginBottom: spacing.base }}>
+                <Text style={{ color: colors.text, marginBottom: spacing.xs, fontWeight: '500', fontSize: fontSize.md }}>Category *</Text>
+                <Text style={{ color: colors.textSecondary, marginBottom: spacing.xs, fontSize: fontSize.sm }}>
                   Select the department manager who should handle this ticket
                 </Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
                   {/* Show only: HR, Finance, Engineering, Sales, Technical (all enabled for everyone) */}
                   {[
                     TICKET_CATEGORIES.HR,
@@ -444,18 +470,20 @@ export default function TicketScreen({ navigation, route }) {
                         key={cat}
                         style={{
                           borderRadius: 8,
-                          padding: 12,
+                          padding: spacing.md,
                           borderWidth: 2,
                           borderColor: isSelected ? colors.primary : colors.border,
                           backgroundColor: isSelected ? colors.primaryLight : 'transparent',
                           minWidth: '30%',
+                          flex: 1,
+                          maxWidth: '48%', // Prevent too wide on larger screens
                         }}
                         onPress={() => setCategory(cat)}
                       >
                         <Text
                           style={{
                             textAlign: 'center',
-                            fontSize: 12,
+                            fontSize: fontSize.sm,
                             fontWeight: '500',
                             color: isSelected ? colors.primary : colors.text,
                           }}
@@ -469,26 +497,28 @@ export default function TicketScreen({ navigation, route }) {
               </View>
 
               {/* Priority */}
-              <View style={{ marginBottom: 16 }}>
-                <Text style={{ color: colors.text, marginBottom: 8, fontWeight: '500' }}>Priority *</Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              <View style={{ marginBottom: spacing.base }}>
+                <Text style={{ color: colors.text, marginBottom: spacing.xs, fontWeight: '500', fontSize: fontSize.md }}>Priority *</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
                   {Object.values(TICKET_PRIORITIES).map((pri) => (
                     <TouchableOpacity
                       key={pri}
                       style={{
                         borderRadius: 8,
-                        padding: 12,
+                        padding: spacing.md,
                         borderWidth: 2,
                         borderColor: priority === pri ? getPriorityColor(pri) : colors.border,
                         backgroundColor: priority === pri ? getPriorityColor(pri) + '20' : 'transparent',
                         minWidth: '22%',
+                        flex: 1,
+                        maxWidth: '48%',
                       }}
                       onPress={() => setPriority(pri)}
                     >
                       <Text
                         style={{
                           textAlign: 'center',
-                          fontSize: 12,
+                          fontSize: fontSize.sm,
                           fontWeight: '500',
                           color: priority === pri ? getPriorityColor(pri) : colors.text,
                         }}
@@ -501,15 +531,16 @@ export default function TicketScreen({ navigation, route }) {
               </View>
 
               {/* Subject */}
-              <View style={{ marginBottom: 16 }}>
-                <Text style={{ color: colors.text, marginBottom: 8, fontWeight: '500' }}>Subject *</Text>
+              <View style={{ marginBottom: spacing.base }}>
+                <Text style={{ color: colors.text, marginBottom: spacing.xs, fontWeight: '500', fontSize: fontSize.md }}>Subject *</Text>
                 <TextInput
                   style={{
                     backgroundColor: colors.background,
                     borderRadius: 12,
-                    paddingHorizontal: 16,
-                    paddingVertical: 12,
+                    paddingHorizontal: responsivePadding(16),
+                    paddingVertical: spacing.md,
                     color: colors.text,
+                    fontSize: fontSize.base,
                   }}
                   placeholder="Enter ticket subject"
                   placeholderTextColor={colors.textTertiary}
@@ -519,17 +550,18 @@ export default function TicketScreen({ navigation, route }) {
               </View>
 
               {/* Description */}
-              <View style={{ marginBottom: 16 }}>
-                <Text style={{ color: colors.text, marginBottom: 8, fontWeight: '500' }}>Description *</Text>
+              <View style={{ marginBottom: spacing.base }}>
+                <Text style={{ color: colors.text, marginBottom: spacing.xs, fontWeight: '500', fontSize: fontSize.md }}>Description *</Text>
                 <TextInput
                   style={{
                     backgroundColor: colors.background,
                     borderRadius: 12,
-                    paddingHorizontal: 16,
-                    paddingVertical: 12,
+                    paddingHorizontal: responsivePadding(16),
+                    paddingVertical: spacing.md,
                     color: colors.text,
                     minHeight: 100,
                     textAlignVertical: 'top',
+                    fontSize: fontSize.base,
                   }}
                   placeholder="Describe your issue in detail..."
                   placeholderTextColor={colors.textTertiary}
@@ -540,17 +572,19 @@ export default function TicketScreen({ navigation, route }) {
                 />
               </View>
 
-              <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
+              {/* Action Buttons - Responsive: wraps on small screens */}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.base }}>
                 <TouchableOpacity
                   style={{
                     backgroundColor: colors.border,
                     borderRadius: 8,
-                    padding: 12,
+                    padding: spacing.md,
                     flex: 1,
+                    minWidth: 120,
                   }}
                   onPress={() => setShowCreateModal(false)}
                 >
-                  <Text style={{ textAlign: 'center', fontWeight: '500', color: colors.text }}>
+                  <Text style={{ textAlign: 'center', fontWeight: '500', color: colors.text, fontSize: fontSize.base }}>
                     Cancel
                   </Text>
                 </TouchableOpacity>
@@ -559,13 +593,14 @@ export default function TicketScreen({ navigation, route }) {
                   style={{
                     backgroundColor: colors.primary,
                     borderRadius: 8,
-                    padding: 12,
+                    padding: spacing.md,
                     flex: 1,
+                    minWidth: 120,
                   }}
                   onPress={handleCreateTicket}
                   disabled={isSubmitting}
                 >
-                  <Text style={{ textAlign: 'center', fontWeight: '500', color: 'white' }}>
+                  <Text style={{ textAlign: 'center', fontWeight: '500', color: 'white', fontSize: fontSize.base }}>
                     {isSubmitting ? 'Creating...' : 'Create Ticket'}
                   </Text>
                 </TouchableOpacity>

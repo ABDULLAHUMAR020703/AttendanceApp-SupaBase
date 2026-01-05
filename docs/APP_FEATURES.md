@@ -439,14 +439,34 @@
 - **Unread Count Badge**
   - Display unread notification count
   - Real-time updates
-  - Badge on dashboard
+  - Badge on dashboard and drawer menu
+  - Accurate count (only unread notifications)
+  - Updates immediately after mark/clear operations
 
 - **Notification Center**
-  - View all notifications
-  - Mark as read/unread
-  - Filter notifications
-  - Delete notifications
-  - Notification history
+  - View all notifications with filtering (All, Unread, Read)
+  - Visual distinction: Read notifications have reduced opacity
+  - Mark individual notifications as read
+  - Mark all notifications as read (one-click action)
+  - Clear read notifications (removes only read, preserves unread)
+  - Delete all notifications (removes all notifications)
+  - Notification history preserved after marking as read
+
+- **Actionable Notifications**
+  - Tap any notification to navigate to relevant screen
+  - Role-aware navigation:
+    - Leave requests → HR Dashboard (managers/super_admin) or Leave Request Screen (employees)
+    - Ticket notifications → HR Dashboard (managers/super_admin) or Ticket Screen (employees)
+    - Leave approvals/rejections → Leave Request Screen (employees)
+  - Automatic read marking after successful navigation
+  - Safe navigation with fallbacks (no crashes)
+
+- **Read State Management**
+  - Notifications remain visible after being read
+  - Dual state fields: `read` and `isRead` for compatibility
+  - Default state: All new notifications are unread (`isRead: false`)
+  - Persistent storage with verification
+  - Badge count reflects only unread notifications
 
 ---
 

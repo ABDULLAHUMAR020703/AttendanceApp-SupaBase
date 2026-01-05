@@ -19,12 +19,12 @@ import HamburgerButton from '../shared/components/HamburgerButton';
 import Logo from '../components/Logo';
 
 export default function ReportsScreen({ route, navigation }) {
-  const { user } = route.params || {};
+  const { user: routeUser } = route.params || {};
   const { colors } = useTheme();
   const { user: authUser } = useAuth();
   
-  // Use user from route params or auth context
-  const currentUser = user || authUser;
+  // Use user from route params or auth context (avoid duplicate user variable)
+  const currentUser = routeUser || authUser;
 
   // Only show for super admin
   if (!currentUser || currentUser.role !== 'super_admin') {

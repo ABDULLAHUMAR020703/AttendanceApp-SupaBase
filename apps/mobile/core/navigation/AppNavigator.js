@@ -23,8 +23,12 @@ export default function AppNavigator() {
     );
   }
 
+  // CRITICAL FIX: Use user.uid as key to force navigation reset when user changes
+  // This prevents manager screens from rendering with wrong user data
+  const navigationKey = user ? `${user.uid}-${user.role}` : 'no-user';
+
   return (
-    <NavigationContainer>
+    <NavigationContainer key={navigationKey}>
       <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
       {!user ? <AuthNavigator /> : <DrawerNavigator user={user} />}
     </NavigationContainer>

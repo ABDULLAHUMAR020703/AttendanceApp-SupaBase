@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { supabase } from '../config/supabase';
 import { getEmployeeByUsername } from '../../utils/employees';
 
@@ -7,6 +7,7 @@ const AuthContext = createContext();
 export function AuthProvider({ children }) {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState(null);
+  const loadUserDataRef = useRef(null); // Track active loadUserData call to prevent race conditions
 
   useEffect(() => {
     // Get initial session with error handling
@@ -65,9 +66,24 @@ export function AuthProvider({ children }) {
   }, []);
 
   const loadUserData = async (userId) => {
+    // Cancel any previous loadUserData call to prevent race conditions
+    if (loadUserDataRef.current) {
+      console.log('[AUTH_CONTEXT] Cancelling previous loadUserData');
+      loadUserDataRef.current.cancelled = true;
+    }
+    
+    const currentCall = { cancelled: false };
+    loadUserDataRef.current = currentCall;
+    
     try {
       // First verify the session is still valid
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      // Check if this call was cancelled
+      if (currentCall.cancelled) {
+        console.log('[AUTH_CONTEXT] loadUserData cancelled');
+        return;
+      }
       if (sessionError) {
         console.error('Session error in loadUserData:', sessionError);
         // If refresh token error, sign out
@@ -82,13 +98,30 @@ export function AuthProvider({ children }) {
       
       if (!session) {
         console.log('No active session');
-        setUser(null);
-        setIsLoading(false);
+        if (!currentCall.cancelled) {
+          setUser(null);
+          setIsLoading(false);
+        }
+        return;
+      }
+      
+      // CRITICAL: Verify session.user.id matches userId to prevent loading wrong user data
+      if (session.user.id !== userId) {
+        console.warn('[AUTH_CONTEXT] Session userId mismatch:', {
+          expected: userId,
+          actual: session.user.id,
+        });
+        // Don't load data - session changed (user switched)
         return;
       }
 
       // Get auth user email for fallback query
       const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+      
+      // Check if cancelled after async call
+      if (currentCall.cancelled) {
+        return;
+      }
       if (authError) {
         console.error('Error getting auth user:', authError);
         // If refresh token error, sign out
@@ -130,6 +163,9 @@ export function AuthProvider({ children }) {
       
       if (userError || !userData) {
         console.error('Error loading user data:', userError);
+        // Check if cancelled
+        if (currentCall.cancelled) return;
+        
         // Fallback to basic user info from auth
         if (authUser) {
           setUser({
@@ -140,6 +176,11 @@ export function AuthProvider({ children }) {
           });
         }
         setIsLoading(false);
+        return;
+      }
+      
+      // Check if cancelled before setting user
+      if (currentCall.cancelled) {
         return;
       }
       
@@ -168,8 +209,15 @@ export function AuthProvider({ children }) {
         id: employee?.id || userId,
       };
       
-      setUser(combinedUser);
+      // Final check before setting user
+      if (!currentCall.cancelled) {
+        setUser(combinedUser);
+      }
     } catch (error) {
+      // Check if cancelled
+      if (currentCall.cancelled) {
+        return;
+      }
       console.error('Error loading user data:', error);
       
       // Check if it's a refresh token error
@@ -180,34 +228,44 @@ export function AuthProvider({ children }) {
         } catch (signOutError) {
           console.error('Error signing out:', signOutError);
         }
-        setUser(null);
-        setIsLoading(false);
+        if (!currentCall.cancelled) {
+          setUser(null);
+          setIsLoading(false);
+        }
         return;
       }
       
       // Fallback to basic user info
-      try {
-        const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-        if (authError) {
-          console.error('Error getting auth user in catch:', authError);
-          if (authError.message?.includes('Refresh Token') || authError.message?.includes('refresh_token')) {
-            await supabase.auth.signOut();
+      if (!currentCall.cancelled) {
+        try {
+          const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+          if (authError) {
+            console.error('Error getting auth user in catch:', authError);
+            if (authError.message?.includes('Refresh Token') || authError.message?.includes('refresh_token')) {
+              await supabase.auth.signOut();
+            }
+            setUser(null);
+          } else if (authUser) {
+            setUser({
+              uid: authUser.id,
+              email: authUser.email,
+              username: authUser.email?.split('@')[0],
+              role: 'employee',
+            });
           }
+        } catch (getUserError) {
+          console.error('Error in getUser fallback:', getUserError);
           setUser(null);
-        } else if (authUser) {
-          setUser({
-            uid: authUser.id,
-            email: authUser.email,
-            username: authUser.email?.split('@')[0],
-            role: 'employee',
-          });
         }
-      } catch (getUserError) {
-        console.error('Error in getUser fallback:', getUserError);
-        setUser(null);
       }
     } finally {
-      setIsLoading(false);
+      // Only update loading state if this call is still active
+      if (loadUserDataRef.current === currentCall) {
+        loadUserDataRef.current = null;
+      }
+      if (!currentCall.cancelled) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -219,10 +277,42 @@ export function AuthProvider({ children }) {
 
   const handleLogout = async () => {
     try {
-      await supabase.auth.signOut();
+      console.log('[AUTH_CONTEXT] Logout started');
+      
+      // 1. Clear user state FIRST to prevent UI from rendering with stale data
       setUser(null);
+      setIsLoading(true);
+      
+      // 2. Sign out from Supabase (clears Supabase session)
+      await supabase.auth.signOut();
+      console.log('[AUTH_CONTEXT] ✓ Supabase signOut complete');
+      
+      // 3. Clear AsyncStorage session keys (defensive cleanup)
+      try {
+        const { clearSupabaseSession } = await import('../../utils/sessionHelper');
+        await clearSupabaseSession();
+        console.log('[AUTH_CONTEXT] ✓ AsyncStorage cleared');
+      } catch (clearError) {
+        console.warn('[AUTH_CONTEXT] Error clearing storage:', clearError);
+      }
+      
+      // 4. Reset loading state
+      setIsLoading(false);
+      console.log('[AUTH_CONTEXT] ✓ Logout complete');
+      
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('[AUTH_CONTEXT] Logout error:', error);
+      // Even if signOut fails, clear local state
+      setUser(null);
+      setIsLoading(false);
+      
+      // Try to clear AsyncStorage manually
+      try {
+        const { clearSupabaseSession } = await import('../../utils/sessionHelper');
+        await clearSupabaseSession();
+      } catch (clearError) {
+        console.error('[AUTH_CONTEXT] Failed to clear storage:', clearError);
+      }
     }
   };
 

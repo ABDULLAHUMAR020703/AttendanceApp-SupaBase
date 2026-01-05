@@ -41,10 +41,33 @@ export default function LeaveRequestScreen({ navigation, route }) {
 
   useEffect(() => {
     loadData();
-    const unsubscribe = navigation.addListener('focus', () => {
-      loadData();
-    });
-    return unsubscribe;
+    
+    // Safely check if navigation and addListener exist
+    let unsubscribe = null;
+    if (navigation && typeof navigation.addListener === 'function') {
+      try {
+        unsubscribe = navigation.addListener('focus', () => {
+          loadData();
+        });
+      } catch (error) {
+        if (__DEV__) {
+          console.warn('[LeaveRequestScreen] Failed to add navigation listener:', error);
+        }
+      }
+    }
+    
+    return () => {
+      // Only call unsubscribe if it's a function
+      if (typeof unsubscribe === 'function') {
+        try {
+          unsubscribe();
+        } catch (error) {
+          if (__DEV__) {
+            console.warn('[LeaveRequestScreen] Error unsubscribing navigation listener:', error);
+          }
+        }
+      }
+    };
   }, [navigation]);
 
   const loadData = async () => {

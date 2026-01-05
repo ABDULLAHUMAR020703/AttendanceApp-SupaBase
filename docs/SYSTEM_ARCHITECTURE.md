@@ -911,6 +911,33 @@ When a user creates a ticket:
 - **Key**: `@attendance_records` - Attendance data
 - **Key**: `@tickets` - Ticket data
 - **Key**: `@notifications` - Notification data
+  - Structure: Array of notification objects
+  - Each notification includes:
+    - `id`: Unique identifier
+    - `recipientUsername`: Target user
+    - `title`: Notification title
+    - `body`: Notification message
+    - `type`: Notification type (ticket_created, leave_request, etc.)
+    - `data`: Additional data including navigation payload
+    - `read`: Boolean read state (legacy)
+    - `isRead`: Boolean read state (primary)
+    - `readAt`: ISO timestamp when marked as read
+    - `createdAt`: ISO timestamp when created
+  - State Management:
+    - Default state: All new notifications have `isRead: false`
+    - Dual fields (`read` and `isRead`) for backward compatibility
+    - Persistence verification: All write operations verify by reading back
+    - Badge count: Only counts notifications where `!read && !isRead`
+  - Operations:
+    - `markNotificationAsRead(id)`: Marks single notification as read with verification
+    - `markAllNotificationsAsRead(username)`: Marks all user notifications as read
+    - `clearReadNotifications(username)`: Removes only read notifications, preserves unread
+    - `getUnreadNotificationCount(username)`: Returns count of unread notifications
+  - Navigation:
+    - Centralized navigation handler: `handleNotificationNavigation()`
+    - Role-aware routing based on notification type and user role
+    - Automatic read marking after successful navigation
+    - Safe navigation with fallbacks to prevent crashes
 - **Key**: `@signup_requests` - Pending signup requests
 
 ### Data Synchronization
@@ -1338,7 +1365,19 @@ Example: testuser,password:testuser123,role:employee
 - **Legacy Employee Utils**: `utils/employees.js` (to be migrated to `features/employees/`)
 - **Legacy Ticket Utils**: `utils/ticketManagement.js` (to be migrated to `features/tickets/`)
 - **Legacy Leave Utils**: `utils/leaveManagement.js` (to be migrated to `features/leave/`)
-- **Legacy Notification Utils**: `utils/notifications.js` (to be migrated to `features/notifications/`)
+- **Notification Utils**: `utils/notifications.js`
+  - Centralized notification creation and persistence
+  - Read state management with dual fields (`read` and `isRead`)
+  - Batch notification creation for multiple recipients
+  - Persistence verification (read-back after write)
+  - Badge count calculation (unread only)
+  - Clear read notifications functionality
+- **Notification Navigation**: `utils/notificationNavigation.js`
+  - Centralized navigation handler for all notification taps
+  - Role-aware routing based on notification type and user role
+  - Safe navigation with fallbacks (prevents crashes)
+  - Nested navigator support (Drawer > MainStack)
+  - Automatic read marking after successful navigation
 - **Legacy Analytics Utils**: `utils/analytics.js` (to be migrated to `features/analytics/`)
 - **Legacy Calendar Utils**: `utils/calendar.js` (to be migrated to `features/calendar/`)
 - **Legacy Location Utils**: `utils/location.js` (to be migrated to `features/attendance/utils/`)

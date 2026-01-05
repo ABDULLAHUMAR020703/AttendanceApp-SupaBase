@@ -72,18 +72,48 @@ export default function EmployeeDashboard({ route }) {
     }, 1000);
     
     // Reload data when screen comes into focus (returning from AuthenticationScreen)
-    const unsubscribe = navigation.addListener('focus', () => {
-      loadData();
-    });
+    // Safely check if navigation and addListener exist
+    let unsubscribe = null;
+    if (navigation && typeof navigation.addListener === 'function') {
+      try {
+        unsubscribe = navigation.addListener('focus', () => {
+          loadData();
+        });
+      } catch (error) {
+        if (__DEV__) {
+          console.warn('[EmployeeDashboard] Failed to add navigation listener:', error);
+        }
+      }
+    }
 
     // Set up interval to check notifications every 30 seconds
     const notificationInterval = setInterval(() => {
       loadNotificationCount();
     }, 30000);
+    
+    // Listen for app state changes (foreground/background) - CRITICAL for notification reliability
+    const { AppState } = require('react-native');
+    const handleAppStateChange = (nextAppState) => {
+      if (nextAppState === 'active') {
+        // App came to foreground - refresh notifications immediately
+        loadNotificationCount();
+      }
+    };
+    const appStateSubscription = AppState.addEventListener('change', handleAppStateChange);
 
     return () => {
-      unsubscribe();
+      // Only call unsubscribe if it's a function
+      if (typeof unsubscribe === 'function') {
+        try {
+          unsubscribe();
+        } catch (error) {
+          if (__DEV__) {
+            console.warn('[EmployeeDashboard] Error unsubscribing navigation listener:', error);
+          }
+        }
+      }
       clearInterval(notificationInterval);
+      appStateSubscription?.remove();
     };
   }, [navigation]);
 

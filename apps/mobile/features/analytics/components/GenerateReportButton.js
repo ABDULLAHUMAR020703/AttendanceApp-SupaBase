@@ -11,6 +11,8 @@ import {
   Alert,
   ActivityIndicator,
   StyleSheet,
+  ScrollView,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../core/contexts/ThemeContext';
@@ -58,7 +60,16 @@ export default function GenerateReportButton({ style }) {
       Alert.alert(
         'Report Generation Started',
         'Your report is being generated and will be sent to your email shortly.',
-        [{ text: 'OK', onPress: () => setModalVisible(false) }]
+        [{ 
+          text: 'OK', 
+          onPress: () => {
+            setModalVisible(false);
+            // Reset form after successful generation
+            setSelectedRange('monthly');
+            setCustomFrom('');
+            setCustomTo('');
+          }
+        }]
       );
     } catch (error) {
       Alert.alert(
@@ -94,7 +105,15 @@ export default function GenerateReportButton({ style }) {
         visible={modalVisible}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => setModalVisible(false)}
+        onRequestClose={() => {
+          if (!isGenerating) {
+            setModalVisible(false);
+            // Reset form when closing
+            setSelectedRange('monthly');
+            setCustomFrom('');
+            setCustomTo('');
+          }
+        }}
       >
         <View style={styles.modalOverlay}>
           <View
@@ -115,14 +134,27 @@ export default function GenerateReportButton({ style }) {
                 Generate Report
               </Text>
               <TouchableOpacity
-                onPress={() => setModalVisible(false)}
+                onPress={() => {
+                  if (!isGenerating) {
+                    setModalVisible(false);
+                    // Reset form when closing
+                    setSelectedRange('monthly');
+                    setCustomFrom('');
+                    setCustomTo('');
+                  }
+                }}
                 style={styles.closeButton}
+                disabled={isGenerating}
               >
                 <Ionicons name="close" size={iconSize.lg} color={colors.text} />
               </TouchableOpacity>
             </View>
 
-            <View style={styles.modalBody}>
+            <ScrollView 
+              style={styles.modalBody}
+              contentContainerStyle={styles.modalBodyContent}
+              showsVerticalScrollIndicator={true}
+            >
               <Text
                 style={[
                   styles.label,
@@ -184,13 +216,55 @@ export default function GenerateReportButton({ style }) {
                   >
                     Start Date (YYYY-MM-DD):
                   </Text>
+                  <TextInput
+                    style={[
+                      styles.dateInput,
+                      {
+                        backgroundColor: colors.background,
+                        borderColor: colors.border,
+                        color: colors.text,
+                        fontSize: responsiveFont(14),
+                      },
+                    ]}
+                    placeholder="2024-01-01"
+                    placeholderTextColor={colors.textTertiary}
+                    value={customFrom}
+                    onChangeText={setCustomFrom}
+                    editable={!isGenerating}
+                  />
+                  
+                  <Text
+                    style={[
+                      styles.label,
+                      { color: colors.textSecondary, fontSize: responsiveFont(14), marginTop: spacing.md },
+                    ]}
+                  >
+                    End Date (YYYY-MM-DD):
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.dateInput,
+                      {
+                        backgroundColor: colors.background,
+                        borderColor: colors.border,
+                        color: colors.text,
+                        fontSize: responsiveFont(14),
+                      },
+                    ]}
+                    placeholder="2024-01-31"
+                    placeholderTextColor={colors.textTertiary}
+                    value={customTo}
+                    onChangeText={setCustomTo}
+                    editable={!isGenerating}
+                  />
+                  
                   <Text
                     style={[
                       styles.hint,
-                      { color: colors.textTertiary, fontSize: responsiveFont(12) },
+                      { color: colors.textTertiary, fontSize: responsiveFont(12), marginTop: spacing.xs },
                     ]}
                   >
-                    Note: Custom date range picker can be enhanced later. For now, enter dates manually in YYYY-MM-DD format.
+                    Enter dates in YYYY-MM-DD format (e.g., 2024-01-01)
                   </Text>
                 </View>
               )}
@@ -224,7 +298,7 @@ export default function GenerateReportButton({ style }) {
                   )}
                 </TouchableOpacity>
               </View>
-            </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -258,7 +332,13 @@ const styles = StyleSheet.create({
     maxWidth: 500,
     borderRadius: 16,
     padding: spacing.lg,
-    maxHeight: '80%',
+    maxHeight: '85%',
+    // Ensure modal doesn't overflow screen
+    alignSelf: 'center',
+    // Prevent content from being cut off
+    overflow: 'hidden',
+    // Ensure proper layout
+    flexShrink: 1,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -273,7 +353,12 @@ const styles = StyleSheet.create({
     padding: spacing.xs,
   },
   modalBody: {
-    flex: 1,
+    // Remove flex: 1 to prevent layout issues
+    // ScrollView will handle scrolling
+  },
+  modalBodyContent: {
+    paddingBottom: spacing.lg,
+    flexGrow: 1,
   },
   label: {
     fontWeight: '600',
@@ -292,6 +377,15 @@ const styles = StyleSheet.create({
   },
   customRangeContainer: {
     marginTop: spacing.md,
+  },
+  dateInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.xs,
+    marginBottom: spacing.sm,
+    minHeight: 44,
   },
   hint: {
     marginTop: spacing.xs,

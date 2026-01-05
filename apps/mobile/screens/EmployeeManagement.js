@@ -48,6 +48,7 @@ import {
   getHRRoleIcon, 
   getHRRoleLabel 
 } from '../utils/hrRoles';
+import { spacing, responsivePadding } from '../shared/utils/responsive';
 
 export default function EmployeeManagement({ route }) {
   const { user, openLeaveRequests } = route.params || {};
@@ -548,7 +549,7 @@ export default function EmployeeManagement({ route }) {
             )}
         </View>
         
-        <View className="items-end">
+        <View className="items-end" style={{ flexShrink: 1, minWidth: 0 }}>
           <View className="flex-row items-center mb-2">
             <Ionicons 
               name={getWorkModeIcon(item.workMode)} 
@@ -563,25 +564,47 @@ export default function EmployeeManagement({ route }) {
             </Text>
           </View>
           
-            <View className="flex-row space-x-2">
-          <TouchableOpacity
-            className="bg-primary-500 rounded-lg px-3 py-1"
-            onPress={() => handleWorkModeChange(item)}
+          {/* Action Buttons - Responsive: wraps on small screens */}
+          <View 
+            style={{ 
+              flexDirection: 'row', 
+              flexWrap: 'wrap', 
+              gap: spacing.xs,
+              marginTop: spacing.xs / 2,
+              justifyContent: 'flex-end', // Align buttons to the right when they wrap
+              maxWidth: '100%', // Ensure container doesn't exceed parent width
+            }}
           >
+              <TouchableOpacity
+                className="bg-primary-500 rounded-lg px-3 py-1"
+                style={{ 
+                  minWidth: 90, // Prevent buttons from being too narrow
+                  flexShrink: 1,
+                }}
+                onPress={() => handleWorkModeChange(item)}
+              >
                 <Text className="text-white text-xs font-medium">Work Mode</Text>
               </TouchableOpacity>
               
               <TouchableOpacity
                 className="bg-green-500 rounded-lg px-3 py-1"
+                style={{ 
+                  minWidth: 70, // Prevent buttons from being too narrow
+                  flexShrink: 1,
+                }}
                 onPress={() => handleManageLeaves(item)}
               >
                 <Text className="text-white text-xs font-medium">Leaves</Text>
-          </TouchableOpacity>
+              </TouchableOpacity>
               
               {/* Role Edit Button - Only for super_admin */}
               {user.role === 'super_admin' && (
                 <TouchableOpacity
                   className="bg-purple-500 rounded-lg px-3 py-1"
+                  style={{ 
+                    minWidth: 60, // Prevent buttons from being too narrow
+                    flexShrink: 1,
+                  }}
                   onPress={() => {
                     setSelectedEmployeeForRoleEdit(item);
                     setSelectedRole(item.role);
@@ -835,14 +858,28 @@ export default function EmployeeManagement({ route }) {
     <View className="flex-1 bg-gray-50">
       {/* Header */}
       <View className="bg-white px-6 py-4 shadow-sm">
-        <View className="flex-row items-center justify-between mb-4">
-          <Text className="text-xl font-bold text-gray-800">
+        <View className="flex-row items-center justify-between mb-4" style={{ flexWrap: 'wrap' }}>
+          <Text className="text-xl font-bold text-gray-800" style={{ flexShrink: 1, minWidth: 0 }}>
             Employee Management
           </Text>
           
-          <View className="flex-row space-x-2">
+          {/* Header Action Buttons - Responsive: wraps on small screens */}
+          <View 
+            style={{ 
+              flexDirection: 'row', 
+              flexWrap: 'wrap', 
+              gap: spacing.xs,
+              marginTop: spacing.xs,
+              flexShrink: 1,
+              minWidth: 0,
+            }}
+          >
             <TouchableOpacity
               className="bg-blue-500 rounded-xl px-4 py-2"
+              style={{ 
+                minWidth: 100, // Prevent buttons from being too narrow
+                flexShrink: 1,
+              }}
               onPress={() => setShowLeaveSettingsModal(true)}
             >
               <View className="flex-row items-center">
@@ -851,17 +888,21 @@ export default function EmployeeManagement({ route }) {
               </View>
             </TouchableOpacity>
           
-          <TouchableOpacity
-            className="bg-orange-500 rounded-xl px-4 py-2"
-            onPress={() => setShowRequestsModal(true)}
-          >
-            <View className="flex-row items-center">
-              <Ionicons name="notifications" size={16} color="white" />
-              <Text className="text-white font-semibold ml-1">
-                Requests ({pendingRequests.length})
-              </Text>
-            </View>
-          </TouchableOpacity>
+            <TouchableOpacity
+              className="bg-orange-500 rounded-xl px-4 py-2"
+              style={{ 
+                minWidth: 120, // Prevent buttons from being too narrow (needs space for count)
+                flexShrink: 1,
+              }}
+              onPress={() => setShowRequestsModal(true)}
+            >
+              <View className="flex-row items-center">
+                <Ionicons name="notifications" size={16} color="white" />
+                <Text className="text-white font-semibold ml-1">
+                  Requests ({pendingRequests.length})
+                </Text>
+              </View>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -893,7 +934,7 @@ export default function EmployeeManagement({ route }) {
           data={filteredEmployees}
           renderItem={renderEmployee}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ padding: 16 }}
+          contentContainerStyle={{ padding: responsivePadding(16), paddingBottom: spacing['2xl'] }}
           refreshControl={
             <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
           }

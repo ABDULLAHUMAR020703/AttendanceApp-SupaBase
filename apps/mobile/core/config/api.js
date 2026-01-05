@@ -4,6 +4,12 @@ import Constants from 'expo-constants';
 
 /**
  * Get the appropriate API Gateway URL based on the platform
+ * 
+ * PRODUCTION (Render Deployment):
+ * - Set apiGatewayUrl in app.json to your Render service URL
+ * - Example: "https://attendanceapp-supabase-1.onrender.com"
+ * 
+ * LOCAL DEVELOPMENT:
  * - iOS Simulator: localhost works
  * - Android Emulator: Use 10.0.2.2 (special IP for host machine)
  * - Physical Device: Use your computer's local IP address
@@ -15,16 +21,18 @@ import Constants from 'expo-constants';
  * Example: 'http://192.168.1.100:3000'
  */
 const getApiGatewayUrl = () => {
-  // Check if there's a configured URL in app.json (for physical devices)
-  // Set this to your computer's IP address when testing on physical devices
-  // Set to null in app.json to use platform-specific defaults (for simulators/emulators)
+  // Check if there's a configured URL in app.json (for production or physical devices)
+  // Set this to your Render service URL for production
+  // Set to null in app.json to use platform-specific defaults (for local development)
   const configuredUrl = Constants.expoConfig?.extra?.apiGatewayUrl;
   if (configuredUrl && configuredUrl !== null && configuredUrl !== 'null') {
-    const url = configuredUrl;
-    return typeof url === 'string' ? url : String(url);
+    // Remove trailing slash if present to prevent double slashes in URLs
+    let url = typeof configuredUrl === 'string' ? configuredUrl : String(configuredUrl);
+    url = url.replace(/\/+$/, ''); // Remove trailing slashes
+    return url;
   }
 
-  // Platform-specific defaults
+  // Platform-specific defaults (for local development only)
   if (Platform.OS === 'android') {
     // Android emulator uses 10.0.2.2 to reach host machine
     // For physical devices, you'll need to set this manually
@@ -39,9 +47,9 @@ const getApiGatewayUrl = () => {
 };
 
 // API Gateway base URL
-// IMPORTANT: For physical devices, update this to your computer's IP address
-// Example: 'http://192.168.1.100:3000'
-// You can also set it in app.json under "extra.apiGatewayUrl"
+// PRODUCTION: Set in app.json under "extra.apiGatewayUrl" to your Render service URL
+// LOCAL DEV: For physical devices, set in app.json to your computer's IP address
+// Example: 'http://192.168.1.100:3000' (local) or 'https://your-service.onrender.com' (production)
 
 export const API_GATEWAY_URL = getApiGatewayUrl();
 

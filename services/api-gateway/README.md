@@ -31,12 +31,22 @@ The server will start on port 3000 (or the port specified in the `PORT` environm
 
 ## Configuration
 
-Set environment variables in a `.env` file (optional):
+Set environment variables in a `.env` file (for local development) or in Render Dashboard (for production):
 
+### Local Development:
 ```env
 PORT=3000
 AUTH_SERVICE_URL=http://localhost:3001
+REPORTING_SERVICE_URL=http://localhost:3002
 ```
+
+### Render Production:
+```env
+AUTH_SERVICE_URL=https://attendanceapp-supabase.onrender.com
+REPORTING_SERVICE_URL=https://reporting-service-ki0r.onrender.com
+```
+
+**Important:** For Render deployment, set these in Render Dashboard → Environment tab, not in `.env` file.
 
 ## Connecting from Mobile App
 

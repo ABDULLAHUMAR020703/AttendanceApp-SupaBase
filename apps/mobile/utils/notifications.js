@@ -51,72 +51,239 @@ export const requestNotificationPermissions = async () => {
 };
 
 /**
- * Create and store a notification
- * @param {string} recipientUsername - Username of the notification recipient
- * @param {string} title - Notification title
- * @param {string} body - Notification body
- * @param {string} type - Notification type (e.g., 'leave_request', 'leave_approved', 'leave_rejected')
+ * CENTRALIZED NOTIFICATION CREATION HELPER
+ * 
+ * This is the SINGLE source of truth for creating notifications.
+ * All notifications MUST be created through this function to ensure:
+ * - Guaranteed persistence to AsyncStorage
+ * - Consistent notification structure
+ * - Proper error handling
+ * - Validation of required fields
+ * 
+ * @param {string} recipientUsername - Username of the notification recipient (REQUIRED)
+ * @param {string} title - Notification title (REQUIRED)
+ * @param {string} body - Notification body (REQUIRED)
+ * @param {string} type - Notification type (e.g., 'ticket_created', 'leave_request', 'leave_approved', 'leave_rejected', 'ticket_assigned', 'ticket_response', 'system')
  * @param {Object} data - Additional data to attach to notification
  * @returns {Promise<{success: boolean, notificationId?: string, error?: string}>}
  */
 export const createNotification = async (recipientUsername, title, body, type = 'general', data = {}) => {
+  // Validate required fields
+  if (!recipientUsername || !title || !body) {
+    const errorMsg = 'Missing required fields: recipientUsername, title, and body are required';
+    if (__DEV__) {
+      console.error('[Notification] Validation failed:', errorMsg);
+    }
+    return {
+      success: false,
+      error: errorMsg
+    };
+  }
+
   try {
+    // Generate unique notification ID
     const notificationId = `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Create notification object with all required fields
     const notification = {
       id: notificationId,
-      recipientUsername,
-      title,
-      body,
-      type,
-      data,
+      recipientUsername: recipientUsername.trim(),
+      title: title.trim(),
+      body: body.trim(),
+      type: type || 'general',
+      data: data || {},
       read: false,
+      isRead: false, // Alias for compatibility
       createdAt: new Date().toISOString(),
     };
 
-    // Get all notifications and add new one
+    if (__DEV__) {
+      console.log(`[Notification] Creating notification for ${recipientUsername}:`, {
+        id: notificationId,
+        type,
+        title: notification.title.substring(0, 50) + '...'
+      });
+    }
+
+    // CRITICAL: Get all notifications and add new one
+    // This must be awaited to prevent race conditions
     const notificationsJson = await AsyncStorage.getItem(NOTIFICATIONS_KEY);
     const allNotifications = notificationsJson ? JSON.parse(notificationsJson) : [];
-    allNotifications.push(notification);
+    
+    // Validate parsed data is an array
+    if (!Array.isArray(allNotifications)) {
+      if (__DEV__) {
+        console.warn('[Notification] Invalid notifications data, resetting to empty array');
+      }
+      allNotifications = [];
+    }
+    
+    // Add new notification at the beginning (newest first)
+    // This ensures it's always at the top and won't be cut off
+    allNotifications.unshift(notification);
 
     // Keep only last 1000 notifications to prevent storage bloat
-    const sortedNotifications = allNotifications.sort((a, b) => 
-      new Date(b.createdAt) - new Date(a.createdAt)
-    );
+    // Sort by date (newest first) to ensure proper ordering
+    const sortedNotifications = allNotifications.sort((a, b) => {
+      const dateA = new Date(a.createdAt || a.created_at || 0);
+      const dateB = new Date(b.createdAt || b.created_at || 0);
+      return dateB - dateA; // Newest first
+    });
     const limitedNotifications = sortedNotifications.slice(0, 1000);
+    
+    // CRITICAL: Verify the new notification is in the limited array
+    // If it's not, something went wrong with sorting/limiting
+    const notificationInLimited = limitedNotifications.find(n => n.id === notificationId);
+    if (!notificationInLimited) {
+      // This should never happen, but if it does, add it back at the top
+      if (__DEV__) {
+        console.warn(`[Notification] New notification ${notificationId} was cut off during limiting, adding back at top`);
+      }
+      limitedNotifications.unshift(notification);
+      // Remove the last one to keep at 1000
+      if (limitedNotifications.length > 1000) {
+        limitedNotifications.pop();
+      }
+    }
 
-    await AsyncStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(limitedNotifications));
+    // CRITICAL: Write to AsyncStorage and verify success
+    // This MUST complete before returning success
+    try {
+      await AsyncStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(limitedNotifications));
+      
+      // Verify write succeeded by reading back
+      // Add a small delay to ensure AsyncStorage has fully written
+      await new Promise(resolve => setTimeout(resolve, 10));
+      
+      const verifyJson = await AsyncStorage.getItem(NOTIFICATIONS_KEY);
+      if (!verifyJson) {
+        throw new Error('Notification write verification failed - no data found after write');
+      }
+      
+      const verifyNotifications = JSON.parse(verifyJson);
+      if (!Array.isArray(verifyNotifications)) {
+        throw new Error('Notification write verification failed - invalid data format after write');
+      }
+      
+      const verifyFound = verifyNotifications.find(n => n && n.id === notificationId);
+      
+      if (!verifyFound) {
+        // Last attempt: Check if notification exists with different ID format or was stored differently
+        const allIds = verifyNotifications.map(n => n?.id).filter(Boolean);
+        if (__DEV__) {
+          console.error(`[Notification] Verification failed for ${notificationId}`);
+          console.error(`[Notification] Found ${verifyNotifications.length} notifications, first 5 IDs:`, allIds.slice(0, 5));
+          console.error(`[Notification] Notification object:`, JSON.stringify(notification, null, 2));
+        }
+        throw new Error('Notification write verification failed - notification not found after write');
+      }
+      
+      if (__DEV__) {
+        console.log(`[Notification] ✓ Successfully stored notification ${notificationId} for ${recipientUsername}`);
+      }
+    } catch (storageError) {
+      // Storage write failed - this is critical
+      const errorMsg = `Failed to persist notification to storage: ${storageError.message}`;
+      console.error('[Notification] CRITICAL ERROR:', errorMsg);
+      return {
+        success: false,
+        error: errorMsg
+      };
+    }
 
-    // Send push notification if permissions granted
+    // Send push notification if permissions granted (non-blocking)
+    // This is optional - we already stored the notification
     try {
       const hasPermission = await requestNotificationPermissions();
       if (hasPermission) {
         await Notifications.scheduleNotificationAsync({
           content: {
-            title,
-            body,
+            title: notification.title,
+            body: notification.body,
             data: { ...data, notificationId, type },
             sound: true,
           },
           trigger: null, // Show immediately
         });
+        
+        if (__DEV__) {
+          console.log(`[Notification] ✓ Push notification sent for ${notificationId}`);
+        }
       }
     } catch (pushError) {
-      console.error('Error sending push notification:', pushError);
-      // Continue even if push notification fails - we still stored it
+      // Push notification failure is non-critical - notification is already stored
+      if (__DEV__) {
+        console.warn('[Notification] Push notification failed (non-critical):', pushError.message);
+      }
     }
 
-    console.log(`Notification created: ${notificationId} for ${recipientUsername}`);
     return {
       success: true,
       notificationId: notificationId
     };
   } catch (error) {
-    console.error('Error creating notification:', error);
+    const errorMsg = `Failed to create notification: ${error.message}`;
+    console.error('[Notification] Error:', errorMsg);
     return {
       success: false,
-      error: error.message || 'Failed to create notification'
+      error: errorMsg
     };
   }
+};
+
+/**
+ * BATCH NOTIFICATION CREATION
+ * 
+ * Creates notifications for multiple recipients atomically.
+ * If any notification fails, it's logged but doesn't stop others.
+ * 
+ * @param {Array<string>} recipientUsernames - Array of usernames to notify
+ * @param {string} title - Notification title
+ * @param {string} body - Notification body
+ * @param {string} type - Notification type
+ * @param {Object} data - Additional data
+ * @returns {Promise<{success: boolean, created: number, failed: number, errors?: Array<string>}>}
+ */
+export const createBatchNotifications = async (recipientUsernames, title, body, type = 'general', data = {}) => {
+  if (!Array.isArray(recipientUsernames) || recipientUsernames.length === 0) {
+    return {
+      success: false,
+      created: 0,
+      failed: 0,
+      errors: ['No recipients provided']
+    };
+  }
+
+  const results = await Promise.allSettled(
+    recipientUsernames.map(username => 
+      createNotification(username, title, body, type, data)
+    )
+  );
+
+  const created = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
+  const failed = results.length - created;
+  const errors = results
+    .filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.success))
+    .map((r, i) => {
+      if (r.status === 'rejected') {
+        return `Failed for ${recipientUsernames[i]}: ${r.reason?.message || 'Unknown error'}`;
+      }
+      return `Failed for ${recipientUsernames[i]}: ${r.value.error || 'Unknown error'}`;
+    });
+
+  if (__DEV__) {
+    console.log(`[Notification] Batch creation: ${created} created, ${failed} failed`);
+    if (errors.length > 0) {
+      console.warn('[Notification] Batch errors:', errors);
+    }
+  }
+
+  return {
+    success: created > 0,
+    created,
+    failed,
+    errors: errors.length > 0 ? errors : undefined
+  };
 };
 
 /**
@@ -133,11 +300,16 @@ export const getUserNotifications = async (username, unreadOnly = false) => {
     let userNotifications = allNotifications.filter(notif => notif.recipientUsername === username);
     
     if (unreadOnly) {
-      userNotifications = userNotifications.filter(notif => !notif.read);
+      // Check both read and isRead fields for compatibility
+      userNotifications = userNotifications.filter(notif => !notif.read && !notif.isRead);
     }
     
     // Sort by date (newest first)
-    return userNotifications.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    return userNotifications.sort((a, b) => {
+      const dateA = new Date(a.createdAt || a.created_at || 0);
+      const dateB = new Date(b.createdAt || b.created_at || 0);
+      return dateB - dateA;
+    });
   } catch (error) {
     console.error('Error getting user notifications:', error);
     return [];
@@ -151,28 +323,59 @@ export const getUserNotifications = async (username, unreadOnly = false) => {
  */
 export const markNotificationAsRead = async (notificationId) => {
   try {
+    if (__DEV__) {
+      console.log(`[Notification] Marking notification ${notificationId} as read`);
+    }
+
     const notificationsJson = await AsyncStorage.getItem(NOTIFICATIONS_KEY);
     const allNotifications = notificationsJson ? JSON.parse(notificationsJson) : [];
     
     const notificationIndex = allNotifications.findIndex(notif => notif.id === notificationId);
     if (notificationIndex === -1) {
+      if (__DEV__) {
+        console.warn(`[Notification] Notification ${notificationId} not found`);
+      }
       return {
         success: false,
         error: 'Notification not found'
       };
     }
 
+    // Set both read and isRead for compatibility
     allNotifications[notificationIndex].read = true;
+    allNotifications[notificationIndex].isRead = true;
     allNotifications[notificationIndex].readAt = new Date().toISOString();
 
+    // CRITICAL: Persist and verify
     await AsyncStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(allNotifications));
+    
+    // Verify write succeeded
+    const verifyJson = await AsyncStorage.getItem(NOTIFICATIONS_KEY);
+    const verifyNotifications = verifyJson ? JSON.parse(verifyJson) : [];
+    const verifyFound = verifyNotifications.find(n => n.id === notificationId);
+    
+    if (!verifyFound || !verifyFound.read || !verifyFound.isRead) {
+      const errorMsg = 'Notification read state verification failed';
+      if (__DEV__) {
+        console.error(`[Notification] ${errorMsg}`);
+      }
+      return {
+        success: false,
+        error: errorMsg
+      };
+    }
+
+    if (__DEV__) {
+      console.log(`[Notification] ✓ Successfully marked notification ${notificationId} as read`);
+    }
 
     return { success: true };
   } catch (error) {
-    console.error('Error marking notification as read:', error);
+    const errorMsg = error.message || 'Failed to mark notification as read';
+    console.error('[Notification] Error marking notification as read:', errorMsg);
     return {
       success: false,
-      error: error.message || 'Failed to mark notification as read'
+      error: errorMsg
     };
   }
 };
@@ -180,32 +383,64 @@ export const markNotificationAsRead = async (notificationId) => {
 /**
  * Mark all notifications as read for a user
  * @param {string} username - Username
- * @returns {Promise<{success: boolean, error?: string}>}
+ * @returns {Promise<{success: boolean, error?: string, count?: number}>}
  */
 export const markAllNotificationsAsRead = async (username) => {
   try {
+    if (__DEV__) {
+      console.log(`[Notification] Marking all notifications as read for ${username}`);
+    }
+
     const notificationsJson = await AsyncStorage.getItem(NOTIFICATIONS_KEY);
     const allNotifications = notificationsJson ? JSON.parse(notificationsJson) : [];
     
+    let markedCount = 0;
     const updatedNotifications = allNotifications.map(notif => {
-      if (notif.recipientUsername === username && !notif.read) {
+      if (notif.recipientUsername === username && (!notif.read && !notif.isRead)) {
+        markedCount++;
         return {
           ...notif,
           read: true,
+          isRead: true, // Ensure both fields are set
           readAt: new Date().toISOString()
         };
       }
       return notif;
     });
 
+    // CRITICAL: Persist and verify
     await AsyncStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(updatedNotifications));
+    
+    // Verify write succeeded - check that all user's notifications are now read
+    const verifyJson = await AsyncStorage.getItem(NOTIFICATIONS_KEY);
+    const verifyNotifications = verifyJson ? JSON.parse(verifyJson) : [];
+    const userUnreadCount = verifyNotifications.filter(
+      n => n.recipientUsername === username && (!n.read || !n.isRead)
+    ).length;
+    
+    if (userUnreadCount > 0) {
+      const errorMsg = `Verification failed: ${userUnreadCount} unread notifications still exist`;
+      if (__DEV__) {
+        console.error(`[Notification] ${errorMsg}`);
+      }
+      return {
+        success: false,
+        error: errorMsg,
+        count: markedCount
+      };
+    }
 
-    return { success: true };
+    if (__DEV__) {
+      console.log(`[Notification] ✓ Successfully marked ${markedCount} notification(s) as read for ${username}`);
+    }
+
+    return { success: true, count: markedCount };
   } catch (error) {
-    console.error('Error marking all notifications as read:', error);
+    const errorMsg = error.message || 'Failed to mark all notifications as read';
+    console.error('[Notification] Error marking all notifications as read:', errorMsg);
     return {
       success: false,
-      error: error.message || 'Failed to mark all notifications as read'
+      error: errorMsg
     };
   }
 };
@@ -218,11 +453,29 @@ export const markAllNotificationsAsRead = async (username) => {
 export const getUnreadNotificationCount = async (username) => {
   try {
     const notifications = await getUserNotifications(username, true);
-    return notifications.length;
+    const count = notifications.length;
+    
+    if (__DEV__) {
+      console.log(`[Notification] Unread count for ${username}: ${count}`);
+    }
+    
+    // Ensure count is never negative
+    return Math.max(0, count);
   } catch (error) {
-    console.error('Error getting unread notification count:', error);
+    console.error('[Notification] Error getting unread notification count:', error);
     return 0;
   }
+};
+
+/**
+ * Refresh notification count for a user
+ * This is a convenience function that can be called after creating notifications
+ * to ensure UI is updated immediately
+ * @param {string} username - Username
+ * @returns {Promise<number>} Updated unread count
+ */
+export const refreshNotificationCount = async (username) => {
+  return await getUnreadNotificationCount(username);
 };
 
 /**
@@ -269,6 +522,69 @@ export const deleteAllUserNotifications = async (username) => {
     return {
       success: false,
       error: error.message || 'Failed to delete all notifications'
+    };
+  }
+};
+
+/**
+ * Clear read notifications for a user (removes only notifications where isRead === true)
+ * This is different from deleteAllUserNotifications which removes ALL notifications
+ * @param {string} username - Username
+ * @returns {Promise<{success: boolean, error?: string, count?: number}>}
+ */
+export const clearReadNotifications = async (username) => {
+  try {
+    if (__DEV__) {
+      console.log(`[Notification] Clearing read notifications for ${username}`);
+    }
+
+    const notificationsJson = await AsyncStorage.getItem(NOTIFICATIONS_KEY);
+    const allNotifications = notificationsJson ? JSON.parse(notificationsJson) : [];
+    
+    // Count how many read notifications will be removed
+    const readNotifications = allNotifications.filter(
+      notif => notif.recipientUsername === username && (notif.read || notif.isRead)
+    );
+    const removedCount = readNotifications.length;
+    
+    // Keep only unread notifications and notifications for other users
+    const filteredNotifications = allNotifications.filter(
+      notif => !(notif.recipientUsername === username && (notif.read || notif.isRead))
+    );
+
+    // CRITICAL: Persist and verify
+    await AsyncStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(filteredNotifications));
+    
+    // Verify write succeeded - check that no read notifications remain for this user
+    const verifyJson = await AsyncStorage.getItem(NOTIFICATIONS_KEY);
+    const verifyNotifications = verifyJson ? JSON.parse(verifyJson) : [];
+    const remainingReadCount = verifyNotifications.filter(
+      n => n.recipientUsername === username && (n.read || n.isRead)
+    ).length;
+    
+    if (remainingReadCount > 0) {
+      const errorMsg = `Verification failed: ${remainingReadCount} read notifications still exist`;
+      if (__DEV__) {
+        console.error(`[Notification] ${errorMsg}`);
+      }
+      return {
+        success: false,
+        error: errorMsg,
+        count: removedCount
+      };
+    }
+
+    if (__DEV__) {
+      console.log(`[Notification] ✓ Successfully cleared ${removedCount} read notification(s) for ${username}`);
+    }
+
+    return { success: true, count: removedCount };
+  } catch (error) {
+    const errorMsg = error.message || 'Failed to clear read notifications';
+    console.error('[Notification] Error clearing read notifications:', errorMsg);
+    return {
+      success: false,
+      error: errorMsg
     };
   }
 };

@@ -296,7 +296,11 @@ apps/mobile/
 │   └── hooks/                  # Shared hooks
 │
 ├── screens/                    # Screen components (legacy)
+│   ├── NotificationsScreen.js # Notification center with state management
+│   └── ...
 └── utils/                      # Utility functions (legacy)
+    ├── notifications.js        # Notification state management
+    └── notificationNavigation.js # Centralized notification navigation handler
 ```
 
 ### Core Components
@@ -424,7 +428,7 @@ CREATE TABLE users (
 - `@company_employees` - Employee list cache
 - `@attendance_records` - Attendance data
 - `@tickets` - Ticket data
-- `@notifications` - Notification data
+- `@notifications` - Notification data (with read state)
 - `@leave_requests` - Leave request data
 - `@signup_requests` - Signup request data
 - `@auth_preferences` - Authentication preferences
@@ -433,6 +437,68 @@ CREATE TABLE users (
 **Data Format:**
 - JSON strings stored as values
 - Automatic serialization/deserialization
+- Persistence verification for critical operations
+
+### Notification System Architecture
+
+**Core Components:**
+
+1. **Notification State Management** (`apps/mobile/utils/notifications.js`)
+   - Centralized notification creation and persistence
+   - Read state management with dual fields (`read` and `isRead`)
+   - Batch notification creation for multiple recipients
+   - Persistence verification (read-back after write)
+   - Badge count calculation (unread only)
+
+2. **Notification Navigation Handler** (`apps/mobile/utils/notificationNavigation.js`)
+   - Centralized navigation handler for all notification taps
+   - Role-aware routing based on notification type and user role
+   - Safe navigation with fallbacks (prevents crashes)
+   - Nested navigator support (Drawer > MainStack)
+   - Automatic read marking after successful navigation
+
+3. **Notification Screen** (`apps/mobile/screens/NotificationsScreen.js`)
+   - Notification list with filtering (All, Unread, Read)
+   - Mark individual/all notifications as read
+   - Clear read notifications (preserves unread)
+   - Visual distinction for read notifications (reduced opacity)
+   - Real-time badge count updates
+
+**Notification State Management:**
+
+**Storage Structure:**
+- Notifications stored in `@notifications` key
+- Each notification includes:
+  - `id`: Unique identifier
+  - `recipientUsername`: Target user
+  - `title`: Notification title
+  - `body`: Notification message
+  - `type`: Notification type (ticket_created, leave_request, etc.)
+  - `data`: Additional data including navigation payload
+  - `read`: Boolean read state (legacy)
+  - `isRead`: Boolean read state (primary)
+  - `readAt`: ISO timestamp when marked as read
+  - `createdAt`: ISO timestamp when created
+
+**Read State Management:**
+- Default state: All new notifications have `isRead: false`
+- Dual fields (`read` and `isRead`) for backward compatibility
+- Persistence verification: All write operations verify by reading back
+- Badge count calculation: Only counts notifications where `!read && !isRead`
+
+**Notification Operations:**
+- `markNotificationAsRead(id)`: Marks single notification as read with verification
+- `markAllNotificationsAsRead(username)`: Marks all user notifications as read
+- `clearReadNotifications(username)`: Removes only read notifications, preserves unread
+- `getUnreadNotificationCount(username)`: Returns count of unread notifications
+- `getUserNotifications(username, unreadOnly)`: Retrieves notifications with optional filtering
+
+**Navigation Integration:**
+- Centralized navigation handler: `handleNotificationNavigation()`
+- Role-aware routing based on notification type and user role
+- Automatic read marking after successful navigation
+- Safe navigation with fallbacks to prevent crashes
+- Nested navigator support (Drawer > MainStack)
 
 ---
 

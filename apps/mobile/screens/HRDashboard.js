@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../core/contexts/AuthContext';
 import { getAttendanceRecords } from '../utils/storage';
 import { getAllLeaveRequests, getPendingLeaveRequests, processLeaveRequest } from '../utils/leaveManagement';
 import {
@@ -28,11 +29,36 @@ import {
 import { getEmployees, getManageableEmployees, canManageEmployee, isHRManager } from '../utils/employees';
 import { generateAttendanceReport, generateLeaveReport } from '../utils/export';
 import { ROUTES } from '../shared/constants/routes';
+import { spacing, fontSize, responsivePadding, responsiveFont, iconSize } from '../shared/utils/responsive';
 
 export default function HRDashboard({ navigation, route }) {
-  const { user } = route.params;
+  const { user: routeUser, initialTab, openLeaveRequests, ticketId } = route.params || {};
+  const { user: authUser } = useAuth();
   const { colors } = useTheme();
-  const [activeTab, setActiveTab] = useState('overview'); // overview, attendance, leaves, tickets
+  
+  // CRITICAL FIX: Role guard - prevent rendering if user is not manager/super_admin
+  // Use authUser from context (most up-to-date) with fallback to route params
+  const user = authUser || routeUser;
+  
+  // Guard: Redirect if user doesn't have manager/super_admin role
+  useEffect(() => {
+    if (!user || (user.role !== 'manager' && user.role !== 'super_admin')) {
+      if (navigation) {
+        if (user && user.role === 'employee') {
+          navigation.replace('EmployeeDashboard', { user });
+        } else {
+          navigation.replace('LoginScreen');
+        }
+      }
+    }
+  }, [user, navigation]);
+  
+  // Guard: Only render if user has manager or super_admin role
+  if (!user || (user.role !== 'manager' && user.role !== 'super_admin')) {
+    return null;
+  }
+  // Set initial tab from route params if provided (for notification navigation)
+  const [activeTab, setActiveTab] = useState(initialTab || 'overview'); // overview, attendance, leaves, tickets
   const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Overview stats
@@ -56,11 +82,58 @@ export default function HRDashboard({ navigation, route }) {
 
   useEffect(() => {
     loadData();
-    const unsubscribe = navigation.addListener('focus', () => {
-      loadData();
-    });
-    return unsubscribe;
+    
+    // Safely check if navigation and addListener exist
+    let unsubscribe = null;
+    if (navigation && typeof navigation.addListener === 'function') {
+      try {
+        unsubscribe = navigation.addListener('focus', () => {
+          loadData();
+        });
+      } catch (error) {
+        if (__DEV__) {
+          console.warn('[HRDashboard] Failed to add navigation listener:', error);
+        }
+      }
+    }
+    
+    return () => {
+      // Only call unsubscribe if it's a function
+      if (typeof unsubscribe === 'function') {
+        try {
+          unsubscribe();
+        } catch (error) {
+          if (__DEV__) {
+            console.warn('[HRDashboard] Error unsubscribing navigation listener:', error);
+          }
+        }
+      }
+    };
   }, [navigation, activeTab, ticketFilter]);
+  
+  // Handle navigation params (e.g., from notifications)
+  // IMPORTANT: This only changes the active tab - it does NOT trigger any actions
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+      if (__DEV__) {
+        console.log('[HRDashboard] Navigation param: initialTab =', initialTab);
+      }
+    }
+    if (openLeaveRequests) {
+      setActiveTab('leaves');
+      if (__DEV__) {
+        console.log('[HRDashboard] Navigation param: openLeaveRequests = true, switching to leaves tab');
+      }
+    }
+    if (ticketId) {
+      setActiveTab('tickets');
+      if (__DEV__) {
+        console.log('[HRDashboard] Navigation param: ticketId =', ticketId, ', switching to tickets tab');
+      }
+      // Optionally, you could highlight the specific ticket here
+    }
+  }, [initialTab, openLeaveRequests, ticketId]);
 
   const loadData = async () => {
     await Promise.all([
@@ -255,6 +328,15 @@ export default function HRDashboard({ navigation, route }) {
   };
 
   const handleProcessLeaveRequest = async (requestId, status) => {
+    // Defensive check: Ensure status is valid
+    if (status !== 'approved' && status !== 'rejected') {
+      if (__DEV__) {
+        console.error('[HRDashboard] Invalid leave request status:', status);
+      }
+      Alert.alert('Error', 'Invalid action. Please try again.');
+      return;
+    }
+    
     // Find the request
     const request = leaveRequests.find(req => req.id === requestId);
     if (!request) {
@@ -396,19 +478,21 @@ export default function HRDashboard({ navigation, route }) {
   const renderOverview = () => (
     <ScrollView
       style={{ flex: 1 }}
+      contentContainerStyle={{ paddingBottom: spacing['2xl'] }}
       refreshControl={
         <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
       }
     >
-      <View style={{ padding: 16 }}>
-        {/* Stats Cards */}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+      <View style={{ padding: responsivePadding(16) }}>
+        {/* Stats Cards - Responsive: wraps on small screens */}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginBottom: spacing.base }}>
           <View
             style={{
               backgroundColor: colors.surface,
               borderRadius: 16,
-              padding: 20,
+              padding: responsivePadding(20),
               width: '47%',
+              minWidth: 140, // Prevent too narrow on small screens
               shadowColor: colors.shadow,
               shadowOffset: { width: 0, height: 2 },
               shadowOpacity: 0.1,
@@ -416,25 +500,25 @@ export default function HRDashboard({ navigation, route }) {
               elevation: 3,
             }}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs }}>
               <View
                 style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 20,
+                  width: iconSize.lg,
+                  height: iconSize.lg,
+                  borderRadius: iconSize.lg / 2,
                   backgroundColor: colors.primaryLight,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  marginRight: 12,
+                  marginRight: spacing.md,
                 }}
               >
-                <Ionicons name="people" size={20} color={colors.primary} />
+                <Ionicons name="people" size={iconSize.md} color={colors.primary} />
               </View>
               <View>
-                <Text style={{ fontSize: 24, fontWeight: 'bold', color: colors.text }}>
+                <Text style={{ fontSize: fontSize['2xl'], fontWeight: 'bold', color: colors.text }}>
                   {stats.totalEmployees}
                 </Text>
-                <Text style={{ fontSize: 12, color: colors.textSecondary }}>Employees</Text>
+                <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>Employees</Text>
               </View>
             </View>
           </View>
@@ -443,8 +527,9 @@ export default function HRDashboard({ navigation, route }) {
             style={{
               backgroundColor: colors.surface,
               borderRadius: 16,
-              padding: 20,
+              padding: responsivePadding(20),
               width: '47%',
+              minWidth: 140,
               shadowColor: colors.shadow,
               shadowOffset: { width: 0, height: 2 },
               shadowOpacity: 0.1,
@@ -452,25 +537,25 @@ export default function HRDashboard({ navigation, route }) {
               elevation: 3,
             }}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs }}>
               <View
                 style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 20,
+                  width: iconSize.lg,
+                  height: iconSize.lg,
+                  borderRadius: iconSize.lg / 2,
                   backgroundColor: '#10b98120',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  marginRight: 12,
+                  marginRight: spacing.md,
                 }}
               >
-                <Ionicons name="time" size={20} color="#10b981" />
+                <Ionicons name="time" size={iconSize.md} color="#10b981" />
               </View>
               <View>
-                <Text style={{ fontSize: 24, fontWeight: 'bold', color: colors.text }}>
+                <Text style={{ fontSize: fontSize['2xl'], fontWeight: 'bold', color: colors.text }}>
                   {stats.totalAttendance}
                 </Text>
-                <Text style={{ fontSize: 12, color: colors.textSecondary }}>Attendance</Text>
+                <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>Attendance</Text>
               </View>
             </View>
           </View>
@@ -479,8 +564,9 @@ export default function HRDashboard({ navigation, route }) {
             style={{
               backgroundColor: colors.surface,
               borderRadius: 16,
-              padding: 20,
+              padding: responsivePadding(20),
               width: '47%',
+              minWidth: 140,
               shadowColor: colors.shadow,
               shadowOffset: { width: 0, height: 2 },
               shadowOpacity: 0.1,
@@ -488,25 +574,25 @@ export default function HRDashboard({ navigation, route }) {
               elevation: 3,
             }}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs }}>
               <View
                 style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 20,
+                  width: iconSize.lg,
+                  height: iconSize.lg,
+                  borderRadius: iconSize.lg / 2,
                   backgroundColor: '#f59e0b20',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  marginRight: 12,
+                  marginRight: spacing.md,
                 }}
               >
-                <Ionicons name="calendar" size={20} color="#f59e0b" />
+                <Ionicons name="calendar" size={iconSize.md} color="#f59e0b" />
               </View>
               <View>
-                <Text style={{ fontSize: 24, fontWeight: 'bold', color: colors.text }}>
+                <Text style={{ fontSize: fontSize['2xl'], fontWeight: 'bold', color: colors.text }}>
                   {stats.pendingLeaves}
                 </Text>
-                <Text style={{ fontSize: 12, color: colors.textSecondary }}>Pending Leaves</Text>
+                <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>Pending Leaves</Text>
               </View>
             </View>
           </View>
@@ -515,8 +601,9 @@ export default function HRDashboard({ navigation, route }) {
             style={{
               backgroundColor: colors.surface,
               borderRadius: 16,
-              padding: 20,
+              padding: responsivePadding(20),
               width: '47%',
+              minWidth: 140,
               shadowColor: colors.shadow,
               shadowOffset: { width: 0, height: 2 },
               shadowOpacity: 0.1,
@@ -524,41 +611,41 @@ export default function HRDashboard({ navigation, route }) {
               elevation: 3,
             }}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs }}>
               <View
                 style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 20,
+                  width: iconSize.lg,
+                  height: iconSize.lg,
+                  borderRadius: iconSize.lg / 2,
                   backgroundColor: '#ef444420',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  marginRight: 12,
+                  marginRight: spacing.md,
                 }}
               >
-                <Ionicons name="ticket" size={20} color="#ef4444" />
+                <Ionicons name="ticket" size={iconSize.md} color="#ef4444" />
               </View>
               <View>
-                <Text style={{ fontSize: 24, fontWeight: 'bold', color: colors.text }}>
+                <Text style={{ fontSize: fontSize['2xl'], fontWeight: 'bold', color: colors.text }}>
                   {stats.openTickets}
                 </Text>
-                <Text style={{ fontSize: 12, color: colors.textSecondary }}>Open Tickets</Text>
+                <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>Open Tickets</Text>
               </View>
             </View>
           </View>
         </View>
 
         {/* Quick Actions */}
-        <View style={{ marginBottom: 16 }}>
-          <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text, marginBottom: 12 }}>
+        <View style={{ marginBottom: spacing.base }}>
+          <Text style={{ fontSize: responsiveFont(18), fontWeight: '600', color: colors.text, marginBottom: spacing.md }}>
             Quick Actions
           </Text>
-          <View style={{ gap: 12 }}>
+          <View style={{ gap: spacing.md }}>
             <TouchableOpacity
               style={{
                 backgroundColor: colors.surface,
                 borderRadius: 12,
-                padding: 16,
+                padding: responsivePadding(16),
                 flexDirection: 'row',
                 alignItems: 'center',
                 shadowColor: colors.shadow,
@@ -571,33 +658,33 @@ export default function HRDashboard({ navigation, route }) {
             >
               <View
                 style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 24,
+                  width: iconSize['2xl'],
+                  height: iconSize['2xl'],
+                  borderRadius: iconSize['2xl'] / 2,
                   backgroundColor: colors.primaryLight,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  marginRight: 12,
+                  marginRight: spacing.md,
                 }}
               >
-                <Ionicons name="people-outline" size={24} color={colors.primary} />
+                <Ionicons name="people-outline" size={iconSize.lg} color={colors.primary} />
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text }}>
+              <View style={{ flex: 1, flexShrink: 1 }}>
+                <Text style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.text }}>
                   Manage Employees
                 </Text>
-                <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
                   View and manage employee profiles
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+              <Ionicons name="chevron-forward" size={iconSize.md} color={colors.textSecondary} />
             </TouchableOpacity>
 
             <TouchableOpacity
               style={{
                 backgroundColor: colors.surface,
                 borderRadius: 12,
-                padding: 16,
+                padding: responsivePadding(16),
                 flexDirection: 'row',
                 alignItems: 'center',
                 shadowColor: colors.shadow,
@@ -610,33 +697,33 @@ export default function HRDashboard({ navigation, route }) {
             >
               <View
                 style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 24,
+                  width: iconSize['2xl'],
+                  height: iconSize['2xl'],
+                  borderRadius: iconSize['2xl'] / 2,
                   backgroundColor: '#10b98120',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  marginRight: 12,
+                  marginRight: spacing.md,
                 }}
               >
-                <Ionicons name="document-text-outline" size={24} color="#10b981" />
+                <Ionicons name="document-text-outline" size={iconSize.lg} color="#10b981" />
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text }}>
+              <View style={{ flex: 1, flexShrink: 1 }}>
+                <Text style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.text }}>
                   Generate Attendance Report
                 </Text>
-                <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
                   Export attendance data
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+              <Ionicons name="chevron-forward" size={iconSize.md} color={colors.textSecondary} />
             </TouchableOpacity>
 
             <TouchableOpacity
               style={{
                 backgroundColor: colors.surface,
                 borderRadius: 12,
-                padding: 16,
+                padding: responsivePadding(16),
                 flexDirection: 'row',
                 alignItems: 'center',
                 shadowColor: colors.shadow,
@@ -649,26 +736,26 @@ export default function HRDashboard({ navigation, route }) {
             >
               <View
                 style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 24,
+                  width: iconSize['2xl'],
+                  height: iconSize['2xl'],
+                  borderRadius: iconSize['2xl'] / 2,
                   backgroundColor: '#f59e0b20',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  marginRight: 12,
+                  marginRight: spacing.md,
                 }}
               >
-                <Ionicons name="document-text-outline" size={24} color="#f59e0b" />
+                <Ionicons name="document-text-outline" size={iconSize.lg} color="#f59e0b" />
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text }}>
+              <View style={{ flex: 1, flexShrink: 1 }}>
+                <Text style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.text }}>
                   Generate Leave Report
                 </Text>
-                <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
                   Export leave data
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+              <Ionicons name="chevron-forward" size={iconSize.md} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
         </View>
@@ -678,8 +765,8 @@ export default function HRDashboard({ navigation, route }) {
 
   const renderAttendance = () => (
     <View style={{ flex: 1 }}>
-      <View style={{ padding: 16 }}>
-        <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text, marginBottom: 12 }}>
+      <View style={{ padding: responsivePadding(16) }}>
+        <Text style={{ fontSize: responsiveFont(18), fontWeight: '600', color: colors.text, marginBottom: spacing.md }}>
           Recent Attendance Records
         </Text>
       </View>
@@ -687,22 +774,23 @@ export default function HRDashboard({ navigation, route }) {
         <FlatList
           data={attendanceRecords}
           keyExtractor={(item) => item.id}
+          contentContainerStyle={{ paddingBottom: spacing['2xl'] }}
           renderItem={({ item }) => (
             <View
               style={{
                 backgroundColor: colors.surface,
                 borderRadius: 12,
-                padding: 16,
-                marginHorizontal: 16,
-                marginBottom: 12,
+                padding: responsivePadding(16),
+                marginHorizontal: responsivePadding(16),
+                marginBottom: spacing.md,
               }}
             >
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <View>
-                  <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text }}>
+                <View style={{ flex: 1, flexShrink: 1 }}>
+                  <Text style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.text }}>
                     {item.username}
                   </Text>
-                  <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                  <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
                     {formatDate(item.timestamp)}
                   </Text>
                 </View>
@@ -710,13 +798,14 @@ export default function HRDashboard({ navigation, route }) {
                   style={{
                     backgroundColor: item.type === 'checkin' ? '#10b98120' : '#ef444420',
                     borderRadius: 12,
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
+                    paddingHorizontal: spacing.md,
+                    paddingVertical: spacing.xs,
+                    marginLeft: spacing.xs,
                   }}
                 >
                   <Text
                     style={{
-                      fontSize: 12,
+                      fontSize: fontSize.sm,
                       fontWeight: '600',
                       color: item.type === 'checkin' ? '#10b981' : '#ef4444',
                       textTransform: 'capitalize',
@@ -733,9 +822,9 @@ export default function HRDashboard({ navigation, route }) {
           }
         />
       ) : (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 }}>
-          <Ionicons name="time-outline" size={64} color={colors.textTertiary} />
-          <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text, marginTop: 16 }}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing['2xl'] }}>
+          <Ionicons name="time-outline" size={iconSize['4xl']} color={colors.textTertiary} />
+          <Text style={{ fontSize: responsiveFont(18), fontWeight: '600', color: colors.text, marginTop: spacing.base }}>
             No attendance records
           </Text>
         </View>
@@ -745,8 +834,8 @@ export default function HRDashboard({ navigation, route }) {
 
   const renderLeaves = () => (
     <View style={{ flex: 1 }}>
-      <View style={{ padding: 16 }}>
-        <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text, marginBottom: 12 }}>
+      <View style={{ padding: responsivePadding(16) }}>
+        <Text style={{ fontSize: responsiveFont(18), fontWeight: '600', color: colors.text, marginBottom: spacing.md }}>
           Leave Requests
         </Text>
         {pendingLeaves.length > 0 && (
@@ -754,11 +843,11 @@ export default function HRDashboard({ navigation, route }) {
             style={{
               backgroundColor: '#f59e0b20',
               borderRadius: 12,
-              padding: 12,
-              marginBottom: 12,
+              padding: spacing.md,
+              marginBottom: spacing.md,
             }}
           >
-            <Text style={{ fontSize: 14, fontWeight: '600', color: '#f59e0b' }}>
+            <Text style={{ fontSize: fontSize.base, fontWeight: '600', color: '#f59e0b' }}>
               {pendingLeaves.length} Pending Leave Request{pendingLeaves.length !== 1 ? 's' : ''}
             </Text>
           </View>
@@ -773,17 +862,17 @@ export default function HRDashboard({ navigation, route }) {
               style={{
                 backgroundColor: colors.surface,
                 borderRadius: 12,
-                padding: 16,
-                marginHorizontal: 16,
-                marginBottom: 12,
+                padding: responsivePadding(16),
+                marginHorizontal: responsivePadding(16),
+                marginBottom: spacing.md,
               }}
             >
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.xs }}>
+                <View style={{ flex: 1, flexShrink: 1 }}>
+                  <Text style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.text }}>
                     {item.employeeName || item.employeeId}
                   </Text>
-                  <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                  <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
                     {item.startDate}{item.startDate !== item.endDate ? ` to ${item.endDate}` : ''} ({item.isHalfDay ? 'Half day' : `${item.days} day${item.days !== 1 ? 's' : ''}`})
                     {item.isHalfDay && ` - ${item.halfDayPeriod === 'morning' ? 'Morning' : 'Afternoon'}`}
                   </Text>
@@ -792,13 +881,14 @@ export default function HRDashboard({ navigation, route }) {
                   style={{
                     backgroundColor: getLeaveStatusColor(item.status) + '20',
                     borderRadius: 12,
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
+                    paddingHorizontal: spacing.md,
+                    paddingVertical: spacing.xs,
+                    marginLeft: spacing.xs,
                   }}
                 >
                   <Text
                     style={{
-                      fontSize: 12,
+                      fontSize: fontSize.sm,
                       fontWeight: '600',
                       color: getLeaveStatusColor(item.status),
                       textTransform: 'capitalize',
@@ -808,52 +898,54 @@ export default function HRDashboard({ navigation, route }) {
                   </Text>
                 </View>
               </View>
-              <Text style={{ fontSize: 12, color: colors.textSecondary, textTransform: 'capitalize', marginBottom: 8 }}>
+              <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary, textTransform: 'capitalize', marginBottom: spacing.xs }}>
                 {item.leaveType} Leave
               </Text>
               {item.reason && (
-                <Text style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 8, fontStyle: 'italic' }}>
+                <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary, marginBottom: spacing.xs, fontStyle: 'italic' }}>
                   Reason: {item.reason}
                 </Text>
               )}
               {item.status === 'pending' && (
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs }}>
                   <TouchableOpacity
                     onPress={() => handleProcessLeaveRequest(item.id, 'approved')}
                     style={{
                       flex: 1,
+                      minWidth: 120, // Prevent buttons from being too narrow
                       backgroundColor: '#10b981',
                       borderRadius: 8,
-                      paddingVertical: 10,
-                      paddingHorizontal: 16,
+                      paddingVertical: spacing.sm,
+                      paddingHorizontal: spacing.base,
                       flexDirection: 'row',
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
                   >
-                    <Ionicons name="checkmark-circle" size={18} color="#fff" style={{ marginRight: 6 }} />
-                    <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>Approve</Text>
+                    <Ionicons name="checkmark-circle" size={iconSize.md} color="#fff" style={{ marginRight: spacing.xs }} />
+                    <Text style={{ color: '#fff', fontWeight: '600', fontSize: fontSize.base }}>Approve</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => handleProcessLeaveRequest(item.id, 'rejected')}
                     style={{
                       flex: 1,
+                      minWidth: 120,
                       backgroundColor: '#ef4444',
                       borderRadius: 8,
-                      paddingVertical: 10,
-                      paddingHorizontal: 16,
+                      paddingVertical: spacing.sm,
+                      paddingHorizontal: spacing.base,
                       flexDirection: 'row',
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
                   >
-                    <Ionicons name="close-circle" size={18} color="#fff" style={{ marginRight: 6 }} />
-                    <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>Reject</Text>
+                    <Ionicons name="close-circle" size={iconSize.md} color="#fff" style={{ marginRight: spacing.xs }} />
+                    <Text style={{ color: '#fff', fontWeight: '600', fontSize: fontSize.base }}>Reject</Text>
                   </TouchableOpacity>
                 </View>
               )}
               {item.status !== 'pending' && item.processedBy && (
-                <Text style={{ fontSize: 11, color: colors.textTertiary, marginTop: 8 }}>
+                <Text style={{ fontSize: fontSize.xs, color: colors.textTertiary, marginTop: spacing.xs }}>
                   {item.status === 'approved' ? 'Approved' : 'Rejected'} by {item.processedBy}
                   {item.processedAt && ` on ${formatDate(item.processedAt)}`}
                 </Text>
@@ -865,9 +957,9 @@ export default function HRDashboard({ navigation, route }) {
           }
         />
       ) : (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 }}>
-          <Ionicons name="calendar-outline" size={64} color={colors.textTertiary} />
-          <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text, marginTop: 16 }}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing['2xl'] }}>
+          <Ionicons name="calendar-outline" size={iconSize['4xl']} color={colors.textTertiary} />
+          <Text style={{ fontSize: responsiveFont(18), fontWeight: '600', color: colors.text, marginTop: spacing.base }}>
             No leave requests
           </Text>
         </View>
@@ -877,12 +969,12 @@ export default function HRDashboard({ navigation, route }) {
 
   const renderTickets = () => (
     <View style={{ flex: 1 }}>
-      <View style={{ padding: 16 }}>
-        <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text, marginBottom: 12 }}>
+      <View style={{ padding: responsivePadding(16) }}>
+        <Text style={{ fontSize: responsiveFont(18), fontWeight: '600', color: colors.text, marginBottom: spacing.md }}>
           Tickets
         </Text>
-        {/* Filter Tabs */}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+        {/* Filter Tabs - Responsive: wraps on small screens */}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.md }}>
           {['all', TICKET_STATUS.OPEN, TICKET_STATUS.IN_PROGRESS, TICKET_STATUS.RESOLVED, TICKET_STATUS.CLOSED].map((filterType) => (
             <TouchableOpacity
               key={filterType}
@@ -898,7 +990,7 @@ export default function HRDashboard({ navigation, route }) {
                 style={{
                   color: ticketFilter === filterType ? 'white' : colors.textSecondary,
                   fontWeight: ticketFilter === filterType ? '600' : '400',
-                  fontSize: 12,
+                  fontSize: fontSize.sm,
                   textTransform: 'capitalize',
                 }}
               >
@@ -917,34 +1009,34 @@ export default function HRDashboard({ navigation, route }) {
               style={{
                 backgroundColor: colors.surface,
                 borderRadius: 12,
-                padding: 16,
-                marginHorizontal: 16,
-                marginBottom: 12,
+                padding: responsivePadding(16),
+                marginHorizontal: responsivePadding(16),
+                marginBottom: spacing.md,
               }}
               onPress={() => navigation.navigate('TicketManagement', { user, ticket: item })}
             >
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.xs }}>
+                <View style={{ flex: 1, flexShrink: 1 }}>
+                  <Text style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.text }}>
                     {item.subject}
                   </Text>
-                  <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                  <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
                     By {item.createdBy} • {formatDate(item.createdAt)}
                   </Text>
                 </View>
-                <View style={{ alignItems: 'flex-end' }}>
+                <View style={{ alignItems: 'flex-end', marginLeft: spacing.xs }}>
                   <View
                     style={{
                       backgroundColor: getStatusColor(item.status) + '20',
                       borderRadius: 12,
-                      paddingHorizontal: 12,
-                      paddingVertical: 6,
-                      marginBottom: 4,
+                      paddingHorizontal: spacing.md,
+                      paddingVertical: spacing.xs,
+                      marginBottom: spacing.xs / 2,
                     }}
                   >
                     <Text
                       style={{
-                        fontSize: 12,
+                        fontSize: fontSize.sm,
                         fontWeight: '600',
                         color: getStatusColor(item.status),
                       }}
@@ -956,13 +1048,13 @@ export default function HRDashboard({ navigation, route }) {
                     style={{
                       backgroundColor: getPriorityColor(item.priority) + '20',
                       borderRadius: 12,
-                      paddingHorizontal: 12,
-                      paddingVertical: 6,
+                      paddingHorizontal: spacing.md,
+                      paddingVertical: spacing.xs,
                     }}
                   >
                     <Text
                       style={{
-                        fontSize: 12,
+                        fontSize: fontSize.sm,
                         fontWeight: '600',
                         color: getPriorityColor(item.priority),
                       }}
@@ -972,54 +1064,57 @@ export default function HRDashboard({ navigation, route }) {
                   </View>
                 </View>
               </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
-                <Ionicons name="pricetag-outline" size={14} color={colors.textSecondary} />
-                <Text style={{ fontSize: 12, color: colors.textSecondary, marginLeft: 6 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginTop: spacing.xs }}>
+                <Ionicons name="pricetag-outline" size={iconSize.sm} color={colors.textSecondary} />
+                <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary, marginLeft: spacing.xs }}>
                   {getCategoryLabel(item.category)}
                 </Text>
                 {item.assignedTo && (
                   <>
-                    <Text style={{ color: colors.textTertiary, marginHorizontal: 8 }}>•</Text>
-                    <Ionicons name="person-outline" size={14} color={colors.textSecondary} />
-                    <Text style={{ fontSize: 12, color: colors.textSecondary, marginLeft: 6 }}>
+                    <Text style={{ color: colors.textTertiary, marginHorizontal: spacing.xs }}>•</Text>
+                    <Ionicons name="person-outline" size={iconSize.sm} color={colors.textSecondary} />
+                    <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary, marginLeft: spacing.xs }}>
                       {item.assignedTo}
                     </Text>
                   </>
                 )}
               </View>
-              {/* Action Buttons */}
-              <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+              {/* Action Buttons - Responsive: wraps on small screens */}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.md }}>
                 <TouchableOpacity
                   onPress={() => navigation.navigate('TicketManagement', { user, ticket: item })}
                   style={{
                     flex: 1,
+                    minWidth: 120,
                     backgroundColor: colors.primary,
                     borderRadius: 8,
-                    paddingVertical: 10,
-                    paddingHorizontal: 16,
+                    paddingVertical: spacing.sm,
+                    paddingHorizontal: spacing.base,
                     flexDirection: 'row',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <Ionicons name="eye-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
-                  <Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>View Details</Text>
+                  <Ionicons name="eye-outline" size={iconSize.sm} color="#fff" style={{ marginRight: spacing.xs }} />
+                  <Text style={{ color: '#fff', fontWeight: '600', fontSize: fontSize.sm }}>View Details</Text>
                 </TouchableOpacity>
                 {item.status !== TICKET_STATUS.CLOSED && (
                   <TouchableOpacity
                     onPress={() => handleCloseTicket(item.id)}
                     style={{
+                      flex: 1,
+                      minWidth: 120,
                       backgroundColor: '#6b7280',
                       borderRadius: 8,
-                      paddingVertical: 10,
-                      paddingHorizontal: 16,
+                      paddingVertical: spacing.sm,
+                      paddingHorizontal: spacing.base,
                       flexDirection: 'row',
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
                   >
-                    <Ionicons name="close-circle-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
-                    <Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>Close</Text>
+                    <Ionicons name="close-circle-outline" size={iconSize.sm} color="#fff" style={{ marginRight: spacing.xs }} />
+                    <Text style={{ color: '#fff', fontWeight: '600', fontSize: fontSize.sm }}>Close</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -1030,9 +1125,9 @@ export default function HRDashboard({ navigation, route }) {
           }
         />
       ) : (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 }}>
-          <Ionicons name="ticket-outline" size={64} color={colors.textTertiary} />
-          <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text, marginTop: 16 }}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing['2xl'] }}>
+          <Ionicons name="ticket-outline" size={iconSize['4xl']} color={colors.textTertiary} />
+          <Text style={{ fontSize: responsiveFont(18), fontWeight: '600', color: colors.text, marginTop: spacing.base }}>
             No tickets
           </Text>
         </View>
@@ -1046,8 +1141,8 @@ export default function HRDashboard({ navigation, route }) {
       <View
         style={{
           backgroundColor: colors.surface,
-          paddingHorizontal: 16,
-          paddingVertical: 12,
+          paddingHorizontal: responsivePadding(16),
+          paddingVertical: spacing.md,
           shadowColor: colors.shadow,
           shadowOffset: { width: 0, height: 2 },
           shadowOpacity: 0.1,
@@ -1057,24 +1152,24 @@ export default function HRDashboard({ navigation, route }) {
       >
         <Text
           style={{
-            fontSize: 20,
+            fontSize: responsiveFont(20),
             fontWeight: 'bold',
             color: colors.text,
-            marginBottom: 12,
+            marginBottom: spacing.md,
           }}
         >
           HR Dashboard
         </Text>
 
-        {/* Tab Navigation */}
-        <View style={{ flexDirection: 'row', gap: 8 }}>
+        {/* Tab Navigation - Responsive: wraps on small screens */}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
           {['overview', 'attendance', 'leaves', 'tickets'].map((tab) => (
             <TouchableOpacity
               key={tab}
               onPress={() => setActiveTab(tab)}
               style={{
-                paddingHorizontal: 16,
-                paddingVertical: 8,
+                paddingHorizontal: responsivePadding(16),
+                paddingVertical: spacing.xs,
                 borderRadius: 20,
                 backgroundColor: activeTab === tab ? colors.primary : colors.background,
               }}
@@ -1083,7 +1178,7 @@ export default function HRDashboard({ navigation, route }) {
                 style={{
                   color: activeTab === tab ? 'white' : colors.textSecondary,
                   fontWeight: activeTab === tab ? '600' : '400',
-                  fontSize: 14,
+                  fontSize: fontSize.base,
                   textTransform: 'capitalize',
                 }}
               >

@@ -19,6 +19,7 @@ import {
 } from '../utils/storage';
 import { getEmployees, getManageableEmployees, canManageEmployee } from '../utils/employees';
 import DatePickerCalendar from '../components/DatePickerCalendar';
+import { spacing, fontSize, responsivePadding, responsiveFont, iconSize } from '../shared/utils/responsive';
 
 export default function ManualAttendanceScreen({ navigation, route }) {
   const { user } = route.params;
@@ -37,10 +38,33 @@ export default function ManualAttendanceScreen({ navigation, route }) {
 
   useEffect(() => {
     loadData();
-    const unsubscribe = navigation.addListener('focus', () => {
-      loadData();
-    });
-    return unsubscribe;
+    
+    // Safely check if navigation and addListener exist
+    let unsubscribe = null;
+    if (navigation && typeof navigation.addListener === 'function') {
+      try {
+        unsubscribe = navigation.addListener('focus', () => {
+          loadData();
+        });
+      } catch (error) {
+        if (__DEV__) {
+          console.warn('[ManualAttendanceScreen] Failed to add navigation listener:', error);
+        }
+      }
+    }
+    
+    return () => {
+      // Only call unsubscribe if it's a function
+      if (typeof unsubscribe === 'function') {
+        try {
+          unsubscribe();
+        } catch (error) {
+          if (__DEV__) {
+            console.warn('[ManualAttendanceScreen] Error unsubscribing navigation listener:', error);
+          }
+        }
+      }
+    };
   }, [navigation]);
 
   const loadData = async () => {
@@ -245,35 +269,35 @@ export default function ManualAttendanceScreen({ navigation, route }) {
       <View style={{
         backgroundColor: colors.surface,
         borderRadius: 12,
-        padding: 16,
-        marginBottom: 12,
-        marginHorizontal: 16,
+        padding: responsivePadding(16),
+        marginBottom: spacing.md,
+        marginHorizontal: responsivePadding(16),
         borderLeftWidth: 4,
         borderLeftColor: item.type === 'checkin' ? colors.success : colors.error
       }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 4 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.xs }}>
+          <View style={{ flex: 1, flexShrink: 1 }}>
+            <Text style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.text, marginBottom: spacing.xs / 2 }}>
               {item.employeeName || item.username}
             </Text>
-            <Text style={{ fontSize: 14, color: colors.textSecondary }}>
+            <Text style={{ fontSize: fontSize.base, color: colors.textSecondary }}>
               {item.type === 'checkin' ? 'Check In' : 'Check Out'}
             </Text>
             {item.isManual && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-                <Ionicons name="create-outline" size={12} color={colors.warning} />
-                <Text style={{ fontSize: 12, color: colors.warning, marginLeft: 4 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing.xs / 2 }}>
+                <Ionicons name="create-outline" size={iconSize.xs} color={colors.warning} />
+                <Text style={{ fontSize: fontSize.sm, color: colors.warning, marginLeft: spacing.xs / 2 }}>
                   Manual Entry
                 </Text>
               </View>
             )}
           </View>
-          <View style={{ alignItems: 'flex-end' }}>
-            <Text style={{ fontSize: 12, color: colors.textTertiary }}>
+          <View style={{ alignItems: 'flex-end', marginLeft: spacing.xs }}>
+            <Text style={{ fontSize: fontSize.sm, color: colors.textTertiary }}>
               {formatDateTime(item.timestamp || item.createdAt)}
             </Text>
             {item.createdBy && (
-              <Text style={{ fontSize: 11, color: colors.textTertiary, marginTop: 2 }}>
+              <Text style={{ fontSize: fontSize.xs, color: colors.textTertiary, marginTop: spacing.xs / 4 }}>
                 By: {item.createdBy}
               </Text>
             )}
@@ -281,36 +305,38 @@ export default function ManualAttendanceScreen({ navigation, route }) {
         </View>
         
         {item.location?.address && (
-          <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }}>
+          <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary, marginTop: spacing.xs / 2 }}>
             📍 {item.location.address}
           </Text>
         )}
 
         {canManage && (
-          <View style={{ flexDirection: 'row', marginTop: 12, gap: 8 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing.md, gap: spacing.xs }}>
             <TouchableOpacity
               style={{
                 flex: 1,
+                minWidth: 100,
                 backgroundColor: colors.primary,
-                paddingVertical: 8,
+                paddingVertical: spacing.xs,
                 borderRadius: 8,
                 alignItems: 'center'
               }}
               onPress={() => openEditModal(item)}
             >
-              <Text style={{ color: 'white', fontWeight: '600' }}>Edit</Text>
+              <Text style={{ color: 'white', fontWeight: '600', fontSize: fontSize.base }}>Edit</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={{
                 flex: 1,
+                minWidth: 100,
                 backgroundColor: colors.error,
-                paddingVertical: 8,
+                paddingVertical: spacing.xs,
                 borderRadius: 8,
                 alignItems: 'center'
               }}
               onPress={() => handleDeleteAttendance(item)}
             >
-              <Text style={{ color: 'white', fontWeight: '600' }}>Delete</Text>
+              <Text style={{ color: 'white', fontWeight: '600', fontSize: fontSize.base }}>Delete</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -322,19 +348,19 @@ export default function ManualAttendanceScreen({ navigation, route }) {
     <TouchableOpacity
       key={employee.id}
       style={{
-        padding: 12,
+        padding: spacing.md,
         backgroundColor: selectedEmployee?.id === employee.id ? colors.primaryLight : colors.surface,
         borderRadius: 8,
-        marginBottom: 8,
+        marginBottom: spacing.xs,
         borderWidth: 1,
         borderColor: selectedEmployee?.id === employee.id ? colors.primary : 'transparent'
       }}
       onPress={() => setSelectedEmployee(employee)}
     >
-      <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text }}>
+      <Text style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.text }}>
         {employee.name}
       </Text>
-      <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+      <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
         {employee.username} • {employee.department}
       </Text>
     </TouchableOpacity>
@@ -343,24 +369,25 @@ export default function ManualAttendanceScreen({ navigation, route }) {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Header */}
-      <View style={{ backgroundColor: colors.surface, paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      <View style={{ backgroundColor: colors.surface, paddingHorizontal: responsivePadding(16), paddingVertical: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, flexShrink: 1 }}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
-            style={{ padding: 8, marginRight: 8 }}
+            style={{ padding: spacing.xs, marginRight: spacing.xs }}
           >
-            <Ionicons name="arrow-back" size={24} color={colors.text} />
+            <Ionicons name="arrow-back" size={iconSize.lg} color={colors.text} />
           </TouchableOpacity>
-          <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text }}>
+          <Text style={{ fontSize: responsiveFont(20), fontWeight: 'bold', color: colors.text }}>
             Manual Attendance
           </Text>
         </View>
         <TouchableOpacity
           style={{
             backgroundColor: colors.primary,
-            paddingHorizontal: 16,
-            paddingVertical: 8,
-            borderRadius: 8
+            paddingHorizontal: responsivePadding(16),
+            paddingVertical: spacing.xs,
+            borderRadius: 8,
+            marginTop: spacing.xs,
           }}
           onPress={() => {
             resetForm();
@@ -368,8 +395,8 @@ export default function ManualAttendanceScreen({ navigation, route }) {
           }}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Ionicons name="add" size={20} color="white" />
-            <Text style={{ color: 'white', fontWeight: '600', marginLeft: 4 }}>Add</Text>
+            <Ionicons name="add" size={iconSize.md} color="white" />
+            <Text style={{ color: 'white', fontWeight: '600', marginLeft: spacing.xs / 2, fontSize: fontSize.sm }}>Add</Text>
           </View>
         </TouchableOpacity>
       </View>
@@ -379,14 +406,14 @@ export default function ManualAttendanceScreen({ navigation, route }) {
         data={attendanceRecords}
         renderItem={renderRecord}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingVertical: 16 }}
+        contentContainerStyle={{ paddingVertical: responsivePadding(16), paddingBottom: spacing['2xl'] }}
         ListEmptyComponent={
-          <View style={{ alignItems: 'center', padding: 32 }}>
-            <Ionicons name="time-outline" size={64} color={colors.textTertiary} />
-            <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text, marginTop: 16 }}>
+          <View style={{ alignItems: 'center', padding: spacing['2xl'] }}>
+            <Ionicons name="time-outline" size={iconSize['4xl']} color={colors.textTertiary} />
+            <Text style={{ fontSize: responsiveFont(18), fontWeight: '600', color: colors.text, marginTop: spacing.base }}>
               No attendance records
             </Text>
-            <Text style={{ fontSize: 14, color: colors.textSecondary, marginTop: 8, textAlign: 'center' }}>
+            <Text style={{ fontSize: fontSize.base, color: colors.textSecondary, marginTop: spacing.xs, textAlign: 'center' }}>
               Add manual attendance records for employees
             </Text>
           </View>
@@ -401,19 +428,19 @@ export default function ManualAttendanceScreen({ navigation, route }) {
         onRequestClose={() => setShowAddModal(false)}
       >
         <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '90%', padding: 20 }}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text }}>
+          <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '90%', padding: responsivePadding(20) }}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing['2xl'] }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg }}>
+                <Text style={{ fontSize: responsiveFont(20), fontWeight: 'bold', color: colors.text }}>
                   Add Attendance Record
                 </Text>
                 <TouchableOpacity onPress={() => setShowAddModal(false)}>
-                  <Ionicons name="close" size={24} color={colors.text} />
+                  <Ionicons name="close" size={iconSize.lg} color={colors.text} />
                 </TouchableOpacity>
               </View>
 
               {/* Employee Selection */}
-              <View style={{ marginBottom: 16 }}>
+              <View style={{ marginBottom: spacing.base }}>
                 <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 8 }}>
                   Select Employee *
                 </Text>
@@ -423,15 +450,16 @@ export default function ManualAttendanceScreen({ navigation, route }) {
               </View>
 
               {/* Attendance Type */}
-              <View style={{ marginBottom: 16 }}>
-                <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 8 }}>
+              <View style={{ marginBottom: spacing.base }}>
+                <Text style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.text, marginBottom: spacing.xs }}>
                   Type *
                 </Text>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
                   <TouchableOpacity
                     style={{
                       flex: 1,
-                      padding: 12,
+                      minWidth: 120,
+                      padding: spacing.md,
                       borderRadius: 8,
                       backgroundColor: attendanceType === 'checkin' ? colors.success : colors.background,
                       borderWidth: 2,
@@ -440,14 +468,15 @@ export default function ManualAttendanceScreen({ navigation, route }) {
                     }}
                     onPress={() => setAttendanceType('checkin')}
                   >
-                    <Text style={{ color: attendanceType === 'checkin' ? 'white' : colors.text, fontWeight: '600' }}>
+                    <Text style={{ color: attendanceType === 'checkin' ? 'white' : colors.text, fontWeight: '600', fontSize: fontSize.base }}>
                       Check In
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={{
                       flex: 1,
-                      padding: 12,
+                      minWidth: 120,
+                      padding: spacing.md,
                       borderRadius: 8,
                       backgroundColor: attendanceType === 'checkout' ? colors.error : colors.background,
                       borderWidth: 2,
@@ -456,7 +485,7 @@ export default function ManualAttendanceScreen({ navigation, route }) {
                     }}
                     onPress={() => setAttendanceType('checkout')}
                   >
-                    <Text style={{ color: attendanceType === 'checkout' ? 'white' : colors.text, fontWeight: '600' }}>
+                    <Text style={{ color: attendanceType === 'checkout' ? 'white' : colors.text, fontWeight: '600', fontSize: fontSize.base }}>
                       Check Out
                     </Text>
                   </TouchableOpacity>
@@ -464,8 +493,8 @@ export default function ManualAttendanceScreen({ navigation, route }) {
               </View>
 
               {/* Date Selection */}
-              <View style={{ marginBottom: 16 }}>
-                <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 8 }}>
+              <View style={{ marginBottom: spacing.base }}>
+                <Text style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.text, marginBottom: spacing.xs }}>
                   Date *
                 </Text>
                 <DatePickerCalendar
@@ -478,18 +507,19 @@ export default function ManualAttendanceScreen({ navigation, route }) {
               </View>
 
               {/* Time Input */}
-              <View style={{ marginBottom: 16 }}>
-                <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 8 }}>
+              <View style={{ marginBottom: spacing.base }}>
+                <Text style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.text, marginBottom: spacing.xs }}>
                   Time * (HH:MM)
                 </Text>
                 <TextInput
                   style={{
                     backgroundColor: colors.background,
                     borderRadius: 8,
-                    padding: 12,
+                    padding: spacing.md,
                     color: colors.text,
                     borderWidth: 1,
-                    borderColor: colors.border
+                    borderColor: colors.border,
+                    fontSize: fontSize.base,
                   }}
                   placeholder="09:30"
                   placeholderTextColor={colors.textTertiary}
@@ -500,18 +530,19 @@ export default function ManualAttendanceScreen({ navigation, route }) {
               </View>
 
               {/* Location (Optional) */}
-              <View style={{ marginBottom: 20 }}>
-                <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 8 }}>
+              <View style={{ marginBottom: spacing.lg }}>
+                <Text style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.text, marginBottom: spacing.xs }}>
                   Location (Optional)
                 </Text>
                 <TextInput
                   style={{
                     backgroundColor: colors.background,
                     borderRadius: 8,
-                    padding: 12,
+                    padding: spacing.md,
                     color: colors.text,
                     borderWidth: 1,
-                    borderColor: colors.border
+                    borderColor: colors.border,
+                    fontSize: fontSize.base,
                   }}
                   placeholder="Enter location address"
                   placeholderTextColor={colors.textTertiary}
@@ -520,11 +551,13 @@ export default function ManualAttendanceScreen({ navigation, route }) {
                 />
               </View>
 
-              <View style={{ flexDirection: 'row', gap: 12, marginTop: 20 }}>
+              {/* Action Buttons - Responsive: wraps on small screens */}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.lg }}>
                 <TouchableOpacity
                   style={{
                     flex: 1,
-                    padding: 14,
+                    minWidth: 120,
+                    padding: spacing.md,
                     borderRadius: 8,
                     backgroundColor: colors.background,
                     alignItems: 'center'
@@ -534,12 +567,13 @@ export default function ManualAttendanceScreen({ navigation, route }) {
                     resetForm();
                   }}
                 >
-                  <Text style={{ color: colors.text, fontWeight: '600' }}>Cancel</Text>
+                  <Text style={{ color: colors.text, fontWeight: '600', fontSize: fontSize.base }}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={{
                     flex: 1,
-                    padding: 14,
+                    minWidth: 120,
+                    padding: spacing.md,
                     borderRadius: 8,
                     backgroundColor: colors.primary,
                     alignItems: 'center'
@@ -547,7 +581,7 @@ export default function ManualAttendanceScreen({ navigation, route }) {
                   onPress={handleAddAttendance}
                   disabled={isSubmitting}
                 >
-                  <Text style={{ color: 'white', fontWeight: '600' }}>
+                  <Text style={{ color: 'white', fontWeight: '600', fontSize: fontSize.base }}>
                     {isSubmitting ? 'Creating...' : 'Create'}
                   </Text>
                 </TouchableOpacity>
@@ -565,40 +599,41 @@ export default function ManualAttendanceScreen({ navigation, route }) {
         onRequestClose={() => setShowEditModal(false)}
       >
         <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '90%', padding: 20 }}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text }}>
+          <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '90%', padding: responsivePadding(20) }}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing['2xl'] }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg }}>
+                <Text style={{ fontSize: responsiveFont(20), fontWeight: 'bold', color: colors.text }}>
                   Edit Attendance Record
                 </Text>
                 <TouchableOpacity onPress={() => {
                   setShowEditModal(false);
                   setSelectedRecord(null);
                 }}>
-                  <Ionicons name="close" size={24} color={colors.text} />
+                  <Ionicons name="close" size={iconSize.lg} color={colors.text} />
                 </TouchableOpacity>
               </View>
 
               {/* Employee Info (Read-only) */}
               {selectedEmployee && (
-                <View style={{ marginBottom: 16, padding: 12, backgroundColor: colors.background, borderRadius: 8 }}>
-                  <Text style={{ fontSize: 14, color: colors.textSecondary, marginBottom: 4 }}>Employee</Text>
-                  <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text }}>
+                <View style={{ marginBottom: spacing.base, padding: spacing.md, backgroundColor: colors.background, borderRadius: 8 }}>
+                  <Text style={{ fontSize: fontSize.base, color: colors.textSecondary, marginBottom: spacing.xs / 2 }}>Employee</Text>
+                  <Text style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.text }}>
                     {selectedEmployee.name} ({selectedEmployee.username})
                   </Text>
                 </View>
               )}
 
               {/* Attendance Type */}
-              <View style={{ marginBottom: 16 }}>
-                <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 8 }}>
+              <View style={{ marginBottom: spacing.base }}>
+                <Text style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.text, marginBottom: spacing.xs }}>
                   Type *
                 </Text>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
                   <TouchableOpacity
                     style={{
                       flex: 1,
-                      padding: 12,
+                      minWidth: 120,
+                      padding: spacing.md,
                       borderRadius: 8,
                       backgroundColor: attendanceType === 'checkin' ? colors.success : colors.background,
                       borderWidth: 2,
@@ -607,14 +642,15 @@ export default function ManualAttendanceScreen({ navigation, route }) {
                     }}
                     onPress={() => setAttendanceType('checkin')}
                   >
-                    <Text style={{ color: attendanceType === 'checkin' ? 'white' : colors.text, fontWeight: '600' }}>
+                    <Text style={{ color: attendanceType === 'checkin' ? 'white' : colors.text, fontWeight: '600', fontSize: fontSize.base }}>
                       Check In
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={{
                       flex: 1,
-                      padding: 12,
+                      minWidth: 120,
+                      padding: spacing.md,
                       borderRadius: 8,
                       backgroundColor: attendanceType === 'checkout' ? colors.error : colors.background,
                       borderWidth: 2,
@@ -623,7 +659,7 @@ export default function ManualAttendanceScreen({ navigation, route }) {
                     }}
                     onPress={() => setAttendanceType('checkout')}
                   >
-                    <Text style={{ color: attendanceType === 'checkout' ? 'white' : colors.text, fontWeight: '600' }}>
+                    <Text style={{ color: attendanceType === 'checkout' ? 'white' : colors.text, fontWeight: '600', fontSize: fontSize.base }}>
                       Check Out
                     </Text>
                   </TouchableOpacity>
@@ -631,8 +667,8 @@ export default function ManualAttendanceScreen({ navigation, route }) {
               </View>
 
               {/* Date Selection */}
-              <View style={{ marginBottom: 16 }}>
-                <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 8 }}>
+              <View style={{ marginBottom: spacing.base }}>
+                <Text style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.text, marginBottom: spacing.xs }}>
                   Date *
                 </Text>
                 <DatePickerCalendar
@@ -645,15 +681,16 @@ export default function ManualAttendanceScreen({ navigation, route }) {
               </View>
 
               {/* Time Input */}
-              <View style={{ marginBottom: 16 }}>
-                <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 8 }}>
+              <View style={{ marginBottom: spacing.base }}>
+                <Text style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.text, marginBottom: spacing.xs }}>
                   Time * (HH:MM)
                 </Text>
                 <TextInput
                   style={{
                     backgroundColor: colors.background,
                     borderRadius: 8,
-                    padding: 12,
+                    padding: spacing.md,
+                    fontSize: fontSize.base,
                     color: colors.text,
                     borderWidth: 1,
                     borderColor: colors.border
@@ -667,18 +704,19 @@ export default function ManualAttendanceScreen({ navigation, route }) {
               </View>
 
               {/* Location */}
-              <View style={{ marginBottom: 20 }}>
-                <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 8 }}>
+              <View style={{ marginBottom: spacing.lg }}>
+                <Text style={{ fontSize: fontSize.md, fontWeight: '600', color: colors.text, marginBottom: spacing.xs }}>
                   Location
                 </Text>
                 <TextInput
                   style={{
                     backgroundColor: colors.background,
                     borderRadius: 8,
-                    padding: 12,
+                    padding: spacing.md,
                     color: colors.text,
                     borderWidth: 1,
-                    borderColor: colors.border
+                    borderColor: colors.border,
+                    fontSize: fontSize.base,
                   }}
                   placeholder="Enter location address"
                   placeholderTextColor={colors.textTertiary}
@@ -687,11 +725,13 @@ export default function ManualAttendanceScreen({ navigation, route }) {
                 />
               </View>
 
-              <View style={{ flexDirection: 'row', gap: 12, marginTop: 20 }}>
+              {/* Action Buttons - Responsive: wraps on small screens */}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.lg }}>
                 <TouchableOpacity
                   style={{
                     flex: 1,
-                    padding: 14,
+                    minWidth: 120,
+                    padding: spacing.md,
                     borderRadius: 8,
                     backgroundColor: colors.background,
                     alignItems: 'center'
@@ -701,12 +741,13 @@ export default function ManualAttendanceScreen({ navigation, route }) {
                     setSelectedRecord(null);
                   }}
                 >
-                  <Text style={{ color: colors.text, fontWeight: '600' }}>Cancel</Text>
+                  <Text style={{ color: colors.text, fontWeight: '600', fontSize: fontSize.base }}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={{
                     flex: 1,
-                    padding: 14,
+                    minWidth: 120,
+                    padding: spacing.md,
                     borderRadius: 8,
                     backgroundColor: colors.primary,
                     alignItems: 'center'
@@ -714,7 +755,7 @@ export default function ManualAttendanceScreen({ navigation, route }) {
                   onPress={handleEditAttendance}
                   disabled={isSubmitting}
                 >
-                  <Text style={{ color: 'white', fontWeight: '600' }}>
+                  <Text style={{ color: 'white', fontWeight: '600', fontSize: fontSize.base }}>
                     {isSubmitting ? 'Updating...' : 'Update'}
                   </Text>
                 </TouchableOpacity>
