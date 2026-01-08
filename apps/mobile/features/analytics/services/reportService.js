@@ -2,6 +2,8 @@
  * Report Service - Frontend service for generating reports
  */
 import { API_GATEWAY_URL, API_TIMEOUT } from '../../../core/config/api';
+import * as FileSystem from 'expo-file-system';
+import { Linking, Platform } from 'react-native';
 
 /**
  * Generate a report
@@ -141,6 +143,109 @@ export async function generateReport(range, from = null, to = null, user = null)
     
     // Generic fallback
     throw new Error(error.message || 'Failed to generate report. Please check your connection and try again.');
+  }
+}
+
+/**
+ * Download a generated report
+ * @param {string} reportId - Report ID from generate response
+ * @param {Object} user - User object for authentication
+ * @returns {Promise<{success: boolean, fileUri?: string, error?: string}>} Download result
+ */
+export async function downloadReport(reportId, user = null) {
+  try {
+    // Validate API Gateway URL
+    if (!API_GATEWAY_URL || API_GATEWAY_URL.includes('localhost') || API_GATEWAY_URL.includes('undefined')) {
+      throw new Error('API Gateway is not configured. Please check your app configuration.');
+    }
+
+    const headers = {};
+
+    // Add authentication headers if user is available
+    if (user) {
+      if (user.uid) {
+        headers['x-user-id'] = String(user.uid);
+      } else if (user.id) {
+        headers['x-user-id'] = String(user.id);
+      }
+      if (user.email) {
+        headers['x-user-email'] = user.email;
+      }
+    }
+
+    const url = `${API_GATEWAY_URL}/api/reports/download/${reportId}`;
+    
+    if (__DEV__) {
+      console.log('[ReportService] Downloading report:', { url, reportId });
+    }
+
+    // Download file to local storage
+    const fileUri = FileSystem.documentDirectory + `report-${reportId}.pdf`;
+    
+    const downloadResult = await FileSystem.downloadAsync(url, fileUri, {
+      headers,
+    });
+
+    if (downloadResult.status !== 200) {
+      throw new Error(`Download failed with status ${downloadResult.status}`);
+    }
+
+    if (__DEV__) {
+      console.log('[ReportService] Report downloaded successfully:', fileUri);
+    }
+
+    return {
+      success: true,
+      fileUri: downloadResult.uri,
+    };
+  } catch (error) {
+    console.error('[ReportService] Error downloading report:', error);
+    
+    // Handle specific error types
+    if (error.message?.includes('404') || error.message?.includes('not found')) {
+      throw new Error('Report not found or has expired. Reports expire after 30 minutes.');
+    }
+    
+    if (error.message?.includes('Network') || error.message?.includes('fetch')) {
+      throw new Error('Network error. Please check your internet connection and try again.');
+    }
+    
+    throw new Error(error.message || 'Failed to download report. Please try again.');
+  }
+}
+
+/**
+ * Open a downloaded report file
+ * @param {string} fileUri - Local file URI
+ * @returns {Promise<{success: boolean, error?: string}>} Open result
+ */
+export async function openReport(fileUri) {
+  try {
+    // For Android, use content URI
+    if (Platform.OS === 'android') {
+      const contentUri = await FileSystem.getContentUriAsync(fileUri);
+      const canOpen = await Linking.canOpenURL(contentUri);
+      
+      if (canOpen) {
+        await Linking.openURL(contentUri);
+        return { success: true };
+      } else {
+        throw new Error('No app available to open PDF files');
+      }
+    } else {
+      // For iOS, use file URI directly
+      const canOpen = await Linking.canOpenURL(fileUri);
+      
+      if (canOpen) {
+        await Linking.openURL(fileUri);
+        return { success: true };
+      } else {
+        throw new Error('No app available to open PDF files');
+      }
+    }
+  } catch (error) {
+    console.error('[ReportService] Error opening report:', error);
+    throw new Error(error.message || 'Failed to open report. The file has been saved to your device.');
   }
 }
 

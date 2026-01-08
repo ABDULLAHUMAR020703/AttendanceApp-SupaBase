@@ -4,11 +4,20 @@
  */
 const express = require('express');
 const router = express.Router();
+const fs = require('fs');
+const path = require('path');
 const { generateReportData } = require('../services/reportFormatter');
 const { generatePDF, savePDFToFile, deletePDFFile } = require('../services/pdfGenerator');
 const { sendReportEmail, generateManualReportEmailBody } = require('../services/emailService');
 const { getSuperAdminEmail } = require('../services/queryService');
 const { supabase } = require('../config/supabase');
+const { 
+  generateReportId, 
+  storeReport, 
+  getReport, 
+  deleteReport,
+  cleanupExpiredReports 
+} = require('../services/reportStorage');
 
 /**
  * Middleware to verify super admin role
@@ -108,6 +117,10 @@ router.post('/generate', verifySuperAdmin, async (req, res) => {
       });
     }
 
+    // Generate unique report ID for download tracking
+    const reportId = generateReportId();
+    console.log(`[${timestamp}] Generated report ID: ${reportId}`);
+
     // Generate report data (async - don't wait)
     generateReportData(range, from, to)
       .then(async (reportData) => {
@@ -118,11 +131,14 @@ router.post('/generate', verifySuperAdmin, async (req, res) => {
           const pdfBuffer = await generatePDF(reportData);
           console.log(`[${timestamp}] PDF generated (${pdfBuffer.length} bytes)`);
 
-          // Save PDF to temporary file
-          const now = new Date();
-          const filename = `report-${reportData.period.type}-${now.getTime()}.pdf`;
+          // Save PDF to file using reportId
+          const filename = `report-${reportId}.pdf`;
           const pdfPath = await savePDFToFile(pdfBuffer, filename);
           console.log(`[${timestamp}] PDF saved: ${pdfPath}`);
+
+          // Store report metadata for download access
+          storeReport(reportId, pdfPath, reportData);
+          console.log(`[${timestamp}] Report metadata stored for download: ${reportId}`);
 
           // Get super admin email
           const superAdminEmail = await getSuperAdminEmail();
@@ -134,24 +150,29 @@ router.post('/generate', verifySuperAdmin, async (req, res) => {
           const emailSubject = `Attendance Report - ${reportData.period.label}`;
           const emailBody = generateManualReportEmailBody(reportData);
 
-          // Send email
+          // Send email (with PDF attachment)
           await sendReportEmail(superAdminEmail, emailSubject, emailBody, pdfPath, filename);
           console.log(`[${timestamp}] ✓ Report sent successfully to ${superAdminEmail}`);
 
-          // Clean up temporary file
-          deletePDFFile(pdfPath);
+          // NOTE: Do NOT delete PDF immediately - it's needed for download
+          // PDF will be cleaned up by expiration mechanism
         } catch (error) {
           console.error(`[${timestamp}] ✗ Error processing report:`, error);
+          // Clean up report metadata on error
+          deleteReport(reportId, deletePDFFile);
         }
       })
       .catch((error) => {
         console.error(`[${timestamp}] ✗ Error generating report:`, error);
+        // Clean up report metadata on error
+        deleteReport(reportId, deletePDFFile);
       });
 
     // Return immediately - report generation happens in background
     res.status(202).json({
       success: true,
-      message: 'Report generation started. You will receive the report via email shortly.',
+      reportId: reportId,
+      message: 'Report generation started. You will receive the report via email shortly. You can also download it using the report ID.',
       timestamp: timestamp,
     });
   } catch (error) {
@@ -160,6 +181,80 @@ router.post('/generate', verifySuperAdmin, async (req, res) => {
       success: false,
       error: 'Internal server error',
       message: 'Failed to initiate report generation',
+    });
+  }
+});
+
+/**
+ * Download report
+ * GET /api/reports/download/:reportId
+ * 
+ * Downloads a previously generated report by ID
+ */
+router.get('/download/:reportId', verifySuperAdmin, async (req, res) => {
+  const timestamp = new Date().toISOString();
+  const { reportId } = req.params;
+  
+  console.log(`[${timestamp}] Download request for report: ${reportId}`);
+  
+  try {
+    // Get report metadata
+    const report = getReport(reportId);
+    
+    if (!report) {
+      return res.status(404).json({
+        success: false,
+        error: 'Report not found',
+        message: 'Report not found or has expired. Reports expire after 30 minutes.',
+      });
+    }
+    
+    // Check if file exists
+    if (!fs.existsSync(report.filePath)) {
+      console.error(`[${timestamp}] Report file not found: ${report.filePath}`);
+      deleteReport(reportId);
+      return res.status(404).json({
+        success: false,
+        error: 'Report file not found',
+        message: 'The report file is no longer available.',
+      });
+    }
+    
+    // Generate filename for download
+    const reportData = report.reportData;
+    const periodLabel = reportData?.period?.label || 'report';
+    const sanitizedLabel = periodLabel.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    const downloadFilename = `attendance-report-${sanitizedLabel}-${reportId.substring(0, 8)}.pdf`;
+    
+    // Set response headers for PDF download
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${downloadFilename}"`);
+    res.setHeader('Content-Length', fs.statSync(report.filePath).size);
+    
+    // Stream the file
+    const fileStream = fs.createReadStream(report.filePath);
+    fileStream.pipe(res);
+    
+    fileStream.on('end', () => {
+      console.log(`[${timestamp}] ✓ Report ${reportId} downloaded successfully`);
+    });
+    
+    fileStream.on('error', (error) => {
+      console.error(`[${timestamp}] ✗ Error streaming report ${reportId}:`, error);
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          error: 'Download failed',
+          message: 'Error reading report file.',
+        });
+      }
+    });
+  } catch (error) {
+    console.error(`[${timestamp}] Error handling download request:`, error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      message: 'Failed to download report',
     });
   }
 });

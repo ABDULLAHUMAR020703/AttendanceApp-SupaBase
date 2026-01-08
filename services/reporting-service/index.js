@@ -8,6 +8,8 @@ require('dotenv').config();
 
 const reportRoutes = require('./routes/reports');
 const { startMonthlyReportJob } = require('./jobs/monthlyReportJob');
+const { cleanupExpiredReports } = require('./services/reportStorage');
+const { deletePDFFile } = require('./services/pdfGenerator');
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -47,6 +49,7 @@ app.get('/', (req, res) => {
     version: '1.0.0',
     endpoints: {
       generate: 'POST /api/reports/generate',
+      download: 'GET /api/reports/download/:reportId',
       health: '/health',
     },
   });
@@ -66,6 +69,14 @@ app.listen(PORT, HOST, () => {
   
   // Start monthly report cron job
   startMonthlyReportJob();
+  
+  // Start cleanup job for expired reports (runs every 5 minutes)
+  setInterval(() => {
+    cleanupExpiredReports(deletePDFFile);
+  }, 5 * 60 * 1000); // 5 minutes
+  
+  // Run initial cleanup
+  cleanupExpiredReports(deletePDFFile);
 });
 
 module.exports = app;

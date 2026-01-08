@@ -17,7 +17,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../core/contexts/ThemeContext';
 import { useAuth } from '../../../core/contexts/AuthContext';
-import { generateReport } from '../services/reportService';
+import { generateReport, downloadReport, openReport } from '../services/reportService';
 import { fontSize, spacing, iconSize, responsiveFont, responsivePadding } from '../../../utils/responsive';
 
 const REPORT_RANGES = [
@@ -34,8 +34,10 @@ export default function GenerateReportButton({ style }) {
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedRange, setSelectedRange] = useState('monthly');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
+  const [lastReportId, setLastReportId] = useState(null);
 
   // Only show for super admin
   if (!user || user.role !== 'super_admin') {
@@ -50,20 +52,25 @@ export default function GenerateReportButton({ style }) {
 
     setIsGenerating(true);
     try {
-      await generateReport(
+      const result = await generateReport(
         selectedRange,
         selectedRange === 'custom' ? customFrom : null,
         selectedRange === 'custom' ? customTo : null,
         user
       );
 
+      // Store reportId for download
+      if (result.reportId) {
+        setLastReportId(result.reportId);
+      }
+
       Alert.alert(
         'Report Generation Started',
-        'Your report is being generated and will be sent to your email shortly.',
+        'Your report is being generated and will be sent to your email shortly. You can also download it once it\'s ready.',
         [{ 
           text: 'OK', 
           onPress: () => {
-            setModalVisible(false);
+            // Don't close modal - keep it open to show download button
             // Reset form after successful generation
             setSelectedRange('monthly');
             setCustomFrom('');
@@ -79,6 +86,60 @@ export default function GenerateReportButton({ style }) {
       );
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handleDownload = async () => {
+    if (!lastReportId) {
+      Alert.alert('Error', 'No report ID available. Please generate a report first.');
+      return;
+    }
+
+    setIsDownloading(true);
+    try {
+      Alert.alert(
+        'Downloading Report',
+        'Please wait while we download your report...',
+        [],
+        { cancelable: false }
+      );
+
+      const result = await downloadReport(lastReportId, user);
+      
+      if (result.success && result.fileUri) {
+        // Offer to share/open the file
+        Alert.alert(
+          'Download Complete',
+          'Report downloaded successfully. Would you like to open it?',
+          [
+            {
+              text: 'Cancel',
+              style: 'cancel',
+            },
+              {
+                text: 'Open',
+                onPress: async () => {
+                  try {
+                    await openReport(result.fileUri);
+                  } catch (openError) {
+                    Alert.alert(
+                      'Error',
+                      openError.message || 'Failed to open report. The file has been saved to your device.'
+                    );
+                  }
+                },
+              },
+          ]
+        );
+      }
+    } catch (error) {
+      Alert.alert(
+        'Download Failed',
+        error.message || 'Failed to download report. The report may have expired (reports expire after 30 minutes).',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -106,12 +167,13 @@ export default function GenerateReportButton({ style }) {
         transparent={true}
         animationType="slide"
         onRequestClose={() => {
-          if (!isGenerating) {
+          if (!isGenerating && !isDownloading) {
             setModalVisible(false);
             // Reset form when closing
             setSelectedRange('monthly');
             setCustomFrom('');
             setCustomTo('');
+            // Keep lastReportId for potential download after modal closes
           }
         }}
       >
@@ -135,12 +197,13 @@ export default function GenerateReportButton({ style }) {
               </Text>
               <TouchableOpacity
                 onPress={() => {
-                  if (!isGenerating) {
+                  if (!isGenerating && !isDownloading) {
                     setModalVisible(false);
                     // Reset form when closing
                     setSelectedRange('monthly');
                     setCustomFrom('');
                     setCustomTo('');
+                    // Keep lastReportId for potential download after modal closes
                   }
                 }}
                 style={styles.closeButton}
@@ -297,6 +360,38 @@ export default function GenerateReportButton({ style }) {
                     </>
                   )}
                 </TouchableOpacity>
+
+                {/* Download Button - Show when reportId is available */}
+                {lastReportId && (
+                  <TouchableOpacity
+                    style={[
+                      styles.downloadButton,
+                      {
+                        backgroundColor: colors.success || '#4CAF50',
+                        opacity: isDownloading ? 0.6 : 1,
+                        marginTop: spacing.md,
+                      },
+                    ]}
+                    onPress={handleDownload}
+                    disabled={isDownloading || isGenerating}
+                  >
+                    {isDownloading ? (
+                      <ActivityIndicator color="white" />
+                    ) : (
+                      <>
+                        <Ionicons name="download" size={iconSize.md} color="white" />
+                        <Text
+                          style={[
+                            styles.generateButtonText,
+                            { fontSize: responsiveFont(14), marginLeft: spacing.xs },
+                          ]}
+                        >
+                          Download Report
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                )}
               </View>
             </ScrollView>
           </View>
@@ -405,6 +500,14 @@ const styles = StyleSheet.create({
   generateButtonText: {
     color: 'white',
     fontWeight: '600',
+  },
+  downloadButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: 12,
   },
 });
 
