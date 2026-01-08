@@ -118,10 +118,19 @@ async function getTickets(from, to) {
 
 /**
  * Get super admin email
+ * Priority: Environment variable > Database query
  * @returns {Promise<string>} Super admin email address
  */
 async function getSuperAdminEmail() {
   try {
+    // Check environment variable first (allows override without database changes)
+    const envEmail = process.env.REPORT_RECIPIENT_EMAIL || process.env.SUPER_ADMIN_EMAIL;
+    if (envEmail) {
+      console.log('Using email from environment variable:', envEmail);
+      return envEmail;
+    }
+
+    // Fallback to database query
     const { data, error } = await supabase
       .from('users')
       .select('email')
