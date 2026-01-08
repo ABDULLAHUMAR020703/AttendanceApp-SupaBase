@@ -657,17 +657,33 @@ export const assignTicket = async (ticketId, assignedTo, assignedBy) => {
       updateData.status = TICKET_STATUS.IN_PROGRESS;
     }
 
-    // Update ticket in Supabase
-    const { error: updateError } = await supabase
+    // Update ticket in Supabase and return updated data
+    const { data: updatedTicket, error: updateError } = await supabase
       .from('tickets')
       .update(updateData)
-      .eq('id', ticketId);
+      .eq('id', ticketId)
+      .select('id, created_by_uid, created_by, category, priority, subject, description, status, assigned_to, created_at, updated_at, resolved_at, closed_at, responses')
+      .single();
 
     if (updateError) {
       console.error('Error assigning ticket in Supabase:', updateError);
+      // Check if it's a permission error (RLS policy violation)
+      if (updateError.code === '42501' || updateError.message?.includes('permission') || updateError.message?.includes('policy')) {
+        return {
+          success: false,
+          error: 'Permission denied: You do not have permission to reassign this ticket'
+        };
+      }
       return {
         success: false,
         error: updateError.message || 'Failed to assign ticket'
+      };
+    }
+
+    if (!updatedTicket) {
+      return {
+        success: false,
+        error: 'Update succeeded but no data returned'
       };
     }
 
@@ -709,7 +725,28 @@ export const assignTicket = async (ticketId, assignedTo, assignedBy) => {
       }
     }
 
-    return { success: true };
+    // Convert Supabase format to app format
+    const formattedTicket = {
+      id: updatedTicket.id,
+      createdBy: updatedTicket.created_by,
+      createdByUid: updatedTicket.created_by_uid,
+      category: updatedTicket.category,
+      priority: updatedTicket.priority,
+      subject: updatedTicket.subject,
+      description: updatedTicket.description,
+      status: updatedTicket.status,
+      assignedTo: updatedTicket.assigned_to,
+      createdAt: updatedTicket.created_at,
+      updatedAt: updatedTicket.updated_at,
+      resolvedAt: updatedTicket.resolved_at,
+      closedAt: updatedTicket.closed_at,
+      responses: updatedTicket.responses || []
+    };
+
+    return { 
+      success: true, 
+      data: formattedTicket 
+    };
   } catch (error) {
     console.error('Error assigning ticket:', error);
     return {

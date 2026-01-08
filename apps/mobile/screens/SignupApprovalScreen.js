@@ -8,6 +8,8 @@ import {
   RefreshControl,
   Modal,
   TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -353,15 +355,20 @@ export default function SignupApprovalScreen({ navigation }) {
         animationType="slide"
         onRequestClose={() => setShowRejectModal(false)}
       >
-        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
-          <View
-            className="bg-white rounded-xl"
-            style={{
-              padding: responsivePadding(24),
-              width: wp(90),
-              maxWidth: 400,
-            }}
-          >
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        >
+          <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
+            <View
+              className="bg-white rounded-xl"
+              style={{
+                padding: responsivePadding(24),
+                width: wp(90),
+                maxWidth: 400,
+              }}
+            >
             <Text
               className="font-bold text-gray-800"
               style={{
@@ -428,8 +435,9 @@ export default function SignupApprovalScreen({ navigation }) {
                 </Text>
               </TouchableOpacity>
             </View>
+            </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

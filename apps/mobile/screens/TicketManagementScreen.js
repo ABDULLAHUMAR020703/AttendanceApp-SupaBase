@@ -125,6 +125,13 @@ export default function TicketManagementScreen({ navigation, route }) {
         Alert.alert('Success', 'Ticket assigned successfully');
         setShowAssignModal(false);
         setSelectedEmployee(null);
+        
+        // Update local state immediately with returned data if available
+        if (result.data) {
+          setTicket(result.data);
+        }
+        
+        // Reload ticket from Supabase to ensure consistency
         await loadTicket();
       } else {
         Alert.alert('Error', result.error || 'Failed to assign ticket');

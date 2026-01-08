@@ -9,6 +9,8 @@ import {
   Modal,
   FlatList,
   RefreshControl,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { 
@@ -383,9 +385,17 @@ export default function LeaveRequestScreen({ navigation, route }) {
           resetForm();
         }}
       >
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
         <View className="flex-1 justify-end bg-black bg-opacity-50">
           <View className="bg-white rounded-t-3xl p-6" style={{ maxHeight: '90%' }}>
-            <ScrollView showsVerticalScrollIndicator={false}>
+              <ScrollView 
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
               <View className="flex-row items-center justify-between mb-4">
                 <Text className="text-xl font-bold text-gray-800">
                   New Leave Request
@@ -818,6 +828,7 @@ export default function LeaveRequestScreen({ navigation, route }) {
             </ScrollView>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
