@@ -26,10 +26,11 @@ import {
   updateTicketStatus,
   getTicketById,
 } from '../utils/ticketManagement';
-import { getEmployees, getManageableEmployees, canManageEmployee, isHRManager } from '../utils/employees';
+import { getEmployees, getManageableEmployees, canManageEmployee } from '../utils/employees';
 import { generateAttendanceReport, generateLeaveReport } from '../utils/export';
 import { ROUTES } from '../shared/constants/routes';
 import { spacing, fontSize, responsivePadding, responsiveFont, iconSize } from '../shared/utils/responsive';
+import { isHRAdmin } from '../shared/constants/roles';
 
 export default function HRDashboard({ navigation, route }) {
   const { user: routeUser, initialTab, openLeaveRequests, ticketId } = route.params || {};
@@ -147,8 +148,8 @@ export default function HRDashboard({ navigation, route }) {
   const loadOverviewStats = async () => {
     try {
       // Get employees based on user role
-      // HR managers and super admins see all employees
-      const employees = (user.role === 'super_admin' || isHRManager(user))
+      // HR admins and super admins see all employees
+      const employees = (user.role === 'super_admin' || isHRAdmin(user))
         ? await getEmployees() 
         : await getManageableEmployees(user);
       
@@ -159,8 +160,8 @@ export default function HRDashboard({ navigation, route }) {
       
       // Get tickets (filtered by role)
       let allTickets = await getAllTickets();
-      // HR managers and super admins see all tickets
-      if (user.role !== 'super_admin' && !isHRManager(user)) {
+      // HR admins and super admins see all tickets
+      if (user.role !== 'super_admin' && !isHRAdmin(user)) {
         // Filter tickets for regular managers (same logic as loadTicketData)
         const manageableEmployees = await getManageableEmployees(user);
         const manageableEmployeeUsernames = new Set(manageableEmployees.map(emp => emp.username));
@@ -201,18 +202,9 @@ export default function HRDashboard({ navigation, route }) {
     try {
       const allLeaves = await getAllLeaveRequests();
       const pending = await getPendingLeaveRequests();
-      const empList = await getEmployees();
       
-      // Enrich leave requests with employee names
-      const enrichedLeaves = allLeaves.map(leave => {
-        const employee = empList.find(emp => emp.id === leave.employeeId);
-        return {
-          ...leave,
-          employeeName: employee ? employee.name : leave.employeeId
-        };
-      });
-      
-      const sorted = enrichedLeaves.sort((a, b) => new Date(b.requestedAt || b.createdAt) - new Date(a.requestedAt || a.createdAt));
+      // getAllLeaveRequests now includes employeeName, so no need to enrich
+      const sorted = allLeaves.sort((a, b) => new Date(b.requestedAt || b.createdAt) - new Date(a.requestedAt || a.createdAt));
       setLeaveRequests(sorted);
       setPendingLeaves(pending);
     } catch (error) {
@@ -224,8 +216,8 @@ export default function HRDashboard({ navigation, route }) {
     try {
       let allTicketsData = await getAllTickets();
       
-      // For super admins and HR managers, show all tickets
-      if (user.role !== 'super_admin' && !isHRManager(user)) {
+      // For super admins and HR admins, show all tickets
+      if (user.role !== 'super_admin' && !isHRAdmin(user)) {
         // For other managers, show tickets assigned to them OR tickets from their department category
         const manageableEmployees = await getManageableEmployees(user);
         const manageableEmployeeUsernames = new Set(manageableEmployees.map(emp => emp.username));
@@ -345,8 +337,8 @@ export default function HRDashboard({ navigation, route }) {
     }
 
     // Check permissions
-    // HR managers and super admins can manage all leave requests
-    if (user.role !== 'super_admin' && !isHRManager(user)) {
+    // HR admins and super admins can manage all leave requests
+    if (user.role !== 'super_admin' && !isHRAdmin(user)) {
       // For regular managers, check if they can manage this request
       let canManage = false;
       
@@ -416,8 +408,8 @@ export default function HRDashboard({ navigation, route }) {
     }
 
     // Check permissions
-    // HR managers and super admins can manage all tickets
-    if (user.role !== 'super_admin' && !isHRManager(user)) {
+    // HR admins and super admins can manage all tickets
+    if (user.role !== 'super_admin' && !isHRAdmin(user)) {
       // For regular managers, check if they can manage this ticket
       let canManage = false;
       

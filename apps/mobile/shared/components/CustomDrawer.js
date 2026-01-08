@@ -14,6 +14,7 @@ import { getPendingSignupCount } from '../../utils/signupRequests';
 import { getUnreadNotificationCount } from '../../utils/notifications';
 import { fontSize, spacing, iconSize, componentSize, responsivePadding, responsiveFont, wp } from '../../utils/responsive';
 import { ROUTES } from '../constants/routes';
+import { isHRAdmin } from '../constants/roles';
 import Logo from './Logo';
 import Trademark from './Trademark';
 import HelpButton from './HelpButton';
@@ -196,12 +197,13 @@ export default function CustomDrawer({ navigation, state }) {
         icon: 'person-add-outline',
         screen: ROUTES.CREATE_USER,
         roles: ['super_admin'],
+        // Also allow HR admins (checked in render logic)
       },
       {
         name: 'Signup Approvals',
         icon: 'checkmark-circle-outline',
         screen: ROUTES.SIGNUP_APPROVAL,
-        roles: ['super_admin'],
+        roles: ['super_admin', 'manager'], // Managers can approve signups, including HR
         badge: pendingSignupCount,
       },
       {
@@ -215,10 +217,20 @@ export default function CustomDrawer({ navigation, state }) {
     // Manager only items
     const managerItems = [];
 
+    // Filter superAdminItems: HR admins can access Create User, but not Reports
+    const filteredSuperAdminItems = superAdminItems.filter(item => {
+      if (item.screen === ROUTES.CREATE_USER) {
+        // Allow HR admins to see Create User
+        return user.role === 'super_admin' || isHRAdmin(user);
+      }
+      // Other super admin items (like Reports) are super_admin only
+      return user.role === 'super_admin';
+    });
+
     return [
       ...baseItems,
       ...adminItems,
-      ...(user.role === 'super_admin' ? superAdminItems : []),
+      ...filteredSuperAdminItems,
       ...(user.role === 'manager' ? managerItems : []),
       {
         name: 'Theme Settings',

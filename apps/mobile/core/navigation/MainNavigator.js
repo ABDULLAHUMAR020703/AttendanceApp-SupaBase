@@ -3,7 +3,7 @@ import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { ROLES } from '../../shared/constants/roles';
+import { ROLES, isHRAdmin } from '../../shared/constants/roles';
 import { ROUTES } from '../../shared/constants/routes';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -172,7 +172,7 @@ export default function MainNavigator({ user }) {
           options={{ title: 'Employee Management' }}
           initialParams={{ user }}
         />
-        {user.role === ROLES.SUPER_ADMIN && (
+        {(user.role === ROLES.SUPER_ADMIN || isHRAdmin(user)) && (
           <>
             <Stack.Screen 
               name={ROUTES.CREATE_USER} 
@@ -180,13 +180,15 @@ export default function MainNavigator({ user }) {
               options={{ title: 'Create User' }}
               initialParams={{ user }}
             />
-            <Stack.Screen 
-              name="ReportsScreen" 
-              component={ReportsScreen}
-              options={{ title: 'Reports' }}
-              initialParams={{ user }}
-            />
           </>
+        )}
+        {user.role === ROLES.SUPER_ADMIN && (
+          <Stack.Screen 
+            name="ReportsScreen" 
+            component={ReportsScreen}
+            options={{ title: 'Reports' }}
+            initialParams={{ user }}
+          />
         )}
       </Stack.Navigator>
     );

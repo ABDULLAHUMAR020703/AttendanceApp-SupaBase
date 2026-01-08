@@ -62,3 +62,15 @@ export const isSuperAdmin = (role) => {
   return role === ROLES.SUPER_ADMIN;
 };
 
+/**
+ * Check if user is HR Admin (manager with HR department)
+ * HR Admins have elevated privileges for HR and people-management features
+ * but do NOT have full system-level Super Admin powers
+ * @param {Object} user - User object with role and department
+ * @returns {boolean} Is HR Admin
+ */
+export const isHRAdmin = (user) => {
+  if (!user) return false;
+  return user.role === ROLES.MANAGER && user.department === 'HR';
+};
+

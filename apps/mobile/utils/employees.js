@@ -470,6 +470,7 @@ export const getManagersByDepartment = async (department) => {
 
 /**
  * Check if user is HR manager (special privileges)
+ * @deprecated Use isHRAdmin from shared/constants/roles.js instead
  * @param {Object} user - User object with role and department
  * @returns {boolean} Whether user is HR manager
  */
@@ -495,8 +496,8 @@ export const getManageableEmployees = async (user) => {
       if (user.role === 'super_admin') {
         query = query.neq('role', 'super_admin');
       } 
-      // HR managers can manage all employees (except super admins)
-      else if (isHRManager(user)) {
+      // HR admins can manage all employees (except super admins)
+      else if (user.role === 'manager' && user.department === 'HR') {
         query = query.neq('role', 'super_admin');
       }
       // Managers can only manage employees in their department
@@ -544,8 +545,8 @@ export const getManageableEmployees = async (user) => {
       return employees.filter(emp => emp.isActive && emp.role !== 'super_admin');
     }
     
-    // HR managers can manage all employees (except super admins)
-    if (isHRManager(user)) {
+    // HR admins can manage all employees (except super admins)
+    if (user.role === 'manager' && user.department === 'HR') {
       return employees.filter(emp => emp.isActive && emp.role !== 'super_admin');
     }
     
@@ -586,9 +587,11 @@ export const canManageEmployee = (user, employee) => {
     return employee.role !== 'super_admin';
   }
   
-  // Other managers can only manage employees in their department
+  // Other managers can only manage employees (non-manager, non-super_admin) in their department
   if (user.role === 'manager') {
-    return employee.department === user.department && employee.role !== 'super_admin';
+    return employee.department === user.department 
+      && employee.role !== 'super_admin' 
+      && employee.role !== 'manager'; // Managers can't manage other managers
   }
   
   // Only super admins and managers can manage employees
@@ -596,36 +599,120 @@ export const canManageEmployee = (user, employee) => {
 };
 
 /**
- * Update employee work mode
- * @param {string} employeeId - Employee ID
+ * Update employee work mode in Supabase
+ * @param {string} employeeId - Employee ID (can be 'emp_xxx', uid, or username)
  * @param {string} newWorkMode - New work mode
- * @param {string} changedBy - Username who made the change
- * @returns {Promise<boolean>} Success status
+ * @param {Object} updaterUser - User object making the change (for permission checks)
+ * @returns {Promise<{success: boolean, error?: string, data?: Object}>} Success status with updated data
  */
-export const updateEmployeeWorkMode = async (employeeId, newWorkMode, changedBy) => {
+export const updateEmployeeWorkMode = async (employeeId, newWorkMode, updaterUser) => {
   try {
-    const employees = await getEmployees();
-    const employeeIndex = employees.findIndex(emp => emp.id === employeeId);
-    
-    if (employeeIndex === -1) {
-      throw new Error('Employee not found');
+    // Validate work mode
+    const validModes = ['in_office', 'semi_remote', 'fully_remote'];
+    if (!validModes.includes(newWorkMode)) {
+      return { success: false, error: 'Invalid work mode' };
     }
+
+    // Validate updater user
+    if (!updaterUser || !updaterUser.role) {
+      return { success: false, error: 'Invalid updater user' };
+    }
+
+    // Get the target employee from Supabase
+    let targetEmployee = null;
+    let targetUid = null;
     
-    const oldWorkMode = employees[employeeIndex].workMode;
-    employees[employeeIndex].workMode = newWorkMode;
-    employees[employeeIndex].lastUpdated = new Date().toISOString();
+    // Try to get by employeeId (could be 'emp_xxx', uid, or username)
+    if (employeeId.startsWith('emp_')) {
+      const uid = employeeId.replace('emp_', '');
+      targetEmployee = await getEmployeeById(uid);
+      targetUid = uid;
+    } else {
+      // Try as UID first
+      targetEmployee = await getEmployeeById(employeeId);
+      if (targetEmployee) {
+        targetUid = targetEmployee.uid || employeeId;
+      } else {
+        // If not found, try as username
+        targetEmployee = await getEmployeeByUsername(employeeId);
+        if (targetEmployee) {
+          targetUid = targetEmployee.uid;
+        }
+      }
+    }
+
+    if (!targetEmployee || !targetUid) {
+      return { success: false, error: 'Employee not found' };
+    }
+
+    // Permission checks BEFORE updating
+    // 1. Block if target is super_admin and updater is not super_admin
+    if (targetEmployee.role === 'super_admin' && updaterUser.role !== 'super_admin') {
+      return { success: false, error: 'Permission denied: Cannot modify super admin accounts' };
+    }
+
+    // 2. Check if updater can manage this employee
+    if (!canManageEmployee(updaterUser, targetEmployee)) {
+      // Provide specific error message based on updater role
+      if (updaterUser.role === 'manager' && updaterUser.department !== 'HR') {
+        return { success: false, error: 'Permission denied: You can only manage employees in your department' };
+      } else if (updaterUser.role === 'manager' && updaterUser.department === 'HR') {
+        return { success: false, error: 'Permission denied: HR managers cannot modify super admin accounts' };
+      } else {
+        return { success: false, error: 'Permission denied: You do not have permission to manage this employee' };
+      }
+    }
+
+    // Get old work mode for history
+    const oldWorkMode = targetEmployee.workMode || targetEmployee.work_mode;
+
+    // Update directly in Supabase using UID (most reliable identifier)
+    // This ensures RLS policies are properly enforced
+    const { data: updatedUser, error: updateError } = await supabase
+      .from('users')
+      .update({ 
+        work_mode: newWorkMode,
+        updated_at: new Date().toISOString()
+      })
+      .eq('uid', targetUid)
+      .select('uid, username, email, name, role, department, position, work_mode, hire_date, is_active')
+      .single();
+
+    if (updateError) {
+      console.error('Supabase update error:', updateError);
+      // Check if it's a permission error (RLS policy violation)
+      if (updateError.code === '42501' || updateError.message?.includes('permission') || updateError.message?.includes('policy')) {
+        return { success: false, error: 'Permission denied: You do not have permission to update this employee\'s work mode' };
+      }
+      return { success: false, error: updateError.message || 'Failed to update work mode in database' };
+    }
+
+    if (!updatedUser) {
+      return { success: false, error: 'Update succeeded but no data returned' };
+    }
+
+    // Add to work mode history (local tracking)
+    await addWorkModeHistory(
+      targetEmployee.id || targetEmployee.uid || targetUid, 
+      oldWorkMode, 
+      newWorkMode, 
+      updaterUser.username || updaterUser.name || 'Unknown'
+    );
+
+    console.log(`✓ Work mode updated for ${targetEmployee.name} (${targetEmployee.username}): ${oldWorkMode} → ${newWorkMode}`);
+    console.log(`  Updated by: ${updaterUser.username} (${updaterUser.role}${updaterUser.department ? `, ${updaterUser.department}` : ''})`);
     
-    // Save updated employees
-    await AsyncStorage.setItem(EMPLOYEES_KEY, JSON.stringify(employees));
-    
-    // Add to work mode history
-    await addWorkModeHistory(employeeId, oldWorkMode, newWorkMode, changedBy);
-    
-    console.log(`Work mode updated for ${employees[employeeIndex].name}: ${oldWorkMode} → ${newWorkMode}`);
-    return true;
+    return { 
+      success: true, 
+      data: {
+        ...updatedUser,
+        workMode: updatedUser.work_mode, // Convert to camelCase for frontend
+        id: `emp_${updatedUser.uid}` // Maintain compatibility
+      }
+    };
   } catch (error) {
     console.error('Error updating employee work mode:', error);
-    return false;
+    return { success: false, error: error.message || 'Failed to update work mode' };
   }
 };
 
@@ -771,9 +858,22 @@ export const processWorkModeRequest = async (requestId, status, processedBy, adm
     
     // If approved, update employee work mode
     if (status === 'approved') {
-      const employee = await getEmployeeByUsername(request.employeeId);
-      if (employee) {
-        await updateEmployeeWorkMode(employee.id, request.requestedMode, processedBy);
+      // Get the user who is processing the request (for permission checks)
+      // Note: processedBy is a username, we need to get the full user object
+      const processingUser = await getEmployeeByUsername(processedBy);
+      if (processingUser) {
+        const employee = await getEmployeeByUsername(request.employeeId);
+        if (employee) {
+          const result = await updateEmployeeWorkMode(
+            employee.id || employee.uid, 
+            request.requestedMode, 
+            processingUser
+          );
+          if (!result.success) {
+            console.error('Failed to update work mode:', result.error);
+            // Don't fail the request processing, just log the error
+          }
+        }
       }
     }
     

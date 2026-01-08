@@ -11,6 +11,8 @@ import {
   ScrollView,
   Keyboard,
   TouchableWithoutFeedback,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { 
@@ -21,9 +23,9 @@ import {
   processWorkModeRequest,
   getManageableEmployees,
   canManageEmployee,
-  updateEmployee,
-  isHRManager
+  updateEmployee
 } from '../utils/employees';
+import { isHRAdmin } from '../shared/constants/roles';
 import { 
   getAllWorkModes, 
   getWorkModeLabel, 
@@ -159,8 +161,8 @@ export default function EmployeeManagement({ route }) {
     try {
       const allRequests = await getPendingLeaveRequests();
       
-      // For super admins and HR managers, show all requests
-      if (user.role === 'super_admin' || isHRManager(user)) {
+      // For super admins and HR admins, show all requests
+      if (user.role === 'super_admin' || isHRAdmin(user)) {
         setPendingLeaveRequests(allRequests);
         return;
       }
@@ -232,24 +234,44 @@ export default function EmployeeManagement({ route }) {
 
   const confirmWorkModeChange = async (newWorkMode) => {
     try {
-      const success = await updateEmployeeWorkMode(
-        selectedEmployee.id, 
+      const result = await updateEmployeeWorkMode(
+        selectedEmployee.id || selectedEmployee.uid, 
         newWorkMode, 
-        user.username
+        user  // Pass full user object for permission checks
       );
       
-      if (success) {
+      if (result.success) {
         Alert.alert(
           'Success', 
           `${selectedEmployee.name}'s work mode updated to ${getWorkModeLabel(newWorkMode)}`
         );
+        
+        // Update local state immediately with returned data if available
+        if (result.data) {
+          setEmployees(prevEmployees => 
+            prevEmployees.map(emp => 
+              (emp.id === selectedEmployee.id || emp.uid === selectedEmployee.uid)
+                ? { ...emp, workMode: result.data.workMode || result.data.work_mode, ...result.data }
+                : emp
+            )
+          );
+          setFilteredEmployees(prevFiltered => 
+            prevFiltered.map(emp => 
+              (emp.id === selectedEmployee.id || emp.uid === selectedEmployee.uid)
+                ? { ...emp, workMode: result.data.workMode || result.data.work_mode, ...result.data }
+                : emp
+            )
+          );
+        }
+        
+        // Reload data from Supabase to get fresh state (ensures consistency)
         await loadData();
       } else {
-        Alert.alert('Error', 'Failed to update work mode');
+        Alert.alert('Error', result.error || 'Failed to update work mode');
       }
     } catch (error) {
       console.error('Error updating work mode:', error);
-      Alert.alert('Error', 'Failed to update work mode');
+      Alert.alert('Error', error.message || 'Failed to update work mode');
     } finally {
       setShowWorkModeModal(false);
       setSelectedEmployee(null);
@@ -284,8 +306,8 @@ export default function EmployeeManagement({ route }) {
     // Check if user can manage this leave request
     const request = pendingLeaveRequests.find(req => req.id === requestId);
     if (request) {
-      // Super admins and HR managers can process any request
-      if (user.role === 'super_admin' || isHRManager(user)) {
+      // Super admins and HR admins can process any request
+      if (user.role === 'super_admin' || isHRAdmin(user)) {
         // Allow processing
       } else if (request.assignedTo === user.username) {
         // Manager is assigned to this request - allow processing
@@ -473,6 +495,18 @@ export default function EmployeeManagement({ route }) {
   const handleUpdateRole = async () => {
     if (!selectedEmployeeForRoleEdit) return;
 
+    // HR admins cannot change roles to super_admin
+    if (isHRAdmin(user) && selectedRole === 'super_admin') {
+      Alert.alert('Permission Denied', 'HR admins cannot promote users to super admin. Only super admins can create or promote other super admins.');
+      return;
+    }
+
+    // Prevent changing super_admin roles (only super_admins can do this)
+    if (selectedEmployeeForRoleEdit.role === 'super_admin' && user.role !== 'super_admin') {
+      Alert.alert('Permission Denied', 'Only super admins can modify super admin accounts.');
+      return;
+    }
+
     try {
       const result = await updateEmployee(selectedEmployeeForRoleEdit.id, {
         role: selectedRole,
@@ -597,8 +631,8 @@ export default function EmployeeManagement({ route }) {
                 <Text className="text-white text-xs font-medium">Leaves</Text>
               </TouchableOpacity>
               
-              {/* Role Edit Button - Only for super_admin */}
-              {user.role === 'super_admin' && (
+              {/* Role Edit Button - For super_admin and HR admins */}
+              {(user.role === 'super_admin' || isHRAdmin(user)) && (
                 <TouchableOpacity
                   className="bg-purple-500 rounded-lg px-3 py-1"
                   style={{ 
@@ -606,6 +640,11 @@ export default function EmployeeManagement({ route }) {
                     flexShrink: 1,
                   }}
                   onPress={() => {
+                    // HR cannot edit super_admin accounts
+                    if (isHRAdmin(user) && item.role === 'super_admin') {
+                      Alert.alert('Permission Denied', 'HR admins cannot modify super admin accounts.');
+                      return;
+                    }
                     setSelectedEmployeeForRoleEdit(item);
                     setSelectedRole(item.role);
                     setShowRoleEditModal(true);
@@ -993,7 +1032,13 @@ export default function EmployeeManagement({ route }) {
               Select New Role:
             </Text>
             <View className="mb-4">
-              {ROLES.map((role) => (
+              {ROLES.filter(role => {
+                // HR admins cannot select super_admin role
+                if (isHRAdmin(user) && role.value === 'super_admin') {
+                  return false;
+                }
+                return true;
+              }).map((role) => (
                 <TouchableOpacity
                   key={role.value}
                   className={`rounded-lg p-3 mb-2 ${selectedRole === role.value ? 'bg-primary-500' : 'bg-gray-200'}`}
@@ -1070,10 +1115,15 @@ const LeaveSettingsModal = ({ visible, onClose, defaultSettings, onSave, onSetti
       animationType="slide"
       onRequestClose={handleBack}
     >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
-          <TouchableWithoutFeedback onPress={() => {}}>
-            <View className="bg-white rounded-xl p-6 mx-4 w-full max-w-sm">
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View className="bg-white rounded-xl p-6 mx-4 w-full max-w-sm">
               {/* Header with Back Button */}
               <View className="flex-row items-center justify-between mb-4">
                 <TouchableOpacity
@@ -1154,9 +1204,10 @@ const LeaveSettingsModal = ({ visible, onClose, defaultSettings, onSave, onSetti
                 </TouchableOpacity>
               </View>
             </View>
-          </TouchableWithoutFeedback>
-        </View>
-      </TouchableWithoutFeedback>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -1189,11 +1240,16 @@ const EmployeeLeaveModal = ({ visible, onClose, employeeData, leaveInputs, onInp
       animationType="slide"
       onRequestClose={handleBack}
     >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
-          <TouchableWithoutFeedback onPress={() => {}}>
-            <View className="bg-white rounded-xl p-6 mx-4 w-full max-w-sm max-h-96">
-              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View className="bg-white rounded-xl p-6 mx-4 w-full max-w-sm max-h-96">
+                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 {/* Header with Back Button */}
                 <View className="flex-row items-center justify-between mb-2">
                   <TouchableOpacity
@@ -1309,11 +1365,12 @@ const EmployeeLeaveModal = ({ visible, onClose, employeeData, leaveInputs, onInp
                 <Text className="text-center font-medium text-white">Save</Text>
               </TouchableOpacity>
             </View>
-          </ScrollView>
-        </View>
-      </TouchableWithoutFeedback>
-    </View>
-      </TouchableWithoutFeedback>
+                </ScrollView>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };

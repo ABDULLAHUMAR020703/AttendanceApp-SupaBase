@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { createEmployee } from '../utils/employees';
 import { WORK_MODES } from '../utils/workModes';
 import { useTheme } from '../contexts/ThemeContext';
+import { isHRAdmin } from '../shared/constants/roles';
 import { fontSize, spacing, iconSize, componentSize, responsivePadding, responsiveFont, wp } from '../utils/responsive';
 import Logo from '../components/Logo';
 import Trademark from '../components/Trademark';
@@ -89,6 +90,12 @@ export default function CreateUserScreen({ navigation, route }) {
 
   const handleCreateUser = async () => {
     if (!validateForm()) {
+      return;
+    }
+
+    // HR admins cannot create super_admin users
+    if (isHRAdmin(user) && formData.role === 'super_admin') {
+      Alert.alert('Permission Denied', 'HR admins cannot create super admin users. Only super admins can create other super admins.');
       return;
     }
 
@@ -277,7 +284,13 @@ export default function CreateUserScreen({ navigation, route }) {
               Role *
             </Text>
             <View className="flex-row" style={{ gap: spacing.sm }}>
-              {ROLES.map((role) => (
+              {ROLES.filter(role => {
+                // HR admins cannot create super_admin users
+                if (isHRAdmin(user) && role.value === 'super_admin') {
+                  return false;
+                }
+                return true;
+              }).map((role) => (
                 <TouchableOpacity
                   key={role.value}
                   className={`flex-1 rounded-xl ${formData.role === role.value ? 'bg-primary-500' : 'bg-gray-200'}`}
