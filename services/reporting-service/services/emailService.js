@@ -1,40 +1,30 @@
 /**
- * Email Service - Sends reports via email
+ * Email Service - Sends reports via email using Resend API
  */
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 const fs = require('fs');
 require('dotenv').config();
 
-// Email configuration
-const EMAIL_HOST = process.env.EMAIL_HOST || 'smtp.gmail.com';
-const EMAIL_PORT = parseInt(process.env.EMAIL_PORT || '587');
-const EMAIL_USER = process.env.EMAIL_USER;
-const EMAIL_PASS = process.env.EMAIL_PASSWORD;
-const EMAIL_FROM = process.env.EMAIL_FROM || EMAIL_USER;
+// Resend API configuration
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || process.env.EMAIL_FROM || 'reports@hadir.ai';
 
 /**
- * Create email transporter
- * @returns {Object} Nodemailer transporter
+ * Initialize Resend client
+ * @returns {Resend|null} Resend client instance or null if not configured
  */
-function createTransporter() {
-  if (!EMAIL_USER || !EMAIL_PASS) {
-    console.warn('⚠ Email credentials not configured. Email sending will be disabled.');
+function createResendClient() {
+  if (!RESEND_API_KEY) {
+    console.warn('⚠ Resend API key not configured. Email sending will be disabled.');
+    console.warn('⚠ Please set RESEND_API_KEY environment variable.');
     return null;
   }
 
-  return nodemailer.createTransport({
-    host: EMAIL_HOST,
-    port: EMAIL_PORT,
-    secure: EMAIL_PORT === 465, // true for 465, false for other ports
-    auth: {
-      user: EMAIL_USER,
-      pass: EMAIL_PASS,
-    },
-  });
+  return new Resend(RESEND_API_KEY);
 }
 
 /**
- * Send report via email
+ * Send report via email using Resend API
  * @param {string} to - Recipient email address
  * @param {string} subject - Email subject
  * @param {string} body - Email body (HTML or plain text)
@@ -43,10 +33,10 @@ function createTransporter() {
  * @returns {Promise<Object>} Email send result
  */
 async function sendReportEmail(to, subject, body, pdfPath, pdfFilename) {
-  const transporter = createTransporter();
+  const resend = createResendClient();
   
-  if (!transporter) {
-    throw new Error('Email service not configured. Please set EMAIL_USER and EMAIL_PASSWORD environment variables.');
+  if (!resend) {
+    throw new Error('Email service not configured. Please set RESEND_API_KEY environment variable.');
   }
 
   if (!fs.existsSync(pdfPath)) {
@@ -54,24 +44,45 @@ async function sendReportEmail(to, subject, body, pdfPath, pdfFilename) {
   }
 
   try {
-    const info = await transporter.sendMail({
-      from: `"Hadir.AI Reports" <${EMAIL_FROM}>`,
-      to: to,
+    // Read PDF file as base64 for attachment
+    const pdfBuffer = fs.readFileSync(pdfPath);
+    const pdfBase64 = pdfBuffer.toString('base64');
+
+    // Send email via Resend API
+    // Resend expects attachments as base64 strings
+    const { data, error } = await resend.emails.send({
+      from: `Hadir.AI Reports <${RESEND_FROM_EMAIL}>`,
+      to: [to],
       subject: subject,
       html: body,
       attachments: [
         {
           filename: pdfFilename,
-          path: pdfPath,
-          contentType: 'application/pdf',
+          content: pdfBase64, // Base64 encoded PDF content
         },
       ],
     });
 
-    console.log('✓ Report email sent successfully:', info.messageId);
-    return { success: true, messageId: info.messageId };
+    if (error) {
+      console.error('✗ Resend API error:', error);
+      throw new Error(`Resend API error: ${error.message || JSON.stringify(error)}`);
+    }
+
+    if (!data || !data.id) {
+      throw new Error('Resend API returned no email ID');
+    }
+
+    console.log('✓ Report email sent successfully via Resend:', data.id);
+    return { success: true, messageId: data.id };
   } catch (error) {
     console.error('✗ Error sending report email:', error);
+    // Provide more helpful error messages
+    if (error.message?.includes('API key')) {
+      throw new Error('Invalid Resend API key. Please check RESEND_API_KEY environment variable.');
+    }
+    if (error.message?.includes('domain')) {
+      throw new Error('Resend domain not verified. Please verify your sending domain in Resend dashboard.');
+    }
     throw error;
   }
 }

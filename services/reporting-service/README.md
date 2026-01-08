@@ -18,12 +18,11 @@ Microservice for generating and emailing attendance, leave, and ticket reports.
    SUPABASE_URL=your_supabase_url
    SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
    
-   # Email Configuration (for sending reports)
-   EMAIL_HOST=smtp.gmail.com
-   EMAIL_PORT=587
-   EMAIL_USER=your_email@gmail.com
-   EMAIL_PASSWORD=your_app_password
-   EMAIL_FROM=your_email@gmail.com
+   # Email Configuration (for sending reports via Resend)
+   RESEND_API_KEY=re_xxxxxxxxxxxxx
+   RESEND_FROM_EMAIL=noreply@yourdomain.com
+   # Optional: Report recipient email (overrides database lookup)
+   REPORT_RECIPIENT_EMAIL=admin@yourdomain.com
    ```
 
 3. **Start the Service**
@@ -93,21 +92,33 @@ The service automatically generates and emails monthly reports on the 1st of eve
 
 ## Email Configuration
 
-For Gmail, you'll need to:
-1. Enable 2-Factor Authentication
-2. Generate an App Password
-3. Use the App Password as `EMAIL_PASSWORD` in `.env`
+The service uses [Resend](https://resend.com) for reliable email delivery via HTTPS API (no SMTP required).
 
-For other email providers, adjust `EMAIL_HOST` and `EMAIL_PORT` accordingly.
+### Setup Steps:
+
+1. **Create a Resend account** at https://resend.com
+2. **Get your API key** from the Resend dashboard
+3. **Verify your domain** in Resend (required for sending emails)
+4. **Set environment variables:**
+   - `RESEND_API_KEY`: Your Resend API key (starts with `re_`)
+   - `RESEND_FROM_EMAIL`: Verified sender email (e.g., `noreply@yourdomain.com`)
+
+### Why Resend?
+
+- ✅ No SMTP connection timeouts (uses HTTPS API)
+- ✅ Reliable delivery on cloud platforms like Render
+- ✅ Better deliverability and tracking
+- ✅ Simple API-based integration
 
 ## Troubleshooting
 
 ### Email Not Sending
 
-1. Check email credentials in `.env`
-2. Verify SMTP settings (host, port)
-3. For Gmail, ensure App Password is used (not regular password)
-4. Check service logs for error messages
+1. Verify `RESEND_API_KEY` is set correctly in environment variables
+2. Ensure your domain is verified in Resend dashboard
+3. Check that `RESEND_FROM_EMAIL` uses a verified domain
+4. Review service logs for detailed error messages
+5. Check Resend dashboard for delivery status and errors
 
 ### Report Generation Fails
 
