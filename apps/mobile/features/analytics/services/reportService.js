@@ -28,13 +28,14 @@ export async function generateReport(range, from = null, to = null, user = null)
     // Backend expects x-user-id or x-user-email to verify super_admin role
     if (user) {
       // Prefer uid (Supabase Auth ID) as it matches the database uid column
+      // This is more reliable than the 'id' field which might have different formats
       if (user.uid) {
         headers['x-user-id'] = String(user.uid);
       } else if (user.id) {
         headers['x-user-id'] = String(user.id);
       }
       
-      // Also send email as fallback
+      // Always send email - backend will prioritize email lookup for better reliability
       if (user.email) {
         headers['x-user-email'] = user.email;
       }
@@ -44,6 +45,8 @@ export async function generateReport(range, from = null, to = null, user = null)
           'x-user-id': headers['x-user-id'],
           'x-user-email': headers['x-user-email'],
           userRole: user.role,
+          userUid: user.uid,
+          userId: user.id,
         });
       }
     } else {

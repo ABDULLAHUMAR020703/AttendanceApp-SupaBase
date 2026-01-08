@@ -31,6 +31,8 @@ async function verifySuperAdmin(req, res, next) {
     const userId = req.headers['x-user-id'];
     const userEmail = req.headers['x-user-email'];
 
+    console.log(`[verifySuperAdmin] Received headers:`, { userId, userEmail });
+
     if (!userId && !userEmail) {
       return res.status(401).json({
         success: false,
@@ -40,18 +42,51 @@ async function verifySuperAdmin(req, res, next) {
     }
 
     // Query user from database to verify role
-    let query = supabase.from('users').select('role, uid, id').eq('is_active', true);
+    // Prioritize email lookup as it's more reliable than ID matching
+    let query = supabase.from('users').select('role, uid, id, email, username').eq('is_active', true);
     
-    if (userId) {
-      // Try both uid and id fields
-      query = query.or(`uid.eq.${userId},id.eq.${userId}`);
-    } else if (userEmail) {
+    if (userEmail) {
+      // Email lookup is most reliable - try this first
       query = query.eq('email', userEmail);
+      console.log(`[verifySuperAdmin] Querying by email: ${userEmail}`);
+    } else if (userId) {
+      // Try both uid and id fields - use proper Supabase OR syntax
+      // Format: (uid.eq.value,id.eq.value) - note the parentheses
+      query = query.or(`uid.eq.${userId},id.eq.${userId}`);
+      console.log(`[verifySuperAdmin] Querying by userId: ${userId}`);
     }
 
     const { data, error } = await query.single();
 
-    if (error || !data) {
+    // Log the query result for debugging
+    console.log(`[verifySuperAdmin] Query result:`, { 
+      found: !!data, 
+      error: error?.message || null,
+      userRole: data?.role || null,
+      userId: data?.id || null,
+      userUid: data?.uid || null,
+      userEmail: data?.email || null
+    });
+
+    if (error) {
+      console.error(`[verifySuperAdmin] Database query error:`, error);
+      // If it's a "not found" error (PGRST116), provide more specific message
+      if (error.code === 'PGRST116' || error.message?.includes('No rows')) {
+        return res.status(403).json({
+          success: false,
+          error: 'Forbidden',
+          message: `User not found in database. Searched with: ${userId ? `ID: ${userId}` : `Email: ${userEmail}`}`,
+        });
+      }
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden',
+        message: 'User not found or inactive',
+      });
+    }
+
+    if (!data) {
+      console.warn(`[verifySuperAdmin] No user data returned from query`);
       return res.status(403).json({
         success: false,
         error: 'Forbidden',
@@ -60,6 +95,7 @@ async function verifySuperAdmin(req, res, next) {
     }
 
     if (data.role !== 'super_admin') {
+      console.warn(`[verifySuperAdmin] User role mismatch. Expected: super_admin, Got: ${data.role}`);
       return res.status(403).json({
         success: false,
         error: 'Forbidden',
@@ -68,10 +104,11 @@ async function verifySuperAdmin(req, res, next) {
     }
 
     // User is verified as super admin
+    console.log(`[verifySuperAdmin] ✓ User verified as super_admin: ${data.email || data.username}`);
     req.user = data;
     next();
   } catch (error) {
-    console.error('Error verifying super admin:', error);
+    console.error('[verifySuperAdmin] Unexpected error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error',
