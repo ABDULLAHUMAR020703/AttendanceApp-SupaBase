@@ -757,25 +757,48 @@ export const getPendingLeaveRequests = async () => {
       });
     }
 
-    // Convert database format to app format
-    return (requests || []).map(req => ({
-      id: req.id,
-      employeeId: req.employee_id,
-      leaveType: req.leave_type,
-      startDate: req.start_date,
-      endDate: req.end_date,
-      days: req.days,
-      reason: req.reason,
-      category: req.category,
-      isHalfDay: req.is_half_day,
-      halfDayPeriod: req.half_day_period,
-      status: req.status,
-      requestedAt: req.requested_at,
-      processedAt: req.processed_at,
-      processedBy: req.processed_by,
-      adminNotes: req.admin_notes,
-      assignedTo: req.assigned_to
-    }));
+    // Fetch employee names in a single query to avoid N+1
+    const employeeUids = [...new Set((requests || []).map(req => req.employee_uid).filter(Boolean))];
+    const employeeMap = new Map();
+    
+    if (employeeUids.length > 0) {
+      const { data: employees, error: empError } = await supabase
+        .from('users')
+        .select('uid, username, name, email')
+        .in('uid', employeeUids);
+      
+      if (!empError && employees) {
+        employees.forEach(emp => {
+          employeeMap.set(emp.uid, emp);
+        });
+      }
+    }
+
+    // Convert database format to app format with employee names
+    return (requests || []).map(req => {
+      const employee = employeeMap.get(req.employee_uid);
+      return {
+        id: req.id,
+        employeeId: req.employee_id,
+        employeeUid: req.employee_uid,
+        employeeName: employee?.name || employee?.username || req.employee_id,
+        employeeUsername: employee?.username || req.employee_id,
+        leaveType: req.leave_type,
+        startDate: req.start_date,
+        endDate: req.end_date,
+        days: req.days,
+        reason: req.reason,
+        category: req.category,
+        isHalfDay: req.is_half_day,
+        halfDayPeriod: req.half_day_period,
+        status: req.status,
+        requestedAt: req.requested_at,
+        processedAt: req.processed_at,
+        processedBy: req.processed_by,
+        adminNotes: req.admin_notes,
+        assignedTo: req.assigned_to
+      };
+    });
   } catch (error) {
     console.error('Error getting pending leave requests:', error);
     return [];
@@ -809,25 +832,51 @@ export const getAllLeaveRequests = async () => {
 
     console.log(`[Leave Requests] Found ${requests?.length || 0} total request(s) for current user`);
 
-    // Convert database format to app format
-    return (requests || []).map(req => ({
-      id: req.id,
-      employeeId: req.employee_id,
-      leaveType: req.leave_type,
-      startDate: req.start_date,
-      endDate: req.end_date,
-      days: req.days,
-      reason: req.reason,
-      category: req.category,
-      isHalfDay: req.is_half_day,
-      halfDayPeriod: req.half_day_period,
-      status: req.status,
-      requestedAt: req.requested_at,
-      processedAt: req.processed_at,
-      processedBy: req.processed_by,
-      adminNotes: req.admin_notes,
-      assignedTo: req.assigned_to
-    }));
+    // Fetch employee names in a single query to avoid N+1
+    const employeeUids = [...new Set((requests || []).map(req => req.employee_uid).filter(Boolean))];
+    const employeeMap = new Map();
+    
+    if (employeeUids.length > 0) {
+      const { data: employees, error: empError } = await supabase
+        .from('users')
+        .select('uid, username, name, email')
+        .in('uid', employeeUids);
+      
+      if (!empError && employees) {
+        employees.forEach(emp => {
+          employeeMap.set(emp.uid, emp);
+        });
+        console.log(`[Leave Requests] Loaded ${employees.length} employee name(s) for ${employeeUids.length} unique employee(s)`);
+      } else if (empError) {
+        console.warn('[Leave Requests] Could not fetch employee names:', empError.message);
+      }
+    }
+
+    // Convert database format to app format with employee names
+    return (requests || []).map(req => {
+      const employee = employeeMap.get(req.employee_uid);
+      return {
+        id: req.id,
+        employeeId: req.employee_id,
+        employeeUid: req.employee_uid,
+        employeeName: employee?.name || employee?.username || req.employee_id,
+        employeeUsername: employee?.username || req.employee_id,
+        leaveType: req.leave_type,
+        startDate: req.start_date,
+        endDate: req.end_date,
+        days: req.days,
+        reason: req.reason,
+        category: req.category,
+        isHalfDay: req.is_half_day,
+        halfDayPeriod: req.half_day_period,
+        status: req.status,
+        requestedAt: req.requested_at,
+        processedAt: req.processed_at,
+        processedBy: req.processed_by,
+        adminNotes: req.admin_notes,
+        assignedTo: req.assigned_to
+      };
+    });
   } catch (error) {
     console.error('Error getting all leave requests:', error);
     return [];
