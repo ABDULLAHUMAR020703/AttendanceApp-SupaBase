@@ -3,6 +3,7 @@
  */
 import { API_GATEWAY_URL, API_TIMEOUT } from '../../../core/config/api';
 import * as FileSystem from 'expo-file-system';
+import * as FileSystemLegacy from 'expo-file-system/legacy';
 import { Linking, Platform } from 'react-native';
 
 /**
@@ -185,7 +186,8 @@ export async function downloadReport(reportId, user = null) {
     // Download file to local storage
     const fileUri = FileSystem.documentDirectory + `report-${reportId}.pdf`;
     
-    const downloadResult = await FileSystem.downloadAsync(url, fileUri, {
+    // Use legacy API for downloadAsync (deprecated in v54, but still functional)
+    const downloadResult = await FileSystemLegacy.downloadAsync(url, fileUri, {
       headers,
     });
 
@@ -226,7 +228,8 @@ export async function openReport(fileUri) {
   try {
     // For Android, use content URI
     if (Platform.OS === 'android') {
-      const contentUri = await FileSystem.getContentUriAsync(fileUri);
+      // Use legacy API for getContentUriAsync
+      const contentUri = await FileSystemLegacy.getContentUriAsync(fileUri);
       const canOpen = await Linking.canOpenURL(contentUri);
       
       if (canOpen) {
