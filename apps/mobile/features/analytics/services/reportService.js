@@ -184,7 +184,16 @@ export async function downloadReport(reportId, user = null) {
     }
 
     // Download file to local storage
-    const fileUri = FileSystem.documentDirectory + `report-${reportId}.pdf`;
+    // Use legacy API's documentDirectory (same pattern as export.js)
+    const documentDir = FileSystemLegacy.documentDirectory || FileSystem.documentDirectory;
+    if (!documentDir) {
+      throw new Error('Document directory is not available. Please ensure expo-file-system is properly configured.');
+    }
+    const fileUri = documentDir + `report-${reportId}.pdf`;
+    
+    if (__DEV__) {
+      console.log('[ReportService] Downloading to:', fileUri);
+    }
     
     // Use legacy API for downloadAsync (deprecated in v54, but still functional)
     const downloadResult = await FileSystemLegacy.downloadAsync(url, fileUri, {
