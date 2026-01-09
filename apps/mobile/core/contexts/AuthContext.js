@@ -1,6 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { supabase } from '../config/supabase';
 import { getEmployeeByUsername } from '../../utils/employees';
+import { subscribeToNotifications } from '../../features/notifications/services/realtimeNotifications';
+import { subscribeToAttendance } from '../../features/attendance/services/realtimeAttendance';
+import { subscribeToWorkModeChanges } from '../../features/employees/services/realtimeEmployees';
+import { startLocationMonitoring, stopLocationMonitoring } from '../../features/geofencing/services/locationMonitoringService';
 
 const AuthContext = createContext();
 
@@ -8,6 +12,11 @@ export function AuthProvider({ children }) {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState(null);
   const loadUserDataRef = useRef(null); // Track active loadUserData call to prevent race conditions
+  const realtimeSubscriptionsRef = useRef({
+    notifications: null,
+    attendance: null,
+    workMode: null,
+  });
 
   useEffect(() => {
     // Get initial session with error handling
@@ -64,6 +73,126 @@ export function AuthProvider({ children }) {
       subscription.unsubscribe();
     };
   }, []);
+
+  // Set up realtime subscriptions when user is logged in
+  useEffect(() => {
+    // Only subscribe if user is available and has uid
+    if (!user || !user.uid) {
+      // Clean up any existing subscriptions if user is logged out
+      if (realtimeSubscriptionsRef.current.notifications) {
+        console.log('[AUTH_CONTEXT] Cleaning up notifications subscription (user logged out)');
+        realtimeSubscriptionsRef.current.notifications.unsubscribe();
+        realtimeSubscriptionsRef.current.notifications = null;
+      }
+      if (realtimeSubscriptionsRef.current.attendance) {
+        console.log('[AUTH_CONTEXT] Cleaning up attendance subscription (user logged out)');
+        realtimeSubscriptionsRef.current.attendance.unsubscribe();
+        realtimeSubscriptionsRef.current.attendance = null;
+      }
+      if (realtimeSubscriptionsRef.current.workMode) {
+        console.log('[AUTH_CONTEXT] Cleaning up work mode subscription (user logged out)');
+        realtimeSubscriptionsRef.current.workMode.unsubscribe();
+        realtimeSubscriptionsRef.current.workMode = null;
+      }
+      // Stop location monitoring
+      stopLocationMonitoring();
+      return;
+    }
+
+    console.log('[AUTH_CONTEXT] Setting up realtime subscriptions for user:', user.username);
+
+    // 1. Subscribe to notifications
+    try {
+      if (!realtimeSubscriptionsRef.current.notifications) {
+        const notificationsSub = subscribeToNotifications(
+          user.uid,
+          user.username,
+          (data) => {
+            // Notification received callback
+            // The notification is already stored in AsyncStorage by the service
+            // This callback can be used to trigger UI updates if needed
+            console.log('[AUTH_CONTEXT] Notification received via realtime:', data.notification.id);
+            // You can emit an event or update a context here if needed
+          },
+          (error) => {
+            console.error('[AUTH_CONTEXT] Notifications subscription error:', error);
+          }
+        );
+        realtimeSubscriptionsRef.current.notifications = notificationsSub;
+      }
+    } catch (error) {
+      console.error('[AUTH_CONTEXT] Error setting up notifications subscription:', error);
+    }
+
+    // 2. Subscribe to attendance records
+    try {
+      if (!realtimeSubscriptionsRef.current.attendance) {
+        const attendanceSub = subscribeToAttendance(
+          user,
+          (data) => {
+            // Attendance change callback
+            console.log('[AUTH_CONTEXT] Attendance change via realtime:', data.type, data.record.id);
+            // You can emit an event or update a context here if needed
+          },
+          (error) => {
+            console.error('[AUTH_CONTEXT] Attendance subscription error:', error);
+          }
+        );
+        realtimeSubscriptionsRef.current.attendance = attendanceSub;
+      }
+    } catch (error) {
+      console.error('[AUTH_CONTEXT] Error setting up attendance subscription:', error);
+    }
+
+    // 3. Subscribe to work mode changes
+    try {
+      if (!realtimeSubscriptionsRef.current.workMode) {
+        const workModeSub = subscribeToWorkModeChanges(
+          user,
+          (data) => {
+            // Work mode change callback
+            console.log('[AUTH_CONTEXT] Work mode change via realtime:', data.username, data.oldWorkMode, '->', data.newWorkMode);
+            // You can emit an event or update a context here if needed
+          },
+          (error) => {
+            console.error('[AUTH_CONTEXT] Work mode subscription error:', error);
+          }
+        );
+        realtimeSubscriptionsRef.current.workMode = workModeSub;
+      }
+    } catch (error) {
+      console.error('[AUTH_CONTEXT] Error setting up work mode subscription:', error);
+    }
+
+    // 4. Start location monitoring (for automatic checkout)
+    (async () => {
+      try {
+        console.log('[AUTH_CONTEXT] Starting location monitoring for user:', user.username);
+        await startLocationMonitoring(user);
+      } catch (error) {
+        console.error('[AUTH_CONTEXT] Error starting location monitoring:', error);
+      }
+    })();
+
+    // Cleanup function: unsubscribe when user changes or component unmounts
+    return () => {
+      console.log('[AUTH_CONTEXT] Cleaning up realtime subscriptions');
+      if (realtimeSubscriptionsRef.current.notifications) {
+        realtimeSubscriptionsRef.current.notifications.unsubscribe();
+        realtimeSubscriptionsRef.current.notifications = null;
+      }
+      if (realtimeSubscriptionsRef.current.attendance) {
+        realtimeSubscriptionsRef.current.attendance.unsubscribe();
+        realtimeSubscriptionsRef.current.attendance = null;
+      }
+      if (realtimeSubscriptionsRef.current.workMode) {
+        realtimeSubscriptionsRef.current.workMode.unsubscribe();
+        realtimeSubscriptionsRef.current.workMode = null;
+      }
+      // Stop location monitoring
+      stopLocationMonitoring();
+    };
+  }, [user]); // Re-run when user changes
 
   const loadUserData = async (userId) => {
     // Cancel any previous loadUserData call to prevent race conditions
@@ -212,6 +341,7 @@ export function AuthProvider({ children }) {
       // Final check before setting user
       if (!currentCall.cancelled) {
         setUser(combinedUser);
+        // Realtime subscriptions will be set up in useEffect when user changes
       }
     } catch (error) {
       // Check if cancelled
@@ -279,15 +409,33 @@ export function AuthProvider({ children }) {
     try {
       console.log('[AUTH_CONTEXT] Logout started');
       
-      // 1. Clear user state FIRST to prevent UI from rendering with stale data
+      // 1. Unsubscribe from all realtime channels FIRST
+      console.log('[AUTH_CONTEXT] Unsubscribing from realtime channels...');
+      if (realtimeSubscriptionsRef.current.notifications) {
+        realtimeSubscriptionsRef.current.notifications.unsubscribe();
+        realtimeSubscriptionsRef.current.notifications = null;
+      }
+      if (realtimeSubscriptionsRef.current.attendance) {
+        realtimeSubscriptionsRef.current.attendance.unsubscribe();
+        realtimeSubscriptionsRef.current.attendance = null;
+      }
+      if (realtimeSubscriptionsRef.current.workMode) {
+        realtimeSubscriptionsRef.current.workMode.unsubscribe();
+        realtimeSubscriptionsRef.current.workMode = null;
+      }
+      // Stop location monitoring
+      stopLocationMonitoring();
+      console.log('[AUTH_CONTEXT] ✓ Realtime subscriptions cleaned up');
+      
+      // 2. Clear user state to prevent UI from rendering with stale data
       setUser(null);
       setIsLoading(true);
       
-      // 2. Sign out from Supabase (clears Supabase session)
+      // 3. Sign out from Supabase (clears Supabase session)
       await supabase.auth.signOut();
       console.log('[AUTH_CONTEXT] ✓ Supabase signOut complete');
       
-      // 3. Clear AsyncStorage session keys (defensive cleanup)
+      // 4. Clear AsyncStorage session keys (defensive cleanup)
       try {
         const { clearSupabaseSession } = await import('../../utils/sessionHelper');
         await clearSupabaseSession();
@@ -296,13 +444,27 @@ export function AuthProvider({ children }) {
         console.warn('[AUTH_CONTEXT] Error clearing storage:', clearError);
       }
       
-      // 4. Reset loading state
+      // 5. Reset loading state
       setIsLoading(false);
       console.log('[AUTH_CONTEXT] ✓ Logout complete');
       
     } catch (error) {
       console.error('[AUTH_CONTEXT] Logout error:', error);
-      // Even if signOut fails, clear local state
+      // Even if signOut fails, clear local state and subscriptions
+      if (realtimeSubscriptionsRef.current.notifications) {
+        realtimeSubscriptionsRef.current.notifications.unsubscribe();
+        realtimeSubscriptionsRef.current.notifications = null;
+      }
+      if (realtimeSubscriptionsRef.current.attendance) {
+        realtimeSubscriptionsRef.current.attendance.unsubscribe();
+        realtimeSubscriptionsRef.current.attendance = null;
+      }
+      if (realtimeSubscriptionsRef.current.workMode) {
+        realtimeSubscriptionsRef.current.workMode.unsubscribe();
+        realtimeSubscriptionsRef.current.workMode = null;
+      }
+      // Stop location monitoring
+      stopLocationMonitoring();
       setUser(null);
       setIsLoading(false);
       
