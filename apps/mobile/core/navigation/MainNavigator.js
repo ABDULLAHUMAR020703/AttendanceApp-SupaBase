@@ -26,6 +26,8 @@ import CreateUserScreen from '../../screens/CreateUserScreen';
 import EmployeeManagement from '../../screens/EmployeeManagement';
 import ReportsScreen from '../../screens/ReportsScreen';
 import LoginScreen from '../../screens/LoginScreen';
+import AttendanceSettingsScreen from '../../screens/AttendanceSettingsScreen';
+import { GeoFencingScreen } from '../../features/geofencing';
 
 const Stack = createStackNavigator();
 
@@ -111,6 +113,12 @@ export default function MainNavigator({ user }) {
           options={{ title: 'My Tickets' }}
           initialParams={{ user }}
         />
+        <Stack.Screen 
+          name={ROUTES.GEO_FENCING} 
+          component={GeoFencingScreen}
+          options={{ title: 'GeoFencing' }}
+          initialParams={{ user }}
+        />
       </Stack.Navigator>
     );
   }
@@ -183,13 +191,27 @@ export default function MainNavigator({ user }) {
           </>
         )}
         {user.role === ROLES.SUPER_ADMIN && (
-          <Stack.Screen 
-            name="ReportsScreen" 
-            component={ReportsScreen}
-            options={{ title: 'Reports' }}
-            initialParams={{ user }}
-          />
+          <>
+            <Stack.Screen 
+              name="ReportsScreen" 
+              component={ReportsScreen}
+              options={{ headerShown: false }}
+              initialParams={{ user }}
+            />
+            <Stack.Screen 
+              name={ROUTES.ATTENDANCE_SETTINGS} 
+              component={AttendanceSettingsScreen}
+              options={{ title: 'Attendance Settings' }}
+              initialParams={{ user }}
+            />
+          </>
         )}
+        <Stack.Screen 
+          name={ROUTES.GEO_FENCING} 
+          component={GeoFencingScreen}
+          options={{ title: 'GeoFencing' }}
+          initialParams={{ user }}
+        />
       </Stack.Navigator>
     );
   }

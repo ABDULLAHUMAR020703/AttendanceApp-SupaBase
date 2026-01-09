@@ -23,6 +23,8 @@ export const ROUTES = {
   SIGNUP_APPROVAL: 'SignupApproval',
   CREATE_USER: 'CreateUser',
   EMPLOYEE_MANAGEMENT: 'EmployeeManagement',
+  GEO_FENCING: 'GeoFencingScreen',
+  ATTENDANCE_SETTINGS: 'AttendanceSettingsScreen',
 };
 
 // Route groups by role
