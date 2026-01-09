@@ -15,6 +15,9 @@ import { getUnreadNotificationCount } from '../../utils/notifications';
 import { fontSize, spacing, iconSize, componentSize, responsivePadding, responsiveFont, wp } from '../../utils/responsive';
 import { ROUTES } from '../constants/routes';
 import { isHRAdmin } from '../constants/roles';
+import { getOfficeLocation } from '../../features/geofencing';
+import { getCurrentLocation } from '../../features/geofencing';
+import { isWithin1km } from '../../features/geofencing';
 import Logo from './Logo';
 import Trademark from './Trademark';
 import HelpButton from './HelpButton';
@@ -24,6 +27,7 @@ export default function CustomDrawer({ navigation, state }) {
   const { colors, theme } = useTheme();
   const [pendingSignupCount, setPendingSignupCount] = useState(0);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const [isEmployeeInsideRadius, setIsEmployeeInsideRadius] = useState(false);
 
   useEffect(() => {
     loadCounts();
@@ -92,6 +96,31 @@ export default function CustomDrawer({ navigation, state }) {
         console.error('Error loading notification count:', error);
       }
     }
+    // Check if employee is inside office radius
+    if (user && user.role === 'employee') {
+      try {
+        const officeLocation = await getOfficeLocation();
+        if (officeLocation) {
+          const currentLocation = await getCurrentLocation();
+          if (currentLocation && currentLocation.latitude && currentLocation.longitude) {
+            const inside = isWithin1km(
+              currentLocation.latitude,
+              currentLocation.longitude,
+              officeLocation.latitude,
+              officeLocation.longitude
+            );
+            setIsEmployeeInsideRadius(inside);
+          } else {
+            setIsEmployeeInsideRadius(false);
+          }
+        } else {
+          setIsEmployeeInsideRadius(false);
+        }
+      } catch (error) {
+        console.error('Error checking employee location:', error);
+        setIsEmployeeInsideRadius(false);
+      }
+    }
   };
 
   const getMenuItems = () => {
@@ -107,7 +136,7 @@ export default function CustomDrawer({ navigation, state }) {
     ];
 
     if (user.role === 'employee') {
-      return [
+      const employeeItems = [
         ...baseItems,
         {
           name: 'Attendance History',
@@ -140,13 +169,27 @@ export default function CustomDrawer({ navigation, state }) {
           roles: ['employee'],
           badge: unreadNotificationCount,
         },
-        {
-          name: 'Theme Settings',
-          icon: 'color-palette-outline',
-          screen: ROUTES.THEME_SETTINGS,
-          roles: ['employee'],
-        },
       ];
+
+      // Add GeoFencing only if employee is inside office radius
+      if (isEmployeeInsideRadius) {
+        employeeItems.push({
+          name: 'GeoFencing',
+          icon: 'location-outline',
+          screen: ROUTES.GEO_FENCING,
+          roles: ['employee'],
+          readOnly: true, // Employees can only view
+        });
+      }
+
+      employeeItems.push({
+        name: 'Theme Settings',
+        icon: 'color-palette-outline',
+        screen: ROUTES.THEME_SETTINGS,
+        roles: ['employee'],
+      });
+
+      return employeeItems;
     }
 
     // Admin/Manager menu items
@@ -212,6 +255,12 @@ export default function CustomDrawer({ navigation, state }) {
         screen: 'ReportsScreen',
         roles: ['super_admin'],
       },
+      {
+        name: 'Attendance Settings',
+        icon: 'settings-outline',
+        screen: ROUTES.ATTENDANCE_SETTINGS,
+        roles: ['super_admin'],
+      },
     ];
 
     // Manager only items
@@ -227,18 +276,41 @@ export default function CustomDrawer({ navigation, state }) {
       return user.role === 'super_admin';
     });
 
-    return [
+    const adminMenuItems = [
       ...baseItems,
       ...adminItems,
       ...filteredSuperAdminItems,
       ...(user.role === 'manager' ? managerItems : []),
-      {
-        name: 'Theme Settings',
-        icon: 'color-palette-outline',
-        screen: ROUTES.THEME_SETTINGS,
-        roles: ['super_admin', 'manager'],
-      },
     ];
+
+    // Add GeoFencing for super_admin and HR (always visible, editable)
+    // Add GeoFencing for managers (always visible, read-only)
+    if (user.role === 'super_admin' || isHRAdmin(user)) {
+      adminMenuItems.push({
+        name: 'GeoFencing',
+        icon: 'location-outline',
+        screen: ROUTES.GEO_FENCING,
+        roles: ['super_admin', 'manager'],
+        readOnly: false, // super_admin and HR can edit
+      });
+    } else if (user.role === 'manager') {
+      adminMenuItems.push({
+        name: 'GeoFencing',
+        icon: 'location-outline',
+        screen: ROUTES.GEO_FENCING,
+        roles: ['manager'],
+        readOnly: true, // Managers can only view
+      });
+    }
+
+    adminMenuItems.push({
+      name: 'Theme Settings',
+      icon: 'color-palette-outline',
+      screen: ROUTES.THEME_SETTINGS,
+      roles: ['super_admin', 'manager'],
+    });
+
+    return adminMenuItems;
   };
 
   const menuItems = getMenuItems();

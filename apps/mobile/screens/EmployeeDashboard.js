@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocationState } from '../features/geofencing/hooks/useLocationState';
 import {
   View,
   Text,
@@ -271,6 +272,9 @@ export default function EmployeeDashboard({ route }) {
 
   const canCheckIn = !lastRecord || lastRecord.type === 'checkout';
   const canCheckOut = lastRecord && lastRecord.type === 'checkin';
+  
+  // Track location state when checked in
+  const locationState = useLocationState(user, canCheckOut, 30000); // Poll every 30 seconds
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }} edges={['top']}>
@@ -442,6 +446,50 @@ export default function EmployeeDashboard({ route }) {
             </View>
           )}
         </View>
+
+        {/* Location Warning Banner - Show when outside radius and auto checkout is disabled */}
+        {canCheckOut && locationState.isInside === false && !locationState.autoCheckoutEnabled && (
+          <View
+            className="rounded-xl"
+            style={{
+              backgroundColor: '#FEF3C7',
+              borderWidth: 1,
+              borderColor: '#F59E0B',
+              padding: spacing.md,
+              marginBottom: spacing.md,
+              flexDirection: 'row',
+              alignItems: 'center',
+            }}
+          >
+            <Ionicons
+              name="warning"
+              size={iconSize.lg}
+              color="#F59E0B"
+              style={{ marginRight: spacing.sm }}
+            />
+            <View style={{ flex: 1 }}>
+              <Text
+                style={{
+                  fontSize: responsiveFont(14),
+                  fontWeight: '600',
+                  color: '#92400E',
+                  marginBottom: spacing.xs / 2,
+                }}
+              >
+                Outside Office Area
+              </Text>
+              <Text
+                style={{
+                  fontSize: responsiveFont(12),
+                  color: '#92400E',
+                  lineHeight: 16,
+                }}
+              >
+                You are {locationState.formattedDistance || 'outside'} from the office. Manual checkout is blocked until you return within 1km.
+              </Text>
+            </View>
+          </View>
+        )}
 
         {/* Leave Balance Card */}
         {leaveBalance && remainingLeaves && (
