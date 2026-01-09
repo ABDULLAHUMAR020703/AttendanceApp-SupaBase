@@ -23,7 +23,7 @@ import {
   getCategoryLabel,
   TICKET_STATUS,
 } from '../utils/ticketManagement';
-import { getEmployees } from '../utils/employees';
+import { getAdminUsers } from '../utils/employees';
 import { useTheme } from '../contexts/ThemeContext';
 
 export default function TicketManagementScreen({ navigation, route }) {
@@ -98,11 +98,13 @@ export default function TicketManagementScreen({ navigation, route }) {
 
   const loadEmployees = async () => {
     try {
-      const empList = await getEmployees();
-      const admins = empList.filter(emp => emp.role === 'admin');
+      // Fetch all managers and super_admins from Supabase
+      const admins = await getAdminUsers();
       setEmployees(admins);
+      console.log(`[TicketManagement] Loaded ${admins.length} eligible assignees (managers + super_admins)`);
     } catch (error) {
       console.error('Error loading employees:', error);
+      Alert.alert('Error', 'Failed to load assignees. Please try again.');
     }
   };
 
@@ -461,32 +463,63 @@ export default function TicketManagementScreen({ navigation, route }) {
                 <Ionicons name="close" size={24} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
-            <FlatList
-              data={employees}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={{
-                    backgroundColor: selectedEmployee?.id === item.id ? colors.primaryLight : colors.background,
-                    borderRadius: 12,
-                    padding: 16,
-                    marginBottom: 8,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                  }}
-                  onPress={() => setSelectedEmployee(item)}
-                >
-                  <Ionicons
-                    name={selectedEmployee?.id === item.id ? 'radio-button-on' : 'radio-button-off'}
-                    size={20}
-                    color={selectedEmployee?.id === item.id ? colors.primary : colors.textSecondary}
-                  />
-                  <Text style={{ fontSize: 16, color: colors.text, marginLeft: 12 }}>
-                    {item.name} ({item.username})
-                  </Text>
-                </TouchableOpacity>
-              )}
-            />
+            {employees.length === 0 ? (
+              <View style={{ padding: 20, alignItems: 'center' }}>
+                <Text style={{ color: colors.textSecondary, fontSize: 14 }}>
+                  No managers or super admins available
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                data={employees}
+                keyExtractor={(item) => item.uid || item.id}
+                renderItem={({ item }) => {
+                  const roleLabel = item.role === 'super_admin' ? 'Super Admin' : 
+                                   item.role === 'manager' ? 'Manager' : item.role;
+                  const displayName = item.name || item.username || 'Unknown';
+                  const displayPosition = item.position || '';
+                  const displayText = displayPosition 
+                    ? `${displayName} — ${displayPosition} (${roleLabel})`
+                    : `${displayName} (${roleLabel})`;
+                  
+                  return (
+                    <TouchableOpacity
+                      style={{
+                        backgroundColor: selectedEmployee?.uid === item.uid || selectedEmployee?.id === item.id 
+                          ? colors.primaryLight 
+                          : colors.background,
+                        borderRadius: 12,
+                        padding: 16,
+                        marginBottom: 8,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                      }}
+                      onPress={() => setSelectedEmployee(item)}
+                    >
+                      <Ionicons
+                        name={selectedEmployee?.uid === item.uid || selectedEmployee?.id === item.id 
+                          ? 'radio-button-on' 
+                          : 'radio-button-off'}
+                        size={20}
+                        color={selectedEmployee?.uid === item.uid || selectedEmployee?.id === item.id 
+                          ? colors.primary 
+                          : colors.textSecondary}
+                      />
+                      <View style={{ flex: 1, marginLeft: 12 }}>
+                        <Text style={{ fontSize: 16, color: colors.text, fontWeight: '500' }}>
+                          {displayText}
+                        </Text>
+                        {item.department && (
+                          <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                            {item.department}
+                          </Text>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                }}
+              />
+            )}
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
               <TouchableOpacity
                 style={{ backgroundColor: colors.border, borderRadius: 8, padding: 12, flex: 1 }}

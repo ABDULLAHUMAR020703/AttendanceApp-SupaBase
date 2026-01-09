@@ -352,6 +352,40 @@ export const getEmployeeById = async (employeeId) => {
  */
 export const getAdminUsers = async () => {
   try {
+    // First, try to get from Supabase (source of truth)
+    try {
+      const { data: admins, error } = await supabase
+        .from('users')
+        .select('uid, username, email, name, role, department, position, work_mode, hire_date, is_active')
+        .in('role', ['manager', 'super_admin'])
+        .eq('is_active', true)
+        .order('role', { ascending: false }) // super_admin first, then manager
+        .order('name', { ascending: true });
+      
+      if (!error && admins && admins.length > 0) {
+        // Convert Supabase format to app format
+        const formattedAdmins = admins.map(admin => ({
+          id: `emp_${admin.uid}`,
+          uid: admin.uid,
+          username: admin.username,
+          name: admin.name,
+          email: admin.email,
+          role: admin.role,
+          department: admin.department,
+          position: admin.position,
+          workMode: admin.work_mode,
+          hireDate: admin.hire_date,
+          isActive: admin.is_active
+        }));
+        
+        console.log(`✓ Found ${formattedAdmins.length} admin user(s) from Supabase (${formattedAdmins.filter(a => a.role === 'super_admin').length} super_admin, ${formattedAdmins.filter(a => a.role === 'manager').length} manager)`);
+        return formattedAdmins;
+      }
+    } catch (supabaseError) {
+      console.log('Could not get admin users from Supabase, falling back to AsyncStorage:', supabaseError.message);
+    }
+    
+    // Fallback to AsyncStorage
     const employees = await getEmployees();
     return employees.filter(emp => 
       (emp.role === 'super_admin' || emp.role === 'manager') && emp.isActive
