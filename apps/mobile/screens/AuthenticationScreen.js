@@ -20,6 +20,7 @@ import {
 } from '../utils/biometricAuth';
 import { getCurrentLocationWithAddress, formatAddressForDisplay } from '../utils/location';
 import { useTheme } from '../contexts/ThemeContext';
+import { validateCheckInLocation } from '../features/geofencing';
 
 export default function AuthenticationScreen({ navigation, route }) {
   const { type, user, authMethod = 'face' } = route.params; // authMethod: 'face' or 'biometric'
@@ -353,6 +354,60 @@ export default function AuthenticationScreen({ navigation, route }) {
         accuracy: null,
         address: 'Location unavailable'
       };
+
+      // GEOFENCING VALIDATION
+      if (type === 'checkin') {
+        // Validate location coordinates are available
+        if (!location.latitude || !location.longitude) {
+          Alert.alert(
+            'Location Required',
+            'Unable to get your current location. Please enable location services and try again.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+
+        // Validate check-in location based on work mode
+        const validation = await validateCheckInLocation(
+          user,
+          location.latitude,
+          location.longitude
+        );
+
+        if (!validation.valid) {
+          // Block check-in if validation fails
+          Alert.alert(
+            'Check-In Blocked',
+            validation.error || 'You must be within the office location to check in.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+
+        // Log warning if present (non-blocking)
+        if (validation.warning) {
+          console.warn('[AuthenticationScreen] Location validation warning:', validation.warning);
+        }
+      } else if (type === 'checkout') {
+        // Validate checkout location (only if auto_checkout is disabled)
+        const { validateCheckoutLocation } = await import('../features/geofencing/services/checkoutValidationService');
+        const validation = await validateCheckoutLocation(user, location);
+
+        if (!validation.valid) {
+          // Block checkout if validation fails
+          Alert.alert(
+            'Check-Out Blocked',
+            validation.error || 'You must be within 1km of the office to check out.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+
+        // Log warning if present (non-blocking)
+        if (validation.warning) {
+          console.warn('[AuthenticationScreen] Checkout validation warning:', validation.warning);
+        }
+      }
 
       const attendanceRecord = {
         id: Date.now().toString(),
