@@ -3,4 +3,8 @@
   <string name="expo_splash_screen_resize_mode" translatable="false">contain</string>
   <string name="expo_splash_screen_status_bar_translucent" translatable="false">false</string>
   <string name="expo_system_ui_user_interface_style" translatable="false">light</string>
+  <!-- Google Maps API Key for react-native-maps (Android requirement) -->
+  <!-- For EAS builds: This will be replaced by the pre-build hook using GOOGLE_MAPS_API_KEY secret -->
+  <!-- For local builds: Replace YOUR_GOOGLE_MAPS_API_KEY with your actual API key -->
+  <string name="google_maps_api_key" translatable="false">YOUR_GOOGLE_MAPS_API_KEY</string>
 </resources>
