@@ -737,27 +737,21 @@ useEffect(() => {
 - Reduces database read/write costs
 - Faster local access
 
-### Supabase Migration
+### Supabase Implementation
 
-#### From Firebase to Supabase
+The app uses Supabase as the primary backend service:
 
-The app has been fully migrated from Firebase to Supabase:
+**Current Architecture:**
+- Supabase Authentication for user management
+- PostgreSQL SQL database for data storage
+- Supabase Client SDK for all database operations
+- Row Level Security (RLS) for data access control
 
-**Before (Firebase):**
-- Firebase Authentication
-- Firestore NoSQL database
-- Firebase Admin SDK for backend
-
-**After (Current - Supabase):**
-- Supabase Authentication
-- PostgreSQL SQL database
-- Supabase Client for all operations
-
-#### Migration Scripts
+#### User Management Scripts
 
 User creation scripts available:
 - **`scripts/create-users-supabase.js`** - Programmatically create users via Supabase Admin API
-- **`migrations/manual-create-users.sql`** - SQL script for manual user creation
+- **`scripts/create-new-users-automated.js`** - Automated user creation script
 
 ### Supabase Best Practices
 
@@ -1270,7 +1264,7 @@ Example: testuser,password:testuser123,role:employee
    - Create in Supabase Authentication (email + password)
    - Create record in PostgreSQL `users` table
    - Add to AsyncStorage `@company_employees`
-3. Use migration script: `scripts/create-users-supabase.js` or SQL script: `migrations/manual-create-users.sql`
+3. Use user creation script: `scripts/create-users-supabase.js` or automated script: `scripts/create-new-users-automated.js`
 
 ---
 
@@ -1387,7 +1381,7 @@ Example: testuser,password:testuser123,role:employee
 
 ### Scripts
 - **User Creation Script**: `scripts/create-users-supabase.js` - Programmatic user creation via Supabase Admin API
-- **SQL Script**: `migrations/manual-create-users.sql` - Manual SQL user creation
+- **Automated User Creation**: `scripts/create-new-users-automated.js` - Automated user creation with validation
 
 ---
 
@@ -1411,9 +1405,9 @@ Example: testuser,password:testuser123,role:employee
 - **PostgreSQL**: SQL database with Supabase client
 - **Error Handling**: Comprehensive error codes and messages
 
-### Migration
-- **Script**: `scripts/create-users-supabase.js` - Programmatic user creation
-- **SQL Script**: `migrations/manual-create-users.sql` - Manual SQL user creation
+### User Management
+- **Script**: `scripts/create-users-supabase.js` - Programmatic user creation via Supabase Admin API
+- **Automated Script**: `scripts/create-new-users-automated.js` - Automated user creation with validation
 - **Source**: Create users directly in Supabase Auth + PostgreSQL
 
 For detailed Supabase setup, see `SETUP.md`.

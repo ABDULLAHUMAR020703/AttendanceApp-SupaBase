@@ -420,7 +420,7 @@ CREATE TABLE users (
 **Important Notes:**
 - **UID Field**: The `uid` column must match the Supabase Auth User ID (`auth.uid()`)
 - If `uid` values don't match, the system falls back to email-based lookup
-- See `migrations/UPDATE_UID_TO_MATCH_AUTH.md` for instructions on updating UIDs
+- Use migration script `migrations/011_update_uid_to_match_auth.sql` to update UIDs if needed
 
 ### AsyncStorage (Local)
 
