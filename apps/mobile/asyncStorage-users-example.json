@@ -1,7 +1,7 @@
 [
   {
     "id": "emp_001",
-    "uid": "firebase_uid_001",
+    "uid": "supabase_uid_001",
     "username": "testuser",
     "email": "testuser@company.com",
     "name": "Test User",
@@ -16,7 +16,7 @@
   },
   {
     "id": "emp_002",
-    "uid": "firebase_uid_002",
+    "uid": "supabase_uid_002",
     "username": "testadmin",
     "email": "testadmin@company.com",
     "name": "Test Admin",
@@ -31,7 +31,7 @@
   },
   {
     "id": "emp_003",
-    "uid": "firebase_uid_003",
+    "uid": "supabase_uid_003",
     "username": "john.doe",
     "email": "john.doe@company.com",
     "name": "John Doe",
@@ -46,7 +46,7 @@
   },
   {
     "id": "emp_004",
-    "uid": "firebase_uid_004",
+    "uid": "supabase_uid_004",
     "username": "jane.smith",
     "email": "jane.smith@company.com",
     "name": "Jane Smith",
@@ -61,7 +61,7 @@
   },
   {
     "id": "emp_005",
-    "uid": "firebase_uid_005",
+    "uid": "supabase_uid_005",
     "username": "mike.johnson",
     "email": "mike.johnson@company.com",
     "name": "Mike Johnson",
@@ -76,7 +76,7 @@
   },
   {
     "id": "emp_006",
-    "uid": "firebase_uid_006",
+    "uid": "supabase_uid_006",
     "username": "sarah.williams",
     "email": "sarah.williams@company.com",
     "name": "Sarah Williams",
@@ -91,7 +91,7 @@
   },
   {
     "id": "emp_007",
-    "uid": "firebase_uid_007",
+    "uid": "supabase_uid_007",
     "username": "david.brown",
     "email": "david.brown@company.com",
     "name": "David Brown",
@@ -106,7 +106,7 @@
   },
   {
     "id": "emp_008",
-    "uid": "firebase_uid_008",
+    "uid": "supabase_uid_008",
     "username": "emily.davis",
     "email": "emily.davis@company.com",
     "name": "Emily Davis",
@@ -121,7 +121,7 @@
   },
   {
     "id": "emp_009",
-    "uid": "firebase_uid_009",
+    "uid": "supabase_uid_009",
     "username": "hrmanager",
     "email": "hrmanager@company.com",
     "name": "HR Manager",
@@ -136,7 +136,7 @@
   },
   {
     "id": "emp_010",
-    "uid": "firebase_uid_010",
+    "uid": "supabase_uid_010",
     "username": "techmanager",
     "email": "techmanager@company.com",
     "name": "Tech Manager",
@@ -151,7 +151,7 @@
   },
   {
     "id": "emp_011",
-    "uid": "firebase_uid_011",
+    "uid": "supabase_uid_011",
     "username": "salesmanager",
     "email": "salesmanager@company.com",
     "name": "Sales Manager",

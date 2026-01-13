@@ -986,7 +986,7 @@ export const createEmployee = async (employeeData) => {
       return { success: false, error: 'Username already exists' };
     }
 
-    // Check if username exists in Firebase
+    // Check if username exists in Supabase
     const { checkUsernameExists, addUserToFile } = await import('./auth');
     const usernameExists = await checkUsernameExists(username);
     if (usernameExists) {
@@ -1016,7 +1016,7 @@ export const createEmployee = async (employeeData) => {
     employees.push(newEmployee);
     await AsyncStorage.setItem(EMPLOYEES_KEY, JSON.stringify(employees));
 
-    // Create user in Firebase
+    // Create user in Supabase
     const addUserResult = await addUserToFile({
       username,
       password,
@@ -1066,7 +1066,7 @@ export const updateEmployee = async (employeeId, updates) => {
       updatedAt: new Date().toISOString(),
     };
 
-    // If role is being updated, also update Firebase
+    // If role is being updated, also update Supabase
     if (updates.role && updates.role !== employee.role) {
       const { updateUserRole } = await import('./auth');
       const updateRoleResult = await updateUserRole(employee.username, updates.role);

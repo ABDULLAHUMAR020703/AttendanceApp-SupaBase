@@ -29,7 +29,7 @@ import { initializeDefaultEmployees } from './utils/employees';
 export default function App() {
   useEffect(() => {
     // Initialize default employees when app starts
-    // Firebase handles authentication automatically - no file initialization needed
+    // Supabase handles authentication automatically - no file initialization needed
     const initializeApp = async () => {
       await initializeDefaultEmployees();
     };

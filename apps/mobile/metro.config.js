@@ -8,8 +8,8 @@ config.resolver.assetExts.push('ttf', 'otf', 'woff', 'woff2');
 // Add source extensions for better module resolution
 config.resolver.sourceExts.push('mjs', 'cjs');
 
-// Enable package exports for Firebase and other modern packages
-// This should handle Firebase subpath exports automatically
+// Enable package exports for modern packages
+// This handles subpath exports automatically
 config.resolver.unstable_enablePackageExports = true;
 
 // Configure resolver to handle browser-only packages in React Native

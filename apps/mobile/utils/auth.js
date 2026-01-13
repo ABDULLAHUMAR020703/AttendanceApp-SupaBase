@@ -1,4 +1,4 @@
-// Supabase Authentication - Migrated from Firebase
+// Supabase Authentication
 import { API_GATEWAY_URL, API_TIMEOUT } from '../core/config/api';
 import { supabase } from '../core/config/supabase';
 
