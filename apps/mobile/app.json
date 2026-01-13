@@ -29,7 +29,12 @@
       "permissions": [
         "USE_BIOMETRIC",
         "USE_FINGERPRINT"
-      ]
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyDAJ1-UZX7gq4a4g-7XkZNHrURsBza-IJ8"
+        }
+      }
     },
     "experiments": {
       "typedRoutes": false
