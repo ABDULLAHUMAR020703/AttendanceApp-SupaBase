@@ -24,7 +24,9 @@ A comprehensive employee attendance management system built with React Native, E
 ### 📊 Core Features
 - **Attendance Tracking**
   - GPS-based check-in/check-out
-  - Location verification
+  - Location verification with geofencing
+  - Office location management (admin/HR)
+  - Automatic check-out when leaving office radius (configurable)
   - Attendance history and analytics
   - Manual attendance entry (for managers/admins)
 
@@ -54,9 +56,15 @@ A comprehensive employee attendance management system built with React Native, E
   - Smooth animations
 
 - **Offline Support**
-  - Local data caching
+  - Local data caching with AsyncStorage
   - Offline-first approach
   - Automatic sync when online
+
+- **Real-Time Updates**
+  - Supabase Realtime subscriptions
+  - Live notification updates
+  - Real-time attendance record synchronization
+  - Instant work mode change notifications
 
 ---
 
@@ -148,10 +156,14 @@ Supabase (PostgreSQL + Auth)
    
    Create users via script:
    ```bash
+   # Option 1: Automated user creation (recommended)
+   node scripts/create-new-users-automated.js
+   
+   # Option 2: Manual user creation
    node scripts/create-users-supabase.js
    ```
    
-   Or use SQL script: `migrations/manual-create-users.sql`
+   See `scripts/README_AUTOMATED_USER_CREATION.md` for detailed instructions.
 
 5. **Start the services:**
    
@@ -251,10 +263,15 @@ AttendanceApp-SupaBase/
 │   └── auth-service/        # Auth Service (port 3001)
 │
 ├── scripts/
-│   └── create-users-supabase.js  # User creation script
+│   ├── create-users-supabase.js          # Manual user creation script
+│   ├── create-new-users-automated.js     # Automated user creation script
+│   └── README_AUTOMATED_USER_CREATION.md # User creation documentation
 │
-├── migrations/
-│   └── manual-create-users.sql    # SQL migration script
+├── migrations/                    # Database migration scripts
+│   ├── 004_create_leave_requests_table.sql
+│   ├── 005_create_tickets_table.sql
+│   ├── 006_create_attendance_records_table.sql
+│   └── ... (additional migration files)
 │
 ├── docs/                    # Documentation
 ├── SETUP.md                 # Detailed setup guide
@@ -294,7 +311,7 @@ After running the user creation script:
 - **Manager:** `techmanager` / `techmanager123`
 - **Employee:** `testuser` / `testuser123`
 
-See `migrations/manual-create-users.sql` for all demo users.
+See `scripts/README_AUTOMATED_USER_CREATION.md` for all demo users and creation instructions.
 
 ---
 
