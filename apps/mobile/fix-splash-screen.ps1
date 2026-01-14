@@ -15,7 +15,7 @@ if (Test-Path "assets\splash.png") {
 # Step 2: Remove old native splash screen assets
 Write-Host "`n[2/5] Removing old native splash screen assets..." -ForegroundColor Yellow
 $splashAssets = Get-ChildItem -Path "android\app\src\main\res" -Recurse -Filter "splashscreen_logo.png" -ErrorAction SilentlyContinue
-if ($splashAssets) {
+if ($null -ne $splashAssets -and $splashAssets.Count -gt 0) {
     $splashAssets | Remove-Item -Force
     Write-Host "✅ Removed $($splashAssets.Count) old splash screen assets" -ForegroundColor Green
 } else {
