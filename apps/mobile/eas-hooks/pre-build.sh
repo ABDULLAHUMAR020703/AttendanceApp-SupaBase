@@ -14,7 +14,7 @@ if [ -z "$GOOGLE_MAPS_API_KEY" ]; then
   GOOGLE_MAPS_API_KEY="YOUR_GOOGLE_MAPS_API_KEY"
 fi
 
-# Path to strings.xml (relative to project root)
+# Path to strings.xml (relative to apps/mobile directory where this hook runs)
 STRINGS_XML="android/app/src/main/res/values/strings.xml"
 
 if [ ! -f "$STRINGS_XML" ]; then
@@ -27,14 +27,14 @@ fi
 # Backup original file (optional, for safety)
 cp "$STRINGS_XML" "${STRINGS_XML}.backup"
 
-# Replace placeholder with actual API key
+# Replace placeholder or existing API key with actual API key
 # Handle both macOS and Linux sed differences
 if [[ "$OSTYPE" == "darwin"* ]]; then
   # macOS
-  sed -i '' "s/YOUR_GOOGLE_MAPS_API_KEY/$GOOGLE_MAPS_API_KEY/g" "$STRINGS_XML"
+  sed -i '' "s/<string name=\"google_maps_api_key\"[^>]*>.*<\/string>/<string name=\"google_maps_api_key\" translatable=\"false\">$GOOGLE_MAPS_API_KEY<\/string>/g" "$STRINGS_XML"
 else
   # Linux (EAS build servers)
-  sed -i "s/YOUR_GOOGLE_MAPS_API_KEY/$GOOGLE_MAPS_API_KEY/g" "$STRINGS_XML"
+  sed -i "s/<string name=\"google_maps_api_key\"[^>]*>.*<\/string>/<string name=\"google_maps_api_key\" translatable=\"false\">$GOOGLE_MAPS_API_KEY<\/string>/g" "$STRINGS_XML"
 fi
 
 echo "✅ Google Maps API key injected into $STRINGS_XML"

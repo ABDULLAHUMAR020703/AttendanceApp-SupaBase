@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, Circle } from 'react-native-maps';
@@ -35,6 +36,8 @@ export default function GeoFencingScreen({ navigation, route }) {
   const [isLocked, setIsLocked] = useState(false); // Track if marker is locked (dragging disabled)
   const [locationName, setLocationName] = useState('Unknown location'); // Human-readable location name
   const [isResolvingLocation, setIsResolvingLocation] = useState(false); // Loading state for reverse geocoding
+  const [mapReady, setMapReady] = useState(false); // Track if map is ready to render
+  const [mapError, setMapError] = useState(null); // Track map rendering errors
   const [region, setRegion] = useState({
     latitude: -6.2088, // Default: Jakarta, Indonesia
     longitude: 106.8456,
@@ -50,11 +53,42 @@ export default function GeoFencingScreen({ navigation, route }) {
   useEffect(() => {
     loadOfficeLocation();
 
+    // Log map configuration status (for debugging Android Google Maps API key)
+    if (Platform.OS === 'android') {
+      console.log('[GeoFencingScreen] Android detected - checking Google Maps configuration...');
+      // Note: We can't directly check the API key at runtime, but we can log that we're initializing
+      console.log('[GeoFencingScreen] MapView will initialize with Google Maps provider on Android');
+    }
+
     // Cleanup: cancel pending geocoding on unmount
     return () => {
       cancelReverseGeocode();
     };
   }, []);
+
+  // Handle map ready event
+  const handleMapReady = () => {
+    console.log('[GeoFencingScreen] MapView is ready and rendered successfully');
+    setMapReady(true);
+    setMapError(null);
+  };
+
+  // Handle map error
+  const handleMapError = (error) => {
+    console.error('[GeoFencingScreen] MapView error:', error);
+    setMapError(error?.message || 'Failed to load map');
+    setMapReady(false);
+    
+    // Log specific error details for debugging
+    if (Platform.OS === 'android') {
+      console.error('[GeoFencingScreen] Android MapView error details:', {
+        message: error?.message,
+        code: error?.code,
+        nativeEvent: error?.nativeEvent,
+      });
+      console.error('[GeoFencingScreen] This may indicate a missing or invalid Google Maps API key');
+    }
+  };
 
   /**
    * Resolve location name from coordinates
@@ -538,6 +572,26 @@ export default function GeoFencingScreen({ navigation, route }) {
       textAlign: 'center',
       marginTop: 12,
     },
+    mapErrorContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+      padding: 20,
+    },
+    mapErrorText: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: '#ef4444',
+      marginTop: 16,
+      textAlign: 'center',
+    },
+    mapErrorSubtext: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      marginTop: 8,
+      textAlign: 'center',
+    },
   });
 
   if (isLoading) {
@@ -576,15 +630,32 @@ export default function GeoFencingScreen({ navigation, route }) {
       >
         {/* Map Container */}
         <View style={styles.mapContainer}>
-          <MapView
-            ref={mapRef}
-            style={styles.map}
-            initialRegion={region}
-            region={region}
-            onRegionChangeComplete={setRegion}
-            mapType="standard"
-            // Use default provider (OpenStreetMap) - no provider prop needed
-          >
+          {mapError && (
+            <View style={styles.mapErrorContainer}>
+              <Ionicons name="alert-circle" size={48} color="#ef4444" />
+              <Text style={styles.mapErrorText}>Map failed to load</Text>
+              <Text style={styles.mapErrorSubtext}>{mapError}</Text>
+              {Platform.OS === 'android' && (
+                <Text style={styles.mapErrorSubtext}>
+                  Check Google Maps API key configuration
+                </Text>
+              )}
+            </View>
+          )}
+          {!mapError && (
+            <MapView
+              ref={mapRef}
+              style={styles.map}
+              initialRegion={region}
+              region={region}
+              onRegionChangeComplete={setRegion}
+              mapType="standard"
+              onMapReady={handleMapReady}
+              onError={handleMapError}
+              // Android: Uses Google Maps (requires API key in AndroidManifest.xml)
+              // iOS: Uses Apple Maps (no API key needed)
+              // Provider is automatically selected by react-native-maps based on platform
+            >
             {officeLocation && (
               <>
                 {/* Red draggable marker */}
@@ -613,7 +684,8 @@ export default function GeoFencingScreen({ navigation, route }) {
                 />
               </>
             )}
-          </MapView>
+            </MapView>
+          )}
         </View>
 
         {/* Info Card */}
