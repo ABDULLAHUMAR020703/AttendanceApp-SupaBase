@@ -456,16 +456,9 @@ export const updateOfficeLocation = async (latitude, longitude, radius = 1000, u
       email: session.user.email,
     });
 
-    // Get authenticated user info
-    const { data: { user: authUser }, error: authUserError } = await supabase.auth.getUser();
-    
-    if (authUserError || !authUser) {
-      console.error('[GeofenceService] Error getting auth user:', authUserError);
-      return {
-        success: false,
-        error: 'Unable to verify user identity. Please log in again.',
-      };
-    }
+    // Use session.user directly instead of calling getUser() again
+    // This prevents AuthSessionMissingError when session exists but getUser() fails
+    const authUser = session.user;
 
     console.log('[GeofenceService] Auth user retrieved:', {
       id: authUser.id,

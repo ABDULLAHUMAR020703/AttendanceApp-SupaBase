@@ -137,8 +137,9 @@ export default function SignupApprovalScreen({ navigation }) {
 
   const renderRequest = ({ item }) => (
     <View
-      className="bg-white rounded-xl shadow-sm"
+      className="rounded-xl shadow-sm"
       style={{
+        backgroundColor: colors.surface,
         padding: responsivePadding(16),
         marginBottom: spacing.md,
         marginHorizontal: spacing.sm,
@@ -147,8 +148,9 @@ export default function SignupApprovalScreen({ navigation }) {
       <View className="flex-row items-start justify-between" style={{ marginBottom: spacing.sm }}>
         <View className="flex-1" style={{ flexShrink: 1 }}>
           <Text
-            className="font-bold text-gray-800"
+            className="font-bold"
             style={{
+              color: colors.text,
               fontSize: responsiveFont(18),
               marginBottom: spacing.xs / 2,
             }}
@@ -156,14 +158,19 @@ export default function SignupApprovalScreen({ navigation }) {
             {item.name}
           </Text>
           <Text
-            className="text-gray-600"
-            style={{ fontSize: responsiveFont(14), marginBottom: spacing.xs / 2 }}
+            style={{ 
+              color: colors.textSecondary,
+              fontSize: responsiveFont(14), 
+              marginBottom: spacing.xs / 2 
+            }}
           >
             @{item.username}
           </Text>
           <Text
-            className="text-gray-500"
-            style={{ fontSize: responsiveFont(12) }}
+            style={{ 
+              color: colors.textTertiary,
+              fontSize: responsiveFont(12) 
+            }}
           >
             {item.email}
           </Text>
@@ -191,15 +198,19 @@ export default function SignupApprovalScreen({ navigation }) {
 
       <View style={{ marginBottom: spacing.sm }}>
         <Text
-          className="text-gray-500"
-          style={{ fontSize: responsiveFont(12) }}
+          style={{ 
+            color: colors.textTertiary,
+            fontSize: responsiveFont(12) 
+          }}
         >
           Requested: {formatDate(item.requestedAt)}
         </Text>
         {item.approvedAt && (
           <Text
-            className="text-gray-500"
-            style={{ fontSize: responsiveFont(12) }}
+            style={{ 
+              color: colors.textTertiary,
+              fontSize: responsiveFont(12) 
+            }}
           >
             {item.status === 'approved' ? 'Approved' : 'Rejected'}: {formatDate(item.approvedAt)}
             {item.approvedBy && ` by ${item.approvedBy}`}
@@ -207,8 +218,11 @@ export default function SignupApprovalScreen({ navigation }) {
         )}
         {item.rejectionReason && (
           <Text
-            className="text-red-600"
-            style={{ fontSize: responsiveFont(12), marginTop: spacing.xs / 2 }}
+            style={{ 
+              color: colors.error,
+              fontSize: responsiveFont(12), 
+              marginTop: spacing.xs / 2 
+            }}
           >
             Reason: {item.rejectionReason}
           </Text>
@@ -252,31 +266,39 @@ export default function SignupApprovalScreen({ navigation }) {
     </View>
   );
 
-  const FilterButton = ({ title, value }) => (
-    <TouchableOpacity
-      className={`rounded-full ${filter === value ? 'bg-primary-500' : 'bg-gray-200'}`}
-      style={{
-        paddingHorizontal: responsivePadding(16),
-        paddingVertical: spacing.xs,
-        marginRight: spacing.xs,
-      }}
-      onPress={() => setFilter(value)}
-    >
-      <Text
-        className={`font-medium ${filter === value ? 'text-white' : 'text-gray-700'}`}
-        style={{ fontSize: responsiveFont(14) }}
+  const FilterButton = ({ title, value }) => {
+    const isActive = filter === value;
+    return (
+      <TouchableOpacity
+        className="rounded-full"
+        style={{
+          backgroundColor: isActive ? colors.primary : colors.borderLight,
+          paddingHorizontal: responsivePadding(16),
+          paddingVertical: spacing.xs,
+          marginRight: spacing.xs,
+        }}
+        onPress={() => setFilter(value)}
       >
-        {title}
-      </Text>
-    </TouchableOpacity>
-  );
+        <Text
+          className="font-medium"
+          style={{ 
+            color: isActive ? '#ffffff' : colors.text,
+            fontSize: responsiveFont(14) 
+          }}
+        >
+          {title}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View className="flex-1" style={{ backgroundColor: colors.background }}>
       {/* Header */}
       <View
-        className="bg-white shadow-sm"
+        className="shadow-sm"
         style={{
+          backgroundColor: colors.surface,
           paddingHorizontal: responsivePadding(24),
           paddingVertical: responsivePadding(16),
         }}
@@ -284,8 +306,9 @@ export default function SignupApprovalScreen({ navigation }) {
         <View className="flex-row items-center" style={{ marginBottom: spacing.md }}>
           <Logo size="small" style={{ marginRight: spacing.sm }} />
           <Text
-            className="font-bold text-gray-800"
+            className="font-bold"
             style={{
+              color: colors.text,
               fontSize: responsiveFont(20),
             }}
           >
@@ -319,10 +342,11 @@ export default function SignupApprovalScreen({ navigation }) {
           className="flex-1 justify-center items-center"
           style={{ paddingHorizontal: responsivePadding(24) }}
         >
-          <Ionicons name="document-text-outline" size={iconSize['4xl']} color="#d1d5db" />
+          <Ionicons name="document-text-outline" size={iconSize['4xl']} color={colors.textTertiary} />
           <Text
-            className="font-semibold text-gray-500 text-center"
+            className="font-semibold text-center"
             style={{
+              color: colors.textSecondary,
               fontSize: responsiveFont(20),
               marginTop: spacing.md,
             }}
@@ -330,8 +354,9 @@ export default function SignupApprovalScreen({ navigation }) {
             No signup requests found
           </Text>
           <Text
-            className="text-gray-400 text-center"
+            className="text-center"
             style={{
+              color: colors.textTertiary,
               fontSize: responsiveFont(14),
               marginTop: spacing.xs,
             }}
@@ -360,18 +385,20 @@ export default function SignupApprovalScreen({ navigation }) {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
         >
-          <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
+          <View className="flex-1 justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
             <View
-              className="bg-white rounded-xl"
+              className="rounded-xl"
               style={{
+                backgroundColor: colors.surface,
                 padding: responsivePadding(24),
                 width: wp(90),
                 maxWidth: 400,
               }}
             >
             <Text
-              className="font-bold text-gray-800"
+              className="font-bold"
               style={{
+                color: colors.text,
                 fontSize: responsiveFont(20),
                 marginBottom: spacing.md,
               }}
@@ -379,8 +406,8 @@ export default function SignupApprovalScreen({ navigation }) {
               Reject Signup Request
             </Text>
             <Text
-              className="text-gray-600"
               style={{
+                color: colors.textSecondary,
                 fontSize: responsiveFont(14),
                 marginBottom: spacing.md,
               }}
@@ -388,13 +415,17 @@ export default function SignupApprovalScreen({ navigation }) {
               Please provide a reason for rejection (optional):
             </Text>
             <TextInput
-              className="border border-gray-300 rounded-lg p-3 text-gray-800"
+              className="border rounded-lg p-3"
               placeholder="Rejection reason..."
+              placeholderTextColor={colors.textTertiary}
               value={rejectionReason}
               onChangeText={setRejectionReason}
               multiline
               numberOfLines={3}
               style={{
+                backgroundColor: colors.background,
+                borderColor: colors.border,
+                color: colors.text,
                 fontSize: responsiveFont(14),
                 marginBottom: spacing.md,
                 textAlignVertical: 'top',
@@ -402,8 +433,9 @@ export default function SignupApprovalScreen({ navigation }) {
             />
             <View className="flex-row" style={{ gap: spacing.sm }}>
               <TouchableOpacity
-                className="flex-1 bg-gray-200 rounded-lg"
+                className="flex-1 rounded-lg"
                 style={{
+                  backgroundColor: colors.borderLight,
                   paddingVertical: spacing.md,
                   alignItems: 'center',
                 }}
@@ -413,15 +445,19 @@ export default function SignupApprovalScreen({ navigation }) {
                 }}
               >
                 <Text
-                  className="font-semibold text-gray-700"
-                  style={{ fontSize: responsiveFont(16) }}
+                  className="font-semibold"
+                  style={{ 
+                    color: colors.text,
+                    fontSize: responsiveFont(16) 
+                  }}
                 >
                   Cancel
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                className="flex-1 bg-red-500 rounded-lg"
+                className="flex-1 rounded-lg"
                 style={{
+                  backgroundColor: colors.error,
                   paddingVertical: spacing.md,
                   alignItems: 'center',
                 }}

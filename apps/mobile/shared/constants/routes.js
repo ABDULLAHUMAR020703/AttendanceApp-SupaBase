@@ -3,6 +3,8 @@ export const ROUTES = {
   // Auth Routes
   LOGIN: 'Login',
   SIGNUP: 'SignUp',
+  FORGOT_PASSWORD: 'ForgotPassword',
+  RESET_PASSWORD: 'ResetPassword',
   
   // Employee Routes
   EMPLOYEE_DASHBOARD: 'EmployeeDashboard',
@@ -14,6 +16,7 @@ export const ROUTES = {
   THEME_SETTINGS: 'ThemeSettingsScreen',
   NOTIFICATIONS: 'NotificationsScreen',
   TICKET_SCREEN: 'TicketScreen',
+  HELP_SUPPORT: 'HelpSupportScreen',
   
   // Admin Routes
   ADMIN_DASHBOARD: 'AdminDashboard',

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../../../core/contexts/ThemeContext';
 
 const DatePickerCalendar = ({ 
   onDateSelect, 
@@ -11,6 +12,7 @@ const DatePickerCalendar = ({
   maxDate = null,
   allowRangeSelection = false 
 }) => {
+  const { colors } = useTheme();
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const today = new Date();
@@ -123,17 +125,17 @@ const DatePickerCalendar = ({
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.surface }]}>
       {/* Month Navigation */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => handleMonthChange(-1)}
           style={styles.navButton}
         >
-          <Ionicons name="chevron-back" size={20} color="#3b82f6" />
+          <Ionicons name="chevron-back" size={20} color={colors.primary} />
         </TouchableOpacity>
 
-        <Text style={styles.monthYear}>
+        <Text style={[styles.monthYear, { color: colors.text }]}>
           {monthNames[month]} {year}
         </Text>
 
@@ -141,7 +143,7 @@ const DatePickerCalendar = ({
           onPress={() => handleMonthChange(1)}
           style={styles.navButton}
         >
-          <Ionicons name="chevron-forward" size={20} color="#3b82f6" />
+          <Ionicons name="chevron-forward" size={20} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
@@ -149,7 +151,7 @@ const DatePickerCalendar = ({
       <View style={styles.dayNamesRow}>
         {dayNames.map((dayName) => (
           <View key={dayName} style={styles.dayNameCell}>
-            <Text style={styles.dayNameText}>{dayName}</Text>
+            <Text style={[styles.dayNameText, { color: colors.textSecondary }]}>{dayName}</Text>
           </View>
         ))}
       </View>
@@ -176,13 +178,13 @@ const DatePickerCalendar = ({
               key={day}
               style={[
                 styles.dayCell,
-                selected && styles.selectedDay,
-                isStart && styles.startDay,
-                isEnd && styles.endDay,
-                inRange && styles.rangeDay,
+                selected && [styles.selectedDay, { backgroundColor: colors.primary }],
+                isStart && [styles.startDay, { backgroundColor: colors.primary }],
+                isEnd && [styles.endDay, { backgroundColor: colors.primary }],
+                inRange && [styles.rangeDay, { backgroundColor: colors.primaryLight }],
                 disabled && styles.disabledDay,
-                isToday && !selected && !isPreview && styles.todayDay,
-                isPreview && styles.previewDay,
+                isToday && !selected && !isPreview && [styles.todayDay, { borderColor: colors.primary }],
+                isPreview && [styles.previewDay, { borderColor: colors.success, backgroundColor: colors.successLight }],
               ]}
               onPress={() => handleDatePress(day)}
               disabled={disabled}
@@ -190,10 +192,11 @@ const DatePickerCalendar = ({
               <Text
                 style={[
                   styles.dayText,
+                  { color: colors.text },
                   selected && styles.selectedDayText,
-                  disabled && styles.disabledDayText,
-                  isToday && !selected && !isPreview && styles.todayDayText,
-                  isPreview && styles.previewDayText,
+                  disabled && [styles.disabledDayText, { color: colors.textTertiary }],
+                  isToday && !selected && !isPreview && [styles.todayDayText, { color: colors.primary }],
+                  isPreview && [styles.previewDayText, { color: colors.success }],
                 ]}
               >
                 {day}
@@ -208,7 +211,6 @@ const DatePickerCalendar = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 16,
     marginVertical: 8,
@@ -225,7 +227,6 @@ const styles = StyleSheet.create({
   monthYear: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1f2937',
   },
   dayNamesRow: {
     flexDirection: 'row',
@@ -239,7 +240,6 @@ const styles = StyleSheet.create({
   dayNameText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#6b7280',
     textTransform: 'uppercase',
   },
   calendarGrid: {
@@ -255,10 +255,8 @@ const styles = StyleSheet.create({
   },
   dayText: {
     fontSize: 14,
-    color: '#1f2937',
   },
   selectedDay: {
-    backgroundColor: '#3b82f6',
     borderRadius: 8,
   },
   selectedDayText: {
@@ -266,41 +264,32 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   startDay: {
-    backgroundColor: '#3b82f6',
     borderTopLeftRadius: 8,
     borderBottomLeftRadius: 8,
   },
   endDay: {
-    backgroundColor: '#3b82f6',
     borderTopRightRadius: 8,
     borderBottomRightRadius: 8,
   },
   rangeDay: {
-    backgroundColor: '#dbeafe',
   },
   disabledDay: {
     opacity: 0.3,
   },
   disabledDayText: {
-    color: '#9ca3af',
   },
   todayDay: {
     borderWidth: 2,
-    borderColor: '#3b82f6',
     borderRadius: 8,
   },
   todayDayText: {
-    color: '#3b82f6',
     fontWeight: '600',
   },
   previewDay: {
     borderWidth: 2,
-    borderColor: '#10b981',
     borderRadius: 8,
-    backgroundColor: '#d1fae5',
   },
   previewDayText: {
-    color: '#059669',
     fontWeight: '600',
   },
 });

@@ -438,6 +438,7 @@ export default function CustomDrawer({ navigation, state }) {
           {/* Help & Support */}
           <HelpButton 
             variant="menu" 
+            navigation={navigation}
             onPress={() => navigation.closeDrawer()}
           />
         </View>

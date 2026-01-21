@@ -12,11 +12,13 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { getUserAttendanceRecords } from '../utils/storage';
 import { fontSize, spacing, iconSize, componentSize, responsivePadding, responsiveFont, normalize } from '../utils/responsive';
+import { useTheme } from '../contexts/ThemeContext';
 import Logo from '../components/Logo';
 import Trademark from '../components/Trademark';
 
 export default function AttendanceHistory({ route }) {
   const { user } = route.params;
+  const { colors } = useTheme();
   const [records, setRecords] = useState([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [filter, setFilter] = useState('all'); // all, checkin, checkout
@@ -70,11 +72,13 @@ export default function AttendanceHistory({ route }) {
 
   const renderRecord = ({ item }) => {
     const { date, time } = formatDate(item.timestamp);
+    const statusColor = item.type === 'checkin' ? colors.success : colors.error;
     
     return (
       <View 
-        className="bg-white rounded-xl shadow-sm"
+        className="rounded-xl shadow-sm"
         style={{
+          backgroundColor: colors.surface,
           padding: responsivePadding(16),
           marginBottom: spacing.md,
           marginHorizontal: spacing.sm,
@@ -88,13 +92,13 @@ export default function AttendanceHistory({ route }) {
               style={{ 
                 width: componentSize.avatarMedium,
                 height: componentSize.avatarMedium,
-                backgroundColor: `${getStatusColor(item.type)}20` 
+                backgroundColor: `${statusColor}20` 
               }}
             >
               <Ionicons 
                 name={getStatusIcon(item.type)} 
                 size={iconSize.md} 
-                color={getStatusColor(item.type)} 
+                color={statusColor} 
               />
             </View>
           </View>
@@ -103,22 +107,27 @@ export default function AttendanceHistory({ route }) {
           <View className="flex-1" style={{ flexShrink: 1 }}>
             <View className="flex-row items-center justify-between" style={{ marginBottom: spacing.xs }}>
               <Text 
-                className="font-semibold text-gray-800 capitalize"
-                style={{ fontSize: responsiveFont(18) }}
+                className="font-semibold capitalize"
+                style={{ 
+                  color: colors.text,
+                  fontSize: responsiveFont(18) 
+                }}
               >
                 {item.type === 'checkin' ? 'Check In' : 'Check Out'}
               </Text>
               <Text 
-                className="text-gray-500"
-                style={{ fontSize: responsiveFont(12) }}
+                style={{ 
+                  color: colors.textTertiary,
+                  fontSize: responsiveFont(12) 
+                }}
               >
                 {time}
               </Text>
             </View>
             
             <Text 
-              className="text-gray-600"
               style={{ 
+                color: colors.textSecondary,
                 fontSize: responsiveFont(14),
                 marginBottom: spacing.xs,
               }}
@@ -129,10 +138,13 @@ export default function AttendanceHistory({ route }) {
             {/* Location */}
             {item.location && (
               <View className="flex-row items-center" style={{ marginBottom: spacing.xs }}>
-                <Ionicons name="location-outline" size={iconSize.sm} color="#6b7280" />
+                <Ionicons name="location-outline" size={iconSize.sm} color={colors.textSecondary} />
                 <Text 
-                  className="text-gray-600 ml-1 flex-1"
-                  style={{ fontSize: responsiveFont(12) }}
+                  className="ml-1 flex-1"
+                  style={{ 
+                    color: colors.textSecondary,
+                    fontSize: responsiveFont(12) 
+                  }}
                   numberOfLines={1}
                 >
                   {item.location.address || 
@@ -165,10 +177,9 @@ export default function AttendanceHistory({ route }) {
 
   const FilterButton = ({ title, value, isActive }) => (
     <TouchableOpacity
-      className={`rounded-full ${
-        isActive ? 'bg-primary-500' : 'bg-gray-200'
-      }`}
+      className="rounded-full"
       style={{
+        backgroundColor: isActive ? colors.primary : colors.borderLight,
         paddingHorizontal: responsivePadding(16),
         paddingVertical: spacing.xs,
         marginRight: spacing.xs,
@@ -176,10 +187,11 @@ export default function AttendanceHistory({ route }) {
       onPress={() => setFilter(value)}
     >
       <Text 
-        className={`font-medium ${
-        isActive ? 'text-white' : 'text-gray-700'
-        }`}
-        style={{ fontSize: responsiveFont(14) }}
+        className="font-medium"
+        style={{ 
+          color: isActive ? '#ffffff' : colors.text,
+          fontSize: responsiveFont(14) 
+        }}
       >
         {title}
       </Text>
@@ -187,11 +199,12 @@ export default function AttendanceHistory({ route }) {
   );
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1" style={{ backgroundColor: colors.background }}>
       {/* Header */}
       <View 
-        className="bg-white shadow-sm"
+        className="shadow-sm"
         style={{
+          backgroundColor: colors.surface,
           paddingHorizontal: responsivePadding(24),
           paddingVertical: responsivePadding(16),
         }}
@@ -199,8 +212,9 @@ export default function AttendanceHistory({ route }) {
         <View className="flex-row items-center" style={{ marginBottom: spacing.md }}>
           <Logo size="small" style={{ marginRight: spacing.sm }} />
           <Text 
-            className="font-bold text-gray-800"
+            className="font-bold"
             style={{ 
+              color: colors.text,
               fontSize: responsiveFont(20),
             }}
           >
@@ -239,10 +253,11 @@ export default function AttendanceHistory({ route }) {
           className="flex-1 justify-center items-center"
           style={{ paddingHorizontal: responsivePadding(24) }}
         >
-          <Ionicons name="time-outline" size={iconSize['4xl']} color="#d1d5db" />
+          <Ionicons name="time-outline" size={iconSize['4xl']} color={colors.textTertiary} />
           <Text 
-            className="font-semibold text-gray-500 text-center"
+            className="font-semibold text-center"
             style={{ 
+              color: colors.textSecondary,
               fontSize: responsiveFont(20),
               marginTop: spacing.md,
             }}
@@ -250,8 +265,9 @@ export default function AttendanceHistory({ route }) {
             No attendance records found
           </Text>
           <Text 
-            className="text-gray-400 text-center"
+            className="text-center"
             style={{ 
+              color: colors.textTertiary,
               fontSize: responsiveFont(14),
               marginTop: spacing.xs,
             }}
@@ -262,8 +278,9 @@ export default function AttendanceHistory({ route }) {
             }
           </Text>
           <TouchableOpacity
-            className="bg-primary-500 rounded-xl"
+            className="rounded-xl"
             style={{
+              backgroundColor: colors.primary,
               paddingHorizontal: responsivePadding(24),
               paddingVertical: spacing.md,
               marginTop: spacing.lg,
@@ -283,12 +300,19 @@ export default function AttendanceHistory({ route }) {
       {/* Summary */}
       {records.length > 0 && (
         <View 
-          className="bg-white border-t border-gray-200"
-          style={{ padding: responsivePadding(16) }}
+          className="border-t"
+          style={{ 
+            backgroundColor: colors.surface,
+            borderColor: colors.border,
+            padding: responsivePadding(16) 
+          }}
         >
           <Text 
-            className="text-gray-600 text-center"
-            style={{ fontSize: responsiveFont(14) }}
+            className="text-center"
+            style={{ 
+              color: colors.textSecondary,
+              fontSize: responsiveFont(14) 
+            }}
           >
             Showing {records.length} record{records.length !== 1 ? 's' : ''}
           </Text>

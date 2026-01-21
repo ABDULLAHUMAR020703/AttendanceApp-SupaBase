@@ -653,12 +653,9 @@ export default function EmployeeDashboard({ route }) {
         <View className="space-y-4">
           {/* Check In Button */}
           <TouchableOpacity
-            className={`rounded-2xl shadow-sm ${
-              canCheckIn 
-                ? 'bg-green-500' 
-                : 'bg-gray-300'
-            }`}
+            className="rounded-2xl shadow-sm"
             style={{
+              backgroundColor: canCheckIn ? colors.success : colors.border,
               padding: responsivePadding(24),
               marginBottom: spacing.md,
             }}
@@ -667,8 +664,9 @@ export default function EmployeeDashboard({ route }) {
           >
             <View className="flex-row items-center">
               <View 
-                className="bg-white rounded-full items-center justify-center"
+                className="rounded-full items-center justify-center"
                 style={{
+                  backgroundColor: colors.surface,
                   width: componentSize.avatarMedium,
                   height: componentSize.avatarMedium,
                   marginRight: spacing.md,
@@ -677,23 +675,22 @@ export default function EmployeeDashboard({ route }) {
                 <Ionicons 
                   name="log-in-outline" 
                   size={iconSize.lg} 
-                  color={canCheckIn ? "#10b981" : "#9ca3af"} 
+                  color={canCheckIn ? colors.success : colors.textTertiary} 
                 />
               </View>
               <View className="flex-1" style={{ flexShrink: 1 }}>
                 <Text 
-                  className={`font-semibold ${
-                    canCheckIn ? 'text-white' : 'text-gray-500'
-                  }`}
-                  style={{ fontSize: responsiveFont(18) }}
+                  className="font-semibold"
+                  style={{ 
+                    color: canCheckIn ? '#ffffff' : colors.textTertiary,
+                    fontSize: responsiveFont(18) 
+                  }}
                 >
                   Check In
                 </Text>
                 <Text 
-                  className={`${
-                    canCheckIn ? 'text-green-100' : 'text-gray-400'
-                  }`}
                   style={{ 
+                    color: canCheckIn ? colors.successLight : colors.textTertiary,
                     fontSize: responsiveFont(12),
                     marginTop: spacing.xs / 2,
                   }}
@@ -708,19 +705,16 @@ export default function EmployeeDashboard({ route }) {
               <Ionicons 
                 name="chevron-forward" 
                 size={iconSize.md} 
-                color={canCheckIn ? "white" : "#9ca3af"} 
+                color={canCheckIn ? "white" : colors.textTertiary} 
               />
             </View>
           </TouchableOpacity>
 
           {/* Check Out Button */}
           <TouchableOpacity
-            className={`rounded-2xl shadow-sm ${
-              canCheckOut 
-                ? 'bg-red-500' 
-                : 'bg-gray-300'
-            }`}
+            className="rounded-2xl shadow-sm"
             style={{
+              backgroundColor: canCheckOut ? colors.error : colors.border,
               padding: responsivePadding(24),
               marginBottom: spacing.md,
             }}
@@ -729,8 +723,9 @@ export default function EmployeeDashboard({ route }) {
           >
             <View className="flex-row items-center">
               <View 
-                className="bg-white rounded-full items-center justify-center"
+                className="rounded-full items-center justify-center"
                 style={{
+                  backgroundColor: colors.surface,
                   width: componentSize.avatarMedium,
                   height: componentSize.avatarMedium,
                   marginRight: spacing.md,
@@ -739,23 +734,22 @@ export default function EmployeeDashboard({ route }) {
                 <Ionicons 
                   name="log-out-outline" 
                   size={iconSize.lg} 
-                  color={canCheckOut ? "#ef4444" : "#9ca3af"} 
+                  color={canCheckOut ? colors.error : colors.textTertiary} 
                 />
               </View>
               <View className="flex-1" style={{ flexShrink: 1 }}>
                 <Text 
-                  className={`font-semibold ${
-                    canCheckOut ? 'text-white' : 'text-gray-500'
-                  }`}
-                  style={{ fontSize: responsiveFont(18) }}
+                  className="font-semibold"
+                  style={{ 
+                    color: canCheckOut ? '#ffffff' : colors.textTertiary,
+                    fontSize: responsiveFont(18) 
+                  }}
                 >
                   Check Out
                 </Text>
                 <Text 
-                  className={`${
-                    canCheckOut ? 'text-red-100' : 'text-gray-400'
-                  }`}
                   style={{ 
+                    color: canCheckOut ? colors.errorLight : colors.textTertiary,
                     fontSize: responsiveFont(12),
                     marginTop: spacing.xs / 2,
                   }}
@@ -770,7 +764,7 @@ export default function EmployeeDashboard({ route }) {
               <Ionicons 
                 name="chevron-forward" 
                 size={iconSize.md} 
-                color={canCheckOut ? "white" : "#9ca3af"} 
+                color={canCheckOut ? "white" : colors.textTertiary} 
               />
             </View>
           </TouchableOpacity>
@@ -954,30 +948,31 @@ export default function EmployeeDashboard({ route }) {
 
           {/* Authentication Settings Button */}
           <TouchableOpacity
-            className="bg-white rounded-2xl p-6 shadow-sm mt-4"
+            className="rounded-2xl p-6 shadow-sm mt-4"
+            style={{ backgroundColor: colors.surface }}
             onPress={() => navigation.navigate('AuthMethodSelection', { user: user })}
           >
             <View className="flex-row items-center">
-              <View className="w-12 h-12 bg-purple-100 rounded-full items-center justify-center mr-4">
-                <Ionicons name="finger-print" size={24} color="#9333ea" />
+              <View className="w-12 h-12 rounded-full items-center justify-center mr-4" style={{ backgroundColor: colors.primaryLight }}>
+                <Ionicons name="finger-print" size={24} color={colors.primary} />
               </View>
               <View className="flex-1">
-                <Text className="text-lg font-semibold text-gray-800">
+                <Text className="text-lg font-semibold" style={{ color: colors.text }}>
                   Authentication Settings
                 </Text>
-                <Text className="text-gray-600 text-sm">
+                <Text className="text-sm" style={{ color: colors.textSecondary }}>
                   Choose face verification or fingerprint
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color="#6b7280" />
+              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
             </View>
           </TouchableOpacity>
         </View>
 
         {/* Work Mode Section */}
         {employee && (
-          <View className="bg-white rounded-2xl p-6 mt-6 shadow-sm">
-            <Text className="text-lg font-semibold text-gray-800 mb-4">
+          <View className="rounded-2xl p-6 mt-6 shadow-sm" style={{ backgroundColor: colors.surface }}>
+            <Text className="text-lg font-semibold mb-4" style={{ color: colors.text }}>
               Work Mode
             </Text>
             
@@ -990,10 +985,10 @@ export default function EmployeeDashboard({ route }) {
                   color={getWorkModeColor(employee.workMode)} 
                 />
                 <View className="ml-3">
-                  <Text className="font-medium text-gray-800">
+                  <Text className="font-medium" style={{ color: colors.text }}>
                     Current: {getWorkModeLabel(employee.workMode)}
                   </Text>
-                  <Text className="text-sm text-gray-500">
+                  <Text className="text-sm" style={{ color: colors.textTertiary }}>
                     {employee.department} • {employee.position}
                   </Text>
                 </View>
@@ -1001,7 +996,7 @@ export default function EmployeeDashboard({ route }) {
             </View>
 
             {/* Work Mode Request Buttons */}
-            <Text className="text-sm text-gray-600 mb-3">
+            <Text className="text-sm mb-3" style={{ color: colors.textSecondary }}>
               Request a different work mode:
             </Text>
             <View className="space-y-2">
@@ -1010,7 +1005,8 @@ export default function EmployeeDashboard({ route }) {
                 .map((mode) => (
                   <TouchableOpacity
                     key={mode.value}
-                    className="flex-row items-center p-3 bg-gray-50 rounded-lg"
+                    className="flex-row items-center p-3 rounded-lg"
+                    style={{ backgroundColor: colors.background }}
                     onPress={() => handleWorkModeRequest(mode.value)}
                   >
                     <Ionicons 
@@ -1019,49 +1015,55 @@ export default function EmployeeDashboard({ route }) {
                       color={mode.color} 
                     />
                     <View className="ml-3 flex-1">
-                      <Text className="font-medium text-gray-800">
+                      <Text className="font-medium" style={{ color: colors.text }}>
                         {mode.label}
                       </Text>
-                      <Text className="text-sm text-gray-500">
+                      <Text className="text-sm" style={{ color: colors.textTertiary }}>
                         {mode.description}
                       </Text>
                     </View>
-                    <Ionicons name="chevron-forward" size={16} color="#6b7280" />
+                    <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
                   </TouchableOpacity>
                 ))}
             </View>
 
             {/* My Requests */}
             {myRequests.length > 0 && (
-              <View className="mt-4 pt-4 border-t border-gray-200">
-                <Text className="text-sm font-medium text-gray-800 mb-2">
+              <View className="mt-4 pt-4 border-t" style={{ borderColor: colors.border }}>
+                <Text className="text-sm font-medium mb-2" style={{ color: colors.text }}>
                   My Requests ({myRequests.length})
                 </Text>
                 {myRequests.slice(0, 2).map((request) => (
                   <View key={request.id} className="flex-row items-center justify-between py-2">
                     <View>
-                      <Text className="text-sm text-gray-600">
+                      <Text className="text-sm" style={{ color: colors.textSecondary }}>
                         {getWorkModeLabel(request.requestedMode)}
                       </Text>
-                      <Text className="text-xs text-gray-500">
+                      <Text className="text-xs" style={{ color: colors.textTertiary }}>
                         {new Date(request.requestedAt).toLocaleDateString()}
                       </Text>
                     </View>
-                    <View className={`px-2 py-1 rounded-full ${
-                      request.status === 'pending' ? 'bg-yellow-100' :
-                      request.status === 'approved' ? 'bg-green-100' : 'bg-red-100'
-                    }`}>
-                      <Text className={`text-xs font-medium ${
-                        request.status === 'pending' ? 'text-yellow-800' :
-                        request.status === 'approved' ? 'text-green-800' : 'text-red-800'
-                      }`}>
+                    <View 
+                      className="px-2 py-1 rounded-full"
+                      style={{
+                        backgroundColor: request.status === 'pending' ? colors.warningLight :
+                                        request.status === 'approved' ? colors.successLight : colors.errorLight,
+                      }}
+                    >
+                      <Text 
+                        className="text-xs font-medium"
+                        style={{
+                          color: request.status === 'pending' ? colors.warning :
+                                 request.status === 'approved' ? colors.success : colors.error,
+                        }}
+                      >
                         {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
                       </Text>
                     </View>
                   </View>
                 ))}
                 {myRequests.length > 2 && (
-                  <Text className="text-xs text-gray-500 mt-1">
+                  <Text className="text-xs mt-1" style={{ color: colors.textTertiary }}>
                     +{myRequests.length - 2} more requests
                   </Text>
                 )}
@@ -1071,22 +1073,22 @@ export default function EmployeeDashboard({ route }) {
         )}
 
         {/* Quick Stats */}
-        <View className="bg-white rounded-2xl p-6 mt-6 shadow-sm">
-          <Text className="text-lg font-semibold text-gray-800 mb-4">
+        <View className="rounded-2xl p-6 mt-6 shadow-sm" style={{ backgroundColor: colors.surface }}>
+          <Text className="text-lg font-semibold mb-4" style={{ color: colors.text }}>
             Quick Stats
           </Text>
           <View className="flex-row justify-around">
             <View className="items-center">
-              <Text className="text-2xl font-bold text-primary-500">0</Text>
-              <Text className="text-gray-600 text-sm">Days Worked</Text>
+              <Text className="text-2xl font-bold" style={{ color: colors.primary }}>0</Text>
+              <Text className="text-sm" style={{ color: colors.textSecondary }}>Days Worked</Text>
             </View>
             <View className="items-center">
-              <Text className="text-2xl font-bold text-green-500">0</Text>
-              <Text className="text-gray-600 text-sm">Hours Logged</Text>
+              <Text className="text-2xl font-bold" style={{ color: colors.success }}>0</Text>
+              <Text className="text-sm" style={{ color: colors.textSecondary }}>Hours Logged</Text>
             </View>
             <View className="items-center">
-              <Text className="text-2xl font-bold text-blue-500">0</Text>
-              <Text className="text-gray-600 text-sm">This Month</Text>
+              <Text className="text-2xl font-bold" style={{ color: colors.primary }}>0</Text>
+              <Text className="text-sm" style={{ color: colors.textSecondary }}>This Month</Text>
             </View>
           </View>
         </View>
@@ -1104,50 +1106,58 @@ export default function EmployeeDashboard({ route }) {
         animationType="slide"
         onRequestClose={() => setShowWorkModeModal(false)}
       >
-        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
-          <View className="bg-white rounded-xl p-6 mx-4 w-full max-w-sm">
-            <Text className="text-xl font-bold text-gray-800 mb-4">
+        <View className="flex-1 justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+          <View className="rounded-xl p-6 mx-4 w-full max-w-sm" style={{ backgroundColor: colors.surface }}>
+            <Text className="text-xl font-bold mb-4" style={{ color: colors.text }}>
               Request Work Mode Change
             </Text>
             
             {selectedWorkMode && (
               <View className="mb-4">
-                <Text className="text-gray-600 mb-2">
+                <Text className="mb-2" style={{ color: colors.textSecondary }}>
                   Requesting: <Text className="font-medium">{getWorkModeLabel(selectedWorkMode)}</Text>
                 </Text>
-                <Text className="text-sm text-gray-500">
+                <Text className="text-sm" style={{ color: colors.textTertiary }}>
                   {getAllWorkModes().find(mode => mode.value === selectedWorkMode)?.description}
                 </Text>
               </View>
             )}
             
-            <Text className="text-gray-800 font-medium mb-2">
+            <Text className="font-medium mb-2" style={{ color: colors.text }}>
               Reason for request:
             </Text>
             <TextInput
-              className="border border-gray-300 rounded-lg p-3 mb-4 text-gray-800"
+              className="border rounded-lg p-3 mb-4"
               placeholder="Please explain why you need this work mode change..."
+              placeholderTextColor={colors.textTertiary}
               value={requestReason}
               onChangeText={setRequestReason}
               multiline
               numberOfLines={3}
               textAlignVertical="top"
+              style={{
+                backgroundColor: colors.background,
+                borderColor: colors.border,
+                color: colors.text,
+              }}
             />
             
             <View className="flex-row space-x-3">
               <TouchableOpacity
-                className="bg-gray-200 rounded-lg p-3 flex-1"
+                className="rounded-lg p-3 flex-1"
+                style={{ backgroundColor: colors.borderLight }}
                 onPress={() => {
                   setShowWorkModeModal(false);
                   setSelectedWorkMode(null);
                   setRequestReason('');
                 }}
               >
-                <Text className="text-center font-medium text-gray-700">Cancel</Text>
+                <Text className="text-center font-medium" style={{ color: colors.text }}>Cancel</Text>
               </TouchableOpacity>
               
               <TouchableOpacity
-                className="bg-primary-500 rounded-lg p-3 flex-1"
+                className="rounded-lg p-3 flex-1"
+                style={{ backgroundColor: colors.primary }}
                 onPress={submitWorkModeRequest}
               >
                 <Text className="text-center font-medium text-white">Submit Request</Text>

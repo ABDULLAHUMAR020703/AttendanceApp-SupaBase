@@ -26,7 +26,24 @@
 - Automatic session persistence
 - Remember me functionality
 
-#### 2. **Biometric Authentication**
+#### 2. **Password Change (Self-Service)**
+- Available in Theme Settings screen
+- Requires current password verification
+- Secure password update via Supabase Auth
+- No password data stored locally or in PostgreSQL
+- Self-service only (no admin password resets)
+- Validation: Minimum 6 characters, password strength checks
+
+#### 3. **Password Reset (Forgot Password Flow)**
+- Request password reset via Forgot Password screen
+- Supabase sends email with reset link
+- Deep linking opens app: `hadirai://reset-password`
+- Supabase handles token generation and validation
+- Users set new password via Reset Password screen
+- Generic success message prevents email enumeration
+- Secure token-based reset (no password storage)
+
+#### 4. **Biometric Authentication**
 - **Face ID** (iOS & Android)
   - Native device face recognition
   - Secure check-in/check-out verification
@@ -37,7 +54,7 @@
   - Alternative biometric method
   - Device-native security
 
-#### 3. **Authentication Preferences**
+#### 5. **Authentication Preferences**
 - Users can set preferred authentication method
 - Toggle between biometric and password
 - Per-user authentication settings
@@ -49,6 +66,9 @@
 - AsyncStorage for local session persistence via custom adapter
 - Role-based access control
 - Protected routes based on user roles
+- Self-service password change (requires current password verification)
+- Secure password reset flow via email (deep linking)
+- No password storage in PostgreSQL or AsyncStorage
 
 ---
 
@@ -68,6 +88,8 @@
 - ✅ Request work mode changes
 - ✅ View calendar and events
 - ✅ Change theme preferences (Light/Dark mode)
+- ✅ Change password (self-service, requires current password)
+- ✅ Reset password via email (forgot password flow)
 - ✅ View personal analytics (attendance rate, hours worked)
 
 **Cannot Do:**
@@ -542,6 +564,15 @@
   - Monthly calendar view
   - Date selection
   - Event highlighting
+  - Events stored in Supabase (not AsyncStorage)
+  - Automatic refresh on screen focus
+
+- **Create Calendar Events**
+  - Create events with title, description, date, time
+  - Select event type (meeting, reminder, holiday, other)
+  - Choose visibility: All, None, or Selected users
+  - Select specific employees for visibility
+  - Events persist in Supabase `calendar_events` table
 
 - **Attendance Events**
   - Mark check-in dates
@@ -557,6 +588,13 @@
   - Click date to view events
   - Event type indicators
   - Event descriptions
+  - View event creator and visibility settings
+
+- **Data Consistency**
+  - Supabase is the single source of truth
+  - Employee list fetched directly from Supabase (filtered by `is_active = true`)
+  - Role-based access: super_admin sees all, manager sees department-specific
+  - Events refresh automatically on screen focus
 
 ---
 
@@ -581,9 +619,35 @@
   - App-wide theme application
   - Smooth theme transitions
 
+- **Password Change** (in Theme Settings)
+  - Change password securely
+  - Requires current password verification
+  - Self-service only (no admin password resets)
+  - Uses Supabase Auth for password management
+  - No password data stored locally
+
 ---
 
-### 9. **Data Export & Import**
+### 9. **Help & Support**
+
+#### Support Features
+- **Contact Support**
+  - Send support messages via email
+  - Pre-filled email with user details (name, email, role)
+  - Subject format: `[hadir.ai Support] [Role] Issue`
+  - Production-safe email handling:
+    - Checks if email app is available before opening
+    - Fallback modal with email details if no app available
+    - Copy to clipboard functionality
+    - Works in production APK builds (not just Expo Go)
+
+- **Email Integration**
+  - Uses `mailto:` protocol with proper URL encoding
+  - Handles Android standalone APK compatibility
+  - Graceful error handling and logging
+  - User-friendly fallback experience
+
+### 10. **Data Export & Import**
 
 #### Export Features
 - **Attendance Export**
@@ -693,6 +757,10 @@
 | HR Dashboard - Leave Approval | ❌ | ✅ (Dept) | ✅ (All) |
 | Work Mode Distribution (Dept Filtered) | ❌ | ✅ (Dept) | ✅ (All) |
 | Employee Management | ❌ | ❌ | ✅ |
+| Change Password | ✅ | ✅ | ✅ |
+| Reset Password (Forgot) | ✅ | ✅ | ✅ |
+| Create Calendar Events | ✅ | ✅ | ✅ |
+| View Calendar Events | ✅ | ✅ | ✅ |
 
 ---
 
@@ -805,4 +873,7 @@ The app provides everything needed for modern workforce management in a single, 
 - `docs/SYSTEM_ARCHITECTURE.md` - System architecture and user management
 - `docs/MODULAR_ARCHITECTURE.md` - Code structure and migration status
 - `docs/STRUCTURE_SUMMARY.md` - Quick reference for code organization
+- `docs/TECHNICAL_DOCUMENTATION.md` - Comprehensive technical documentation
+
+*Last Updated: 2025-01-27*
 

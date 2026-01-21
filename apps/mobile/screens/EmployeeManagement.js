@@ -51,9 +51,11 @@ import {
   getHRRoleLabel 
 } from '../utils/hrRoles';
 import { spacing, responsivePadding } from '../shared/utils/responsive';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function EmployeeManagement({ route }) {
   const { user, openLeaveRequests } = route.params || {};
+  const { colors } = useTheme();
   const [employees, setEmployees] = useState([]);
   const [filteredEmployees, setFilteredEmployees] = useState([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -532,13 +534,13 @@ export default function EmployeeManagement({ route }) {
     const leaveInfo = employeeLeaveBalances[employeeId];
     
     return (
-    <View className="bg-white rounded-xl p-4 mb-3 shadow-sm">
+    <View className="rounded-xl p-4 mb-3 shadow-sm" style={{ backgroundColor: colors.surface }}>
       <View className="flex-row items-center justify-between">
         <View className="flex-1">
-          <Text className="text-lg font-semibold text-gray-800">
+          <Text className="text-lg font-semibold" style={{ color: colors.text }}>
             {item.name}
           </Text>
-          <Text className="text-gray-600 text-sm">
+          <Text className="text-sm" style={{ color: colors.textSecondary }}>
             {item.department} • {item.position}
           </Text>
             {/* HR Role Display */}
@@ -557,25 +559,25 @@ export default function EmployeeManagement({ route }) {
                 </Text>
               </View>
             )}
-            <Text className="text-gray-500 text-xs mt-1">
+            <Text className="text-xs mt-1" style={{ color: colors.textTertiary }}>
             @{item.username}
           </Text>
             
             {/* Remaining Leaves Display */}
             {leaveInfo && leaveInfo.remaining && (
-              <View className="mt-2 pt-2 border-t border-gray-100">
-                <Text className="text-xs text-gray-500 mb-1">Remaining Leaves:</Text>
+              <View className="mt-2 pt-2 border-t" style={{ borderColor: colors.borderLight }}>
+                <Text className="text-xs mb-1" style={{ color: colors.textTertiary }}>Remaining Leaves:</Text>
                 <View className="flex-row flex-wrap gap-x-3 gap-y-1">
-                  <Text className="text-xs text-gray-700">
-                    <Text className="font-semibold text-blue-600">Annual:</Text> {leaveInfo.remaining.annual}
+                  <Text className="text-xs" style={{ color: colors.text }}>
+                    <Text className="font-semibold" style={{ color: colors.primary }}>Annual:</Text> {leaveInfo.remaining.annual}
                   </Text>
-                  <Text className="text-xs text-gray-700">
-                    <Text className="font-semibold text-green-600">Sick:</Text> {leaveInfo.remaining.sick}
+                  <Text className="text-xs" style={{ color: colors.text }}>
+                    <Text className="font-semibold" style={{ color: colors.success }}>Sick:</Text> {leaveInfo.remaining.sick}
                   </Text>
-                  <Text className="text-xs text-gray-700">
-                    <Text className="font-semibold text-orange-600">Casual:</Text> {leaveInfo.remaining.casual}
+                  <Text className="text-xs" style={{ color: colors.text }}>
+                    <Text className="font-semibold" style={{ color: colors.warning }}>Casual:</Text> {leaveInfo.remaining.casual}
                   </Text>
-                  <Text className="text-xs font-semibold text-primary-500">
+                  <Text className="text-xs font-semibold" style={{ color: colors.primary }}>
                     Total: {leaveInfo.remaining.total} days
                   </Text>
                 </View>
@@ -610,8 +612,9 @@ export default function EmployeeManagement({ route }) {
             }}
           >
               <TouchableOpacity
-                className="bg-primary-500 rounded-lg px-3 py-1"
+                className="rounded-lg px-3 py-1"
                 style={{ 
+                  backgroundColor: colors.primary,
                   minWidth: 90, // Prevent buttons from being too narrow
                   flexShrink: 1,
                 }}
@@ -621,8 +624,9 @@ export default function EmployeeManagement({ route }) {
               </TouchableOpacity>
               
               <TouchableOpacity
-                className="bg-green-500 rounded-lg px-3 py-1"
+                className="rounded-lg px-3 py-1"
                 style={{ 
+                  backgroundColor: colors.success,
                   minWidth: 70, // Prevent buttons from being too narrow
                   flexShrink: 1,
                 }}
@@ -634,8 +638,9 @@ export default function EmployeeManagement({ route }) {
               {/* Role Edit Button - For super_admin and HR admins */}
               {(user.role === 'super_admin' || isHRAdmin(user)) && (
                 <TouchableOpacity
-                  className="bg-purple-500 rounded-lg px-3 py-1"
+                  className="rounded-lg px-3 py-1"
                   style={{ 
+                    backgroundColor: colors.primary,
                     minWidth: 60, // Prevent buttons from being too narrow
                     flexShrink: 1,
                   }}
@@ -661,36 +666,38 @@ export default function EmployeeManagement({ route }) {
   };
 
   const renderPendingRequest = ({ item }) => (
-    <View className="bg-white rounded-xl p-4 mb-3 shadow-sm">
+    <View className="rounded-xl p-4 mb-3 shadow-sm" style={{ backgroundColor: colors.surface }}>
       <View className="flex-row items-center justify-between mb-2">
-        <Text className="text-lg font-semibold text-gray-800">
+        <Text className="text-lg font-semibold" style={{ color: colors.text }}>
           {item.employeeId}
         </Text>
-        <Text className="text-xs text-gray-500">
+        <Text className="text-xs" style={{ color: colors.textTertiary }}>
           {new Date(item.requestedAt).toLocaleDateString()}
         </Text>
       </View>
       
-      <Text className="text-gray-600 mb-2">
+      <Text className="mb-2" style={{ color: colors.textSecondary }}>
         Requesting: <Text className="font-medium">{getWorkModeLabel(item.requestedMode)}</Text>
       </Text>
       
       {item.reason && (
-        <Text className="text-gray-500 text-sm mb-3">
+        <Text className="text-sm mb-3" style={{ color: colors.textTertiary }}>
           Reason: {item.reason}
         </Text>
       )}
       
       <View className="flex-row space-x-2">
         <TouchableOpacity
-          className="bg-green-500 rounded-lg px-4 py-2 flex-1"
+          className="rounded-lg px-4 py-2 flex-1"
+          style={{ backgroundColor: colors.success }}
           onPress={() => handleProcessRequest(item.id, 'approved')}
         >
           <Text className="text-white text-center font-medium">Approve</Text>
         </TouchableOpacity>
         
         <TouchableOpacity
-          className="bg-red-500 rounded-lg px-4 py-2 flex-1"
+          className="rounded-lg px-4 py-2 flex-1"
+          style={{ backgroundColor: colors.error }}
           onPress={() => handleProcessRequest(item.id, 'rejected')}
         >
           <Text className="text-white text-center font-medium">Reject</Text>
@@ -714,48 +721,50 @@ export default function EmployeeManagement({ route }) {
     };
 
     return (
-      <View className="bg-white rounded-xl p-4 mb-3 shadow-sm">
+      <View className="rounded-xl p-4 mb-3 shadow-sm" style={{ backgroundColor: colors.surface }}>
         <View className="flex-row items-center justify-between mb-2">
-          <Text className="text-lg font-semibold text-gray-800">
+          <Text className="text-lg font-semibold" style={{ color: colors.text }}>
             {employeeName}
           </Text>
-          <Text className="text-xs text-gray-500">
+          <Text className="text-xs" style={{ color: colors.textTertiary }}>
             {new Date(item.requestedAt).toLocaleDateString()}
           </Text>
         </View>
         
-        <Text className="text-gray-600 mb-2">
+        <Text className="mb-2" style={{ color: colors.textSecondary }}>
           <Text className="font-medium">{getLeaveTypeLabel(item.leaveType)}</Text>
           {' • '}
           <Text className="font-medium">
             {item.isHalfDay ? 'Half day' : `${item.days} day${item.days !== 1 ? 's' : ''}`}
           </Text>
           {item.isHalfDay && (
-            <Text className="text-amber-600"> ({item.halfDayPeriod === 'morning' ? 'Morning' : 'Afternoon'})</Text>
+            <Text style={{ color: colors.warning }}> ({item.halfDayPeriod === 'morning' ? 'Morning' : 'Afternoon'})</Text>
           )}
         </Text>
         
-        <Text className="text-gray-500 text-sm mb-1">
+        <Text className="text-sm mb-1" style={{ color: colors.textTertiary }}>
           {new Date(item.startDate).toLocaleDateString()}
           {item.startDate !== item.endDate && ` - ${new Date(item.endDate).toLocaleDateString()}`}
         </Text>
         
         {item.reason && (
-          <Text className="text-gray-500 text-sm mb-3">
+          <Text className="text-sm mb-3" style={{ color: colors.textTertiary }}>
             Reason: {item.reason}
           </Text>
         )}
         
         <View className="flex-row space-x-2">
           <TouchableOpacity
-            className="bg-green-500 rounded-lg px-4 py-2 flex-1"
+            className="rounded-lg px-4 py-2 flex-1"
+            style={{ backgroundColor: colors.success }}
             onPress={() => handleProcessLeaveRequest(item.id, 'approved')}
           >
             <Text className="text-white text-center font-medium">Approve</Text>
           </TouchableOpacity>
           
           <TouchableOpacity
-            className="bg-red-500 rounded-lg px-4 py-2 flex-1"
+            className="rounded-lg px-4 py-2 flex-1"
+            style={{ backgroundColor: colors.error }}
             onPress={() => handleProcessLeaveRequest(item.id, 'rejected')}
           >
             <Text className="text-white text-center font-medium">Reject</Text>
@@ -772,49 +781,54 @@ export default function EmployeeManagement({ route }) {
       animationType="slide"
       onRequestClose={() => setShowWorkModeModal(false)}
     >
-      <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
-        <View className="bg-white rounded-xl p-6 mx-4 w-full max-w-sm">
-          <Text className="text-xl font-bold text-gray-800 mb-4">
+      <View className="flex-1 justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+        <View className="rounded-xl p-6 mx-4 w-full max-w-sm" style={{ backgroundColor: colors.surface }}>
+          <Text className="text-xl font-bold mb-4" style={{ color: colors.text }}>
             Change Work Mode
           </Text>
           
-          <Text className="text-gray-600 mb-4">
+          <Text className="mb-4" style={{ color: colors.textSecondary }}>
             {selectedEmployee?.name} - Current: {getWorkModeLabel(selectedEmployee?.workMode)}
           </Text>
           
-          {getAllWorkModes().map((mode) => (
-            <TouchableOpacity
-              key={mode.value}
-              className={`flex-row items-center p-3 rounded-lg mb-2 ${
-                selectedEmployee?.workMode === mode.value ? 'bg-gray-100' : ''
-              }`}
-              onPress={() => confirmWorkModeChange(mode.value)}
-              disabled={selectedEmployee?.workMode === mode.value}
-            >
-              <Ionicons 
-                name={mode.icon} 
-                size={20} 
-                color={mode.color} 
-              />
-              <View className="ml-3 flex-1">
-                <Text className="font-medium text-gray-800">
-                  {mode.label}
-                </Text>
-                <Text className="text-sm text-gray-500">
-                  {mode.description}
-                </Text>
-              </View>
-              {selectedEmployee?.workMode === mode.value && (
-                <Ionicons name="checkmark" size={20} color="#10b981" />
-              )}
-            </TouchableOpacity>
-          ))}
+          {getAllWorkModes().map((mode) => {
+            const isSelected = selectedEmployee?.workMode === mode.value;
+            return (
+              <TouchableOpacity
+                key={mode.value}
+                className="flex-row items-center p-3 rounded-lg mb-2"
+                style={{
+                  backgroundColor: isSelected ? colors.primaryLight : 'transparent',
+                }}
+                onPress={() => confirmWorkModeChange(mode.value)}
+                disabled={isSelected}
+              >
+                <Ionicons 
+                  name={mode.icon} 
+                  size={20} 
+                  color={mode.color} 
+                />
+                <View className="ml-3 flex-1">
+                  <Text className="font-medium" style={{ color: colors.text }}>
+                    {mode.label}
+                  </Text>
+                  <Text className="text-sm" style={{ color: colors.textTertiary }}>
+                    {mode.description}
+                  </Text>
+                </View>
+                {isSelected && (
+                  <Ionicons name="checkmark" size={20} color={colors.success} />
+                )}
+              </TouchableOpacity>
+            );
+          })}
           
           <TouchableOpacity
-            className="bg-gray-200 rounded-lg p-3 mt-4"
+            className="rounded-lg p-3 mt-4"
+            style={{ backgroundColor: colors.borderLight }}
             onPress={() => setShowWorkModeModal(false)}
           >
-            <Text className="text-center font-medium text-gray-700">Cancel</Text>
+            <Text className="text-center font-medium" style={{ color: colors.text }}>Cancel</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -828,14 +842,14 @@ export default function EmployeeManagement({ route }) {
       animationType="slide"
       onRequestClose={() => setShowRequestsModal(false)}
     >
-      <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
-        <View className="bg-white rounded-xl p-6 mx-4 w-full max-w-md max-h-96">
+      <View className="flex-1 justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+        <View className="rounded-xl p-6 mx-4 w-full max-w-md max-h-96" style={{ backgroundColor: colors.surface }}>
           <View className="flex-row items-center justify-between mb-4">
-            <Text className="text-xl font-bold text-gray-800">
+            <Text className="text-xl font-bold" style={{ color: colors.text }}>
               Pending Work Mode Requests
             </Text>
             <TouchableOpacity onPress={() => setShowRequestsModal(false)}>
-              <Ionicons name="close" size={24} color="#6b7280" />
+              <Ionicons name="close" size={24} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
           
@@ -848,8 +862,8 @@ export default function EmployeeManagement({ route }) {
             />
           ) : (
             <View className="items-center py-8">
-              <Ionicons name="checkmark-circle" size={48} color="#10b981" />
-              <Text className="text-gray-600 mt-2">No pending work mode requests</Text>
+              <Ionicons name="checkmark-circle" size={48} color={colors.success} />
+              <Text className="mt-2" style={{ color: colors.textSecondary }}>No pending work mode requests</Text>
             </View>
           )}
         </View>
@@ -864,14 +878,14 @@ export default function EmployeeManagement({ route }) {
       animationType="slide"
       onRequestClose={() => setShowLeaveRequestsModal(false)}
     >
-      <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
-        <View className="bg-white rounded-xl p-6 mx-4 w-full max-w-md max-h-96">
+      <View className="flex-1 justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+        <View className="rounded-xl p-6 mx-4 w-full max-w-md max-h-96" style={{ backgroundColor: colors.surface }}>
           <View className="flex-row items-center justify-between mb-4">
-            <Text className="text-xl font-bold text-gray-800">
+            <Text className="text-xl font-bold" style={{ color: colors.text }}>
               Pending Leave Requests
             </Text>
             <TouchableOpacity onPress={() => setShowLeaveRequestsModal(false)}>
-              <Ionicons name="close" size={24} color="#6b7280" />
+              <Ionicons name="close" size={24} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
           
@@ -884,8 +898,8 @@ export default function EmployeeManagement({ route }) {
             />
           ) : (
             <View className="items-center py-8">
-              <Ionicons name="checkmark-circle" size={48} color="#10b981" />
-              <Text className="text-gray-600 mt-2">No pending leave requests</Text>
+              <Ionicons name="checkmark-circle" size={48} color={colors.success} />
+              <Text className="mt-2" style={{ color: colors.textSecondary }}>No pending leave requests</Text>
             </View>
           )}
         </View>
@@ -894,11 +908,11 @@ export default function EmployeeManagement({ route }) {
   );
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1" style={{ backgroundColor: colors.background }}>
       {/* Header */}
-      <View className="bg-white px-6 py-4 shadow-sm">
+      <View className="px-6 py-4 shadow-sm" style={{ backgroundColor: colors.surface }}>
         <View className="flex-row items-center justify-between mb-4" style={{ flexWrap: 'wrap' }}>
-          <Text className="text-xl font-bold text-gray-800" style={{ flexShrink: 1, minWidth: 0 }}>
+          <Text className="text-xl font-bold" style={{ color: colors.text, flexShrink: 1, minWidth: 0 }}>
             Employee Management
           </Text>
           
@@ -914,8 +928,9 @@ export default function EmployeeManagement({ route }) {
             }}
           >
             <TouchableOpacity
-              className="bg-blue-500 rounded-xl px-4 py-2"
+              className="rounded-xl px-4 py-2"
               style={{ 
+                backgroundColor: colors.primary,
                 minWidth: 100, // Prevent buttons from being too narrow
                 flexShrink: 1,
               }}
@@ -928,8 +943,9 @@ export default function EmployeeManagement({ route }) {
             </TouchableOpacity>
           
             <TouchableOpacity
-              className="bg-orange-500 rounded-xl px-4 py-2"
+              className="rounded-xl px-4 py-2"
               style={{ 
+                backgroundColor: colors.warning,
                 minWidth: 120, // Prevent buttons from being too narrow (needs space for count)
                 flexShrink: 1,
               }}
@@ -947,22 +963,22 @@ export default function EmployeeManagement({ route }) {
       </View>
 
       {/* Statistics */}
-      <View className="bg-white mx-4 my-4 rounded-xl p-4 shadow-sm">
-        <Text className="text-lg font-semibold text-gray-800 mb-3">
+      <View className="mx-4 my-4 rounded-xl p-4 shadow-sm" style={{ backgroundColor: colors.surface }}>
+        <Text className="text-lg font-semibold mb-3" style={{ color: colors.text }}>
           Work Mode Distribution
         </Text>
         <View className="flex-row justify-around">
           <View className="items-center">
-            <Text className="text-2xl font-bold text-blue-500">{stats.inOffice}</Text>
-            <Text className="text-gray-600 text-sm">In Office</Text>
+            <Text className="text-2xl font-bold" style={{ color: colors.primary }}>{stats.inOffice}</Text>
+            <Text className="text-sm" style={{ color: colors.textSecondary }}>In Office</Text>
           </View>
           <View className="items-center">
-            <Text className="text-2xl font-bold text-amber-500">{stats.semiRemote}</Text>
-            <Text className="text-gray-600 text-sm">Semi Remote</Text>
+            <Text className="text-2xl font-bold" style={{ color: colors.warning }}>{stats.semiRemote}</Text>
+            <Text className="text-sm" style={{ color: colors.textSecondary }}>Semi Remote</Text>
           </View>
           <View className="items-center">
-            <Text className="text-2xl font-bold text-emerald-500">{stats.fullyRemote}</Text>
-            <Text className="text-gray-600 text-sm">Fully Remote</Text>
+            <Text className="text-2xl font-bold" style={{ color: colors.success }}>{stats.fullyRemote}</Text>
+            <Text className="text-sm" style={{ color: colors.textSecondary }}>Fully Remote</Text>
           </View>
         </View>
       </View>
@@ -981,11 +997,11 @@ export default function EmployeeManagement({ route }) {
         />
       ) : (
         <View className="flex-1 justify-center items-center px-6">
-          <Ionicons name="people-outline" size={64} color="#d1d5db" />
-          <Text className="text-xl font-semibold text-gray-500 mt-4 text-center">
+          <Ionicons name="people-outline" size={64} color={colors.textTertiary} />
+          <Text className="text-xl font-semibold mt-4 text-center" style={{ color: colors.textSecondary }}>
             No employees found
           </Text>
-          <Text className="text-gray-400 text-center mt-2">
+          <Text className="text-center mt-2" style={{ color: colors.textTertiary }}>
             Employees will appear here once they are added to the system
           </Text>
         </View>
@@ -1008,27 +1024,27 @@ export default function EmployeeManagement({ route }) {
         animationType="slide"
         onRequestClose={() => setShowRoleEditModal(false)}
       >
-        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
-          <View className="bg-white rounded-xl p-6 mx-4 w-full max-w-sm">
-            <Text className="text-xl font-bold text-gray-800 mb-4">
+        <View className="flex-1 justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+          <View className="rounded-xl p-6 mx-4 w-full max-w-sm" style={{ backgroundColor: colors.surface }}>
+            <Text className="text-xl font-bold mb-4" style={{ color: colors.text }}>
               Edit Employee Role
             </Text>
             
             {selectedEmployeeForRoleEdit && (
               <View className="mb-4">
-                <Text className="text-gray-600 mb-2">
+                <Text className="mb-2" style={{ color: colors.textSecondary }}>
                   Employee: <Text className="font-medium">{selectedEmployeeForRoleEdit.name}</Text>
                 </Text>
-                <Text className="text-gray-500 text-sm">
+                <Text className="text-sm" style={{ color: colors.textTertiary }}>
                   @{selectedEmployeeForRoleEdit.username}
                 </Text>
-                <Text className="text-gray-500 text-sm mt-1">
+                <Text className="text-sm mt-1" style={{ color: colors.textTertiary }}>
                   Current Role: <Text className="font-medium capitalize">{selectedEmployeeForRoleEdit.role}</Text>
                 </Text>
               </View>
             )}
             
-            <Text className="text-gray-800 font-medium mb-2">
+            <Text className="font-medium mb-2" style={{ color: colors.text }}>
               Select New Role:
             </Text>
             <View className="mb-4">
@@ -1038,32 +1054,45 @@ export default function EmployeeManagement({ route }) {
                   return false;
                 }
                 return true;
-              }).map((role) => (
-                <TouchableOpacity
-                  key={role.value}
-                  className={`rounded-lg p-3 mb-2 ${selectedRole === role.value ? 'bg-primary-500' : 'bg-gray-200'}`}
-                  onPress={() => setSelectedRole(role.value)}
-                >
-                  <Text className={`font-medium ${selectedRole === role.value ? 'text-white' : 'text-gray-700'}`}>
-                    {role.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              }).map((role) => {
+                const isSelected = selectedRole === role.value;
+                return (
+                  <TouchableOpacity
+                    key={role.value}
+                    className="rounded-lg p-3 mb-2"
+                    style={{
+                      backgroundColor: isSelected ? colors.primary : colors.borderLight,
+                    }}
+                    onPress={() => setSelectedRole(role.value)}
+                  >
+                    <Text 
+                      className="font-medium"
+                      style={{
+                        color: isSelected ? '#ffffff' : colors.text,
+                      }}
+                    >
+                      {role.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
             
             <View className="flex-row space-x-3">
               <TouchableOpacity
-                className="bg-gray-200 rounded-lg p-3 flex-1"
+                className="rounded-lg p-3 flex-1"
+                style={{ backgroundColor: colors.borderLight }}
                 onPress={() => {
                   setShowRoleEditModal(false);
                   setSelectedEmployeeForRoleEdit(null);
                 }}
               >
-                <Text className="text-center font-medium text-gray-700">Cancel</Text>
+                <Text className="text-center font-medium" style={{ color: colors.text }}>Cancel</Text>
               </TouchableOpacity>
               
               <TouchableOpacity
-                className="bg-primary-500 rounded-lg p-3 flex-1"
+                className="rounded-lg p-3 flex-1"
+                style={{ backgroundColor: colors.primary }}
                 onPress={handleUpdateRole}
               >
                 <Text className="text-center font-medium text-white">Update Role</Text>
@@ -1091,6 +1120,7 @@ export default function EmployeeManagement({ route }) {
 
 // Leave Settings Modal Component
 const LeaveSettingsModal = ({ visible, onClose, defaultSettings, onSave, onSettingsChange }) => {
+  const { colors } = useTheme();
   if (!visible) return null;
   
   const handleClose = () => {
@@ -1121,9 +1151,9 @@ const LeaveSettingsModal = ({ visible, onClose, defaultSettings, onSave, onSetti
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
+          <View className="flex-1 justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
             <TouchableWithoutFeedback onPress={() => {}}>
-              <View className="bg-white rounded-xl p-6 mx-4 w-full max-w-sm">
+              <View className="rounded-xl p-6 mx-4 w-full max-w-sm" style={{ backgroundColor: colors.surface }}>
               {/* Header with Back Button */}
               <View className="flex-row items-center justify-between mb-4">
                 <TouchableOpacity
@@ -1133,67 +1163,89 @@ const LeaveSettingsModal = ({ visible, onClose, defaultSettings, onSave, onSetti
                   <Ionicons name="arrow-back" size={24} color="#3b82f6" />
                   <Text className="text-primary-500 font-semibold ml-2">Back</Text>
                 </TouchableOpacity>
-                <Text className="text-xl font-bold text-gray-800 flex-1 text-center">
+                <Text className="text-xl font-bold flex-1 text-center" style={{ color: colors.text }}>
                   Default Leave Settings
                 </Text>
                 <View style={{ width: 80 }} />
               </View>
               
-              <Text className="text-gray-600 mb-4 text-sm">
+              <Text className="mb-4 text-sm" style={{ color: colors.textSecondary }}>
                 Set default leave balances for all employees. These values will be applied to new employees.
               </Text>
               
               {/* Annual Leaves */}
               <View className="mb-4">
-                <Text className="text-gray-700 mb-2 font-medium">Annual Leaves (days/year)</Text>
+                <Text className="mb-2 font-medium" style={{ color: colors.text }}>Annual Leaves (days/year)</Text>
                 <TextInput
-                  className="bg-gray-100 rounded-xl px-4 py-3 text-gray-800"
+                  className="rounded-xl px-4 py-3"
                   placeholder="20"
+                  placeholderTextColor={colors.textTertiary}
                   value={defaultSettings?.defaultAnnualLeaves?.toString() || ''}
                   onChangeText={(text) => onSettingsChange({ ...defaultSettings, defaultAnnualLeaves: text })}
                   keyboardType="numeric"
                   returnKeyType="next"
                   blurOnSubmit={false}
                   onSubmitEditing={() => Keyboard.dismiss()}
+                  style={{
+                    backgroundColor: colors.background,
+                    color: colors.text,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                  }}
                 />
               </View>
               
               {/* Sick Leaves */}
               <View className="mb-4">
-                <Text className="text-gray-700 mb-2 font-medium">Sick Leaves (days/year)</Text>
+                <Text className="mb-2 font-medium" style={{ color: colors.text }}>Sick Leaves (days/year)</Text>
                 <TextInput
-                  className="bg-gray-100 rounded-xl px-4 py-3 text-gray-800"
+                  className="rounded-xl px-4 py-3"
                   placeholder="10"
+                  placeholderTextColor={colors.textTertiary}
                   value={defaultSettings?.defaultSickLeaves?.toString() || ''}
                   onChangeText={(text) => onSettingsChange({ ...defaultSettings, defaultSickLeaves: text })}
                   keyboardType="numeric"
                   returnKeyType="next"
                   blurOnSubmit={false}
                   onSubmitEditing={() => Keyboard.dismiss()}
+                  style={{
+                    backgroundColor: colors.background,
+                    color: colors.text,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                  }}
                 />
               </View>
               
               {/* Casual Leaves */}
               <View className="mb-4">
-                <Text className="text-gray-700 mb-2 font-medium">Casual Leaves (days/year)</Text>
+                <Text className="mb-2 font-medium" style={{ color: colors.text }}>Casual Leaves (days/year)</Text>
                 <TextInput
-                  className="bg-gray-100 rounded-xl px-4 py-3 text-gray-800"
+                  className="rounded-xl px-4 py-3"
                   placeholder="5"
+                  placeholderTextColor={colors.textTertiary}
                   value={defaultSettings?.defaultCasualLeaves?.toString() || ''}
                   onChangeText={(text) => onSettingsChange({ ...defaultSettings, defaultCasualLeaves: text })}
                   keyboardType="numeric"
                   returnKeyType="done"
                   blurOnSubmit={true}
                   onSubmitEditing={() => Keyboard.dismiss()}
+                  style={{
+                    backgroundColor: colors.background,
+                    color: colors.text,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                  }}
                 />
               </View>
               
               <View className="flex-row space-x-2 mt-4">
                 <TouchableOpacity
-                  className="bg-gray-200 rounded-lg p-3 flex-1"
+                  className="rounded-lg p-3 flex-1"
+                  style={{ backgroundColor: colors.borderLight }}
                   onPress={handleClose}
                 >
-                  <Text className="text-center font-medium text-gray-700">Cancel</Text>
+                  <Text className="text-center font-medium" style={{ color: colors.text }}>Cancel</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity
@@ -1214,6 +1266,7 @@ const LeaveSettingsModal = ({ visible, onClose, defaultSettings, onSave, onSetti
 
 // Employee Leave Modal Component
 const EmployeeLeaveModal = ({ visible, onClose, employeeData, leaveInputs, onInputChange, onSave, onReset }) => {
+  const { colors } = useTheme();
   if (!visible || !employeeData) return null;
   
   const remaining = employeeData.leaveBalance ? calculateRemainingLeaves(employeeData.leaveBalance) : null;
@@ -1246,9 +1299,9 @@ const EmployeeLeaveModal = ({ visible, onClose, employeeData, leaveInputs, onInp
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
+          <View className="flex-1 justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
             <TouchableWithoutFeedback onPress={() => {}}>
-              <View className="bg-white rounded-xl p-6 mx-4 w-full max-w-sm max-h-96">
+              <View className="rounded-xl p-6 mx-4 w-full max-w-sm max-h-96" style={{ backgroundColor: colors.surface }}>
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 {/* Header with Back Button */}
                 <View className="flex-row items-center justify-between mb-2">
@@ -1256,99 +1309,122 @@ const EmployeeLeaveModal = ({ visible, onClose, employeeData, leaveInputs, onInp
                     onPress={handleBack}
                     className="flex-row items-center"
                   >
-                    <Ionicons name="arrow-back" size={24} color="#3b82f6" />
-                    <Text className="text-primary-500 font-semibold ml-2">Back</Text>
+                    <Ionicons name="arrow-back" size={24} color={colors.primary} />
+                    <Text className="font-semibold ml-2" style={{ color: colors.primary }}>Back</Text>
                   </TouchableOpacity>
-                  <Text className="text-xl font-bold text-gray-800 flex-1 text-center">
+                  <Text className="text-xl font-bold flex-1 text-center" style={{ color: colors.text }}>
                     Manage Leaves
                   </Text>
                   <View style={{ width: 80 }} />
                 </View>
                 
-                <Text className="text-gray-600 mb-4 text-sm">
+                <Text className="mb-4 text-sm" style={{ color: colors.textSecondary }}>
                   {employeeData.name} - {employeeData.position}
                 </Text>
             
             {/* Current Leave Balance Display */}
             {employeeData.leaveBalance && (
-              <View className="bg-gray-50 rounded-lg p-3 mb-4">
-                <Text className="text-sm font-semibold text-gray-700 mb-2">Current Balance:</Text>
+              <View className="rounded-lg p-3 mb-4" style={{ backgroundColor: colors.background }}>
+                <Text className="text-sm font-semibold mb-2" style={{ color: colors.text }}>Current Balance:</Text>
                 <View className="space-y-1">
-                  <Text className="text-xs text-gray-600">
+                  <Text className="text-xs" style={{ color: colors.textSecondary }}>
                     Annual: {employeeData.leaveBalance.usedAnnualLeaves || 0} / {employeeData.leaveBalance.annualLeaves || 0} used
                     {remaining && ` (${remaining.annual} remaining)`}
                   </Text>
-                  <Text className="text-xs text-gray-600">
+                  <Text className="text-xs" style={{ color: colors.textSecondary }}>
                     Sick: {employeeData.leaveBalance.usedSickLeaves || 0} / {employeeData.leaveBalance.sickLeaves || 0} used
                     {remaining && ` (${remaining.sick} remaining)`}
                   </Text>
-                  <Text className="text-xs text-gray-600">
+                  <Text className="text-xs" style={{ color: colors.textSecondary }}>
                     Casual: {employeeData.leaveBalance.usedCasualLeaves || 0} / {employeeData.leaveBalance.casualLeaves || 0} used
                     {remaining && ` (${remaining.casual} remaining)`}
                   </Text>
                 </View>
                 {employeeData.leaveBalance.isCustom && (
-                  <Text className="text-xs text-blue-600 mt-2">Custom leave balance</Text>
+                  <Text className="text-xs mt-2" style={{ color: colors.primary }}>Custom leave balance</Text>
                 )}
               </View>
             )}
             
             {/* Annual Leaves Input */}
             <View className="mb-4">
-              <Text className="text-gray-700 mb-2 font-medium">Annual Leaves</Text>
+              <Text className="mb-2 font-medium" style={{ color: colors.text }}>Annual Leaves</Text>
               <TextInput
-                className="bg-gray-100 rounded-xl px-4 py-3 text-gray-800"
+                className="rounded-xl px-4 py-3"
                 placeholder="20"
+                placeholderTextColor={colors.textTertiary}
                 value={leaveInputs.annualLeaves}
                 onChangeText={(text) => onInputChange({ ...leaveInputs, annualLeaves: text })}
                 keyboardType="numeric"
                 returnKeyType="next"
                 blurOnSubmit={false}
                 onSubmitEditing={() => Keyboard.dismiss()}
+                style={{
+                  backgroundColor: colors.background,
+                  color: colors.text,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                }}
               />
             </View>
             
             {/* Sick Leaves Input */}
             <View className="mb-4">
-              <Text className="text-gray-700 mb-2 font-medium">Sick Leaves</Text>
+              <Text className="mb-2 font-medium" style={{ color: colors.text }}>Sick Leaves</Text>
               <TextInput
-                className="bg-gray-100 rounded-xl px-4 py-3 text-gray-800"
+                className="rounded-xl px-4 py-3"
                 placeholder="10"
+                placeholderTextColor={colors.textTertiary}
                 value={leaveInputs.sickLeaves}
                 onChangeText={(text) => onInputChange({ ...leaveInputs, sickLeaves: text })}
                 keyboardType="numeric"
                 returnKeyType="next"
                 blurOnSubmit={false}
                 onSubmitEditing={() => Keyboard.dismiss()}
+                style={{
+                  backgroundColor: colors.background,
+                  color: colors.text,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                }}
               />
             </View>
             
             {/* Casual Leaves Input */}
             <View className="mb-4">
-              <Text className="text-gray-700 mb-2 font-medium">Casual Leaves</Text>
+              <Text className="mb-2 font-medium" style={{ color: colors.text }}>Casual Leaves</Text>
               <TextInput
-                className="bg-gray-100 rounded-xl px-4 py-3 text-gray-800"
+                className="rounded-xl px-4 py-3"
                 placeholder="5"
+                placeholderTextColor={colors.textTertiary}
                 value={leaveInputs.casualLeaves}
                 onChangeText={(text) => onInputChange({ ...leaveInputs, casualLeaves: text })}
                 keyboardType="numeric"
                 returnKeyType="done"
                 blurOnSubmit={true}
                 onSubmitEditing={() => Keyboard.dismiss()}
+                style={{
+                  backgroundColor: colors.background,
+                  color: colors.text,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                }}
               />
             </View>
             
             <View className="flex-row space-x-2 mt-4">
               <TouchableOpacity
-                className="bg-gray-200 rounded-lg p-3 flex-1"
+                className="rounded-lg p-3 flex-1"
+                style={{ backgroundColor: colors.borderLight }}
                 onPress={handleClose}
               >
-                <Text className="text-center font-medium text-gray-700">Cancel</Text>
+                <Text className="text-center font-medium" style={{ color: colors.text }}>Cancel</Text>
               </TouchableOpacity>
               
               {employeeData.leaveBalance?.isCustom && (
                 <TouchableOpacity
-                  className="bg-orange-500 rounded-lg p-3 flex-1"
+                  className="rounded-lg p-3 flex-1"
+                  style={{ backgroundColor: colors.warning }}
                   onPress={() => {
                     Keyboard.dismiss();
                     onReset();
@@ -1359,7 +1435,8 @@ const EmployeeLeaveModal = ({ visible, onClose, employeeData, leaveInputs, onInp
               )}
               
               <TouchableOpacity
-                className="bg-primary-500 rounded-lg p-3 flex-1"
+                className="rounded-lg p-3 flex-1"
+                style={{ backgroundColor: colors.primary }}
                 onPress={handleSaveAndClose}
               >
                 <Text className="text-center font-medium text-white">Save</Text>

@@ -1,28 +1,48 @@
 // Reusable Help & Support Button Component
-// Opens email app with mailto: link to sales@techdotglobal.com
+// Navigates to Help & Support screen or opens email app with mailto: link
 import React from 'react';
 import { TouchableOpacity, Text, View, Linking, Alert, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../core/contexts/ThemeContext';
 import { fontSize, spacing, iconSize, responsiveFont, responsivePadding } from '../../utils/responsive';
+import { ROUTES } from '../constants/routes';
 
 const SUPPORT_EMAIL = 'sales@techdotglobal.com';
 
 /**
  * Help & Support Button Component
- * Opens the user's default email app with a pre-filled email to support
+ * Navigates to Help & Support screen (preferred) or opens email app as fallback
  * 
  * @param {Object} props
  * @param {string} props.variant - 'button' | 'menu' (default: 'button')
  * @param {Object} props.style - Custom styles
- * @param {Function} props.onPress - Optional callback after opening email
+ * @param {Function} props.onPress - Optional callback after action
+ * @param {Object} props.navigation - Navigation object (if available, navigates to screen)
  */
-export default function HelpButton({ variant = 'button', style, onPress }) {
+export default function HelpButton({ variant = 'button', style, onPress, navigation }) {
   const { colors } = useTheme();
 
   const handleHelpPress = async () => {
+    // If navigation is available, navigate to Help & Support screen
+    if (navigation) {
+      try {
+        // HelpSupportScreen is nested inside MainNavigator, which is registered as "MainStack" in DrawerNavigator
+        // Use nested navigation syntax to navigate to the nested screen
+        // This works whether called from DrawerNavigator or MainNavigator context
+        navigation.navigate('MainStack', { screen: ROUTES.HELP_SUPPORT });
+        if (onPress) {
+          onPress();
+        }
+        return;
+      } catch (navError) {
+        console.warn('Navigation failed, falling back to email:', navError);
+        // Fall through to email fallback
+      }
+    }
+
+    // Fallback: Open email app directly
     try {
-      const mailtoUrl = `mailto:${SUPPORT_EMAIL}?subject=Support Request - Hadir.AI`;
+      const mailtoUrl = `mailto:${SUPPORT_EMAIL}?subject=Support Request - hadir.ai`;
       
       // Check if mailto: links are supported
       const canOpen = await Linking.canOpenURL(mailtoUrl);

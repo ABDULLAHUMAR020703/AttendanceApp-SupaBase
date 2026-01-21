@@ -80,6 +80,8 @@ AttendanceApp/
 ├── screens/                        # ⚠️ Legacy screens (CURRENTLY IN USE - to be migrated)
 │   ├── LoginScreen.js             # Auth screen (legacy)
 │   ├── SignUpScreen.js            # Auth screen (legacy)
+│   ├── ForgotPasswordScreen.js    # Password reset request screen
+│   ├── ResetPasswordScreen.js     # Password reset completion screen
 │   ├── EmployeeDashboard.js       # Attendance screen (legacy)
 │   ├── AdminDashboard.js          # Analytics screen (legacy)
 │   ├── HRDashboard.js             # Analytics screen (legacy)
@@ -88,7 +90,7 @@ AttendanceApp/
 │   ├── AuthMethodSelection.js     # Auth screen (legacy)
 │   ├── LeaveRequestScreen.js      # Leave screen (legacy)
 │   ├── CalendarScreen.js          # Calendar screen (legacy)
-│   ├── ThemeSettingsScreen.js     # Settings screen (legacy)
+│   ├── ThemeSettingsScreen.js     # Settings screen (includes password change UI)
 │   ├── NotificationsScreen.js     # Notifications screen (legacy)
 │   ├── TicketScreen.js            # Tickets screen (legacy)
 │   ├── TicketManagementScreen.js  # Tickets screen (legacy)
@@ -99,12 +101,13 @@ AttendanceApp/
 │
 ├── utils/                          # ⚠️ Legacy utils (CURRENTLY IN USE - to be migrated)
 │   ├── auth.js                    # Auth utils (legacy - use features/auth instead)
+│   ├── passwordChange.js          # Password change utility (Supabase Auth integration)
 │   ├── employees.js               # Employee utils (legacy)
 │   ├── ticketManagement.js        # Ticket utils (legacy)
 │   ├── leaveManagement.js         # Leave utils (legacy)
 │   ├── notifications.js           # Notification utils (legacy)
 │   ├── analytics.js               # Analytics utils (legacy)
-│   ├── calendar.js                # Calendar utils (legacy)
+│   ├── calendar.js                # Calendar utils (uses Supabase calendar_events table)
 │   ├── location.js                # Location utils (legacy)
 │   ├── export.js                  # Export utils (legacy)
 │   ├── storage.js                 # Storage utils (legacy - use core/services/storage)
@@ -174,15 +177,22 @@ Each feature is self-contained with:
   - ✅ Context providers (`core/contexts/AuthContext.js`, `ThemeContext.js`)
   - ✅ Navigation setup (`core/navigation/`)
   - ✅ Storage service (`core/services/storage.js`)
+  - ✅ Deep linking support (`AppNavigator.js` handles `hadirai://reset-password`)
 - **Shared Code**: `shared/` directory fully implemented
   - ✅ Shared components (`shared/components/`)
-  - ✅ Shared constants (`shared/constants/`)
+  - ✅ Shared constants (`shared/constants/`) - includes `FORGOT_PASSWORD` and `RESET_PASSWORD` routes
   - ✅ Shared utilities (`shared/utils/`)
 - **Partial Feature Migration**:
   - ✅ `features/auth/` - Auth service and utilities migrated
   - ✅ `features/calendar/` - Calendar component migrated
-  - ⚠️ Auth screens still in `screens/` (LoginScreen, SignUpScreen, etc.)
+  - ⚠️ Auth screens still in `screens/` (LoginScreen, SignUpScreen, ForgotPasswordScreen, ResetPasswordScreen, etc.)
   - ⚠️ Calendar screen still in `screens/CalendarScreen.js`
+- **New Features Added**:
+  - ✅ Password change utility (`utils/passwordChange.js`)
+  - ✅ Forgot password screen (`screens/ForgotPasswordScreen.js`)
+  - ✅ Reset password screen (`screens/ResetPasswordScreen.js`)
+  - ✅ Password change UI in Theme Settings screen
+  - ✅ Calendar events Supabase integration (`utils/calendar.js`)
 
 ### 🔄 In Progress
 - **Feature Modules**: Most features still need migration
@@ -236,11 +246,15 @@ import { storage } from '../core/services/storage';
 // Legacy screens (to be migrated)
 import EmployeeDashboard from '../screens/EmployeeDashboard';
 import AttendanceHistory from '../screens/AttendanceHistory';
+import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
+import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 
 // Legacy utils (to be migrated)
 import { checkIn, checkOut } from '../utils/auth';
+import { changePassword } from '../utils/passwordChange';
 import { getEmployees } from '../utils/employees';
 import { createTicket } from '../utils/ticketManagement';
+import { createCalendarEvent, getCalendarEvents } from '../utils/calendar';
 ```
 
 ## Benefits
@@ -278,9 +292,13 @@ The project includes a GitHub Actions workflow (`.github/workflows/deploy.yml`) 
 ## Notes
 
 - **Navigation**: Currently imports screens from `screens/` directory (legacy)
+  - Includes new screens: `ForgotPasswordScreen`, `ResetPasswordScreen`
+  - Deep linking configured in `AppNavigator.js` for password reset flow
 - **App.js**: Still imports from `utils/employees` (legacy)
-- **Most screens**: Still located in `screens/` directory (18 screens total)
-- **Most utils**: Still located in `utils/` directory (17 utility files)
+- **Most screens**: Still located in `screens/` directory (20 screens total, including new password screens)
+- **Most utils**: Still located in `utils/` directory (18 utility files, including `passwordChange.js`)
+- **Calendar Events**: Stored in Supabase `calendar_events` table (not AsyncStorage)
+- **Password Management**: Uses Supabase Auth only (no local storage)
 - **Migration is gradual**: New code should use feature modules, legacy code will be migrated over time
 - **CI/CD**: GitHub Actions workflow configured for automated builds and deployments
 

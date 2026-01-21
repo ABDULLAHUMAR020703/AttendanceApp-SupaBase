@@ -12,9 +12,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { checkBiometricAvailability, getBiometricTypeName } from '../utils/biometricAuth';
 import { checkFaceRecognitionAvailability, verifyFace } from '../utils/faceVerification';
 import { setAuthPreference, getAuthPreference } from '../utils/authPreferences';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function AuthMethodSelection({ navigation, route }) {
   const { user } = route.params;
+  const { colors } = useTheme();
   const [selectedMethod, setSelectedMethod] = useState(null);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricType, setBiometricType] = useState('');
@@ -108,15 +110,15 @@ export default function AuthMethodSelection({ navigation, route }) {
 
   if (loading) {
     return (
-      <View className="flex-1 justify-center items-center bg-gray-50">
-        <ActivityIndicator size="large" color="#3b82f6" />
-        <Text className="text-gray-600 mt-4">Loading...</Text>
+      <View className="flex-1 justify-center items-center" style={{ backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ color: colors.textSecondary, marginTop: 16 }}>Loading...</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView className="flex-1 bg-gray-50">
+    <ScrollView className="flex-1" style={{ backgroundColor: colors.background }}>
       <View className="p-6">
         {/* Header */}
         <View className="mb-6">
@@ -124,21 +126,24 @@ export default function AuthMethodSelection({ navigation, route }) {
             onPress={() => navigation.goBack()}
             className="mb-4"
           >
-            <Ionicons name="arrow-back" size={24} color="#3b82f6" />
+            <Ionicons name="arrow-back" size={24} color={colors.primary} />
           </TouchableOpacity>
-          <Text className="text-2xl font-bold text-gray-800 mb-2">
+          <Text className="text-2xl font-bold mb-2" style={{ color: colors.text }}>
             Choose Authentication Method
           </Text>
-          <Text className="text-gray-600">
+          <Text style={{ color: colors.textSecondary }}>
             Select how you want to verify your identity when checking in/out
           </Text>
         </View>
 
         {/* Face Verification Option */}
         <TouchableOpacity
-          className={`bg-white rounded-2xl p-6 mb-4 shadow-sm border-2 ${
-            selectedMethod === 'face' ? 'border-primary-500 bg-primary-50' : 'border-gray-200'
-          } ${!faceIDAvailable ? 'opacity-50' : ''}`}
+          className="rounded-2xl p-6 mb-4 shadow-sm border-2"
+          style={{
+            backgroundColor: selectedMethod === 'face' ? colors.primaryLight : colors.surface,
+            borderColor: selectedMethod === 'face' ? colors.primary : colors.border,
+            opacity: !faceIDAvailable ? 0.5 : 1,
+          }}
           onPress={async () => {
             if (!faceIDAvailable) {
               Alert.alert(
@@ -153,37 +158,51 @@ export default function AuthMethodSelection({ navigation, route }) {
           disabled={!faceIDAvailable}
         >
           <View className="flex-row items-center">
-            <View className={`w-16 h-16 rounded-full items-center justify-center mr-4 ${
-              selectedMethod === 'face' ? 'bg-primary-500' : 'bg-gray-200'
-            }`}>
+            <View 
+              className="w-16 h-16 rounded-full items-center justify-center mr-4"
+              style={{
+                backgroundColor: selectedMethod === 'face' ? colors.primary : colors.borderLight,
+              }}
+            >
               <Ionicons 
                 name="finger-print" 
                 size={32} 
-                color={selectedMethod === 'face' ? 'white' : '#9ca3af'} 
+                color={selectedMethod === 'face' ? 'white' : colors.textTertiary} 
               />
             </View>
             <View className="flex-1">
-              <Text className={`text-lg font-semibold mb-1 ${
-                selectedMethod === 'face' ? 'text-primary-700' : 'text-gray-800'
-              }`}>
+              <Text 
+                className="text-lg font-semibold mb-1"
+                style={{
+                  color: selectedMethod === 'face' ? colors.primary : colors.text,
+                }}
+              >
                 Face Verification
               </Text>
-              <Text className="text-sm text-gray-600 mb-2">
+              <Text className="text-sm mb-2" style={{ color: colors.textSecondary }}>
                 Use device's native Face ID for authentication
               </Text>
-              <Text className="text-xs text-gray-500">
+              <Text className="text-xs" style={{ color: colors.textTertiary }}>
                 • Uses device's built-in Face ID/Face Unlock{'\n'}
                 • Secure and fast authentication{'\n'}
                 • No photo required - uses device's Face ID directly
               </Text>
               {!faceIDAvailable && (
-                <View className="mt-2 bg-yellow-100 px-2 py-1 rounded-full self-start">
-                  <Text className="text-xs font-medium text-yellow-800">Not Set Up</Text>
+                <View 
+                  className="mt-2 px-2 py-1 rounded-full self-start"
+                  style={{ backgroundColor: colors.warningLight }}
+                >
+                  <Text 
+                    className="text-xs font-medium"
+                    style={{ color: colors.warning }}
+                  >
+                    Not Set Up
+                  </Text>
                 </View>
               )}
             </View>
             {selectedMethod === 'face' && (
-              <Ionicons name="checkmark-circle" size={28} color="#3b82f6" />
+              <Ionicons name="checkmark-circle" size={28} color={colors.primary} />
             )}
           </View>
         </TouchableOpacity>
@@ -191,7 +210,11 @@ export default function AuthMethodSelection({ navigation, route }) {
         {/* Test Face ID Button - Only show if Face ID is selected and available */}
         {selectedMethod === 'face' && faceIDAvailable && (
           <TouchableOpacity
-            className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4"
+            className="border rounded-xl p-4 mb-4"
+            style={{
+              backgroundColor: colors.primaryLight,
+              borderColor: colors.primary,
+            }}
             onPress={async () => {
               setTestingFaceID(true);
               try {
@@ -225,15 +248,21 @@ export default function AuthMethodSelection({ navigation, route }) {
             disabled={testingFaceID}
           >
             <View className="flex-row items-center">
-              <Ionicons name="checkmark-circle-outline" size={20} color="#3b82f6" className="mr-2" />
-              <Text className="text-sm font-medium text-blue-800 flex-1">
+              <Ionicons name="checkmark-circle-outline" size={20} color={colors.primary} className="mr-2" />
+              <Text 
+                className="text-sm font-medium flex-1"
+                style={{ color: colors.primary }}
+              >
                 {testingFaceID ? 'Testing Face ID...' : 'Test Face ID'}
               </Text>
               {testingFaceID && (
-                <ActivityIndicator size="small" color="#3b82f6" />
+                <ActivityIndicator size="small" color={colors.primary} />
               )}
             </View>
-            <Text className="text-xs text-blue-600 mt-1">
+            <Text 
+              className="text-xs mt-1"
+              style={{ color: colors.primary }}
+            >
               Tap to verify that Face ID is working on your device
             </Text>
           </TouchableOpacity>
@@ -241,9 +270,12 @@ export default function AuthMethodSelection({ navigation, route }) {
 
         {/* Fingerprint/Biometric Option */}
         <TouchableOpacity
-          className={`bg-white rounded-2xl p-6 mb-4 shadow-sm border-2 ${
-            selectedMethod === 'biometric' ? 'border-primary-500 bg-primary-50' : 'border-gray-200'
-          } ${!biometricAvailable ? 'opacity-50' : ''}`}
+          className="rounded-2xl p-6 mb-4 shadow-sm border-2"
+          style={{
+            backgroundColor: selectedMethod === 'biometric' ? colors.primaryLight : colors.surface,
+            borderColor: selectedMethod === 'biometric' ? colors.primary : colors.border,
+            opacity: !biometricAvailable ? 0.5 : 1,
+          }}
           onPress={() => {
             if (biometricAvailable) {
               setSelectedMethod('biometric');
@@ -258,56 +290,85 @@ export default function AuthMethodSelection({ navigation, route }) {
           disabled={!biometricAvailable}
         >
           <View className="flex-row items-center">
-            <View className={`w-16 h-16 rounded-full items-center justify-center mr-4 ${
-              selectedMethod === 'biometric' ? 'bg-primary-500' : 
-              biometricAvailable ? 'bg-gray-200' : 'bg-gray-100'
-            }`}>
+            <View 
+              className="w-16 h-16 rounded-full items-center justify-center mr-4"
+              style={{
+                backgroundColor: selectedMethod === 'biometric' 
+                  ? colors.primary 
+                  : biometricAvailable 
+                    ? colors.borderLight 
+                    : colors.border,
+              }}
+            >
               <Ionicons 
                 name="finger-print" 
                 size={32} 
                 color={
                   selectedMethod === 'biometric' ? 'white' : 
-                  biometricAvailable ? '#9ca3af' : '#d1d5db'
+                  biometricAvailable ? colors.textTertiary : colors.textTertiary
                 } 
               />
             </View>
             <View className="flex-1">
               <View className="flex-row items-center mb-1">
-                <Text className={`text-lg font-semibold ${
-                  selectedMethod === 'biometric' ? 'text-primary-700' : 'text-gray-800'
-                }`}>
+                <Text 
+                  className="text-lg font-semibold"
+                  style={{
+                    color: selectedMethod === 'biometric' ? colors.primary : colors.text,
+                  }}
+                >
                   Fingerprint Authentication
                 </Text>
                 {!biometricAvailable && (
-                  <View className="ml-2 bg-yellow-100 px-2 py-1 rounded-full">
-                    <Text className="text-xs font-medium text-yellow-800">Not Available</Text>
+                  <View 
+                    className="ml-2 px-2 py-1 rounded-full"
+                    style={{ backgroundColor: colors.warningLight }}
+                  >
+                    <Text 
+                      className="text-xs font-medium"
+                      style={{ color: colors.warning }}
+                    >
+                      Not Available
+                    </Text>
                   </View>
                 )}
               </View>
-              <Text className="text-sm text-gray-600 mb-2">
+              <Text className="text-sm mb-2" style={{ color: colors.textSecondary }}>
                 Use your fingerprint sensor for quick verification
               </Text>
-              <Text className="text-xs text-gray-500">
+              <Text className="text-xs" style={{ color: colors.textTertiary }}>
                 • Uses device's built-in fingerprint sensor{'\n'}
                 • Fast and secure authentication{'\n'}
                 • Works with fingerprint enrolled on your device
               </Text>
             </View>
             {selectedMethod === 'biometric' && (
-              <Ionicons name="checkmark-circle" size={28} color="#3b82f6" />
+              <Ionicons name="checkmark-circle" size={28} color={colors.primary} />
             )}
           </View>
         </TouchableOpacity>
 
         {/* Information Box */}
-        <View className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+        <View 
+          className="border rounded-xl p-4 mb-6"
+          style={{
+            backgroundColor: colors.primaryLight,
+            borderColor: colors.primary,
+          }}
+        >
           <View className="flex-row items-start">
-            <Ionicons name="information-circle" size={20} color="#3b82f6" className="mr-2" />
+            <Ionicons name="information-circle" size={20} color={colors.primary} className="mr-2" />
             <View className="flex-1">
-              <Text className="text-sm font-medium text-blue-800 mb-1">
+              <Text 
+                className="text-sm font-medium mb-1"
+                style={{ color: colors.primary }}
+              >
                 How It Works:
               </Text>
-              <Text className="text-xs text-blue-700 leading-5">
+              <Text 
+                className="text-xs leading-5"
+                style={{ color: colors.primary }}
+              >
                 <Text className="font-semibold">Face ID:</Text> Uses your device's native Face ID/Face Unlock to authenticate. No photos are taken - authentication happens directly through your device's security system.{'\n\n'}
                 <Text className="font-semibold">Fingerprint Authentication:</Text> Your device's fingerprint sensor verifies your identity. Your fingerprint data is stored securely on your device and never shared with the app.{'\n\n'}
                 You can change this setting anytime.
@@ -318,9 +379,10 @@ export default function AuthMethodSelection({ navigation, route }) {
 
         {/* Save Button */}
         <TouchableOpacity
-          className={`rounded-xl p-4 items-center ${
-            saving ? 'bg-gray-400' : 'bg-primary-500'
-          }`}
+          className="rounded-xl p-4 items-center"
+          style={{
+            backgroundColor: saving ? colors.border : colors.primary,
+          }}
           onPress={handleSave}
           disabled={saving}
         >

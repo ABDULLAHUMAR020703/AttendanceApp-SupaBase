@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -23,9 +24,10 @@ import {
   getEventTypeIcon,
   getEventTypeLabel,
 } from '../utils/calendar';
-import { getEmployees, getEmployeeByUsername, getEmployeeById } from '../utils/employees';
+import { getEmployeesForCalendar, getEmployeeByUsername, getEmployeeById } from '../utils/employees';
 import { useTheme } from '../contexts/ThemeContext';
 import { getApprovedLeaveDates, getAllLeaveDatesWithEmployees } from '../utils/leaveManagement';
+import DatePickerCalendar from '../components/DatePickerCalendar';
 
 export default function CalendarScreen({ navigation, route }) {
   const { user } = route.params;
@@ -51,38 +53,29 @@ export default function CalendarScreen({ navigation, route }) {
   const [eventDate, setEventDate] = useState(selectedDate);
   const [eventTime, setEventTime] = useState('');
   const [eventType, setEventType] = useState('meeting');
+  const [eventVisibility, setEventVisibility] = useState('all'); // 'all', 'none', 'selected'
   const [selectedEmployees, setSelectedEmployees] = useState([]);
+  const [employeeSearchQuery, setEmployeeSearchQuery] = useState('');
+  const [showEmployeePicker, setShowEmployeePicker] = useState(false);
+  const [showDatePickerModal, setShowDatePickerModal] = useState(false);
 
+  // Load data on mount and when date changes
   useEffect(() => {
     loadData();
-    
-    // Safely check if navigation and addListener exist
-    let unsubscribe = null;
-    if (navigation && typeof navigation.addListener === 'function') {
-      try {
-        unsubscribe = navigation.addListener('focus', () => {
-          loadData();
-        });
-      } catch (error) {
-        if (__DEV__) {
-          console.warn('[CalendarScreen] Failed to add navigation listener:', error);
-        }
-      }
-    }
-    
-    return () => {
-      // Only call unsubscribe if it's a function
-      if (typeof unsubscribe === 'function') {
-        try {
-          unsubscribe();
-        } catch (error) {
-          if (__DEV__) {
-            console.warn('[CalendarScreen] Error unsubscribing navigation listener:', error);
-          }
-        }
-      }
-    };
-  }, [navigation, currentDate, selectedDate]);
+  }, [currentDate, selectedDate]);
+
+  // CRITICAL: Use useFocusEffect to refetch employees from Supabase when screen comes into focus
+  // This ensures we always have the latest employee data (single source of truth)
+  useFocusEffect(
+    React.useCallback(() => {
+      // Refetch employees from Supabase every time screen comes into focus
+      // This ensures latest employees are available for event creation
+      loadEmployees();
+      
+      // Also reload events to ensure consistency
+      loadEvents();
+    }, [user]) // Include user in dependencies to refetch when user changes
+  );
 
   const loadData = async () => {
     await Promise.all([
@@ -136,10 +129,23 @@ export default function CalendarScreen({ navigation, route }) {
 
   const loadEmployees = async () => {
     try {
-      const empList = await getEmployees();
+      // Fetch employees directly from Supabase (single source of truth)
+      // This ensures we get fresh data and only active employees
+      const empList = await getEmployeesForCalendar(user);
       setEmployees(empList);
+      
+      // CRITICAL: Clean up selectedEmployees to remove any that no longer exist
+      // This prevents stale references after refetch
+      setSelectedEmployees(prevSelected => {
+        const validUsernames = new Set(empList.map(emp => emp.username));
+        return prevSelected.filter(username => validUsernames.has(username));
+      });
+      
+      console.log(`[CalendarScreen] ✓ Loaded ${empList.length} employees from Supabase`);
     } catch (error) {
       console.error('Error loading employees:', error);
+      setEmployees([]); // Set empty array on error to prevent stale data
+      setSelectedEmployees([]); // Clear selected employees on error
     }
   };
 
@@ -155,6 +161,12 @@ export default function CalendarScreen({ navigation, route }) {
       return;
     }
 
+    // Validate visibility selection
+    if (eventVisibility === 'selected' && selectedEmployees.length === 0) {
+      Alert.alert('Error', 'Please select at least one employee for "Selected Employees" visibility');
+      return;
+    }
+
     try {
       const result = await createCalendarEvent({
         title: eventTitle.trim(),
@@ -163,7 +175,9 @@ export default function CalendarScreen({ navigation, route }) {
         time: eventTime.trim(),
         type: eventType,
         createdBy: user.username,
-        assignedTo: selectedEmployees,
+        visibility: eventVisibility,
+        visibleTo: eventVisibility === 'selected' ? selectedEmployees : [],
+        assignedTo: eventVisibility === 'selected' ? selectedEmployees : [], // Legacy field
         color: getEventTypeColor(eventType)
       });
 
@@ -171,7 +185,12 @@ export default function CalendarScreen({ navigation, route }) {
         Alert.alert('Success', 'Event created successfully');
         setShowEventModal(false);
         resetEventForm();
-        await loadEvents();
+        // CRITICAL: Refetch both events AND employees from Supabase after event creation
+        // This ensures selected employees list shows latest data
+        await Promise.all([
+          loadEvents(),
+          loadEmployees() // Refetch employees to get latest from Supabase
+        ]);
       } else {
         Alert.alert('Error', result.error || 'Failed to create event');
       }
@@ -217,7 +236,10 @@ export default function CalendarScreen({ navigation, route }) {
     setEventDate(selectedDate);
     setEventTime('');
     setEventType('meeting');
+    setEventVisibility('all');
     setSelectedEmployees([]);
+    setEmployeeSearchQuery('');
+    setShowEmployeePicker(false);
   };
 
   const handleDateSelect = (date) => {
@@ -237,12 +259,34 @@ export default function CalendarScreen({ navigation, route }) {
     setCurrentDate(newDate);
   };
 
-  const toggleEmployeeSelection = (employeeId) => {
-    if (selectedEmployees.includes(employeeId)) {
-      setSelectedEmployees(selectedEmployees.filter(id => id !== employeeId));
+  const toggleEmployeeSelection = (employeeUsername) => {
+    if (selectedEmployees.includes(employeeUsername)) {
+      setSelectedEmployees(selectedEmployees.filter(username => username !== employeeUsername));
     } else {
-      setSelectedEmployees([...selectedEmployees, employeeId]);
+      // Prevent duplicates
+      if (!selectedEmployees.includes(employeeUsername)) {
+        setSelectedEmployees([...selectedEmployees, employeeUsername]);
+      }
     }
+  };
+
+  const removeSelectedEmployee = (employeeUsername) => {
+    setSelectedEmployees(selectedEmployees.filter(username => username !== employeeUsername));
+  };
+
+  const getFilteredEmployees = () => {
+    if (!employeeSearchQuery.trim()) {
+      return employees.filter(emp => emp.username !== user.username); // Exclude current user
+    }
+    const query = employeeSearchQuery.toLowerCase();
+    return employees.filter(emp => 
+      emp.username !== user.username && // Exclude current user
+      (
+        emp.name?.toLowerCase().includes(query) ||
+        emp.username?.toLowerCase().includes(query) ||
+        emp.email?.toLowerCase().includes(query)
+      )
+    );
   };
 
   // Calendar generation functions
@@ -472,27 +516,48 @@ export default function CalendarScreen({ navigation, route }) {
               </Text>
             </View>
           </View>
-          {item.assignedTo && item.assignedTo.length > 0 && (
-            <Text
-              style={{
-                fontSize: 11,
-                color: colors.textTertiary,
-                marginTop: 4,
-              }}
-            >
-              Assigned to {item.assignedTo.length} employee{item.assignedTo.length !== 1 ? 's' : ''}
-            </Text>
+          {/* Visibility Info */}
+          {item.visibility === 'all' && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+              <Ionicons name="people" size={12} color={colors.textTertiary} />
+              <Text
+                style={{
+                  fontSize: 11,
+                  color: colors.textTertiary,
+                  marginLeft: 4,
+                }}
+              >
+                Visible to all employees
+              </Text>
+            </View>
           )}
-          {(!item.assignedTo || item.assignedTo.length === 0) && (
-            <Text
-              style={{
-                fontSize: 11,
-                color: colors.textTertiary,
-                marginTop: 4,
-              }}
-            >
-              Visible to all employees
-            </Text>
+          {item.visibility === 'none' && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+              <Ionicons name="lock-closed" size={12} color={colors.textTertiary} />
+              <Text
+                style={{
+                  fontSize: 11,
+                  color: colors.textTertiary,
+                  marginLeft: 4,
+                }}
+              >
+                Private (only visible to creator)
+              </Text>
+            </View>
+          )}
+          {item.visibility === 'selected' && (item.visibleTo || item.assignedTo) && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+              <Ionicons name="person" size={12} color={colors.textTertiary} />
+              <Text
+                style={{
+                  fontSize: 11,
+                  color: colors.textTertiary,
+                  marginLeft: 4,
+                }}
+              >
+                Visible to {(item.visibleTo || item.assignedTo || []).length} selected employee{((item.visibleTo || item.assignedTo || []).length) !== 1 ? 's' : ''}
+              </Text>
+            </View>
           )}
         </View>
       </View>
@@ -818,21 +883,36 @@ export default function CalendarScreen({ navigation, route }) {
               {/* Date */}
               <View style={{ marginBottom: 16 }}>
                 <Text style={{ color: colors.text, marginBottom: 8, fontWeight: '500' }}>Date *</Text>
-                <TextInput
+                <TouchableOpacity
+                  onPress={() => setShowDatePickerModal(true)}
                   style={{
                     backgroundColor: colors.background,
                     borderRadius: 12,
                     paddingHorizontal: 16,
                     paddingVertical: 12,
-                    color: colors.text,
+                    borderWidth: 1,
+                    borderColor: colors.border,
                   }}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={colors.textTertiary}
-                  value={eventDate}
-                  onChangeText={setEventDate}
-                />
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <TextInput
+                      style={{
+                        flex: 1,
+                        color: colors.text,
+                        fontSize: 16,
+                      }}
+                      placeholder="YYYY-MM-DD"
+                      placeholderTextColor={colors.textTertiary}
+                      value={eventDate}
+                      onChangeText={setEventDate}
+                      editable={true}
+                      onFocus={() => setShowDatePickerModal(true)}
+                    />
+                    <Ionicons name="calendar-outline" size={20} color={colors.primary} style={{ marginLeft: 8 }} />
+                  </View>
+                </TouchableOpacity>
                 <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 4 }}>
-                  Format: YYYY-MM-DD (e.g., 2024-01-15)
+                  Tap to select date or type manually (Format: YYYY-MM-DD)
                 </Text>
               </View>
 
@@ -889,61 +969,264 @@ export default function CalendarScreen({ navigation, route }) {
                 </View>
               </View>
 
-              {/* Assign to Employees (Admin only) */}
-              {user.role === 'admin' && (
+              {/* Visibility Selector */}
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{ color: colors.text, marginBottom: 8, fontWeight: '500' }}>
+                  Visibility *
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {[
+                    { value: 'all', label: 'All', icon: 'people', description: 'Visible to all employees' },
+                    { value: 'none', label: 'None', icon: 'lock-closed', description: 'Only visible to me' },
+                    { value: 'selected', label: 'Selected', icon: 'person', description: 'Selected employees only' },
+                  ].map((option) => (
+                    <TouchableOpacity
+                      key={option.value}
+                      style={{
+                        flex: 1,
+                        minWidth: '30%',
+                        borderRadius: 12,
+                        padding: 12,
+                        borderWidth: 2,
+                        borderColor: eventVisibility === option.value ? colors.primary : colors.border,
+                        backgroundColor: eventVisibility === option.value ? colors.primaryLight : colors.background,
+                        alignItems: 'center',
+                      }}
+                      onPress={() => {
+                        setEventVisibility(option.value);
+                        if (option.value !== 'selected') {
+                          setSelectedEmployees([]);
+                          setShowEmployeePicker(false);
+                        }
+                      }}
+                    >
+                      <Ionicons
+                        name={option.icon}
+                        size={20}
+                        color={eventVisibility === option.value ? colors.primary : colors.textSecondary}
+                        style={{ marginBottom: 4 }}
+                      />
+                      <Text
+                        style={{
+                          textAlign: 'center',
+                          fontSize: 12,
+                          fontWeight: '600',
+                          color: eventVisibility === option.value ? colors.primary : colors.text,
+                          marginBottom: 2,
+                        }}
+                      >
+                        {option.label}
+                      </Text>
+                      <Text
+                        style={{
+                          textAlign: 'center',
+                          fontSize: 10,
+                          color: eventVisibility === option.value ? colors.textSecondary : colors.textTertiary,
+                        }}
+                        numberOfLines={2}
+                      >
+                        {option.description}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Selected Employees Picker (only shown when visibility = 'selected') */}
+              {eventVisibility === 'selected' && (
                 <View style={{ marginBottom: 16 }}>
-                  <Text style={{ color: colors.text, marginBottom: 8, fontWeight: '500' }}>
-                    Assign to (Leave empty for all employees)
-                  </Text>
-                  <ScrollView
-                    style={{
-                      maxHeight: 120,
-                      backgroundColor: colors.background,
-                      borderRadius: 12,
-                      padding: 8,
-                    }}
-                    nestedScrollEnabled
-                  >
-                    {employees.map((emp) => (
-                      <TouchableOpacity
-                        key={emp.id}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <Text style={{ color: colors.text, fontWeight: '500' }}>
+                      Select Employees *
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => setShowEmployeePicker(!showEmployeePicker)}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        padding: 4,
+                      }}
+                    >
+                      <Text style={{ color: colors.primary, fontSize: 12, marginRight: 4 }}>
+                        {showEmployeePicker ? 'Hide' : 'Show'} List
+                      </Text>
+                      <Ionicons
+                        name={showEmployeePicker ? 'chevron-up' : 'chevron-down'}
+                        size={16}
+                        color={colors.primary}
+                      />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Selected Employees Chips */}
+                  {selectedEmployees.length > 0 && (
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        flexWrap: 'wrap',
+                        marginBottom: 8,
+                        minHeight: 40,
+                      }}
+                    >
+                      {selectedEmployees.map((username) => {
+                        const emp = employees.find(e => e.username === username);
+                        return (
+                          <View
+                            key={username}
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              backgroundColor: colors.primaryLight,
+                              borderRadius: 16,
+                              paddingHorizontal: 12,
+                              paddingVertical: 6,
+                              marginRight: 8,
+                              marginBottom: 8,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                color: colors.primary,
+                                fontSize: 12,
+                                fontWeight: '500',
+                                marginRight: 6,
+                              }}
+                            >
+                              {emp?.name || username}
+                            </Text>
+                            <TouchableOpacity
+                              onPress={() => removeSelectedEmployee(username)}
+                              style={{ padding: 2 }}
+                            >
+                              <Ionicons name="close-circle" size={16} color={colors.primary} />
+                            </TouchableOpacity>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  )}
+
+                  {/* Employee Search and List */}
+                  {showEmployeePicker && (
+                    <View
+                      style={{
+                        backgroundColor: colors.background,
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        maxHeight: 200,
+                      }}
+                    >
+                      {/* Search Bar */}
+                      <View
                         style={{
                           flexDirection: 'row',
                           alignItems: 'center',
-                          padding: 8,
+                          backgroundColor: colors.surface,
                           borderRadius: 8,
-                          marginBottom: 4,
-                          backgroundColor: selectedEmployees.includes(emp.id)
-                            ? colors.primaryLight
-                            : colors.surface,
+                          paddingHorizontal: 12,
+                          paddingVertical: 8,
+                          margin: 8,
                         }}
-                        onPress={() => toggleEmployeeSelection(emp.id)}
                       >
-                        <Ionicons
-                          name={selectedEmployees.includes(emp.id) ? 'checkbox' : 'square-outline'}
-                          size={20}
-                          color={selectedEmployees.includes(emp.id) ? colors.primary : colors.textSecondary}
-                        />
-                        <Text
+                        <Ionicons name="search" size={18} color={colors.textSecondary} />
+                        <TextInput
                           style={{
+                            flex: 1,
                             marginLeft: 8,
                             color: colors.text,
                             fontSize: 14,
                           }}
-                        >
-                          {emp.name}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                  {selectedEmployees.length > 0 && (
-                    <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 4 }}>
-                      {selectedEmployees.length} employee{selectedEmployees.length !== 1 ? 's' : ''} selected
-                    </Text>
+                          placeholder="Search by name, username, or email..."
+                          placeholderTextColor={colors.textTertiary}
+                          value={employeeSearchQuery}
+                          onChangeText={setEmployeeSearchQuery}
+                        />
+                        {employeeSearchQuery.length > 0 && (
+                          <TouchableOpacity onPress={() => setEmployeeSearchQuery('')}>
+                            <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+
+                      {/* Employee List */}
+                      <ScrollView
+                        style={{ maxHeight: 150 }}
+                        nestedScrollEnabled
+                        keyboardShouldPersistTaps="handled"
+                      >
+                        {getFilteredEmployees().length > 0 ? (
+                          getFilteredEmployees().map((emp) => {
+                            const isSelected = selectedEmployees.includes(emp.username);
+                            return (
+                              <TouchableOpacity
+                                key={emp.id || emp.username}
+                                style={{
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  padding: 12,
+                                  borderBottomWidth: 1,
+                                  borderBottomColor: colors.border,
+                                }}
+                                onPress={() => toggleEmployeeSelection(emp.username)}
+                              >
+                                <Ionicons
+                                  name={isSelected ? 'checkbox' : 'square-outline'}
+                                  size={20}
+                                  color={isSelected ? colors.primary : colors.textSecondary}
+                                  style={{ marginRight: 12 }}
+                                />
+                                <View style={{ flex: 1 }}>
+                                  <Text
+                                    style={{
+                                      color: colors.text,
+                                      fontSize: 14,
+                                      fontWeight: '500',
+                                    }}
+                                  >
+                                    {emp.name || emp.username}
+                                  </Text>
+                                  {emp.username && emp.username !== emp.name && (
+                                    <Text
+                                      style={{
+                                        color: colors.textSecondary,
+                                        fontSize: 12,
+                                        marginTop: 2,
+                                      }}
+                                    >
+                                      @{emp.username}
+                                    </Text>
+                                  )}
+                                  {emp.email && (
+                                    <Text
+                                      style={{
+                                        color: colors.textTertiary,
+                                        fontSize: 11,
+                                        marginTop: 2,
+                                      }}
+                                      numberOfLines={1}
+                                    >
+                                      {emp.email}
+                                    </Text>
+                                  )}
+                                </View>
+                              </TouchableOpacity>
+                            );
+                          })
+                        ) : (
+                          <View style={{ padding: 16, alignItems: 'center' }}>
+                            <Text style={{ color: colors.textTertiary, fontSize: 14 }}>
+                              {employeeSearchQuery ? 'No employees found' : 'No employees available'}
+                            </Text>
+                          </View>
+                        )}
+                      </ScrollView>
+                    </View>
                   )}
+
                   {selectedEmployees.length === 0 && (
-                    <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 4 }}>
-                      Event will be visible to all employees
+                    <Text style={{ fontSize: 12, color: colors.error, marginTop: 4 }}>
+                      Please select at least one employee
                     </Text>
                   )}
                 </View>
@@ -1223,19 +1506,28 @@ export default function CalendarScreen({ navigation, route }) {
                       Created by {selectedEvent.createdBy}
                     </Text>
                   </View>
-                  {selectedEvent.assignedTo && selectedEvent.assignedTo.length > 0 && (
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Ionicons name="people-outline" size={18} color={colors.textSecondary} />
-                      <Text style={{ color: colors.text, marginLeft: 8 }}>
-                        Assigned to {selectedEvent.assignedTo.length} employee{selectedEvent.assignedTo.length !== 1 ? 's' : ''}
-                      </Text>
-                    </View>
-                  )}
-                  {(!selectedEvent.assignedTo || selectedEvent.assignedTo.length === 0) && (
+                  {/* Visibility Info */}
+                  {selectedEvent.visibility === 'all' && (
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Ionicons name="people-outline" size={18} color={colors.textSecondary} />
                       <Text style={{ color: colors.text, marginLeft: 8 }}>
                         Visible to all employees
+                      </Text>
+                    </View>
+                  )}
+                  {selectedEvent.visibility === 'none' && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Ionicons name="lock-closed-outline" size={18} color={colors.textSecondary} />
+                      <Text style={{ color: colors.text, marginLeft: 8 }}>
+                        Private (only visible to creator)
+                      </Text>
+                    </View>
+                  )}
+                  {selectedEvent.visibility === 'selected' && (selectedEvent.visibleTo || selectedEvent.assignedTo) && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Ionicons name="person-outline" size={18} color={colors.textSecondary} />
+                      <Text style={{ color: colors.text, marginLeft: 8 }}>
+                        Visible to {(selectedEvent.visibleTo || selectedEvent.assignedTo || []).length} selected employee{((selectedEvent.visibleTo || selectedEvent.assignedTo || []).length) !== 1 ? 's' : ''}
                       </Text>
                     </View>
                   )}
@@ -1272,6 +1564,71 @@ export default function CalendarScreen({ navigation, route }) {
                 </TouchableOpacity>
               </>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Date Picker Modal */}
+      <Modal
+        visible={showDatePickerModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowDatePickerModal(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            justifyContent: 'flex-end',
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: colors.surface,
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              padding: 24,
+              maxHeight: '80%',
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <Text
+                style={{
+                  fontSize: 20,
+                  fontWeight: 'bold',
+                  color: colors.text,
+                }}
+              >
+                Select Date
+              </Text>
+              <TouchableOpacity onPress={() => setShowDatePickerModal(false)}>
+                <Ionicons name="close" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <DatePickerCalendar
+              onDateSelect={(date) => {
+                setEventDate(date);
+                setShowDatePickerModal(false);
+              }}
+              selectedStartDate={eventDate}
+              selectedEndDate={null}
+              allowRangeSelection={false}
+            />
+
+            <TouchableOpacity
+              style={{
+                backgroundColor: colors.primary,
+                borderRadius: 8,
+                padding: 12,
+                marginTop: 16,
+              }}
+              onPress={() => setShowDatePickerModal(false)}
+            >
+              <Text style={{ color: 'white', textAlign: 'center', fontWeight: '500' }}>
+                Done
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>

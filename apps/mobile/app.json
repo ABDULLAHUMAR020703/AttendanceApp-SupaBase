@@ -1,11 +1,12 @@
 {
   "expo": {
-    "name": "Hadir.AI",
+    "name": "hadir.ai",
     "slug": "attendance-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "scheme": "hadirai",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -24,11 +25,26 @@
       "package": "com.attendanceapp",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#14b8a6"
+        "backgroundColor": "#00000000"
       },
       "permissions": [
         "USE_BIOMETRIC",
         "USE_FINGERPRINT"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "hadirai"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
       ],
       "config": {
         "googleMaps": {
@@ -70,7 +86,8 @@
       "eas": {
         "projectId": "3517a51b-4c71-476d-8c07-d44f1189df72"
       },
-      "apiGatewayUrl": "https://attendanceapp-supabase-1.onrender.com"
+      "apiGatewayUrl": "https://attendanceapp-supabase-1.onrender.com",
+      "supabaseRedirectUrl": "hadirai://reset-password"
     }
   }
 }

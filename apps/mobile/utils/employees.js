@@ -221,6 +221,75 @@ export const getEmployees = async () => {
 };
 
 /**
+ * Get employees for Calendar event creation - fetches directly from Supabase
+ * This is the SINGLE source of truth for Calendar employee selection
+ * @param {Object} user - Current user object with role and department
+ * @returns {Promise<Array>} Array of employee objects filtered by role and is_active
+ */
+export const getEmployeesForCalendar = async (user) => {
+  try {
+    if (!user || !user.role) {
+      console.error('getEmployeesForCalendar: Invalid user object');
+      return [];
+    }
+
+    // Build query - always filter by is_active = true
+    let query = supabase
+      .from('users')
+      .select('uid, username, email, name, role, department, position, work_mode, hire_date, is_active')
+      .eq('is_active', true);
+
+    // Apply role-based filtering
+    // Super admins can see all employees
+    if (user.role === 'super_admin') {
+      // No additional filtering - show all active employees
+    }
+    // Managers can only see employees from their department
+    else if (user.role === 'manager') {
+      query = query.eq('department', user.department);
+    }
+    // Regular employees can see all employees (for calendar visibility)
+    // This allows employees to see who else is in the company for event creation
+    else {
+      // No additional filtering - show all active employees
+    }
+
+    const { data: employees, error } = await query.order('name', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching employees from Supabase for Calendar:', error);
+      return [];
+    }
+
+    if (!employees || employees.length === 0) {
+      console.log('No active employees found in Supabase for Calendar');
+      return [];
+    }
+
+    // Convert Supabase format to app format
+    const formattedEmployees = employees.map(emp => ({
+      id: `emp_${emp.uid}`,
+      uid: emp.uid,
+      username: emp.username,
+      name: emp.name,
+      email: emp.email,
+      role: emp.role,
+      department: emp.department,
+      position: emp.position,
+      workMode: emp.work_mode,
+      hireDate: emp.hire_date,
+      isActive: emp.is_active
+    }));
+
+    console.log(`✓ Fetched ${formattedEmployees.length} active employee(s) from Supabase for Calendar (User: ${user.username}, Role: ${user.role}${user.department ? `, Department: ${user.department}` : ''})`);
+    return formattedEmployees;
+  } catch (error) {
+    console.error('Error getting employees for Calendar:', error);
+    return [];
+  }
+};
+
+/**
  * Get employee by username
  * @param {string} username - Username to search for
  * @returns {Promise<Object|null>} Employee object or null
@@ -526,9 +595,10 @@ export const getManageableEmployees = async (user) => {
         .select('uid, username, email, name, role, department, position, work_mode, hire_date, is_active')
         .eq('is_active', true);
       
-      // Super admins can manage everyone (except other super admins)
+      // Super admins can manage EVERYONE (including other super admins)
+      // No filtering needed - they see all active users
       if (user.role === 'super_admin') {
-        query = query.neq('role', 'super_admin');
+        // No role filter - super_admin sees ALL active users
       } 
       // HR admins can manage all employees (except super admins)
       else if (user.role === 'manager' && user.department === 'HR') {
@@ -546,27 +616,41 @@ export const getManageableEmployees = async (user) => {
         return [];
       }
       
+      // Add explicit ordering and ensure no limit (Supabase default is 1000, but we want all)
+      query = query.order('name', { ascending: true });
+      
       const { data: employees, error } = await query;
       
-      if (!error && employees && employees.length > 0) {
-        // Convert Supabase format to app format
-        const formattedEmployees = employees.map(emp => ({
-          id: `emp_${emp.uid}`,
-          uid: emp.uid,
-          username: emp.username,
-          name: emp.name,
-          email: emp.email,
-          role: emp.role,
-          department: emp.department,
-          position: emp.position,
-          workMode: emp.work_mode,
-          hireDate: emp.hire_date,
-          isActive: emp.is_active
-        }));
-        
-        console.log(`✓ Found ${formattedEmployees.length} manageable employee(s) from Supabase for ${user.username} (${user.role}, ${user.department})`);
+      if (error) {
+        console.error('Error fetching manageable employees from Supabase:', error);
+        throw error; // Let it fall through to AsyncStorage fallback
+      }
+      
+      // Always return results, even if empty (to distinguish from error)
+      const formattedEmployees = (employees || []).map(emp => ({
+        id: `emp_${emp.uid}`,
+        uid: emp.uid,
+        username: emp.username,
+        name: emp.name,
+        email: emp.email,
+        role: emp.role,
+        department: emp.department,
+        position: emp.position,
+        workMode: emp.work_mode,
+        hireDate: emp.hire_date,
+        isActive: emp.is_active
+      }));
+      
+      console.log(`✓ Found ${formattedEmployees.length} manageable employee(s) from Supabase for ${user.username} (${user.role}, ${user.department || 'N/A'})`);
+      
+      if (formattedEmployees.length > 0) {
         return formattedEmployees;
       }
+      
+      // If no employees found, log warning but don't fall back to AsyncStorage
+      // (Supabase is source of truth - empty result is valid)
+      console.warn(`⚠️ No manageable employees found in Supabase for ${user.username} (${user.role}, ${user.department || 'N/A'})`);
+      return [];
     } catch (supabaseError) {
       console.log('Could not get employees from Supabase, falling back to AsyncStorage:', supabaseError.message);
     }
@@ -574,9 +658,9 @@ export const getManageableEmployees = async (user) => {
     // Fallback to AsyncStorage
     const employees = await getEmployees();
     
-    // Super admins can manage everyone
+    // Super admins can manage EVERYONE (including other super admins)
     if (user.role === 'super_admin') {
-      return employees.filter(emp => emp.isActive && emp.role !== 'super_admin');
+      return employees.filter(emp => emp.isActive);
     }
     
     // HR admins can manage all employees (except super admins)

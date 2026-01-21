@@ -16,6 +16,11 @@ A comprehensive employee attendance management system built with React Native, E
   - Username/Email + Password
   - Biometric authentication (Face ID, Fingerprint)
   - Session persistence with AsyncStorage
+- **Password Management**
+  - Self-service password change (requires current password)
+  - Forgot password flow with email reset
+  - Secure password reset via deep linking
+  - No password storage in database (Supabase Auth only)
 - **Role-Based Access Control**
   - Super Admin: Full system access
   - Manager: Department-level management
@@ -42,6 +47,19 @@ A comprehensive employee attendance management system built with React Native, E
   - Priority levels and status tracking
   - Manager assignment
 
+- **Calendar & Events**
+  - Create and manage calendar events
+  - Event visibility settings (All, None, Selected users)
+  - Supabase storage for data consistency
+  - Automatic refresh on screen focus
+  - Role-based employee filtering
+
+- **Help & Support**
+  - Contact support via email
+  - Production-safe email handling (works in APK builds)
+  - Fallback modal with copy-to-clipboard
+  - Pre-filled email with user details
+
 - **Analytics & Reporting**
   - Personal attendance analytics
   - Department-level statistics
@@ -59,12 +77,14 @@ A comprehensive employee attendance management system built with React Native, E
   - Local data caching with AsyncStorage
   - Offline-first approach
   - Automatic sync when online
+  - Calendar events stored in Supabase (AsyncStorage fallback)
 
 - **Real-Time Updates**
   - Supabase Realtime subscriptions
   - Live notification updates
   - Real-time attendance record synchronization
   - Instant work mode change notifications
+  - Calendar events refresh on screen focus
 
 ---
 
@@ -87,6 +107,7 @@ A comprehensive employee attendance management system built with React Native, E
 **Database & Auth:**
 - Supabase (PostgreSQL + Authentication)
 - Row Level Security (RLS) policies
+- Deep linking for password reset (`hadirai://reset-password`)
 
 ### System Architecture
 
@@ -150,6 +171,18 @@ Supabase (PostgreSQL + Auth)
    cp .env.example .env      # Linux/macOS
    ```
    
+   **Important:** Configure deep linking in `apps/mobile/app.json`:
+   ```json
+   {
+     "expo": {
+       "scheme": "hadirai",
+       "extra": {
+         "supabaseRedirectUrl": "hadirai://reset-password"
+       }
+     }
+   }
+   ```
+   
    See [SETUP.md](SETUP.md) for detailed instructions on getting Supabase credentials.
 
 4. **Set up Supabase database:**
@@ -210,13 +243,16 @@ For detailed setup instructions, see [SETUP.md](SETUP.md).
    ```json
    {
      "expo": {
+       "scheme": "hadirai",
        "extra": {
-         "apiGatewayUrl": "http://YOUR_IP_ADDRESS:3000"
+         "apiGatewayUrl": "http://YOUR_IP_ADDRESS:3000",
+         "supabaseRedirectUrl": "hadirai://reset-password"
        }
      }
    }
    ```
 3. Restart Expo server after updating `app.json`
+4. **For password reset:** Add `hadirai://reset-password` to Supabase Dashboard → Authentication → URL Configuration → Redirect URLs
 
 ---
 
@@ -238,10 +274,25 @@ EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 ```
 
+#### Frontend (`apps/mobile/app.json`)
+```json
+{
+  "expo": {
+    "scheme": "hadirai",
+    "extra": {
+      "apiGatewayUrl": "http://localhost:3000",
+      "supabaseRedirectUrl": "hadirai://reset-password"
+    }
+  }
+}
+```
+
 **Important:** 
 - Backend uses `service_role` key (secret, admin privileges)
 - Frontend uses `anon` key (public, safe for client)
 - Frontend variables must have `EXPO_PUBLIC_` prefix
+- Deep linking scheme `hadirai` is required for password reset flow
+- Add `hadirai://reset-password` to Supabase Dashboard → Authentication → URL Configuration
 
 See `.env.example` files in each directory for detailed instructions.
 
@@ -271,9 +322,16 @@ AttendanceApp-SupaBase/
 │   ├── 004_create_leave_requests_table.sql
 │   ├── 005_create_tickets_table.sql
 │   ├── 006_create_attendance_records_table.sql
+│   ├── 008_create_calendar_events_table.sql
+│   ├── 019_add_calendar_event_visibility.sql
 │   └── ... (additional migration files)
 │
 ├── docs/                    # Documentation
+│   ├── SYSTEM_ARCHITECTURE.md
+│   ├── TECHNICAL_DOCUMENTATION.md
+│   ├── APP_FEATURES.md
+│   ├── MODULAR_ARCHITECTURE.md
+│   └── STRUCTURE_SUMMARY.md
 ├── SETUP.md                 # Detailed setup guide
 └── README.md                # This file
 ```
@@ -300,6 +358,9 @@ AttendanceApp-SupaBase/
 - Submit leave requests
 - Create support tickets
 - View personal analytics
+- Change password (self-service)
+- Reset password via email
+- Create and view calendar events
 
 ---
 
@@ -318,9 +379,11 @@ See `scripts/README_AUTOMATED_USER_CREATION.md` for all demo users and creation 
 ## 📚 Documentation
 
 - **[SETUP.md](SETUP.md)** - Complete setup guide
-- **[docs/TECHNICAL_DOCUMENTATION.md](docs/TECHNICAL_DOCUMENTATION.md)** - Technical details
-- **[docs/SYSTEM_ARCHITECTURE.md](docs/SYSTEM_ARCHITECTURE.md)** - System architecture
-- **[docs/APP_FEATURES.md](docs/APP_FEATURES.md)** - Feature documentation
+- **[docs/TECHNICAL_DOCUMENTATION.md](docs/TECHNICAL_DOCUMENTATION.md)** - Technical details and API documentation
+- **[docs/SYSTEM_ARCHITECTURE.md](docs/SYSTEM_ARCHITECTURE.md)** - System architecture and user management
+- **[docs/APP_FEATURES.md](docs/APP_FEATURES.md)** - Complete feature documentation
+- **[docs/MODULAR_ARCHITECTURE.md](docs/MODULAR_ARCHITECTURE.md)** - Code structure and migration status
+- **[docs/STRUCTURE_SUMMARY.md](docs/STRUCTURE_SUMMARY.md)** - Quick reference for code organization
 
 ---
 
@@ -373,6 +436,16 @@ npm start
 - Check Supabase project is active
 - Ensure users exist in Supabase Auth
 
+**Password reset not working:**
+- Verify deep linking scheme `hadirai` is configured in `app.json`
+- Add `hadirai://reset-password` to Supabase Dashboard → Authentication → URL Configuration
+- Check email link opens the app correctly
+
+**Calendar events not showing:**
+- Verify `calendar_events` table exists in Supabase
+- Check RLS policies are configured correctly
+- Ensure events refresh on screen focus
+
 See [SETUP.md](SETUP.md) for detailed troubleshooting.
 
 ---
@@ -411,3 +484,7 @@ For issues and questions:
 ---
 
 **Built with ❤️ using React Native, Expo, and Supabase**
+
+---
+
+*Last Updated: 2025-01-27*

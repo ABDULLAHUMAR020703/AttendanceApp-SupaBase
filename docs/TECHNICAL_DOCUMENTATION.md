@@ -297,10 +297,15 @@ apps/mobile/
 │
 ├── screens/                    # Screen components (legacy)
 │   ├── NotificationsScreen.js # Notification center with state management
+│   ├── ForgotPasswordScreen.js # Password reset request
+│   ├── ResetPasswordScreen.js  # Password reset completion
+│   ├── ThemeSettingsScreen.js  # Theme settings + password change UI
 │   └── ...
 └── utils/                      # Utility functions (legacy)
     ├── notifications.js        # Notification state management
-    └── notificationNavigation.js # Centralized notification navigation handler
+    ├── notificationNavigation.js # Centralized notification navigation handler
+    ├── passwordChange.js       # Secure password change utility
+    └── calendar.js             # Calendar events (Supabase integration)
 ```
 
 ### Core Components
@@ -394,6 +399,8 @@ Response: { status: "ok", service: "api-gateway", timestamp: "..." }
 ### Supabase PostgreSQL
 
 **Table Structure:**
+
+**Users Table:**
 ```sql
 CREATE TABLE users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -412,20 +419,43 @@ CREATE TABLE users (
 );
 ```
 
+**Calendar Events Table:**
+```sql
+CREATE TABLE calendar_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title VARCHAR(255) NOT NULL,
+  description TEXT,
+  date DATE NOT NULL,
+  time TIME,
+  type VARCHAR(50) DEFAULT 'other',
+  color VARCHAR(7) DEFAULT '#3b82f6',
+  created_by_uid UUID,
+  created_by VARCHAR(255),
+  visibility VARCHAR(20) DEFAULT 'all',  -- 'all', 'none', 'selected'
+  visible_to JSONB DEFAULT '[]'::jsonb,  -- Array of usernames/UIDs
+  assigned_to JSONB DEFAULT '[]'::jsonb,  -- Legacy field (backward compatibility)
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
 **Row Level Security (RLS):**
 - RLS policies control access at the database level
 - Backend uses Service Role Key (bypasses RLS)
 - Frontend uses Anon Key (respects RLS policies)
+- Calendar events have RLS policies based on visibility settings
 
 **Important Notes:**
 - **UID Field**: The `uid` column must match the Supabase Auth User ID (`auth.uid()`)
 - If `uid` values don't match, the system falls back to email-based lookup
 - Use migration script `migrations/011_update_uid_to_match_auth.sql` to update UIDs if needed
+- **Calendar Events**: Stored in Supabase (not AsyncStorage), supports visibility settings (`all`, `none`, `selected`)
+- Calendar events refresh on screen focus for data consistency
 
 ### AsyncStorage (Local)
 
 **Storage Keys:**
-- `@company_employees` - Employee list cache
+- `@company_employees` - Employee list cache (synced from Supabase)
 - `@attendance_records` - Attendance data
 - `@tickets` - Ticket data
 - `@notifications` - Notification data (with read state)
@@ -433,11 +463,14 @@ CREATE TABLE users (
 - `@signup_requests` - Signup request data
 - `@auth_preferences` - Authentication preferences
 - `@theme_preference` - Theme preference
+- `calendar_events` - Calendar events (fallback only, Supabase is primary)
 
 **Data Format:**
 - JSON strings stored as values
 - Automatic serialization/deserialization
 - Persistence verification for critical operations
+
+**Note:** Calendar events are primarily stored in Supabase `calendar_events` table. AsyncStorage is used only as a fallback if Supabase is unavailable.
 
 ### Notification System Architecture
 
@@ -511,7 +544,25 @@ CREATE TABLE users (
    - Server-side password verification via Supabase Auth
    - Supports both username and email login
 
-2. **Biometric Authentication**
+2. **Password Change (Self-Service)**
+   - Available in Theme Settings screen
+   - Requires current password verification via `signInWithPassword`
+   - Updates password using `updateUser` API
+   - No password data stored locally or in PostgreSQL
+   - Self-service only (no admin password resets)
+   - Implementation: `utils/passwordChange.js`
+
+3. **Password Reset (Forgot Password Flow)**
+   - Users request reset via Forgot Password screen
+   - Uses `resetPasswordForEmail` to send reset email
+   - Deep linking: `hadirai://reset-password`
+   - Supabase handles token generation and validation
+   - Email link opens app and navigates to Reset Password screen
+   - Users set new password via `updateUser` API
+   - Generic success message prevents email enumeration
+   - Screens: `ForgotPasswordScreen.js`, `ResetPasswordScreen.js`
+
+4. **Biometric Authentication**
    - **Face ID** (iOS): Native device face recognition, automatically used on iOS devices
    - **Fingerprint** (Android): Fingerprint scanner support, automatically used on Android devices
    - Device-native security with platform-specific implementation
@@ -581,6 +632,39 @@ Response: { success: boolean }
 PATCH /api/auth/users/:username
 Body: Partial<UserObject>
 Response: { success: boolean, user: UserObject }
+
+PATCH /api/auth/users/:username/email
+Body: { email: string }
+Response: { success: boolean, user: UserObject }
+```
+
+### Supabase Auth API (Client-Side)
+
+#### Password Change
+```javascript
+// Re-authenticate with current password
+const { data, error } = await supabase.auth.signInWithPassword({
+  email: userEmail,
+  password: currentPassword,
+});
+
+// Update password
+const { error } = await supabase.auth.updateUser({
+  password: newPassword,
+});
+```
+
+#### Password Reset
+```javascript
+// Request password reset email
+const { error } = await supabase.auth.resetPasswordForEmail(email, {
+  redirectTo: 'hadirai://reset-password',
+});
+
+// Set new password (after clicking email link)
+const { error } = await supabase.auth.updateUser({
+  password: newPassword,
+});
 ```
 
 ### Auth Service Endpoints
@@ -661,6 +745,7 @@ Response:
 - Expo CLI (`npm install -g expo-cli`)
 - iOS Simulator (for iOS) or Android Emulator (for Android)
 - Supabase project with Authentication and PostgreSQL enabled
+- EAS CLI (for production builds): `npm install -g eas-cli`
 
 ### Installation Steps
 
@@ -721,13 +806,16 @@ Response:
    ```json
    {
      "expo": {
+       "scheme": "hadirai",
        "extra": {
-         "apiGatewayUrl": "http://192.168.18.38:3000"
+         "apiGatewayUrl": "http://192.168.18.38:3000",
+         "supabaseRedirectUrl": "hadirai://reset-password"
        }
      }
    }
    ```
    *Update with your computer's IP address for physical device testing*
+   *Deep linking scheme `hadirai` is required for password reset flow*
 
 7. **Start Services**
 
@@ -1088,5 +1176,5 @@ npm test
 
 ---
 
-*Last Updated: 2025-12-26*
+*Last Updated: 2025-01-27*
 

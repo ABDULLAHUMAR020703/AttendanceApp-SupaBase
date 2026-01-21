@@ -179,108 +179,108 @@ export default function CreateUserScreen({ navigation, route }) {
         >
           {/* Username */}
           <View style={{ marginBottom: spacing.md }}>
-            <Text className="text-gray-700 font-medium" style={{ fontSize: responsiveFont(14), marginBottom: spacing.xs }}>
+            <Text className="font-medium" style={{ color: colors.text, fontSize: responsiveFont(14), marginBottom: spacing.xs }}>
               Username *
             </Text>
-            <View className="flex-row items-center bg-gray-100 rounded-xl" style={{ paddingHorizontal: responsivePadding(16), paddingVertical: spacing.md }}>
-              <Ionicons name="person-outline" size={iconSize.md} color="#6b7280" />
+            <View className="flex-row items-center rounded-xl" style={{ backgroundColor: colors.borderLight, paddingHorizontal: responsivePadding(16), paddingVertical: spacing.md }}>
+              <Ionicons name="person-outline" size={iconSize.md} color={colors.textSecondary} />
               <TextInput
-                className="flex-1 text-gray-800"
+                className="flex-1"
                 placeholder="Enter username"
                 value={formData.username}
                 onChangeText={(value) => handleInputChange('username', value)}
                 autoCapitalize="none"
                 autoCorrect={false}
-                style={{ fontSize: responsiveFont(14), marginLeft: spacing.md }}
-                placeholderTextColor="#9ca3af"
+                style={{ color: colors.text, fontSize: responsiveFont(14), marginLeft: spacing.md }}
+                placeholderTextColor={colors.textTertiary}
               />
             </View>
           </View>
 
           {/* Password */}
           <View style={{ marginBottom: spacing.md }}>
-            <Text className="text-gray-700 font-medium" style={{ fontSize: responsiveFont(14), marginBottom: spacing.xs }}>
+            <Text className="font-medium" style={{ color: colors.text, fontSize: responsiveFont(14), marginBottom: spacing.xs }}>
               Password *
             </Text>
-            <View className="flex-row items-center bg-gray-100 rounded-xl" style={{ paddingHorizontal: responsivePadding(16), paddingVertical: spacing.md }}>
-              <Ionicons name="lock-closed-outline" size={iconSize.md} color="#6b7280" />
+            <View className="flex-row items-center rounded-xl" style={{ backgroundColor: colors.borderLight, paddingHorizontal: responsivePadding(16), paddingVertical: spacing.md }}>
+              <Ionicons name="lock-closed-outline" size={iconSize.md} color={colors.textSecondary} />
               <TextInput
-                className="flex-1 text-gray-800"
+                className="flex-1"
                 placeholder="Enter password"
                 value={formData.password}
                 onChangeText={(value) => handleInputChange('password', value)}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
-                style={{ fontSize: responsiveFont(14), marginLeft: spacing.md }}
-                placeholderTextColor="#9ca3af"
+                style={{ color: colors.text, fontSize: responsiveFont(14), marginLeft: spacing.md }}
+                placeholderTextColor={colors.textTertiary}
               />
               <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ marginLeft: spacing.xs }}>
-                <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={iconSize.md} color="#6b7280" />
+                <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={iconSize.md} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
           </View>
 
           {/* Confirm Password */}
           <View style={{ marginBottom: spacing.md }}>
-            <Text className="text-gray-700 font-medium" style={{ fontSize: responsiveFont(14), marginBottom: spacing.xs }}>
+            <Text className="font-medium" style={{ color: colors.text, fontSize: responsiveFont(14), marginBottom: spacing.xs }}>
               Confirm Password *
             </Text>
-            <View className="flex-row items-center bg-gray-100 rounded-xl" style={{ paddingHorizontal: responsivePadding(16), paddingVertical: spacing.md }}>
-              <Ionicons name="lock-closed-outline" size={iconSize.md} color="#6b7280" />
+            <View className="flex-row items-center rounded-xl" style={{ backgroundColor: colors.borderLight, paddingHorizontal: responsivePadding(16), paddingVertical: spacing.md }}>
+              <Ionicons name="lock-closed-outline" size={iconSize.md} color={colors.textSecondary} />
               <TextInput
-                className="flex-1 text-gray-800"
+                className="flex-1"
                 placeholder="Confirm password"
                 value={formData.confirmPassword}
                 onChangeText={(value) => handleInputChange('confirmPassword', value)}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
-                style={{ fontSize: responsiveFont(14), marginLeft: spacing.md }}
-                placeholderTextColor="#9ca3af"
+                style={{ color: colors.text, fontSize: responsiveFont(14), marginLeft: spacing.md }}
+                placeholderTextColor={colors.textTertiary}
               />
             </View>
           </View>
 
           {/* Name */}
           <View style={{ marginBottom: spacing.md }}>
-            <Text className="text-gray-700 font-medium" style={{ fontSize: responsiveFont(14), marginBottom: spacing.xs }}>
+            <Text className="font-medium" style={{ color: colors.text, fontSize: responsiveFont(14), marginBottom: spacing.xs }}>
               Full Name *
             </Text>
-            <View className="flex-row items-center bg-gray-100 rounded-xl" style={{ paddingHorizontal: responsivePadding(16), paddingVertical: spacing.md }}>
-              <Ionicons name="person-circle-outline" size={iconSize.md} color="#6b7280" />
+            <View className="flex-row items-center rounded-xl" style={{ backgroundColor: colors.borderLight, paddingHorizontal: responsivePadding(16), paddingVertical: spacing.md }}>
+              <Ionicons name="person-circle-outline" size={iconSize.md} color={colors.textSecondary} />
               <TextInput
-                className="flex-1 text-gray-800"
+                className="flex-1"
                 placeholder="Enter full name"
                 value={formData.name}
                 onChangeText={(value) => handleInputChange('name', value)}
-                style={{ fontSize: responsiveFont(14), marginLeft: spacing.md }}
-                placeholderTextColor="#9ca3af"
+                style={{ color: colors.text, fontSize: responsiveFont(14), marginLeft: spacing.md }}
+                placeholderTextColor={colors.textTertiary}
               />
             </View>
           </View>
 
           {/* Email */}
           <View style={{ marginBottom: spacing.md }}>
-            <Text className="text-gray-700 font-medium" style={{ fontSize: responsiveFont(14), marginBottom: spacing.xs }}>
+            <Text className="font-medium" style={{ color: colors.text, fontSize: responsiveFont(14), marginBottom: spacing.xs }}>
               Email *
             </Text>
-            <View className="flex-row items-center bg-gray-100 rounded-xl" style={{ paddingHorizontal: responsivePadding(16), paddingVertical: spacing.md }}>
-              <Ionicons name="mail-outline" size={iconSize.md} color="#6b7280" />
+            <View className="flex-row items-center rounded-xl" style={{ backgroundColor: colors.borderLight, paddingHorizontal: responsivePadding(16), paddingVertical: spacing.md }}>
+              <Ionicons name="mail-outline" size={iconSize.md} color={colors.textSecondary} />
               <TextInput
-                className="flex-1 text-gray-800"
+                className="flex-1"
                 placeholder="Enter email"
                 value={formData.email}
                 onChangeText={(value) => handleInputChange('email', value)}
                 keyboardType="email-address"
                 autoCapitalize="none"
-                style={{ fontSize: responsiveFont(14), marginLeft: spacing.md }}
-                placeholderTextColor="#9ca3af"
+                style={{ color: colors.text, fontSize: responsiveFont(14), marginLeft: spacing.md }}
+                placeholderTextColor={colors.textTertiary}
               />
             </View>
           </View>
 
           {/* Role */}
           <View style={{ marginBottom: spacing.md }}>
-            <Text className="text-gray-700 font-medium" style={{ fontSize: responsiveFont(14), marginBottom: spacing.xs }}>
+            <Text className="font-medium" style={{ color: colors.text, fontSize: responsiveFont(14), marginBottom: spacing.xs }}>
               Role *
             </Text>
             <View className="flex-row" style={{ gap: spacing.sm }}>
@@ -290,92 +290,118 @@ export default function CreateUserScreen({ navigation, route }) {
                   return false;
                 }
                 return true;
-              }).map((role) => (
-                <TouchableOpacity
-                  key={role.value}
-                  className={`flex-1 rounded-xl ${formData.role === role.value ? 'bg-primary-500' : 'bg-gray-200'}`}
-                  style={{ paddingVertical: spacing.sm, alignItems: 'center' }}
-                  onPress={() => handleInputChange('role', role.value)}
-                >
-                  <Text className={`font-medium ${formData.role === role.value ? 'text-white' : 'text-gray-700'}`} style={{ fontSize: responsiveFont(14) }}>
-                    {role.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              }).map((role) => {
+                const isSelected = formData.role === role.value;
+                return (
+                  <TouchableOpacity
+                    key={role.value}
+                    className="flex-1 rounded-xl"
+                    style={{ 
+                      backgroundColor: isSelected ? colors.primary : colors.borderLight,
+                      paddingVertical: spacing.sm, 
+                      alignItems: 'center' 
+                    }}
+                    onPress={() => handleInputChange('role', role.value)}
+                  >
+                    <Text 
+                      className="font-medium" 
+                      style={{ 
+                        color: isSelected ? '#ffffff' : colors.text,
+                        fontSize: responsiveFont(14) 
+                      }}
+                    >
+                      {role.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
 
           {/* Department */}
           <View style={{ marginBottom: spacing.md }}>
-            <Text className="text-gray-700 font-medium" style={{ fontSize: responsiveFont(14), marginBottom: spacing.xs }}>
+            <Text className="font-medium" style={{ color: colors.text, fontSize: responsiveFont(14), marginBottom: spacing.xs }}>
               Department
             </Text>
-            <View className="flex-row items-center bg-gray-100 rounded-xl" style={{ paddingHorizontal: responsivePadding(16), paddingVertical: spacing.md }}>
-              <Ionicons name="business-outline" size={iconSize.md} color="#6b7280" />
+            <View className="flex-row items-center rounded-xl" style={{ backgroundColor: colors.borderLight, paddingHorizontal: responsivePadding(16), paddingVertical: spacing.md }}>
+              <Ionicons name="business-outline" size={iconSize.md} color={colors.textSecondary} />
               <TextInput
-                className="flex-1 text-gray-800"
+                className="flex-1"
                 placeholder="Enter department"
                 value={formData.department}
                 onChangeText={(value) => handleInputChange('department', value)}
-                style={{ fontSize: responsiveFont(14), marginLeft: spacing.md }}
-                placeholderTextColor="#9ca3af"
+                style={{ color: colors.text, fontSize: responsiveFont(14), marginLeft: spacing.md }}
+                placeholderTextColor={colors.textTertiary}
               />
             </View>
           </View>
 
           {/* Position */}
           <View style={{ marginBottom: spacing.md }}>
-            <Text className="text-gray-700 font-medium" style={{ fontSize: responsiveFont(14), marginBottom: spacing.xs }}>
+            <Text className="font-medium" style={{ color: colors.text, fontSize: responsiveFont(14), marginBottom: spacing.xs }}>
               Position
             </Text>
-            <View className="flex-row items-center bg-gray-100 rounded-xl" style={{ paddingHorizontal: responsivePadding(16), paddingVertical: spacing.md }}>
-              <Ionicons name="briefcase-outline" size={iconSize.md} color="#6b7280" />
+            <View className="flex-row items-center rounded-xl" style={{ backgroundColor: colors.borderLight, paddingHorizontal: responsivePadding(16), paddingVertical: spacing.md }}>
+              <Ionicons name="briefcase-outline" size={iconSize.md} color={colors.textSecondary} />
               <TextInput
-                className="flex-1 text-gray-800"
+                className="flex-1"
                 placeholder="Enter position"
                 value={formData.position}
                 onChangeText={(value) => handleInputChange('position', value)}
-                style={{ fontSize: responsiveFont(14), marginLeft: spacing.md }}
-                placeholderTextColor="#9ca3af"
+                style={{ color: colors.text, fontSize: responsiveFont(14), marginLeft: spacing.md }}
+                placeholderTextColor={colors.textTertiary}
               />
             </View>
           </View>
 
           {/* Work Mode */}
           <View style={{ marginBottom: spacing.md }}>
-            <Text className="text-gray-700 font-medium" style={{ fontSize: responsiveFont(14), marginBottom: spacing.xs }}>
+            <Text className="font-medium" style={{ color: colors.text, fontSize: responsiveFont(14), marginBottom: spacing.xs }}>
               Work Mode
             </Text>
             <View className="flex-row" style={{ gap: spacing.sm }}>
-              {WORK_MODE_OPTIONS.map((mode) => (
-                <TouchableOpacity
-                  key={mode.value}
-                  className={`flex-1 rounded-xl ${formData.workMode === mode.value ? 'bg-primary-500' : 'bg-gray-200'}`}
-                  style={{ paddingVertical: spacing.sm, alignItems: 'center' }}
-                  onPress={() => handleInputChange('workMode', mode.value)}
-                >
-                  <Text className={`font-medium ${formData.workMode === mode.value ? 'text-white' : 'text-gray-700'}`} style={{ fontSize: responsiveFont(12) }}>
-                    {mode.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              {WORK_MODE_OPTIONS.map((mode) => {
+                const isSelected = formData.workMode === mode.value;
+                return (
+                  <TouchableOpacity
+                    key={mode.value}
+                    className="flex-1 rounded-xl"
+                    style={{ 
+                      backgroundColor: isSelected ? colors.primary : colors.borderLight,
+                      paddingVertical: spacing.sm, 
+                      alignItems: 'center' 
+                    }}
+                    onPress={() => handleInputChange('workMode', mode.value)}
+                  >
+                    <Text 
+                      className="font-medium" 
+                      style={{ 
+                        color: isSelected ? '#ffffff' : colors.text,
+                        fontSize: responsiveFont(12) 
+                      }}
+                    >
+                      {mode.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
 
           {/* Hire Date */}
           <View style={{ marginBottom: spacing.lg }}>
-            <Text className="text-gray-700 font-medium" style={{ fontSize: responsiveFont(14), marginBottom: spacing.xs }}>
+            <Text className="font-medium" style={{ color: colors.text, fontSize: responsiveFont(14), marginBottom: spacing.xs }}>
               Hire Date
             </Text>
-            <View className="flex-row items-center bg-gray-100 rounded-xl" style={{ paddingHorizontal: responsivePadding(16), paddingVertical: spacing.md }}>
-              <Ionicons name="calendar-outline" size={iconSize.md} color="#6b7280" />
+            <View className="flex-row items-center rounded-xl" style={{ backgroundColor: colors.borderLight, paddingHorizontal: responsivePadding(16), paddingVertical: spacing.md }}>
+              <Ionicons name="calendar-outline" size={iconSize.md} color={colors.textSecondary} />
               <TextInput
-                className="flex-1 text-gray-800"
+                className="flex-1"
                 placeholder="YYYY-MM-DD"
                 value={formData.hireDate}
                 onChangeText={(value) => handleInputChange('hireDate', value)}
-                style={{ fontSize: responsiveFont(14), marginLeft: spacing.md }}
-                placeholderTextColor="#9ca3af"
+                style={{ color: colors.text, fontSize: responsiveFont(14), marginLeft: spacing.md }}
+                placeholderTextColor={colors.textTertiary}
               />
             </View>
           </View>

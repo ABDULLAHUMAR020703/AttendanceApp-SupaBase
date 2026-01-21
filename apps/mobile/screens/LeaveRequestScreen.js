@@ -23,9 +23,11 @@ import {
 } from '../utils/leaveManagement';
 import { getEmployeeByUsername } from '../utils/employees';
 import DatePickerCalendar from '../components/DatePickerCalendar';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function LeaveRequestScreen({ navigation, route }) {
   const { user } = route.params;
+  const { colors } = useTheme();
   const [leaveBalance, setLeaveBalance] = useState(null);
   const [myRequests, setMyRequests] = useState([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -220,17 +222,17 @@ export default function LeaveRequestScreen({ navigation, route }) {
   };
 
   const renderRequest = ({ item }) => (
-    <View className="bg-white rounded-xl p-4 mb-3 shadow-sm">
+    <View className="rounded-xl p-4 mb-3 shadow-sm" style={{ backgroundColor: colors.surface }}>
       <View className="flex-row items-center justify-between mb-2">
         <View className="flex-1">
-          <Text className="text-lg font-semibold text-gray-800">
+          <Text className="text-lg font-semibold" style={{ color: colors.text }}>
             {getLeaveTypeLabel(item.leaveType)}
           </Text>
-          <Text className="text-gray-600 text-sm">
+          <Text className="text-sm" style={{ color: colors.textSecondary }}>
             {new Date(item.startDate).toLocaleDateString()}{item.startDate !== item.endDate ? ` - ${new Date(item.endDate).toLocaleDateString()}` : ''}
             {item.isHalfDay && ` (${item.halfDayPeriod === 'morning' ? 'Morning' : 'Afternoon'})`}
           </Text>
-          <Text className="text-gray-500 text-xs mt-1">
+          <Text className="text-xs mt-1" style={{ color: colors.textTertiary }}>
             {item.isHalfDay ? 'Half day' : `${item.days} day${item.days !== 1 ? 's' : ''}`} • Requested {new Date(item.requestedAt).toLocaleDateString()}
           </Text>
         </View>
@@ -249,7 +251,7 @@ export default function LeaveRequestScreen({ navigation, route }) {
             </Text>
           </View>
           {item.processedAt && (
-            <Text className="text-xs text-gray-500">
+            <Text className="text-xs" style={{ color: colors.textTertiary }}>
               {new Date(item.processedAt).toLocaleDateString()}
             </Text>
           )}
@@ -257,27 +259,27 @@ export default function LeaveRequestScreen({ navigation, route }) {
       </View>
       {item.category && (
         <View className="flex-row items-center mt-2">
-          <Ionicons name="business-outline" size={14} color="#6b7280" />
-          <Text className="text-gray-600 text-sm ml-1">
+          <Ionicons name="business-outline" size={14} color={colors.textSecondary} />
+          <Text className="text-sm ml-1" style={{ color: colors.textSecondary }}>
             Category: {getCategoryLabel(item.category)}
           </Text>
         </View>
       )}
       {item.assignedTo && (
         <View className="flex-row items-center mt-1">
-          <Ionicons name="person-outline" size={14} color="#6b7280" />
-          <Text className="text-gray-600 text-sm ml-1">
+          <Ionicons name="person-outline" size={14} color={colors.textSecondary} />
+          <Text className="text-sm ml-1" style={{ color: colors.textSecondary }}>
             Assigned to: {item.assignedTo}
           </Text>
         </View>
       )}
       {item.reason && (
-        <Text className="text-gray-600 text-sm mt-2">
+        <Text className="text-sm mt-2" style={{ color: colors.textSecondary }}>
           Reason: {item.reason}
         </Text>
       )}
       {item.adminNotes && (
-        <Text className="text-sm mt-2" style={{ color: item.status === 'rejected' ? '#ef4444' : '#10b981' }}>
+        <Text className="text-sm mt-2" style={{ color: item.status === 'rejected' ? colors.error : colors.success }}>
           Admin Note: {item.adminNotes}
         </Text>
       )}
@@ -287,15 +289,16 @@ export default function LeaveRequestScreen({ navigation, route }) {
   const remaining = leaveBalance ? calculateRemainingLeaves(leaveBalance) : null;
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1" style={{ backgroundColor: colors.background }}>
       {/* Header */}
-      <View className="bg-white px-6 py-4 shadow-sm">
+      <View className="px-6 py-4 shadow-sm" style={{ backgroundColor: colors.surface }}>
         <View className="flex-row items-center justify-between">
-          <Text className="text-xl font-bold text-gray-800">
+          <Text className="text-xl font-bold" style={{ color: colors.text }}>
             Leave Requests
           </Text>
           <TouchableOpacity
-            className="bg-primary-500 rounded-xl px-4 py-2"
+            className="rounded-xl px-4 py-2"
+            style={{ backgroundColor: colors.primary }}
             onPress={() => setShowRequestModal(true)}
           >
             <View className="flex-row items-center">
@@ -308,39 +311,40 @@ export default function LeaveRequestScreen({ navigation, route }) {
 
       <ScrollView 
         className="flex-1"
+        style={{ backgroundColor: colors.background }}
         refreshControl={
           <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
         }
       >
         {/* Leave Balance Card */}
         {leaveBalance && remaining && (
-          <View className="bg-white mx-4 my-4 rounded-xl p-4 shadow-sm">
-            <Text className="text-lg font-semibold text-gray-800 mb-3">
+          <View className="mx-4 my-4 rounded-xl p-4 shadow-sm" style={{ backgroundColor: colors.surface }}>
+            <Text className="text-lg font-semibold mb-3" style={{ color: colors.text }}>
               Leave Balance
             </Text>
             <View className="space-y-2">
               <View className="flex-row justify-between items-center">
-                <Text className="text-gray-600">Annual Leaves</Text>
-                <Text className="font-semibold text-gray-800">
+                <Text style={{ color: colors.textSecondary }}>Annual Leaves</Text>
+                <Text className="font-semibold" style={{ color: colors.text }}>
                   {remaining.annual} / {leaveBalance.annualLeaves}
                 </Text>
               </View>
               <View className="flex-row justify-between items-center">
-                <Text className="text-gray-600">Sick Leaves</Text>
-                <Text className="font-semibold text-gray-800">
+                <Text style={{ color: colors.textSecondary }}>Sick Leaves</Text>
+                <Text className="font-semibold" style={{ color: colors.text }}>
                   {remaining.sick} / {leaveBalance.sickLeaves}
                 </Text>
               </View>
               <View className="flex-row justify-between items-center">
-                <Text className="text-gray-600">Casual Leaves</Text>
-                <Text className="font-semibold text-gray-800">
+                <Text style={{ color: colors.textSecondary }}>Casual Leaves</Text>
+                <Text className="font-semibold" style={{ color: colors.text }}>
                   {remaining.casual} / {leaveBalance.casualLeaves}
                 </Text>
               </View>
-              <View className="border-t border-gray-200 pt-2 mt-2">
+              <View className="border-t pt-2 mt-2" style={{ borderColor: colors.border }}>
                 <View className="flex-row justify-between items-center">
-                  <Text className="text-gray-800 font-semibold">Total Remaining</Text>
-                  <Text className="font-bold text-primary-500 text-lg">
+                  <Text className="font-semibold" style={{ color: colors.text }}>Total Remaining</Text>
+                  <Text className="font-bold text-lg" style={{ color: colors.primary }}>
                     {remaining.total} days
                   </Text>
                 </View>
@@ -351,7 +355,7 @@ export default function LeaveRequestScreen({ navigation, route }) {
 
         {/* My Requests */}
         <View className="px-4 pb-4">
-          <Text className="text-lg font-semibold text-gray-800 mb-3">
+          <Text className="text-lg font-semibold mb-3" style={{ color: colors.text }}>
             My Leave Requests
           </Text>
           {myRequests.length > 0 ? (
@@ -362,12 +366,12 @@ export default function LeaveRequestScreen({ navigation, route }) {
               scrollEnabled={false}
             />
           ) : (
-            <View className="bg-white rounded-xl p-8 items-center">
-              <Ionicons name="calendar-outline" size={48} color="#d1d5db" />
-              <Text className="text-gray-500 mt-4 text-center">
+            <View className="rounded-xl p-8 items-center" style={{ backgroundColor: colors.surface }}>
+              <Ionicons name="calendar-outline" size={48} color={colors.textTertiary} />
+              <Text className="mt-4 text-center" style={{ color: colors.textSecondary }}>
                 No leave requests yet
               </Text>
-              <Text className="text-gray-400 text-sm mt-2 text-center">
+              <Text className="text-sm mt-2 text-center" style={{ color: colors.textTertiary }}>
                 Tap "New Request" to submit a leave request
               </Text>
             </View>
@@ -390,54 +394,58 @@ export default function LeaveRequestScreen({ navigation, route }) {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
-        <View className="flex-1 justify-end bg-black bg-opacity-50">
-          <View className="bg-white rounded-t-3xl p-6" style={{ maxHeight: '90%' }}>
+        <View className="flex-1 justify-end" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+          <View className="rounded-t-3xl p-6" style={{ backgroundColor: colors.surface, maxHeight: '90%' }}>
               <ScrollView 
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
               >
               <View className="flex-row items-center justify-between mb-4">
-                <Text className="text-xl font-bold text-gray-800">
+                <Text className="text-xl font-bold" style={{ color: colors.text }}>
                   New Leave Request
                 </Text>
                 <TouchableOpacity onPress={() => {
                   setShowRequestModal(false);
                   resetForm();
                 }}>
-                  <Ionicons name="close" size={24} color="#6b7280" />
+                  <Ionicons name="close" size={24} color={colors.textSecondary} />
                 </TouchableOpacity>
               </View>
 
               {/* Leave Type Selection */}
               <View className="mb-4">
-                <Text className="text-gray-700 mb-2 font-medium">Leave Type</Text>
+                <Text className="mb-2 font-medium" style={{ color: colors.text }}>Leave Type</Text>
                 <View className="flex-row space-x-2">
-                  {['annual', 'sick', 'casual'].map((type) => (
-                    <TouchableOpacity
-                      key={type}
-                      className={`flex-1 rounded-lg p-3 border-2 ${
-                        leaveType === type
-                          ? 'border-primary-500 bg-primary-50'
-                          : 'border-gray-200 bg-white'
-                      }`}
-                      onPress={() => setLeaveType(type)}
-                    >
-                      <Text
-                        className={`text-center font-medium ${
-                          leaveType === type ? 'text-primary-600' : 'text-gray-600'
-                        }`}
+                  {['annual', 'sick', 'casual'].map((type) => {
+                    const isSelected = leaveType === type;
+                    return (
+                      <TouchableOpacity
+                        key={type}
+                        className="flex-1 rounded-lg p-3 border-2"
+                        style={{
+                          borderColor: isSelected ? colors.primary : colors.border,
+                          backgroundColor: isSelected ? colors.primaryLight : colors.surface,
+                        }}
+                        onPress={() => setLeaveType(type)}
                       >
-                        {getLeaveTypeLabel(type)}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                        <Text
+                          className="text-center font-medium"
+                          style={{
+                            color: isSelected ? colors.primary : colors.text,
+                          }}
+                        >
+                          {getLeaveTypeLabel(type)}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </View>
 
               {/* Category Selection (for routing to appropriate manager) */}
               <View className="mb-4">
-                <Text className="text-gray-700 mb-2 font-medium">Department/Category</Text>
-                <Text className="text-gray-500 text-xs mb-2">
+                <Text className="mb-2 font-medium" style={{ color: colors.text }}>Department/Category</Text>
+                <Text className="text-xs mb-2" style={{ color: colors.textTertiary }}>
                   Select the department manager who should review this request
                 </Text>
                 <View className="flex-row flex-wrap gap-2">
@@ -477,14 +485,17 @@ export default function LeaveRequestScreen({ navigation, route }) {
                       return (
                         <TouchableOpacity
                           key={cat.value}
-                          className={`rounded-lg p-3 border-2 ${
-                            isSelected
-                              ? 'border-primary-500 bg-primary-50'
-                              : isEnabled
-                              ? 'border-gray-200 bg-white'
-                              : 'border-gray-200 bg-gray-100 opacity-50'
-                          }`}
-                          style={{ minWidth: '30%' }}
+                          className="rounded-lg p-3 border-2"
+                          style={{
+                            minWidth: '30%',
+                            borderColor: isSelected ? colors.primary : colors.border,
+                            backgroundColor: isSelected 
+                              ? colors.primaryLight 
+                              : isEnabled 
+                                ? colors.surface 
+                                : colors.borderLight,
+                            opacity: isEnabled ? 1 : 0.5,
+                          }}
                           onPress={() => {
                             if (isEnabled) {
                               setCategory(routingCategory);
@@ -493,13 +504,14 @@ export default function LeaveRequestScreen({ navigation, route }) {
                           disabled={!isEnabled}
                         >
                           <Text
-                            className={`text-center font-medium text-sm ${
-                              isSelected
-                                ? 'text-primary-600'
+                            className="text-center font-medium text-sm"
+                            style={{
+                              color: isSelected
+                                ? colors.primary
                                 : isEnabled
-                                ? 'text-gray-600'
-                                : 'text-gray-400'
-                            }`}
+                                  ? colors.text
+                                  : colors.textTertiary,
+                            }}
                           >
                             {cat.label}
                           </Text>
@@ -509,12 +521,12 @@ export default function LeaveRequestScreen({ navigation, route }) {
                   })()}
                 </View>
                 {category && (
-                  <Text className="text-xs text-gray-500 mt-2">
+                  <Text className="text-xs mt-2" style={{ color: colors.textTertiary }}>
                     Will be routed to {getCategoryLabel(category)} manager
                   </Text>
                 )}
                 {!category && employee && employee.department && (
-                  <Text className="text-xs text-gray-500 mt-2">
+                  <Text className="text-xs mt-2" style={{ color: colors.textTertiary }}>
                     Please select a department category (HR is always available)
                   </Text>
                 )}
@@ -522,36 +534,38 @@ export default function LeaveRequestScreen({ navigation, route }) {
 
               {/* Half Day Toggle */}
               <View className="mb-4">
-                <Text className="text-gray-700 mb-2 font-medium">Leave Duration</Text>
+                <Text className="mb-2 font-medium" style={{ color: colors.text }}>Leave Duration</Text>
                 <View className="flex-row space-x-2">
                   <TouchableOpacity
-                    className={`flex-1 rounded-lg p-3 border-2 ${
-                      !isHalfDay
-                        ? 'border-primary-500 bg-primary-50'
-                        : 'border-gray-200 bg-white'
-                    }`}
+                    className="flex-1 rounded-lg p-3 border-2"
+                    style={{
+                      borderColor: !isHalfDay ? colors.primary : colors.border,
+                      backgroundColor: !isHalfDay ? colors.primaryLight : colors.surface,
+                    }}
                     onPress={() => setIsHalfDay(false)}
                   >
                     <Text
-                      className={`text-center font-medium ${
-                        !isHalfDay ? 'text-primary-600' : 'text-gray-600'
-                      }`}
+                      className="text-center font-medium"
+                      style={{
+                        color: !isHalfDay ? colors.primary : colors.text,
+                      }}
                     >
                       Full Day(s)
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    className={`flex-1 rounded-lg p-3 border-2 ${
-                      isHalfDay
-                        ? 'border-primary-500 bg-primary-50'
-                        : 'border-gray-200 bg-white'
-                    }`}
+                    className="flex-1 rounded-lg p-3 border-2"
+                    style={{
+                      borderColor: isHalfDay ? colors.primary : colors.border,
+                      backgroundColor: isHalfDay ? colors.primaryLight : colors.surface,
+                    }}
                     onPress={() => setIsHalfDay(true)}
                   >
                     <Text
-                      className={`text-center font-medium ${
-                        isHalfDay ? 'text-primary-600' : 'text-gray-600'
-                      }`}
+                      className="text-center font-medium"
+                      style={{
+                        color: isHalfDay ? colors.primary : colors.text,
+                      }}
                     >
                       Half Day
                     </Text>
@@ -562,54 +576,56 @@ export default function LeaveRequestScreen({ navigation, route }) {
               {/* Half Day Period Selection */}
               {isHalfDay && (
                 <View className="mb-4">
-                  <Text className="text-gray-700 mb-2 font-medium">Half Day Period</Text>
+                  <Text className="mb-2 font-medium" style={{ color: colors.text }}>Half Day Period</Text>
                   <View className="flex-row space-x-2">
                     <TouchableOpacity
-                      className={`flex-1 rounded-lg p-3 border-2 ${
-                        halfDayPeriod === 'morning'
-                          ? 'border-amber-500 bg-amber-50'
-                          : 'border-gray-200 bg-white'
-                      }`}
+                      className="flex-1 rounded-lg p-3 border-2"
+                      style={{
+                        borderColor: halfDayPeriod === 'morning' ? colors.warning : colors.border,
+                        backgroundColor: halfDayPeriod === 'morning' ? colors.warningLight : colors.surface,
+                      }}
                       onPress={() => setHalfDayPeriod('morning')}
                     >
                       <View className="items-center">
                         <Ionicons 
                           name="sunny-outline" 
                           size={20} 
-                          color={halfDayPeriod === 'morning' ? '#f59e0b' : '#6b7280'} 
+                          color={halfDayPeriod === 'morning' ? colors.warning : colors.textSecondary} 
                         />
                         <Text
-                          className={`text-center font-medium mt-1 ${
-                            halfDayPeriod === 'morning' ? 'text-amber-600' : 'text-gray-600'
-                          }`}
+                          className="text-center font-medium mt-1"
+                          style={{
+                            color: halfDayPeriod === 'morning' ? colors.warning : colors.text,
+                          }}
                         >
                           Morning
                         </Text>
-                        <Text className="text-xs text-gray-500">First half</Text>
+                        <Text className="text-xs" style={{ color: colors.textTertiary }}>First half</Text>
                       </View>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      className={`flex-1 rounded-lg p-3 border-2 ${
-                        halfDayPeriod === 'afternoon'
-                          ? 'border-orange-500 bg-orange-50'
-                          : 'border-gray-200 bg-white'
-                      }`}
+                      className="flex-1 rounded-lg p-3 border-2"
+                      style={{
+                        borderColor: halfDayPeriod === 'afternoon' ? colors.warning : colors.border,
+                        backgroundColor: halfDayPeriod === 'afternoon' ? colors.warningLight : colors.surface,
+                      }}
                       onPress={() => setHalfDayPeriod('afternoon')}
                     >
                       <View className="items-center">
                         <Ionicons 
                           name="partly-sunny-outline" 
                           size={20} 
-                          color={halfDayPeriod === 'afternoon' ? '#ea580c' : '#6b7280'} 
+                          color={halfDayPeriod === 'afternoon' ? colors.warning : colors.textSecondary} 
                         />
                         <Text
-                          className={`text-center font-medium mt-1 ${
-                            halfDayPeriod === 'afternoon' ? 'text-orange-600' : 'text-gray-600'
-                          }`}
+                          className="text-center font-medium mt-1"
+                          style={{
+                            color: halfDayPeriod === 'afternoon' ? colors.warning : colors.text,
+                          }}
                         >
                           Afternoon
                         </Text>
-                        <Text className="text-xs text-gray-500">Second half</Text>
+                        <Text className="text-xs" style={{ color: colors.textTertiary }}>Second half</Text>
                       </View>
                     </TouchableOpacity>
                   </View>
@@ -618,7 +634,7 @@ export default function LeaveRequestScreen({ navigation, route }) {
 
               {/* Date Selection Calendar */}
               <View className="mb-4">
-                <Text className="text-gray-700 mb-2 font-medium">
+                <Text className="mb-2 font-medium" style={{ color: colors.text }}>
                   {isHalfDay ? 'Select Date' : 'Select Date Range'}
                 </Text>
                 {isHalfDay ? (
@@ -647,13 +663,11 @@ export default function LeaveRequestScreen({ navigation, route }) {
                 {!isHalfDay && (
                   <View className="mt-4 flex-row space-x-2">
                     <TouchableOpacity
-                      className={`flex-1 rounded-lg p-3 border-2 ${
-                        startDate
-                          ? 'border-red-500 bg-red-50'
-                          : selectedPreviewDate
-                          ? 'border-primary-500 bg-primary-500'
-                          : 'border-gray-300 bg-gray-100'
-                      }`}
+                      className="flex-1 rounded-lg p-3 border-2"
+                      style={{
+                        borderColor: startDate ? colors.error : selectedPreviewDate ? colors.primary : colors.border,
+                        backgroundColor: startDate ? colors.errorLight : selectedPreviewDate ? colors.primary : colors.borderLight,
+                      }}
                       onPress={() => {
                         if (startDate) {
                           // Unselect start date
@@ -674,26 +688,25 @@ export default function LeaveRequestScreen({ navigation, route }) {
                       disabled={!selectedPreviewDate && !startDate}
                     >
                       <Text
-                        className={`text-center font-medium ${
-                          startDate
-                            ? 'text-red-600'
+                        className="text-center font-medium"
+                        style={{
+                          color: startDate
+                            ? colors.error
                             : selectedPreviewDate
-                            ? 'text-white'
-                            : 'text-gray-500'
-                        }`}
+                            ? '#ffffff'
+                            : colors.textTertiary,
+                        }}
                       >
                         {startDate ? 'Unselect Start Date' : 'Select Start Date'}
                       </Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                      className={`flex-1 rounded-lg p-3 border-2 ${
-                        endDate
-                          ? 'border-red-500 bg-red-50'
-                          : selectedPreviewDate && startDate && new Date(selectedPreviewDate) >= new Date(startDate)
-                          ? 'border-primary-500 bg-primary-500'
-                          : 'border-gray-300 bg-gray-100'
-                      }`}
+                      className="flex-1 rounded-lg p-3 border-2"
+                      style={{
+                        borderColor: endDate ? colors.error : selectedPreviewDate && startDate && new Date(selectedPreviewDate) >= new Date(startDate) ? colors.primary : colors.border,
+                        backgroundColor: endDate ? colors.errorLight : selectedPreviewDate && startDate && new Date(selectedPreviewDate) >= new Date(startDate) ? colors.primary : colors.borderLight,
+                      }}
                       onPress={() => {
                         if (endDate) {
                           // Unselect end date
@@ -713,13 +726,14 @@ export default function LeaveRequestScreen({ navigation, route }) {
                       disabled={(!selectedPreviewDate || !startDate) && !endDate}
                     >
                       <Text
-                        className={`text-center font-medium ${
-                          endDate
-                            ? 'text-red-600'
+                        className="text-center font-medium"
+                        style={{
+                          color: endDate
+                            ? colors.error
                             : selectedPreviewDate && startDate && new Date(selectedPreviewDate) >= new Date(startDate)
-                            ? 'text-white'
-                            : 'text-gray-500'
-                        }`}
+                            ? '#ffffff'
+                            : colors.textTertiary,
+                        }}
                       >
                         {endDate ? 'Unselect End Date' : 'Select End Date'}
                       </Text>
@@ -731,13 +745,11 @@ export default function LeaveRequestScreen({ navigation, route }) {
                 {isHalfDay && (
                   <View className="mt-4">
                     <TouchableOpacity
-                      className={`rounded-lg p-3 border-2 ${
-                        startDate
-                          ? 'border-red-500 bg-red-50'
-                          : selectedPreviewDate
-                          ? 'border-primary-500 bg-primary-500'
-                          : 'border-gray-300 bg-gray-100'
-                      }`}
+                      className="rounded-lg p-3 border-2"
+                      style={{
+                        borderColor: startDate ? colors.error : selectedPreviewDate ? colors.primary : colors.border,
+                        backgroundColor: startDate ? colors.errorLight : selectedPreviewDate ? colors.primary : colors.borderLight,
+                      }}
                       onPress={() => {
                         if (startDate) {
                           // Unselect date
@@ -753,13 +765,14 @@ export default function LeaveRequestScreen({ navigation, route }) {
                       disabled={!selectedPreviewDate && !startDate}
                     >
                       <Text
-                        className={`text-center font-medium ${
-                          startDate
-                            ? 'text-red-600'
+                        className="text-center font-medium"
+                        style={{
+                          color: startDate
+                            ? colors.error
                             : selectedPreviewDate
-                            ? 'text-white'
-                            : 'text-gray-500'
-                        }`}
+                            ? '#ffffff'
+                            : colors.textTertiary,
+                        }}
                       >
                         {startDate ? 'Unselect Date' : 'Select Date'}
                       </Text>
@@ -772,16 +785,16 @@ export default function LeaveRequestScreen({ navigation, route }) {
                   <View className="mt-3 flex-row items-center justify-center space-x-4">
                     {startDate && (
                       <View className="flex-row items-center">
-                        <Ionicons name="calendar-outline" size={16} color="#3b82f6" />
-                        <Text className="text-sm text-gray-700 ml-1">
+                        <Ionicons name="calendar-outline" size={16} color={colors.primary} />
+                        <Text className="text-sm ml-1" style={{ color: colors.text }}>
                           {isHalfDay ? 'Date' : 'Start'}: {new Date(startDate).toLocaleDateString()}
                         </Text>
                       </View>
                     )}
                     {!isHalfDay && endDate && startDate !== endDate && (
                       <View className="flex-row items-center">
-                        <Ionicons name="calendar-outline" size={16} color="#3b82f6" />
-                        <Text className="text-sm text-gray-700 ml-1">
+                        <Ionicons name="calendar-outline" size={16} color={colors.primary} />
+                        <Text className="text-sm ml-1" style={{ color: colors.text }}>
                           End: {new Date(endDate).toLocaleDateString()}
                         </Text>
                       </View>
@@ -792,31 +805,40 @@ export default function LeaveRequestScreen({ navigation, route }) {
 
               {/* Reason */}
               <View className="mb-4">
-                <Text className="text-gray-700 mb-2 font-medium">Reason (Optional)</Text>
+                <Text className="mb-2 font-medium" style={{ color: colors.text }}>Reason (Optional)</Text>
                 <TextInput
-                  className="bg-gray-100 rounded-xl px-4 py-3 text-gray-800"
+                  className="rounded-xl px-4 py-3"
                   placeholder="Enter reason for leave..."
+                  placeholderTextColor={colors.textTertiary}
                   value={reason}
                   onChangeText={setReason}
                   multiline
                   numberOfLines={3}
                   textAlignVertical="top"
+                  style={{
+                    backgroundColor: colors.background,
+                    color: colors.text,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                  }}
                 />
               </View>
 
               <View className="flex-row space-x-2 mt-4">
                 <TouchableOpacity
-                  className="bg-gray-200 rounded-lg p-3 flex-1"
+                  className="rounded-lg p-3 flex-1"
+                  style={{ backgroundColor: colors.borderLight }}
                   onPress={() => {
                     setShowRequestModal(false);
                     resetForm();
                   }}
                 >
-                  <Text className="text-center font-medium text-gray-700">Cancel</Text>
+                  <Text className="text-center font-medium" style={{ color: colors.text }}>Cancel</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity
-                  className="bg-primary-500 rounded-lg p-3 flex-1"
+                  className="rounded-lg p-3 flex-1"
+                  style={{ backgroundColor: colors.primary }}
                   onPress={handleSubmitRequest}
                   disabled={isSubmitting}
                 >

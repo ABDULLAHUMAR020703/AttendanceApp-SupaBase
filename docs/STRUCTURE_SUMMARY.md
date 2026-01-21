@@ -78,15 +78,20 @@ AttendanceApp/
 - **Core Infrastructure**: Fully implemented
   - ✅ `core/config/` - Supabase configuration
   - ✅ `core/contexts/` - Auth and Theme contexts
-  - ✅ `core/navigation/` - App, Auth, and Main navigators
+  - ✅ `core/navigation/` - App, Auth, and Main navigators (includes deep linking support)
   - ✅ `core/services/` - Storage abstraction layer
 - **Shared Modules**: Fully implemented
-  - ✅ `shared/constants/` - Roles, work modes, routes
+  - ✅ `shared/constants/` - Roles, work modes, routes (includes `FORGOT_PASSWORD`, `RESET_PASSWORD`)
   - ✅ `shared/components/` - Logo, Trademark, CustomDrawer
   - ✅ `shared/utils/` - Responsive utilities
 - **Partial Feature Migration**:
   - ✅ `features/auth/` - Auth service and utilities (screens still in `screens/`)
   - ✅ `features/calendar/` - Calendar component (screen still in `screens/`)
+- **New Features Added**:
+  - ✅ Password change utility (`utils/passwordChange.js`)
+  - ✅ Forgot password screen (`screens/ForgotPasswordScreen.js`)
+  - ✅ Reset password screen (`screens/ResetPasswordScreen.js`)
+  - ✅ Calendar events Supabase integration
 
 ### 🔄 In Progress
 - **Feature Modules**: Most features still need migration
@@ -104,6 +109,8 @@ AttendanceApp/
 - Update all imports to use feature modules instead of legacy paths
 - Remove legacy code from `screens/`, `utils/`, `components/` after migration
 - Update `App.js` to use feature modules instead of `utils/employees`
+- Migrate password change utility to `features/auth/utils/`
+- Migrate calendar utils to `features/calendar/utils/`
 
 ## How to Use
 
@@ -133,11 +140,15 @@ import CustomDrawer from '../shared/components/CustomDrawer';
 // Legacy screens (currently used by navigation)
 import EmployeeDashboard from '../screens/EmployeeDashboard';
 import AttendanceHistory from '../screens/AttendanceHistory';
+import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
+import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 
 // Legacy utils (currently used by screens)
 import { checkIn, checkOut } from '../utils/auth';
+import { changePassword } from '../utils/passwordChange';
 import { getEmployees } from '../utils/employees';
 import { createTicket } from '../utils/ticketManagement';
+import { createCalendarEvent, getCalendarEvents } from '../utils/calendar';
 ```
 
 ### Adding a New Feature
@@ -173,3 +184,4 @@ import { createTicket } from '../utils/ticketManagement';
 - `docs/STRUCTURE_SUMMARY.md` - Quick reference for code organization
 - `docs/TECHNICAL_DOCUMENTATION.md` - Comprehensive technical documentation
 
+*Last Updated: 2025-01-27*

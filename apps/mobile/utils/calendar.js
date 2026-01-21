@@ -1,6 +1,8 @@
 // Calendar and Events Management Utilities using Supabase (with AsyncStorage fallback)
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../core/config/supabase';
+import { createNotification, createBatchNotifications } from './notifications';
+import { getEmployees } from './employees';
 
 const CALENDAR_EVENTS_KEY = 'calendar_events'; // For fallback only
 
@@ -10,21 +12,145 @@ const CALENDAR_EVENTS_KEY = 'calendar_events'; // For fallback only
  * @returns {Object} Event in app format
  */
 const convertCalendarEventFromDb = (dbEvent) => {
+  // Ensure date is in YYYY-MM-DD format (Supabase DATE returns as string)
+  // Handle potential timezone issues by extracting just the date part
+  let dateStr = dbEvent.date;
+  if (dateStr && typeof dateStr === 'string') {
+    // If date includes time (shouldn't for DATE type, but handle it anyway)
+    dateStr = dateStr.split('T')[0];
+  } else if (dateStr instanceof Date) {
+    // Convert Date object to YYYY-MM-DD string
+    dateStr = dateStr.toISOString().split('T')[0];
+  }
+
   return {
     id: dbEvent.id,
     title: dbEvent.title,
     description: dbEvent.description || '',
-    date: dbEvent.date,
+    date: dateStr,
     time: dbEvent.time || '',
     type: dbEvent.type,
     color: dbEvent.color || '#3b82f6',
     createdBy: dbEvent.created_by,
     createdByUid: dbEvent.created_by_uid,
-    assignedTo: dbEvent.assigned_to || [],
+    visibility: dbEvent.visibility || 'all', // 'all', 'none', 'selected'
+    visibleTo: dbEvent.visible_to || dbEvent.assigned_to || [], // Array of usernames/UIDs
+    assignedTo: dbEvent.assigned_to || dbEvent.visible_to || [], // Legacy field for backward compatibility
     createdAt: dbEvent.created_at,
     updatedAt: dbEvent.updated_at
   };
 };
+
+/**
+ * Get event type label
+ * @param {string} type - Event type
+ * @returns {string} Human-readable label
+ */
+export const getEventTypeLabel = (type) => {
+  const labels = {
+    meeting: 'Meeting',
+    reminder: 'Reminder',
+    holiday: 'Holiday',
+    other: 'Event'
+  };
+  return labels[type] || labels.other;
+};
+
+/**
+ * Send notifications for calendar event creation/update
+ * @param {Object} eventInfo - Event information
+ * @returns {Promise<void>}
+ */
+const sendCalendarEventNotifications = async (eventInfo) => {
+  const {
+    eventId,
+    title,
+    description,
+    date,
+    time,
+    type,
+    createdBy,
+    visibility,
+    visibleTo = [],
+    isUpdate = false
+  } = eventInfo;
+
+  try {
+    // Format date and time for notification
+    const eventDate = new Date(date);
+    const dateStr = eventDate.toLocaleDateString('en-US', { 
+      weekday: 'short', 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric' 
+    });
+    const timeStr = time ? ` at ${time}` : '';
+    const eventTypeLabel = getEventTypeLabel(type);
+
+    const notificationTitle = isUpdate 
+      ? 'Calendar Event Updated'
+      : 'New Calendar Event';
+    
+    const notificationBody = `${createdBy} ${isUpdate ? 'updated' : 'created'} a ${eventTypeLabel.toLowerCase()}: "${title}" on ${dateStr}${timeStr}`;
+
+    let recipients = [];
+
+    if (visibility === 'all') {
+      // Notify all employees
+      const allEmployees = await getEmployees();
+      recipients = allEmployees
+        .filter(emp => emp.username && emp.isActive !== false && emp.username !== createdBy)
+        .map(emp => emp.username);
+    } else if (visibility === 'selected') {
+      // Notify only selected employees (exclude creator)
+      recipients = visibleTo.filter(username => username && username !== createdBy);
+    }
+    // visibility === 'none' - no notifications (only creator can see, no need to notify creator)
+
+    if (recipients.length > 0) {
+      // Remove duplicates
+      const uniqueRecipients = [...new Set(recipients)];
+
+      // Create notifications
+      await createBatchNotifications(
+        uniqueRecipients,
+        notificationTitle,
+        notificationBody,
+        'calendar_event',
+        {
+          eventId,
+          eventType: type,
+          date,
+          time,
+          createdBy,
+          action: isUpdate ? 'updated' : 'created'
+        }
+      );
+
+      console.log(`✓ Sent ${uniqueRecipients.length} calendar event notification(s)`);
+    }
+  } catch (error) {
+    console.error('Error sending calendar event notifications:', error);
+    throw error;
+  }
+};
+
+/**
+ * NOTE: Reminder Notifications
+ * 
+ * For scheduled reminder notifications (e.g., 10 mins before event):
+ * - Would require a reminder_time field in calendar_events table
+ * - Would need to use expo-notifications scheduling API
+ * - Would need to respect visibility rules (only notify users who can see the event)
+ * - Current implementation sends notifications on event creation/update only
+ * 
+ * To implement scheduled reminders:
+ * 1. Add reminder_time TIME field to calendar_events table
+ * 2. When creating/updating event, schedule notifications using:
+ *    await Notifications.scheduleNotificationAsync({...})
+ * 3. Filter recipients based on visibility before scheduling
+ * 4. Cancel old scheduled notifications when event is updated/deleted
+ */
 
 /**
  * Create a calendar event (meeting, reminder, etc.)
@@ -48,7 +174,9 @@ export const createCalendarEvent = async (eventData) => {
       time = '',
       type = 'other',
       createdBy,
-      assignedTo = [], // Empty array means visible to all
+      visibility = 'all', // Extract visibility from eventData
+      visibleTo = [], // Extract visibleTo from eventData
+      assignedTo = [], // Legacy field for backward compatibility
       color = '#3b82f6'
     } = eventData;
 
@@ -57,6 +185,26 @@ export const createCalendarEvent = async (eventData) => {
       return {
         success: false,
         error: 'Title, date, and creator are required'
+      };
+    }
+
+    // Validate visibility
+    const validVisibilities = ['all', 'none', 'selected'];
+    if (!validVisibilities.includes(visibility)) {
+      return {
+        success: false,
+        error: 'Invalid visibility. Must be: all, none, or selected'
+      };
+    }
+
+    // Use visibleTo if provided, otherwise fall back to assignedTo
+    const finalVisibleTo = visibleTo.length > 0 ? visibleTo : assignedTo;
+
+    // Validate selected visibility requires visibleTo
+    if (visibility === 'selected' && (!finalVisibleTo || finalVisibleTo.length === 0)) {
+      return {
+        success: false,
+        error: 'Selected visibility requires at least one employee to be selected'
       };
     }
 
@@ -79,8 +227,19 @@ export const createCalendarEvent = async (eventData) => {
     }
 
     // Get user UID from current Supabase session
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-    const createdByUid = authUser?.id || null;
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    const createdByUid = session?.user?.id || null;
+
+    // Determine visibleTo based on visibility
+    let finalVisibleToArray = [];
+    if (visibility === 'all') {
+      finalVisibleToArray = []; // Empty = visible to all
+    } else if (visibility === 'none') {
+      finalVisibleToArray = [createdBy]; // Only creator can see
+    } else if (visibility === 'selected') {
+      // Include creator in visibleTo if not already included
+      finalVisibleToArray = [...new Set([...finalVisibleTo, createdBy])];
+    }
 
     // Create event in Supabase
     const eventDataDb = {
@@ -92,7 +251,9 @@ export const createCalendarEvent = async (eventData) => {
       color,
       created_by: createdBy,
       created_by_uid: createdByUid,
-      assigned_to: assignedTo.length > 0 ? assignedTo : [] // Empty array = visible to all
+      visibility: visibility,
+      visible_to: finalVisibleToArray,
+      assigned_to: finalVisibleToArray // Keep for backward compatibility
     };
 
     const { data, error } = await supabase
@@ -107,10 +268,31 @@ export const createCalendarEvent = async (eventData) => {
       return await createCalendarEventFallback(eventData);
     }
 
-    console.log('✓ Calendar event created in Supabase:', data.id);
+    const eventId = data.id;
+    console.log('✓ Calendar event created in Supabase:', eventId);
+
+    // Send notifications based on visibility
+    try {
+      await sendCalendarEventNotifications({
+        eventId,
+        title,
+        description,
+        date,
+        time,
+        type,
+        createdBy,
+        visibility,
+        visibleTo: finalVisibleToArray,
+        isUpdate: false
+      });
+    } catch (notifError) {
+      console.error('Error sending calendar event notifications:', notifError);
+      // Don't fail event creation if notifications fail
+    }
+
     return {
       success: true,
-      eventId: data.id
+      eventId: eventId
     };
   } catch (error) {
     console.error('Error creating calendar event:', error);
@@ -131,11 +313,27 @@ const createCalendarEventFallback = async (eventData) => {
       time = '',
       type = 'other',
       createdBy,
+      visibility = 'all',
+      visibleTo = [],
       assignedTo = [],
       color = '#3b82f6'
     } = eventData;
 
+    // Use visibleTo if provided, otherwise fall back to assignedTo
+    const finalVisibleTo = visibleTo.length > 0 ? visibleTo : assignedTo;
+
     const eventId = `event_${Date.now()}_${createdBy}`;
+    
+    // Determine visibleTo based on visibility
+    let finalVisibleToArray = [];
+    if (visibility === 'all') {
+      finalVisibleToArray = [];
+    } else if (visibility === 'none') {
+      finalVisibleToArray = [createdBy];
+    } else if (visibility === 'selected') {
+      finalVisibleToArray = [...new Set([...finalVisibleTo, createdBy])];
+    }
+
     const event = {
       id: eventId,
       title,
@@ -144,7 +342,9 @@ const createCalendarEventFallback = async (eventData) => {
       time,
       type,
       createdBy,
-      assignedTo,
+      visibility,
+      visibleTo: finalVisibleToArray,
+      assignedTo: finalVisibleToArray, // Legacy field
       color,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -180,8 +380,9 @@ const createCalendarEventFallback = async (eventData) => {
 export const getCalendarEvents = async (employeeId = null, startDate = null, endDate = null) => {
   try {
     // Get current user info for RLS filtering
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-    const currentUsername = employeeId || authUser?.user_metadata?.username || null;
+    const { data: { session } } = await supabase.auth.getSession();
+    const currentUserUid = session?.user?.id || null;
+    const currentUsername = employeeId || session?.user?.user_metadata?.username || null;
 
     let query = supabase
       .from('calendar_events')
@@ -208,20 +409,32 @@ export const getCalendarEvents = async (employeeId = null, startDate = null, end
     // Convert to app format
     let events = data.map(convertCalendarEventFromDb);
 
-    // Filter by employee if provided (RLS handles most of this, but we filter assignedTo here)
-    if (currentUsername) {
+    // Filter events based on visibility rules (RLS handles most, but we do additional client-side filtering)
+    // Note: currentUserUid and currentUsername are already declared above (lines 367-369)
+    if (currentUsername || currentUserUid) {
       events = events.filter(event => {
-        // Show event if:
-        // 1. Assigned to all (empty assignedTo array)
-        // 2. Assigned to this employee specifically
-        // 3. Created by this employee
-        return (
-          (!event.assignedTo || event.assignedTo.length === 0) ||
-          event.assignedTo.includes(currentUsername) ||
-          event.assignedTo.includes(employeeId) ||
-          event.createdBy === currentUsername ||
-          event.createdBy === employeeId
-        );
+        // User is always creator - can see their own events
+        if (event.createdBy === currentUsername || event.createdByUid === currentUserUid) {
+          return true;
+        }
+
+        // Check visibility
+        if (event.visibility === 'all') {
+          return true; // Visible to all
+        } else if (event.visibility === 'none') {
+          return false; // Only creator can see
+        } else if (event.visibility === 'selected') {
+          // Check if user is in visibleTo array
+          const visibleTo = event.visibleTo || event.assignedTo || [];
+          return (
+            visibleTo.includes(currentUsername) ||
+            visibleTo.includes(employeeId) ||
+            visibleTo.includes(currentUserUid)
+          );
+        }
+
+        // Default: don't show
+        return false;
       });
     }
 
@@ -245,11 +458,24 @@ const getCalendarEventsFallback = async (employeeId = null, startDate = null, en
     
     if (employeeId) {
       filteredEvents = allEvents.filter(event => {
-        return (
-          (!event.assignedTo || event.assignedTo.length === 0) ||
-          event.assignedTo.includes(employeeId) ||
-          event.createdBy === employeeId
-        );
+        // User is creator - can see their own events
+        if (event.createdBy === employeeId) {
+          return true;
+        }
+
+        // Check visibility
+        if (event.visibility === 'all') {
+          return true; // Visible to all
+        } else if (event.visibility === 'none') {
+          return false; // Only creator can see
+        } else if (event.visibility === 'selected') {
+          // Check if user is in visibleTo array
+          const visibleTo = event.visibleTo || event.assignedTo || [];
+          return visibleTo.includes(employeeId);
+        }
+
+        // Default: don't show
+        return false;
       });
     }
 
@@ -283,8 +509,18 @@ const getCalendarEventsFallback = async (employeeId = null, startDate = null, en
  */
 export const getEventsByDate = async (date, employeeId = null) => {
   try {
-    const allEvents = await getCalendarEvents(employeeId);
-    return allEvents.filter(event => event.date === date);
+    // Normalize date to YYYY-MM-DD format for comparison
+    const normalizedDate = date.split('T')[0];
+    
+    // Fetch events for the specific date range (more efficient than fetching all)
+    const events = await getCalendarEvents(employeeId, normalizedDate, normalizedDate);
+    
+    // Additional client-side filtering to ensure exact date match
+    // This handles any edge cases with date format inconsistencies
+    return events.filter(event => {
+      const eventDate = event.date ? event.date.split('T')[0] : null;
+      return eventDate === normalizedDate;
+    });
   } catch (error) {
     console.error('Error getting events by date:', error);
     return [];
@@ -306,11 +542,20 @@ export const updateCalendarEvent = async (eventId, updates) => {
 
     // Convert app format to db format
     if (updates.createdBy) updateData.created_by = updates.createdBy;
-    if (updates.assignedTo) updateData.assigned_to = updates.assignedTo;
+    if (updates.visibility) updateData.visibility = updates.visibility;
+    if (updates.visibleTo) {
+      updateData.visible_to = updates.visibleTo;
+      updateData.assigned_to = updates.visibleTo; // Keep for backward compatibility
+    } else if (updates.assignedTo) {
+      updateData.visible_to = updates.assignedTo;
+      updateData.assigned_to = updates.assignedTo;
+    }
     if (updates.createdAt) updateData.created_at = updates.createdAt;
     
     // Remove app-format fields
     delete updateData.createdBy;
+    delete updateData.visibleTo;
+    delete updateData.assignedTo;
     delete updateData.createdAt;
     delete updateData.updatedAt;
 
@@ -323,6 +568,31 @@ export const updateCalendarEvent = async (eventId, updates) => {
       console.error('Error updating calendar event in Supabase:', error);
       // Fallback to AsyncStorage
       return await updateCalendarEventFallback(eventId, updates);
+    }
+
+    // Send notifications if visibility or visibleTo changed
+    if (updates.visibility !== undefined || updates.visibleTo !== undefined) {
+      try {
+        // Get the updated event to send notifications
+        const updatedEvent = await getEventById(eventId);
+        if (updatedEvent) {
+          await sendCalendarEventNotifications({
+            eventId: updatedEvent.id,
+            title: updatedEvent.title,
+            description: updatedEvent.description,
+            date: updatedEvent.date,
+            time: updatedEvent.time,
+            type: updatedEvent.type,
+            createdBy: updatedEvent.createdBy,
+            visibility: updatedEvent.visibility,
+            visibleTo: updatedEvent.visibleTo || updatedEvent.assignedTo || [],
+            isUpdate: true
+          });
+        }
+      } catch (notifError) {
+        console.error('Error sending calendar event update notifications:', notifError);
+        // Don't fail update if notifications fail
+      }
     }
 
     return { success: true };
@@ -524,17 +794,3 @@ export const getEventTypeIcon = (type) => {
   return icons[type] || icons.other;
 };
 
-/**
- * Get event type label
- * @param {string} type - Event type
- * @returns {string} Human-readable label
- */
-export const getEventTypeLabel = (type) => {
-  const labels = {
-    meeting: 'Meeting',
-    reminder: 'Reminder',
-    holiday: 'Holiday',
-    other: 'Event'
-  };
-  return labels[type] || labels.other;
-};

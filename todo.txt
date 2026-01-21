@@ -1,9 +1,0 @@
-1.apk logo change to techdotglobal [INSTRUCTIONS PROVIDED - NEEDS MANUAL UPDATE]
-2.techuser routing to hrmanager but not to techmanager [✅ DONE - Engineering and Technical are now separate departments with correct routing]
-3.fingerprint login [✅ DONE - Biometric authentication implemented with fingerprint (Android) and Face ID (iOS)]
-4.add a help button that routes to sales@techdotglobal.com [❌ NOT DONE]
-5.superadmin will recive a monthly report that contains all stats, emailed to him automatically [❌ NOT DONE]
-6.superadmin can generate monthly,yearly,all time ai stat report [❌ NOT DONE]
-7.chatbot will contain basic technical asistance for all users [❌ NOT DONE]
-8.if escalation needed then it will route sales@techdotglobal.com with context ->escalation will be determined with a button underneath every message in the chat box [❌ NOT DONE] 
-

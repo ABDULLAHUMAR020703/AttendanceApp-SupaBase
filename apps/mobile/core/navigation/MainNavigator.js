@@ -27,6 +27,7 @@ import EmployeeManagement from '../../screens/EmployeeManagement';
 import ReportsScreen from '../../screens/ReportsScreen';
 import LoginScreen from '../../screens/LoginScreen';
 import AttendanceSettingsScreen from '../../screens/AttendanceSettingsScreen';
+import HelpSupportScreen from '../../screens/HelpSupportScreen';
 import { GeoFencingScreen } from '../../features/geofencing';
 
 const Stack = createStackNavigator();
@@ -111,6 +112,12 @@ export default function MainNavigator({ user }) {
           name={ROUTES.TICKET_SCREEN} 
           component={TicketScreen}
           options={{ title: 'My Tickets' }}
+          initialParams={{ user }}
+        />
+        <Stack.Screen 
+          name={ROUTES.HELP_SUPPORT} 
+          component={HelpSupportScreen}
+          options={{ title: 'Help & Support' }}
           initialParams={{ user }}
         />
         <Stack.Screen 
@@ -207,6 +214,12 @@ export default function MainNavigator({ user }) {
           </>
         )}
         <Stack.Screen 
+          name={ROUTES.HELP_SUPPORT} 
+          component={HelpSupportScreen}
+          options={{ title: 'Help & Support' }}
+          initialParams={{ user }}
+        />
+        <Stack.Screen 
           name={ROUTES.GEO_FENCING} 
           component={GeoFencingScreen}
           options={{ title: 'GeoFencing' }}
@@ -223,7 +236,7 @@ export default function MainNavigator({ user }) {
         name={ROUTES.LOGIN} 
         component={LoginScreen}
         options={{ 
-          title: 'Hadir.AI',
+          title: 'hadir.ai',
           headerShown: false 
         }}
       />

@@ -453,10 +453,23 @@ export default function ManualAttendanceScreen({ navigation, route }) {
               {/* Employee Selection */}
               <View style={{ marginBottom: spacing.base }}>
                 <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 8 }}>
-                  Select Employee *
+                  Select Employee * ({employees.length} available)
                 </Text>
-                <ScrollView style={{ maxHeight: 200 }}>
-                  {employees.map(renderEmployeeOption)}
+                <ScrollView 
+                  style={{ maxHeight: 300 }}
+                  nestedScrollEnabled={true}
+                  showsVerticalScrollIndicator={true}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  {employees.length === 0 ? (
+                    <View style={{ padding: spacing.md, alignItems: 'center' }}>
+                      <Text style={{ color: colors.textSecondary, fontSize: fontSize.base }}>
+                        No employees available
+                      </Text>
+                    </View>
+                  ) : (
+                    employees.map(renderEmployeeOption)
+                  )}
                 </ScrollView>
               </View>
 

@@ -131,6 +131,12 @@ AttendanceApp/
 - **Physical Device**: Configured in `app.json` as `http://<your-computer-ip>:3000` (e.g., `http://192.168.18.38:3000`)
 - **Configuration**: Set in `apps/mobile/app.json` under `extra.apiGatewayUrl`
 
+**Deep Linking Configuration:**
+- **Scheme**: `hadirai` (configured in `app.json`)
+- **Password Reset URL**: `hadirai://reset-password`
+- **Supabase Redirect URL**: Configured in `app.json` under `extra.supabaseRedirectUrl`
+- **Deep Link Handling**: Implemented in `AppNavigator.js` using `Linking` API
+
 ### Service Startup
 
 **Windows (PowerShell):**
@@ -278,6 +284,23 @@ For detailed architecture documentation, see `docs/MODULAR_ARCHITECTURE.md`.
    - Passwords are **NOT stored in PostgreSQL** (security best practice)
    - Passwords are hashed and stored in **Supabase Authentication**
    - Cannot retrieve original passwords (by design)
+
+4. **Password Change:**
+   - Users can change their own password via Theme Settings screen
+   - Requires re-authentication with current password before changing
+   - Uses Supabase Auth `signInWithPassword` for verification
+   - Uses Supabase Auth `updateUser` to set new password
+   - No password data stored locally or in PostgreSQL
+   - Self-service only (no admin password resets)
+
+5. **Forgot Password Flow:**
+   - Users can request password reset via Forgot Password screen
+   - Uses Supabase Auth `resetPasswordForEmail` to send reset email
+   - Deep linking configured: `hadirai://reset-password`
+   - Email link opens app and navigates to Reset Password screen
+   - Supabase handles token generation, validation, and session creation
+   - Users set new password via `updateUser` API
+   - Generic success message prevents email enumeration
 
 ---
 
@@ -455,6 +478,7 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 - **AsyncStorage Persistence**: Auth state persists across app restarts via custom adapter
 - **PostgreSQL Database**: Relational database with SQL queries
 - **Error Handling**: Graceful fallbacks if initialization fails
+- **Deep Linking**: Configured for password reset flow (`hadirai://reset-password`)
 
 ### Supabase Authentication
 
@@ -472,7 +496,21 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey, {
    - If username is provided, system looks up email in PostgreSQL
    - Password is verified by Supabase Authentication
 
-2. **Session Persistence**
+2. **Password Change** (Self-Service)
+   - Available in Theme Settings screen
+   - Requires current password verification
+   - Uses `signInWithPassword` for re-authentication
+   - Uses `updateUser` to set new password
+   - No admin password resets allowed
+
+3. **Password Reset** (Forgot Password Flow)
+   - Users request reset via Forgot Password screen
+   - Supabase sends email with reset link
+   - Deep link opens app: `hadirai://reset-password`
+   - Supabase handles token validation and session creation
+   - Users set new password via Reset Password screen
+
+4. **Session Persistence**
    - Uses AsyncStorage for offline persistence via custom adapter
    - Automatically restores session on app restart
    - `onAuthStateChange` listener updates app state
@@ -552,6 +590,7 @@ The system handles various Supabase Auth errors:
 
 #### Table Structure
 
+**Users Table:**
 ```sql
 CREATE TABLE users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -570,12 +609,33 @@ CREATE TABLE users (
 );
 ```
 
+**Calendar Events Table:**
+```sql
+CREATE TABLE calendar_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title VARCHAR(255) NOT NULL,
+  description TEXT,
+  date DATE NOT NULL,
+  time TIME,
+  type VARCHAR(50) DEFAULT 'other',
+  color VARCHAR(7) DEFAULT '#3b82f6',
+  created_by_uid UUID,
+  created_by VARCHAR(255),
+  visibility VARCHAR(20) DEFAULT 'all',  -- 'all', 'none', 'selected'
+  visible_to JSONB DEFAULT '[]'::jsonb,  -- Array of usernames/UIDs
+  assigned_to JSONB DEFAULT '[]'::jsonb,  -- Legacy field (backward compatibility)
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
 **Important Notes:**
 - **UID Field**: Stores Supabase Auth UID (not the primary key)
 - **Username Field**: Unique identifier for login
 - **Email Field**: Must match Supabase Auth email
 - **Role Field**: Controls access (`super_admin`, `manager`, `employee`)
 - **Snake_case**: Database uses snake_case (e.g., `work_mode`, `hire_date`)
+- **Calendar Events**: Stored in Supabase (not AsyncStorage), supports visibility settings
 
 #### Row Level Security (RLS)
 
@@ -730,6 +790,15 @@ useEffect(() => {
 - **Signup Requests**: `@signup_requests`
 - **Leave Requests**: `@leave_requests`
 - **Employee List Cache**: `@company_employees` (synced from Supabase)
+
+#### ✅ Stored in Supabase (Cloud)
+
+- **Calendar Events**: `calendar_events` table
+  - Events stored in Supabase PostgreSQL
+  - AsyncStorage used only as fallback if Supabase unavailable
+  - Supports visibility settings: `all`, `none`, `selected`
+  - Row Level Security (RLS) policies control access
+  - Events refresh on screen focus for data consistency
 
 **Why?**
 - Attendance and tickets are device-specific
@@ -1344,6 +1413,7 @@ Example: testuser,password:testuser123,role:employee
 - **Auth Feature**: `features/auth/index.js`
 - **Auth Utils**: `features/auth/utils/biometricAuth.js`, `features/auth/utils/authPreferences.js`
 - **Calendar Component**: `features/calendar/components/DatePickerCalendar.js`
+- **Password Change Utility**: `utils/passwordChange.js`
 - **Core Auth Context**: `core/contexts/AuthContext.js`
 - **Core Theme Context**: `core/contexts/ThemeContext.js`
 - **Core Navigation**: `core/navigation/AppNavigator.js`, `core/navigation/MainNavigator.js`, `core/navigation/AuthNavigator.js`
@@ -1356,9 +1426,11 @@ Example: testuser,password:testuser123,role:employee
 
 #### ⚠️ Legacy Code (Currently in Use - Being Migrated)
 - **Legacy Auth Utils**: `utils/auth.js` (use `features/auth` instead)
+- **Password Change Utility**: `utils/passwordChange.js` (secure password change via Supabase Auth)
 - **Legacy Employee Utils**: `utils/employees.js` (to be migrated to `features/employees/`)
 - **Legacy Ticket Utils**: `utils/ticketManagement.js` (to be migrated to `features/tickets/`)
 - **Legacy Leave Utils**: `utils/leaveManagement.js` (to be migrated to `features/leave/`)
+- **Calendar Utils**: `utils/calendar.js` (uses Supabase `calendar_events` table, AsyncStorage fallback)
 - **Notification Utils**: `utils/notifications.js`
   - Centralized notification creation and persistence
   - Read state management with dual fields (`read` and `isRead`)
@@ -1373,11 +1445,14 @@ Example: testuser,password:testuser123,role:employee
   - Nested navigator support (Drawer > MainStack)
   - Automatic read marking after successful navigation
 - **Legacy Analytics Utils**: `utils/analytics.js` (to be migrated to `features/analytics/`)
-- **Legacy Calendar Utils**: `utils/calendar.js` (to be migrated to `features/calendar/`)
 - **Legacy Location Utils**: `utils/location.js` (to be migrated to `features/attendance/utils/`)
 - **Legacy Storage**: `utils/storage.js` (use `core/services/storage.js` instead)
 - **Legacy Responsive**: `utils/responsive.js` (use `shared/utils/responsive.js` instead)
-- **Legacy Screens**: All 18 screens in `screens/` directory (to be migrated to respective feature modules)
+- **Legacy Screens**: All screens in `screens/` directory including:
+  - `ForgotPasswordScreen.js` (password reset request)
+  - `ResetPasswordScreen.js` (password reset completion)
+  - `ThemeSettingsScreen.js` (includes password change UI)
+  - Other screens to be migrated to respective feature modules
 
 ### Scripts
 - **User Creation Script**: `scripts/create-users-supabase.js` - Programmatic user creation via Supabase Admin API
@@ -1619,5 +1694,5 @@ For detailed EAS build setup, see `apps/mobile/EAS_BUILD_SETUP.md`.
 
 ---
 
-*Last Updated: 2025-12-26*
+*Last Updated: 2025-01-27*
 

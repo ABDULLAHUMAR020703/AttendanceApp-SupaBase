@@ -160,8 +160,9 @@ export default function SignUpScreen() {
             {/* Username Input */}
             <View style={{ marginBottom: spacing.md }}>
               <Text
-                className="text-gray-700 font-medium"
+                className="font-medium"
                 style={{
+                  color: colors.text,
                   fontSize: responsiveFont(14),
                   marginBottom: spacing.xs,
                 }}
@@ -169,25 +170,27 @@ export default function SignUpScreen() {
                 Username
               </Text>
               <View
-                className="flex-row items-center bg-gray-100 rounded-xl"
+                className="flex-row items-center rounded-xl"
                 style={{
+                  backgroundColor: colors.borderLight,
                   paddingHorizontal: responsivePadding(16),
                   paddingVertical: spacing.md,
                 }}
               >
-                <Ionicons name="person-outline" size={iconSize.md} color="#6b7280" />
+                <Ionicons name="person-outline" size={iconSize.md} color={colors.textSecondary} />
                 <TextInput
-                  className="flex-1 text-gray-800"
+                  className="flex-1"
                   placeholder="Enter username"
                   value={formData.username}
                   onChangeText={(value) => handleInputChange('username', value)}
                   autoCapitalize="none"
                   autoCorrect={false}
                   style={{
+                    color: colors.text,
                     fontSize: responsiveFont(14),
                     marginLeft: spacing.md,
                   }}
-                  placeholderTextColor="#9ca3af"
+                  placeholderTextColor={colors.textTertiary}
                 />
               </View>
             </View>
@@ -195,8 +198,9 @@ export default function SignUpScreen() {
             {/* Name Input */}
             <View style={{ marginBottom: spacing.md }}>
               <Text
-                className="text-gray-700 font-medium"
+                className="font-medium"
                 style={{
+                  color: colors.text,
                   fontSize: responsiveFont(14),
                   marginBottom: spacing.xs,
                 }}
@@ -204,23 +208,25 @@ export default function SignUpScreen() {
                 Full Name
               </Text>
               <View
-                className="flex-row items-center bg-gray-100 rounded-xl"
+                className="flex-row items-center rounded-xl"
                 style={{
+                  backgroundColor: colors.borderLight,
                   paddingHorizontal: responsivePadding(16),
                   paddingVertical: spacing.md,
                 }}
               >
-                <Ionicons name="person-circle-outline" size={iconSize.md} color="#6b7280" />
+                <Ionicons name="person-circle-outline" size={iconSize.md} color={colors.textSecondary} />
                 <TextInput
-                  className="flex-1 text-gray-800"
+                  className="flex-1"
                   placeholder="Enter your full name"
                   value={formData.name}
                   onChangeText={(value) => handleInputChange('name', value)}
                   style={{
+                    color: colors.text,
                     fontSize: responsiveFont(14),
                     marginLeft: spacing.md,
                   }}
-                  placeholderTextColor="#9ca3af"
+                  placeholderTextColor={colors.textTertiary}
                 />
               </View>
             </View>
@@ -228,8 +234,9 @@ export default function SignUpScreen() {
             {/* Email Input */}
             <View style={{ marginBottom: spacing.md }}>
               <Text
-                className="text-gray-700 font-medium"
+                className="font-medium"
                 style={{
+                  color: colors.text,
                   fontSize: responsiveFont(14),
                   marginBottom: spacing.xs,
                 }}
@@ -237,15 +244,16 @@ export default function SignUpScreen() {
                 Email
               </Text>
               <View
-                className="flex-row items-center bg-gray-100 rounded-xl"
+                className="flex-row items-center rounded-xl"
                 style={{
+                  backgroundColor: colors.borderLight,
                   paddingHorizontal: responsivePadding(16),
                   paddingVertical: spacing.md,
                 }}
               >
-                <Ionicons name="mail-outline" size={iconSize.md} color="#6b7280" />
+                <Ionicons name="mail-outline" size={iconSize.md} color={colors.textSecondary} />
                 <TextInput
-                  className="flex-1 text-gray-800"
+                  className="flex-1"
                   placeholder="Enter your email"
                   value={formData.email}
                   onChangeText={(value) => handleInputChange('email', value)}
@@ -253,10 +261,11 @@ export default function SignUpScreen() {
                   autoCapitalize="none"
                   autoCorrect={false}
                   style={{
+                    color: colors.text,
                     fontSize: responsiveFont(14),
                     marginLeft: spacing.md,
                   }}
-                  placeholderTextColor="#9ca3af"
+                  placeholderTextColor={colors.textTertiary}
                 />
               </View>
             </View>
@@ -264,8 +273,9 @@ export default function SignUpScreen() {
             {/* Password Input */}
             <View style={{ marginBottom: spacing.md }}>
               <Text
-                className="text-gray-700 font-medium"
+                className="font-medium"
                 style={{
+                  color: colors.text,
                   fontSize: responsiveFont(14),
                   marginBottom: spacing.xs,
                 }}
@@ -273,15 +283,16 @@ export default function SignUpScreen() {
                 Password
               </Text>
               <View
-                className="flex-row items-center bg-gray-100 rounded-xl"
+                className="flex-row items-center rounded-xl"
                 style={{
+                  backgroundColor: colors.borderLight,
                   paddingHorizontal: responsivePadding(16),
                   paddingVertical: spacing.md,
                 }}
               >
-                <Ionicons name="lock-closed-outline" size={iconSize.md} color="#6b7280" />
+                <Ionicons name="lock-closed-outline" size={iconSize.md} color={colors.textSecondary} />
                 <TextInput
-                  className="flex-1 text-gray-800"
+                  className="flex-1"
                   placeholder="Enter password"
                   value={formData.password}
                   onChangeText={(value) => handleInputChange('password', value)}
@@ -289,10 +300,11 @@ export default function SignUpScreen() {
                   autoCapitalize="none"
                   autoCorrect={false}
                   style={{
+                    color: colors.text,
                     fontSize: responsiveFont(14),
                     marginLeft: spacing.md,
                   }}
-                  placeholderTextColor="#9ca3af"
+                  placeholderTextColor={colors.textTertiary}
                 />
                 <TouchableOpacity
                   onPress={() => setShowPassword(!showPassword)}
@@ -301,7 +313,7 @@ export default function SignUpScreen() {
                   <Ionicons
                     name={showPassword ? "eye-off-outline" : "eye-outline"}
                     size={iconSize.md}
-                    color="#6b7280"
+                    color={colors.textSecondary}
                   />
                 </TouchableOpacity>
               </View>
@@ -310,8 +322,9 @@ export default function SignUpScreen() {
             {/* Confirm Password Input */}
             <View style={{ marginBottom: spacing.lg }}>
               <Text
-                className="text-gray-700 font-medium"
+                className="font-medium"
                 style={{
+                  color: colors.text,
                   fontSize: responsiveFont(14),
                   marginBottom: spacing.xs,
                 }}
@@ -319,15 +332,16 @@ export default function SignUpScreen() {
                 Confirm Password
               </Text>
               <View
-                className="flex-row items-center bg-gray-100 rounded-xl"
+                className="flex-row items-center rounded-xl"
                 style={{
+                  backgroundColor: colors.borderLight,
                   paddingHorizontal: responsivePadding(16),
                   paddingVertical: spacing.md,
                 }}
               >
-                <Ionicons name="lock-closed-outline" size={iconSize.md} color="#6b7280" />
+                <Ionicons name="lock-closed-outline" size={iconSize.md} color={colors.textSecondary} />
                 <TextInput
-                  className="flex-1 text-gray-800"
+                  className="flex-1"
                   placeholder="Confirm password"
                   value={formData.confirmPassword}
                   onChangeText={(value) => handleInputChange('confirmPassword', value)}
@@ -335,10 +349,11 @@ export default function SignUpScreen() {
                   autoCapitalize="none"
                   autoCorrect={false}
                   style={{
+                    color: colors.text,
                     fontSize: responsiveFont(14),
                     marginLeft: spacing.md,
                   }}
-                  placeholderTextColor="#9ca3af"
+                  placeholderTextColor={colors.textTertiary}
                 />
                 <TouchableOpacity
                   onPress={() => setShowConfirmPassword(!showConfirmPassword)}

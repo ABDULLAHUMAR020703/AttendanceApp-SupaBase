@@ -43,6 +43,8 @@ export { useLocationState } from './hooks/useLocationState';
 export {
   calculateDistance,
   isPointInGeofence,
+  isWithin1km,
+  getDistanceInMeters,
   formatDistance,
   getClosestGeofence,
 } from './utils/distance';

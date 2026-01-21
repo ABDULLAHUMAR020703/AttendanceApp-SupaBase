@@ -219,8 +219,9 @@ export default function AdminDashboard({ route }) {
     
     return (
       <View 
-        className="bg-white rounded-xl mb-3 shadow-sm"
+        className="rounded-xl mb-3 shadow-sm"
         style={{ 
+          backgroundColor: colors.surface,
           padding: responsivePadding(16),
           marginHorizontal: spacing.sm,
         }}
@@ -248,15 +249,22 @@ export default function AdminDashboard({ route }) {
           <View className="flex-1" style={{ flexShrink: 1 }}>
             <View className="flex-row items-center justify-between" style={{ marginBottom: spacing.xs }}>
               <Text 
-                className="font-semibold text-gray-800"
-                style={{ fontSize: responsiveFont(18), flexShrink: 1 }}
+                className="font-semibold"
+                style={{ 
+                  color: colors.text,
+                  fontSize: responsiveFont(18), 
+                  flexShrink: 1 
+                }}
                 numberOfLines={1}
               >
                 {item.username}
               </Text>
               <Text 
-                className="text-gray-500"
-                style={{ fontSize: responsiveFont(12), marginLeft: spacing.xs }}
+                style={{ 
+                  color: colors.textTertiary,
+                  fontSize: responsiveFont(12), 
+                  marginLeft: spacing.xs 
+                }}
               >
                 {time}
               </Text>
@@ -264,25 +272,28 @@ export default function AdminDashboard({ route }) {
             
             <View className="flex-row items-center flex-wrap" style={{ marginBottom: spacing.xs }}>
               <Text 
-                className="text-gray-600"
-                style={{ fontSize: responsiveFont(14), marginRight: spacing.xs }}
+                style={{ 
+                  color: colors.textSecondary,
+                  fontSize: responsiveFont(14), 
+                  marginRight: spacing.xs 
+                }}
               >
                 {date}
               </Text>
               <View 
-                className={`rounded-full ${
-                item.type === 'checkin' ? 'bg-green-100' : 'bg-red-100'
-                }`}
+                className="rounded-full"
                 style={{ 
+                  backgroundColor: item.type === 'checkin' ? colors.successLight : colors.errorLight,
                   paddingHorizontal: spacing.xs,
                   paddingVertical: spacing.xs / 2,
                 }}
               >
                 <Text 
-                  className={`font-medium ${
-                  item.type === 'checkin' ? 'text-green-800' : 'text-red-800'
-                  }`}
-                  style={{ fontSize: responsiveFont(10) }}
+                  className="font-medium"
+                  style={{ 
+                    color: item.type === 'checkin' ? colors.success : colors.error,
+                    fontSize: responsiveFont(10) 
+                  }}
                 >
                   {item.type === 'checkin' ? 'Check In' : 'Check Out'}
                 </Text>
@@ -292,10 +303,14 @@ export default function AdminDashboard({ route }) {
             {/* Location */}
             {item.location && item.location.latitude !== undefined && item.location.longitude !== undefined && (
               <View className="flex-row items-center" style={{ marginBottom: spacing.xs }}>
-                <Ionicons name="location-outline" size={iconSize.sm} color="#6b7280" />
+                <Ionicons name="location-outline" size={iconSize.sm} color={colors.textSecondary} />
                 <Text 
-                  className="text-gray-600 ml-1"
-                  style={{ fontSize: responsiveFont(12), flexShrink: 1 }}
+                  className="ml-1"
+                  style={{ 
+                    color: colors.textSecondary,
+                    fontSize: responsiveFont(12), 
+                    flexShrink: 1 
+                  }}
                   numberOfLines={1}
                 >
                   {(item.location.latitude ?? 0).toFixed(4)}, {(item.location.longitude ?? 0).toFixed(4)}
@@ -325,8 +340,8 @@ export default function AdminDashboard({ route }) {
 
   const FilterButton = ({ title, value, isActive }) => (
     <TouchableOpacity
-      className={isActive ? 'bg-primary-500' : 'bg-gray-200'}
       style={{
+        backgroundColor: isActive ? colors.primary : colors.borderLight,
         paddingHorizontal: responsivePadding(18),
         paddingVertical: responsivePadding(8),
         marginRight: spacing.sm,
@@ -335,10 +350,11 @@ export default function AdminDashboard({ route }) {
       onPress={() => setFilter(value)}
     >
       <Text 
-        className={`font-medium ${
-        isActive ? 'text-white' : 'text-gray-700'
-        }`}
-        style={{ fontSize: responsiveFont(14) }}
+        className="font-medium"
+        style={{ 
+          color: isActive ? '#ffffff' : colors.text,
+          fontSize: responsiveFont(14) 
+        }}
       >
         {title}
       </Text>
@@ -347,10 +363,10 @@ export default function AdminDashboard({ route }) {
 
   const TabButton = ({ title, value, isActive, icon }) => (
     <TouchableOpacity
-      className={`flex-1 flex-row items-center justify-center ${
-        isActive ? 'border-b-2 border-primary-500' : ''
-      }`}
+      className="flex-1 flex-row items-center justify-center"
       style={{ 
+        borderBottomWidth: isActive ? 2 : 0,
+        borderBottomColor: isActive ? colors.primary : 'transparent',
         paddingVertical: spacing.md,
         minHeight: componentSize.tabBarHeight,
       }}
@@ -359,13 +375,12 @@ export default function AdminDashboard({ route }) {
       <Ionicons 
         name={icon} 
         size={isSmallScreen() ? iconSize.sm : iconSize.md} 
-        color={isActive ? '#3b82f6' : '#6b7280'} 
+        color={isActive ? colors.primary : colors.textSecondary} 
       />
       <Text 
-        className={`font-medium ${
-        isActive ? 'text-primary-500' : 'text-gray-500'
-        }`}
+        className="font-medium"
         style={{ 
+          color: isActive ? colors.primary : colors.textTertiary,
           fontSize: isSmallScreen() ? responsiveFont(12) : responsiveFont(14),
           marginLeft: spacing.xs,
         }}
@@ -642,7 +657,7 @@ export default function AdminDashboard({ route }) {
       </View>
 
       {/* Tab Navigation */}
-        <View className="flex-row border-b border-gray-200">
+        <View className="flex-row border-b" style={{ borderColor: colors.border }}>
           <TabButton 
             title="Attendance" 
             value="attendance" 
@@ -673,25 +688,27 @@ export default function AdminDashboard({ route }) {
         {activeTab === 'attendance' && (
           <>
             <View 
-              className="flex-row items-center bg-gray-100 rounded-xl"
+              className="flex-row items-center rounded-xl"
               style={{
+                backgroundColor: colors.borderLight,
                 paddingHorizontal: responsivePadding(16),
                 paddingVertical: spacing.md,
                 marginBottom: spacing.md,
                 marginTop: spacing.xs,
               }}
             >
-              <Ionicons name="search-outline" size={iconSize.md} color="#6b7280" />
+              <Ionicons name="search-outline" size={iconSize.md} color={colors.textSecondary} />
               <TextInput
-                className="flex-1 text-gray-800"
+                className="flex-1"
                 placeholder="Search by username..."
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 style={{
+                  color: colors.text,
                   fontSize: responsiveFont(14),
                   marginLeft: spacing.md,
                 }}
-                placeholderTextColor="#9ca3af"
+                placeholderTextColor={colors.textTertiary}
               />
             </View>
             
@@ -736,8 +753,9 @@ export default function AdminDashboard({ route }) {
         <>
           {/* Stats */}
           <View 
-            className="bg-white rounded-xl shadow-sm"
+            className="rounded-xl shadow-sm"
             style={{
+              backgroundColor: colors.surface,
               marginHorizontal: responsivePadding(16),
               marginVertical: spacing.md,
               padding: responsivePadding(16),
@@ -746,14 +764,17 @@ export default function AdminDashboard({ route }) {
             <View className="flex-row justify-around">
               <View className="items-center" style={{ flex: 1 }}>
                 <Text 
-                  className="font-bold text-primary-500"
-                  style={{ fontSize: responsiveFont(24) }}
+                  className="font-bold"
+                  style={{ 
+                    color: colors.primary,
+                    fontSize: responsiveFont(24) 
+                  }}
                 >
                   {records.length}
                 </Text>
                 <Text 
-                  className="text-gray-600"
                   style={{ 
+                    color: colors.textSecondary,
                     fontSize: responsiveFont(12),
                     marginTop: spacing.xs / 2,
                   }}
@@ -764,14 +785,17 @@ export default function AdminDashboard({ route }) {
               </View>
               <View className="items-center" style={{ flex: 1 }}>
                 <Text 
-                  className="font-bold text-green-500"
-                  style={{ fontSize: responsiveFont(24) }}
+                  className="font-bold"
+                  style={{ 
+                    color: colors.success,
+                    fontSize: responsiveFont(24) 
+                  }}
                 >
                   {records.filter(r => r.type === 'checkin').length}
                 </Text>
                 <Text 
-                  className="text-gray-600"
                   style={{ 
+                    color: colors.textSecondary,
                     fontSize: responsiveFont(12),
                     marginTop: spacing.xs / 2,
                   }}
@@ -782,14 +806,17 @@ export default function AdminDashboard({ route }) {
               </View>
               <View className="items-center" style={{ flex: 1 }}>
                 <Text 
-                  className="font-bold text-red-500"
-                  style={{ fontSize: responsiveFont(24) }}
+                  className="font-bold"
+                  style={{ 
+                    color: colors.error,
+                    fontSize: responsiveFont(24) 
+                  }}
                 >
                   {records.filter(r => r.type === 'checkout').length}
                 </Text>
                 <Text 
-                  className="text-gray-600"
                   style={{ 
+                    color: colors.textSecondary,
                     fontSize: responsiveFont(12),
                     marginTop: spacing.xs / 2,
                   }}
@@ -818,10 +845,11 @@ export default function AdminDashboard({ route }) {
               className="flex-1 justify-center items-center"
               style={{ paddingHorizontal: responsivePadding(24) }}
             >
-              <Ionicons name="people-outline" size={iconSize['4xl']} color="#d1d5db" />
+              <Ionicons name="people-outline" size={iconSize['4xl']} color={colors.textTertiary} />
               <Text 
-                className="font-semibold text-gray-500 text-center"
+                className="font-semibold text-center"
                 style={{ 
+                  color: colors.textSecondary,
                   fontSize: responsiveFont(20),
                   marginTop: spacing.md,
                 }}
@@ -832,8 +860,9 @@ export default function AdminDashboard({ route }) {
                 }
               </Text>
               <Text 
-                className="text-gray-400 text-center"
+                className="text-center"
                 style={{ 
+                  color: colors.textTertiary,
                   fontSize: responsiveFont(14),
                   marginTop: spacing.xs,
                 }}
@@ -844,8 +873,9 @@ export default function AdminDashboard({ route }) {
                 }
               </Text>
               <TouchableOpacity
-                className="bg-primary-500 rounded-xl"
+                className="rounded-xl"
                 style={{
+                  backgroundColor: colors.primary,
                   paddingHorizontal: responsivePadding(24),
                   paddingVertical: spacing.md,
                   marginTop: spacing.lg,
@@ -865,12 +895,19 @@ export default function AdminDashboard({ route }) {
           {/* Summary */}
           {filteredRecords.length > 0 && (
             <View 
-              className="bg-white border-t border-gray-200"
-              style={{ padding: responsivePadding(16) }}
+              className="border-t"
+              style={{ 
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                padding: responsivePadding(16) 
+              }}
             >
               <Text 
-                className="text-gray-600 text-center"
-                style={{ fontSize: responsiveFont(14) }}
+                className="text-center"
+                style={{ 
+                  color: colors.textSecondary,
+                  fontSize: responsiveFont(14) 
+                }}
               >
                 Showing {filteredRecords.length} of {records.length} record{records.length !== 1 ? 's' : ''}
               </Text>

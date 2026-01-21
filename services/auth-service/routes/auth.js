@@ -382,6 +382,104 @@ router.patch('/users/:username/role', async (req, res) => {
 });
 
 /**
+ * PATCH /api/auth/users/:username/email
+ * Update user email (requires admin privileges)
+ * Body: { email: string }
+ */
+router.patch('/users/:username/email', async (req, res) => {
+  const timestamp = new Date().toISOString();
+  const { username } = req.params;
+  const { email } = req.body;
+  
+  console.log(`[${timestamp}] Auth Service: Update email request for: ${username} -> ${email}`);
+  
+  try {
+    if (!username || !email) {
+      return res.status(400).json({
+        success: false,
+        error: 'Username and email are required',
+      });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid email format',
+      });
+    }
+
+    // Step 1: Get user's UID from database
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('uid, email')
+      .eq('username', username)
+      .single();
+
+    if (userError || !userData) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found',
+      });
+    }
+
+    // Step 2: Update email in Supabase Auth (requires admin API)
+    const { data: authData, error: authError } = await supabase.auth.admin.updateUserById(
+      userData.uid,
+      {
+        email: email,
+        email_confirm: true, // Auto-confirm the new email
+      }
+    );
+
+    if (authError) {
+      console.error('Update email in Auth error:', authError);
+      return res.status(500).json({
+        success: false,
+        error: authError.message || 'Failed to update email in Auth',
+      });
+    }
+
+    // Step 3: Update email in PostgreSQL users table
+    const { data: dbData, error: dbError } = await supabase
+      .from('users')
+      .update({
+        email: email,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('username', username)
+      .select();
+
+    if (dbError) {
+      console.error('Update email in database error:', dbError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to update email in database',
+      });
+    }
+
+    console.log(`[${timestamp}] Auth Service: ✓ User email updated: ${username} -> ${email}`);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Email updated successfully',
+      data: {
+        username: username,
+        oldEmail: userData.email,
+        newEmail: email,
+      },
+    });
+  } catch (error) {
+    console.error('Update email error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+    });
+  }
+});
+
+/**
  * PATCH /api/auth/users/:username
  * Update user information
  * Body: { ...updates }

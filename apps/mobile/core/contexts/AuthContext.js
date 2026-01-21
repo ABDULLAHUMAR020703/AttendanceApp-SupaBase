@@ -244,23 +244,9 @@ export function AuthProvider({ children }) {
         return;
       }
 
-      // Get auth user email for fallback query
-      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-      
-      // Check if cancelled after async call
-      if (currentCall.cancelled) {
-        return;
-      }
-      if (authError) {
-        console.error('Error getting auth user:', authError);
-        // If refresh token error, sign out
-        if (authError.message?.includes('Refresh Token') || authError.message?.includes('refresh_token')) {
-          await supabase.auth.signOut();
-        }
-        setUser(null);
-        setIsLoading(false);
-        return;
-      }
+      // Use session.user directly instead of calling getUser() again
+      // This prevents AuthSessionMissingError when session exists but getUser() fails
+      const authUser = session.user;
 
       // Try to get user data from Supabase database
       // First try by uid (should match Supabase Auth user ID)
@@ -365,26 +351,27 @@ export function AuthProvider({ children }) {
         return;
       }
       
-      // Fallback to basic user info
+      // Fallback to basic user info from session
       if (!currentCall.cancelled) {
         try {
-          const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-          if (authError) {
-            console.error('Error getting auth user in catch:', authError);
-            if (authError.message?.includes('Refresh Token') || authError.message?.includes('refresh_token')) {
+          // Try to get session first, then use session.user instead of getUser()
+          const { data: { session: fallbackSession }, error: sessionError } = await supabase.auth.getSession();
+          if (sessionError || !fallbackSession || !fallbackSession.user) {
+            console.error('Error getting session in catch:', sessionError);
+            if (sessionError?.message?.includes('Refresh Token') || sessionError?.message?.includes('refresh_token')) {
               await supabase.auth.signOut();
             }
             setUser(null);
-          } else if (authUser) {
+          } else if (fallbackSession.user) {
             setUser({
-              uid: authUser.id,
-              email: authUser.email,
-              username: authUser.email?.split('@')[0],
+              uid: fallbackSession.user.id,
+              email: fallbackSession.user.email,
+              username: fallbackSession.user.email?.split('@')[0],
               role: 'employee',
             });
           }
-        } catch (getUserError) {
-          console.error('Error in getUser fallback:', getUserError);
+        } catch (getSessionError) {
+          console.error('Error in getSession fallback:', getSessionError);
           setUser(null);
         }
       }
