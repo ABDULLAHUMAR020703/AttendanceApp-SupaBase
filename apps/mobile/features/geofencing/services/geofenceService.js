@@ -12,6 +12,7 @@ import {
   canManageDepartmentGeofenceAsync,
   mapGeofenceRowToOfficeLocation,
 } from './departmentGeofenceAccess';
+import { normalizeWorkMode, isFullyRemote, requiresGeofenceForCheckIn } from '../utils/workModeRules';
 
 const GEOFENCES_STORAGE_KEY = '@geofences';
 const ACTIVE_GEOFENCE_KEY = '@active_geofence';
@@ -687,43 +688,141 @@ export const updateOfficeLocation = async (
 };
 
 /**
+ * Fetch all locations where the employee may check in (office + assigned sites).
+ * @param {Object|null} user
+ * @returns {Promise<Array>}
+ */
+export const getEmployeeAllowedLocations = async (user = null) => {
+  const locations = [];
+  const seen = new Set();
+
+  const addLocation = (loc, locationType) => {
+    if (!loc?.latitude || !loc?.longitude) return;
+    const key = `${loc.id || loc.name}-${loc.latitude}-${loc.longitude}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    locations.push({
+      ...loc,
+      radius_meters: loc.radius_meters ?? loc.radius ?? 1000,
+      locationType,
+    });
+  };
+
+  const office = await getOfficeLocation(user);
+  if (office) {
+    addLocation(office, 'office');
+  }
+
+  const userUid = user?.uid || user?.id;
+  if (userUid) {
+    try {
+      const { data, error } = await supabase
+        .from('employee_sites')
+        .select('site_id, sites(id, name, latitude, longitude, radius, department_id, company_id)')
+        .eq('employee_uid', userUid);
+
+      if (error) {
+        console.warn('[GeofenceService] getEmployeeAllowedLocations:', error.message);
+      } else {
+        for (const row of data || []) {
+          const site = row.sites;
+          if (!site) continue;
+          addLocation(
+            {
+              id: site.id,
+              name: site.name || 'Assigned location',
+              latitude: site.latitude,
+              longitude: site.longitude,
+              radius_meters: site.radius,
+              department_id: site.department_id,
+            },
+            'assigned'
+          );
+        }
+      }
+    } catch (err) {
+      console.warn('[GeofenceService] getEmployeeAllowedLocations failed:', err?.message);
+    }
+  }
+
+  return locations;
+};
+
+/**
+ * Find the allowed location the user is currently within, if any.
+ */
+export const findMatchingAllowedLocation = async (user, userLat, userLon) => {
+  const locations = await getEmployeeAllowedLocations(user);
+  let closest = null;
+  let closestDistance = Infinity;
+
+  for (const loc of locations) {
+    const distance = getDistanceInMeters(userLat, userLon, loc.latitude, loc.longitude);
+    const radiusM = loc.radius_meters || 1000;
+    if (distance <= radiusM) {
+      return { match: loc, distance };
+    }
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      closest = loc;
+    }
+  }
+
+  return { match: null, closest, distance: closestDistance };
+};
+
+/**
  * Validate check-in location based on work mode
- * - in_office: Must be within 1km of office location
- * - semi_remote or fully_remote: No location restriction
- * @param {Object} user - User object with workMode/work_mode
- * @param {number} userLat - User's current latitude
- * @param {number} userLon - User's current longitude
- * @returns {Promise<{valid: boolean, error?: string, distance?: number, warning?: string}>}
+ * - in_office: office geofence only
+ * - semi_remote: office OR any assigned remote site
+ * - fully_remote: any location (GPS optional)
  */
 export const validateCheckInLocation = async (user, userLat, userLon) => {
   try {
-    // Validate coordinates
+    const workMode = normalizeWorkMode(user);
+
+    if (isFullyRemote(user)) {
+      return { valid: true, locationRequired: false };
+    }
+
     if (typeof userLat !== 'number' || typeof userLon !== 'number' || isNaN(userLat) || isNaN(userLon)) {
       return {
         valid: false,
-        error: 'Invalid location coordinates. Please enable location services.',
+        locationRequired: true,
+        error: 'Unable to get your current location. Please enable location services and try again.',
       };
     }
 
-    // Get user's work mode
-    const workMode = user.workMode || user.work_mode;
-
-    // If work mode is semi_remote or fully_remote, allow check-in regardless of location
-    if (workMode === 'semi_remote' || workMode === 'fully_remote') {
+    if (workMode === 'semi_remote') {
+      const { match, closest, distance } = await findMatchingAllowedLocation(user, userLat, userLon);
+      if (match) {
+        return { valid: true, matchedLocation: match, distance, locationRequired: true };
+      }
+      if (!closest) {
+        return {
+          valid: false,
+          locationRequired: true,
+          error:
+            'No office or assigned work locations are configured for your account. Ask your administrator to set up geofencing or assign you to a site.',
+        };
+      }
       return {
-        valid: true,
+        valid: false,
+        locationRequired: true,
+        error: `You must check in from your office or an assigned work location. Nearest site "${closest.name}" is ${formatDistance(distance)} away.`,
+        distance,
       };
     }
 
     if (workMode === 'in_office') {
       const officeLocation = await getOfficeLocation(user);
-      const deptLabel =
-        officeLocation?.department_name || user.department || 'your department';
+      const deptLabel = officeLocation?.department_name || user.department || 'your department';
 
       if (!officeLocation) {
         console.warn('[GeofenceService] No geofence for department, allowing check-in');
         return {
           valid: true,
+          locationRequired: true,
           warning: `No office geofence configured for ${deptLabel}. Check-in allowed.`,
         };
       }
@@ -739,26 +838,36 @@ export const validateCheckInLocation = async (user, userLat, userLon) => {
       if (distance > radiusM) {
         return {
           valid: false,
+          locationRequired: true,
           error: `You must be within ${formatDistance(radiusM)} of the ${deptLabel} office to check in. You are currently ${formatDistance(distance)} away.`,
           distance,
         };
       }
 
-      return { valid: true };
+      return {
+        valid: true,
+        matchedLocation: { ...officeLocation, locationType: 'office' },
+        distance,
+        locationRequired: true,
+      };
     }
 
-    // Unknown work mode - allow check-in (graceful fallback)
+    if (!requiresGeofenceForCheckIn(user)) {
+      return { valid: true, locationRequired: false };
+    }
+
     console.warn(`[GeofenceService] Unknown work mode: ${workMode}, allowing check-in`);
     return {
       valid: true,
+      locationRequired: false,
       warning: `Unknown work mode (${workMode}). Check-in allowed.`,
     };
   } catch (error) {
     console.error('[GeofenceService] Error validating check-in location:', error);
-    // On error, allow check-in (graceful fallback)
     return {
-      valid: true,
-      warning: 'Unable to validate location. Check-in allowed.',
+      valid: false,
+      locationRequired: true,
+      error: 'Unable to validate your location. Please try again.',
     };
   }
 };

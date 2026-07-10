@@ -1,13 +1,19 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminService } from '../services/adminService';
 import { GlassCard } from '../../../shared/components/GlassCard';
+import { ChartPanel, ChartSkeleton } from '../../../shared/components/charts';
 import { useAuthStore } from '../../auth/store/authStore';
 import { hasAnyPermission, hasPermission, PERMISSIONS } from '../permissions';
 import { formatLeaveActivityTitle } from '../utils/leaveDisplay';
+import { buildUserGrowthSeries, computeGrowthRate } from '../utils/analyticsCharts';
+import { useSilentPoll } from '../../../shared/hooks/useSilentPoll';
 
-const monthLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
+const UserGrowthLineChart = lazy(() =>
+  import('../../../shared/components/charts/UserGrowthLineChart').then((m) => ({
+    default: m.UserGrowthLineChart,
+  }))
+);
 const formatRelativeTime = (isoValue) => {
   if (!isoValue) return 'Unknown time';
   const deltaMs = Date.now() - new Date(isoValue).getTime();
@@ -80,9 +86,9 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const loadDashboard = async () => {
+  const loadDashboard = useCallback(async (silent = false) => {
     setError('');
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const canViewUsers = hasAnyPermission(user, [
         PERMISSIONS.VIEW_EMPLOYEES,
@@ -117,28 +123,7 @@ export function DashboardPage() {
       });
       setCachedUsers(users || []);
 
-      const monthBuckets = new Map();
-      for (let i = 0; i < 12; i += 1) {
-        const date = new Date();
-        date.setMonth(date.getMonth() - (11 - i));
-        const key = `${date.getFullYear()}-${date.getMonth()}`;
-        monthBuckets.set(key, 0);
-      }
-
-      for (const user of users || []) {
-        if (!user?.created_at) continue;
-        const created = new Date(user.created_at);
-        const key = `${created.getFullYear()}-${created.getMonth()}`;
-        if (monthBuckets.has(key)) {
-          monthBuckets.set(key, monthBuckets.get(key) + 1);
-        }
-      }
-      setGrowthSeries(
-        Array.from(monthBuckets.entries()).map(([key, value]) => {
-          const [year, month] = key.split('-').map(Number);
-          return { label: `${monthLabels[month]} ${String(year).slice(-2)}`, value };
-        })
-      );
+      setGrowthSeries(buildUserGrowthSeries(users));
 
       const activity = [];
       for (const leave of leaves || []) {
@@ -173,29 +158,21 @@ export function DashboardPage() {
     } catch (err) {
       setError(err?.response?.data?.error || err?.message || 'Failed to load dashboard data');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     loadDashboard();
-    const timer = setInterval(loadDashboard, 30000);
-    return () => clearInterval(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [loadDashboard]);
 
-  const maxGrowth = Math.max(...growthSeries.map((p) => p.value), 1);
-  const growthPoints = growthSeries.length
-    ? growthSeries.map((point, index) => {
-        const x = index * (550 / Math.max(growthSeries.length - 1, 1)) + 24;
-        const y = 220 - (point.value / maxGrowth) * 180;
-        return `${x},${y}`;
-      })
-    : [];
+  useSilentPoll(loadDashboard, 30000, [user]);
 
-  const growthRate = growthSeries.length > 1
-    ? (((growthSeries[growthSeries.length - 1].value - growthSeries[growthSeries.length - 2].value) / Math.max(growthSeries[growthSeries.length - 2].value, 1)) * 100)
-    : 0;
+  const hasGrowthData = useMemo(
+    () => growthSeries.some((point) => point.users > 0),
+    [growthSeries]
+  );
+  const growthRate = useMemo(() => computeGrowthRate(growthSeries), [growthSeries]);
 
   const unresolvedActions = stats?.pendingLeaves ?? 0;
   const canViewUsers = hasAnyPermission(user, [
@@ -239,8 +216,7 @@ export function DashboardPage() {
   ]);
 
   return (
-    <div className="space-y-6 animate-fade-up">
-      <section className="flex items-start justify-between gap-3">
+    <div className="dashboard-page space-y-6 animate-fade-up">      <section className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-white">Dashboard</h1>
           <p className="mt-1 text-sm text-slate-200">A quick snapshot of users, departments, and pending admin actions.</p>
@@ -388,36 +364,29 @@ export function DashboardPage() {
       <section className="grid xl:grid-cols-5 gap-6">
         {canViewUsers && (
         <GlassCard className="xl:col-span-3 p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-medium text-white">User Growth</h2>
-              <p className="text-xs text-slate-300 mt-1">Monthly trend of active platform users</p>
-            </div>
-            <span className="text-xs text-slate-300">{growthSeries.length ? `${growthSeries.length} months` : 'No timeline data'}</span>
-          </div>
-
-          <div className="mt-5 h-64 rounded-lg border border-white/10 bg-slate-950/30 p-3">
-            {loading ? (
-              <div className="h-full w-full rounded-md skeleton" />
-            ) : growthSeries.length === 0 ? (
-              <div className="h-full grid place-items-center text-sm text-slate-300">No user growth data available.</div>
-            ) : (
-              <svg viewBox="0 0 600 240" className="h-full w-full">
-                <polyline
-                  fill="none"
-                  stroke="#2563EB"
-                  strokeWidth="3"
-                  points={growthPoints.join(' ')}
-                />
-                {growthPoints.map((point, index) => {
-                  const [cx, cy] = point.split(',');
-                  return <circle key={index} cx={cx} cy={cy} r="4" fill="#3B82F6" />;
-                })}
-              </svg>
-            )}
-          </div>
-
-          <div className="mt-4 grid grid-cols-3 gap-3 text-xs">
+          <ChartPanel
+            exportId="chart-user-growth"
+            title="User Growth"
+            subtitle="New users registered per month (last 12 months)"
+            loading={loading}
+            isEmpty={!hasGrowthData}
+            emptyState={{
+              title: 'No registration activity yet',
+              description:
+                'No users have been created in the last 12 months. New registrations will appear here as accounts are added.',
+              actions: [
+                {
+                  label: 'Add user',
+                  onClick: () => navigate('/users', { state: { openCreate: true } }),
+                },
+              ],
+            }}
+          >
+            <Suspense fallback={<ChartSkeleton height={300} />}>
+              <UserGrowthLineChart data={growthSeries} />
+            </Suspense>
+          </ChartPanel>
+          <div className="mt-4 grid grid-cols-1 gap-3 text-xs sm:grid-cols-3">
             <div className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-slate-300">Growth Rate <span className="ml-1 font-semibold text-white">{`${growthRate >= 0 ? '+' : ''}${growthRate.toFixed(1)}%`}</span></div>
             <div className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-slate-300">Active Users <span className="ml-1 font-semibold text-white">{stats?.activeUsers ?? 0}</span></div>
             <div className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-slate-300">Latest Month <span className="ml-1 font-semibold text-white">{growthSeries[growthSeries.length - 1]?.label || 'N/A'}</span></div>

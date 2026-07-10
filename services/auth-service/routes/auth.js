@@ -1467,6 +1467,112 @@ router.get('/position-suggestions', async (req, res) => {
   }
 });
 
+router.get('/me/permissions', async (req, res) => {
+  const requester = parseRequester(req);
+  if (!requester?.uid) {
+    return res.status(401).json({ success: false, error: 'Unauthorized' });
+  }
+  try {
+    const { data: user } = await supabase
+      .from('users')
+      .select('uid, role')
+      .eq('uid', requester.uid)
+      .eq('is_active', true)
+      .maybeSingle();
+    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+    const permissions = user.role === 'super_admin' ? [] : await getManagerPermissions(supabase, user.uid);
+    return res.status(200).json({
+      success: true,
+      data: { uid: user.uid, role: user.role, permissions },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message || 'Failed to load permissions' });
+  }
+});
+
+router.post('/work-mode-requests', async (req, res) => {
+  const requester = parseRequester(req);
+  if (!requester?.uid) {
+    return res.status(401).json({ success: false, error: 'Unauthorized' });
+  }
+  const { requested_work_mode, reason } = req.body;
+  const validModes = ['in_office', 'semi_remote', 'fully_remote'];
+  if (!validModes.includes(requested_work_mode)) {
+    return res.status(400).json({ success: false, error: 'Invalid work mode' });
+  }
+  try {
+    const { data: user } = await supabase
+      .from('users')
+      .select('uid, work_mode, company_id')
+      .eq('uid', requester.uid)
+      .eq('is_active', true)
+      .single();
+    if (!user?.company_id) return res.status(403).json({ success: false, error: 'Tenant required' });
+    if (user.work_mode === requested_work_mode) {
+      return res.status(400).json({ success: false, error: 'You are already on this work mode' });
+    }
+
+    const { data: pending } = await supabase
+      .from('work_mode_requests')
+      .select('id')
+      .eq('employee_uid', user.uid)
+      .eq('status', 'pending')
+      .maybeSingle();
+    if (pending) {
+      return res.status(400).json({ success: false, error: 'You already have a pending work mode request' });
+    }
+
+    const { initializeApprovalSteps, REQUEST_TYPES } = require('../lib/approvalEngine');
+    const { data: row, error } = await supabase
+      .from('work_mode_requests')
+      .insert({
+        company_id: user.company_id,
+        employee_uid: user.uid,
+        current_work_mode: user.work_mode,
+        requested_work_mode,
+        reason: reason || null,
+        status: 'pending',
+        current_step: 1,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+
+    const init = await initializeApprovalSteps(supabase, {
+      companyId: user.company_id,
+      requestType: REQUEST_TYPES.REMOTE_WORK,
+      requestId: row.id,
+      employeeUid: user.uid,
+    });
+    if (init.workflowId) {
+      await supabase.from('work_mode_requests').update({ workflow_id: init.workflowId }).eq('id', row.id);
+    }
+
+    return res.status(201).json({ success: true, data: row });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message || 'Failed to submit request' });
+  }
+});
+
+router.get('/work-mode-requests/mine', async (req, res) => {
+  const requester = parseRequester(req);
+  if (!requester?.uid) {
+    return res.status(401).json({ success: false, error: 'Unauthorized' });
+  }
+  try {
+    const { data, error } = await supabase
+      .from('work_mode_requests')
+      .select('*')
+      .eq('employee_uid', requester.uid)
+      .order('requested_at', { ascending: false })
+      .limit(20);
+    if (error) throw error;
+    return res.status(200).json({ success: true, data: data || [] });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message || 'Failed to load requests' });
+  }
+});
+
 const onboardingRoutes = require('./onboarding');
 router.use(onboardingRoutes);
 

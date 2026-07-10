@@ -1,4 +1,5 @@
 import { MANAGER_PERMISSIONS, hasAnyPermission } from './permissions';
+import { hasTenantWidePeopleAccess } from '../../../../shared/permissions/catalog.cjs';
 
 // User Roles Constants
 export const ROLES = {
@@ -68,15 +69,7 @@ export const isSuperAdmin = (role) => {
  * Backward-compatible name for managers with tenant-wide people permissions.
  * Department names are organizational only and never grant capabilities.
  */
-export const isHRAdmin = (user) => {
-  if (!user) return false;
-  return user.role === ROLES.MANAGER && hasAnyPermission(user, [
-    MANAGER_PERMISSIONS.CREATE_USER,
-    MANAGER_PERMISSIONS.DELETE_USER,
-    MANAGER_PERMISSIONS.CHANGE_USER_ROLE,
-    MANAGER_PERMISSIONS.APPROVE_SIGNUP_REQUESTS,
-  ]);
-};
+export const isHRAdmin = (user) => hasTenantWidePeopleAccess(user);
 
 /**
  * Department geofence management (super admin: all; manager: own department).

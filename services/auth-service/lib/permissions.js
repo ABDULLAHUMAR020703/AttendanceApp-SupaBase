@@ -1,102 +1,17 @@
-const MANAGER_PERMISSION_GROUPS = [
-  {
-    group: 'User Management',
-    permissions: [
-      ['create_user', 'Create Users'],
-      ['edit_user', 'Edit Users'],
-      ['delete_user', 'Delete Users'],
-      ['activate_user', 'Activate Users'],
-      ['deactivate_user', 'Deactivate Users'],
-      ['change_user_role', 'Change User Roles'],
-      ['view_employees', 'View Employees'],
-    ],
-  },
-  {
-    group: 'Attendance',
-    permissions: [
-      ['manual_attendance', 'Manual Attendance'],
-      ['view_attendance', 'View Attendance'],
-      ['export_attendance', 'Export Attendance'],
-      ['attendance_analytics', 'Attendance Analytics'],
-    ],
-  },
-  {
-    group: 'Leave',
-    permissions: [
-      ['view_leave_requests', 'View Leave Requests'],
-      ['approve_leave', 'Approve Leave'],
-      ['reject_leave', 'Reject Leave'],
-      ['edit_leave_balance', 'Edit Leave Balance'],
-    ],
-  },
-  {
-    group: 'Tickets',
-    permissions: [
-      ['view_tickets', 'View Tickets'],
-      ['manage_tickets', 'Manage Tickets'],
-      ['assign_tickets', 'Assign Tickets'],
-      ['close_tickets', 'Close Tickets'],
-    ],
-  },
-  {
-    group: 'Geofencing',
-    permissions: [
-      ['manage_geofencing', 'Manage Geofencing'],
-      ['update_office_location', 'Update Office Location'],
-      ['update_attendance_radius', 'Update Attendance Radius'],
-    ],
-  },
-  {
-    group: 'Analytics',
-    permissions: [
-      ['view_hr_dashboard', 'View HR Dashboard'],
-      ['view_analytics', 'View Analytics'],
-      ['export_reports', 'Export Reports'],
-    ],
-  },
-  {
-    group: 'Calendar',
-    permissions: [
-      ['create_events', 'Create Events'],
-      ['edit_events', 'Edit Events'],
-      ['delete_events', 'Delete Events'],
-    ],
-  },
-  {
-    group: 'System',
-    permissions: [
-      ['manage_notifications', 'Manage Notifications'],
-      ['approve_signup_requests', 'Approve Signup Requests'],
-      ['manage_departments', 'Manage Departments'],
-      ['access_system_settings', 'Access System Settings'],
-    ],
-  },
-];
-
-const ALL_MANAGER_PERMISSIONS = MANAGER_PERMISSION_GROUPS.flatMap((group) =>
-  group.permissions.map(([key]) => key)
-);
-
-const DEFAULT_MANAGER_PERMISSIONS = [
-  'view_employees',
-  'edit_user',
-  'manual_attendance',
-  'view_attendance',
-  'view_leave_requests',
-  'approve_leave',
-  'reject_leave',
-  'view_tickets',
-  'manage_tickets',
-  'view_hr_dashboard',
-  'view_analytics',
-  'create_events',
-  'edit_events',
-  'delete_events',
-];
+/**
+ * Server-side permission checks — catalog lives in shared/permissions/catalog.cjs
+ */
+const catalog = require('../../../shared/permissions/catalog.cjs');
+const {
+  MANAGER_PERMISSION_GROUPS,
+  ALL_MANAGER_PERMISSIONS,
+  DEFAULT_MANAGER_PERMISSIONS,
+  TENANT_WIDE_PEOPLE_PERMISSIONS,
+  FEATURE_PERMISSIONS,
+  normalizePermissionKey,
+} = catalog;
 
 const SELF_PROTECTION_ERROR = 'You cannot modify your own administrative access.';
-
-const normalizePermissionKey = (key) => String(key || '').trim();
 
 async function getManagerPermissions(supabase, managerUid) {
   if (!managerUid) return [];
@@ -169,9 +84,12 @@ async function writeAuditLog(supabase, { actorUid, targetUid, action }) {
 }
 
 module.exports = {
+  ...catalog,
   MANAGER_PERMISSION_GROUPS,
   ALL_MANAGER_PERMISSIONS,
   DEFAULT_MANAGER_PERMISSIONS,
+  TENANT_WIDE_PEOPLE_PERMISSIONS,
+  FEATURE_PERMISSIONS,
   SELF_PROTECTION_ERROR,
   getManagerPermissions,
   hasPermission,

@@ -239,9 +239,18 @@ export function AuthProvider({ children }) {
         const workModeSub = subscribeToWorkModeChanges(
           user,
           (data) => {
-            // Work mode change callback
             console.log('[AUTH_CONTEXT] Work mode change via realtime:', data.username, data.oldWorkMode, '->', data.newWorkMode);
-            // You can emit an event or update a context here if needed
+            if (data.uid === user.uid || data.username === user.username) {
+              setUser((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      workMode: data.newWorkMode,
+                      work_mode: data.newWorkMode,
+                    }
+                  : prev
+              );
+            }
           },
           (error) => {
             console.error('[AUTH_CONTEXT] Work mode subscription error:', error);
@@ -528,7 +537,18 @@ export function AuthProvider({ children }) {
         position: userData.position || '',
         workMode: userData.work_mode || 'in_office',
         hireDate: userData.hire_date,
-        permissions: await fetchManagerPermissions(userId, dbRole),
+        permissions: await (async () => {
+          try {
+            const { refreshPermissionsFromServer } = await import('../api/workflowApi');
+            const refreshed = await refreshPermissionsFromServer({
+              uid: userId,
+              role: dbRole,
+              permissions: await fetchManagerPermissions(userId, dbRole),
+            });
+            if (refreshed.success) return refreshed.permissions;
+          } catch (_) {}
+          return fetchManagerPermissions(userId, dbRole);
+        })(),
         id: userId,
       };
 

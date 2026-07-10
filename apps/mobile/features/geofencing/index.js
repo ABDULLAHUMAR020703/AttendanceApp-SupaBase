@@ -18,6 +18,8 @@ export {
   getOfficeLocation,
   updateOfficeLocation,
   canUpdateOfficeLocation,
+  getEmployeeAllowedLocations,
+  findMatchingAllowedLocation,
   validateCheckInLocation,
 } from './services/geofenceService';
 
@@ -34,6 +36,7 @@ export {
   isLocationMonitoringActive,
   getMonitoringUser,
   getCurrentLocationState,
+  resetMonitoringAfterCheckIn,
 } from './services/locationMonitoringService';
 
 // Checkout Validation

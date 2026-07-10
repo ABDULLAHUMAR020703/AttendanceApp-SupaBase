@@ -59,7 +59,11 @@ export default function MainNavigator({ user }) {
       fontWeight: 'bold',
     },
     headerLeft: () => <HamburgerMenu navigation={navigation} />,
-    animationEnabled: false,
+    animationEnabled: true,
+    transitionSpec: {
+      open: { animation: 'timing', config: { duration: 220 } },
+      close: { animation: 'timing', config: { duration: 180 } },
+    },
   });
 
   if (user.role === ROLES.EMPLOYEE) {

@@ -94,6 +94,7 @@ router.get('/recipients', (req, res) => proxyJson('get', '/api/reports/recipient
 router.get('/schedule', (req, res) => proxyJson('get', '/api/reports/schedule', req, res));
 router.put('/schedule', (req, res) => proxyJson('put', '/api/reports/schedule', req, res));
 router.post('/send-now', (req, res) => proxyJson('post', '/api/reports/send-now', req, res));
+router.get('/delivery-logs', (req, res) => proxyJson('get', '/api/reports/delivery-logs', req, res));
 router.get('/health', (req, res) => proxyJson('get', '/api/reports/health', req, res));
 
 module.exports = router;

@@ -46,6 +46,20 @@ export const saveAttendanceRecord = async (attendanceRecord) => {
       };
     }
 
+    const normalizedType = String(attendanceRecord.type || '').toLowerCase();
+    if (normalizedType !== 'checkin' && normalizedType !== 'checkout') {
+      return { success: false, error: 'Invalid attendance type.' };
+    }
+
+    const existing = await getUserAttendanceRecords(attendanceRecord.username);
+    const last = existing?.[0];
+    if (normalizedType === 'checkin' && last?.type === 'checkin' && !attendanceRecord.isManual) {
+      return { success: false, error: 'You are already checked in.' };
+    }
+    if (normalizedType === 'checkout' && last?.type !== 'checkin' && !attendanceRecord.isManual) {
+      return { success: false, error: 'You must check in before checking out.' };
+    }
+
     // Get user UID from current Supabase session
     const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
     if (authError || !authUser) {
@@ -68,7 +82,7 @@ export const saveAttendanceRecord = async (attendanceRecord) => {
       company_id: tenantCid,
       username: attendanceRecord.username,
       employee_name: employee?.name || attendanceRecord.employeeName || attendanceRecord.username,
-      type: attendanceRecord.type,
+      type: normalizedType,
       timestamp: attendanceRecord.timestamp || new Date().toISOString(),
       location: attendanceRecord.location || null,
       photo: attendanceRecord.photo || null,

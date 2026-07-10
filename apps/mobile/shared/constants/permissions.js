@@ -14,6 +14,9 @@ export const MANAGER_PERMISSIONS = {
   APPROVE_LEAVE: 'approve_leave',
   REJECT_LEAVE: 'reject_leave',
   EDIT_LEAVE_BALANCE: 'edit_leave_balance',
+  VIEW_WORK_MODE_REQUESTS: 'view_work_mode_requests',
+  APPROVE_WORK_MODE: 'approve_work_mode',
+  REJECT_WORK_MODE: 'reject_work_mode',
   VIEW_TICKETS: 'view_tickets',
   MANAGE_TICKETS: 'manage_tickets',
   ASSIGN_TICKETS: 'assign_tickets',
@@ -30,6 +33,7 @@ export const MANAGER_PERMISSIONS = {
   MANAGE_NOTIFICATIONS: 'manage_notifications',
   APPROVE_SIGNUP_REQUESTS: 'approve_signup_requests',
   MANAGE_DEPARTMENTS: 'manage_departments',
+  MANAGE_APPROVAL_WORKFLOWS: 'manage_approval_workflows',
   ACCESS_SYSTEM_SETTINGS: 'access_system_settings',
 };
 

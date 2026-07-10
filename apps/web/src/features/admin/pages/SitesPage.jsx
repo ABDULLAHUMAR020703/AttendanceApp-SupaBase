@@ -1,39 +1,45 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { adminService } from '../services/adminService';
 import { GlassCard } from '../../../shared/components/GlassCard';
 import { PermissionGate } from '../../../shared/components/PermissionGate';
 import { PERMISSIONS } from '../permissions';
+import { useSilentPoll } from '../../../shared/hooks/useSilentPoll';
 
 export function SitesPage() {
   const [sites, setSites] = useState([]);
   const [departments, setDepartments] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [assignEmployeeUid, setAssignEmployeeUid] = useState('');
+  const [assignSiteIds, setAssignSiteIds] = useState([]);
+  const [assignSaving, setAssignSaving] = useState(false);
   const [form, setForm] = useState({ name: '', latitude: '', longitude: '', radius: '', department_id: '' });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const load = async () => {
-    setLoading(true);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setError('');
     try {
-      const [sitesData, departmentsData] = await Promise.all([
+      const [sitesData, departmentsData, usersData] = await Promise.all([
         adminService.getSites(),
         adminService.getDepartments(),
+        adminService.getUsers().catch(() => []),
       ]);
       setSites(sitesData || []);
       setDepartments(departmentsData || []);
+      setUsers((usersData || []).filter((u) => u.role === 'employee' || u.role === 'manager'));
     } catch (err) {
-      setError(err?.response?.data?.error || err?.message || 'Failed to load sites');
+      if (!silent) setError(err?.response?.data?.error || err?.message || 'Failed to load sites');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     load();
-    const timer = setInterval(load, 30000);
-    return () => clearInterval(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [load]);
+
+  useSilentPoll(load, 30000);
 
   const createSite = async () => {
     setError('');
@@ -50,6 +56,34 @@ export function SitesPage() {
       console.error('[SitesPage] Failed to create site:', err);
       setError(err?.message || 'Failed to create site');
     }
+  };
+
+  const loadEmployeeAssignments = async (uid) => {
+    if (!uid) {
+      setAssignSiteIds([]);
+      return;
+    }
+    const rows = await adminService.getEmployeeSites(uid);
+    setAssignSiteIds((rows || []).map((r) => r.site_id));
+  };
+
+  const saveAssignments = async () => {
+    if (!assignEmployeeUid) return;
+    setAssignSaving(true);
+    setError('');
+    try {
+      await adminService.setEmployeeSites(assignEmployeeUid, assignSiteIds);
+    } catch (err) {
+      setError(err.message || 'Failed to save assignments');
+    } finally {
+      setAssignSaving(false);
+    }
+  };
+
+  const toggleSite = (siteId) => {
+    setAssignSiteIds((prev) =>
+      prev.includes(siteId) ? prev.filter((id) => id !== siteId) : [...prev, siteId]
+    );
   };
 
   return (
@@ -103,6 +137,53 @@ export function SitesPage() {
             </GlassCard>
           ))}
       </div>
+
+      <PermissionGate permission={PERMISSIONS.MANAGE_GEOFENCING}>
+        <GlassCard className="p-5 space-y-4">
+          <div>
+            <h2 className="text-base font-medium text-white">Employee location assignments</h2>
+            <p className="text-xs text-slate-300 mt-1">Assign multiple geofence sites per employee (synced to mobile check-in).</p>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <select
+              className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-slate-100"
+              value={assignEmployeeUid}
+              onChange={(e) => {
+                setAssignEmployeeUid(e.target.value);
+                loadEmployeeAssignments(e.target.value);
+              }}
+            >
+              <option value="" className="bg-slate-800">Select employee</option>
+              {users.map((u) => (
+                <option key={u.uid} value={u.uid} className="bg-slate-800">{u.name || u.username} ({u.department})</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              disabled={!assignEmployeeUid || assignSaving}
+              onClick={saveAssignments}
+              className="rounded-lg border border-blue-300/30 bg-blue-500/20 px-4 py-2 text-sm text-blue-100 disabled:opacity-50"
+            >
+              {assignSaving ? 'Saving…' : 'Save assignments'}
+            </button>
+          </div>
+          {assignEmployeeUid && (
+            <div className="flex flex-wrap gap-2">
+              {sites.map((s) => (
+                <label key={s.id} className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs cursor-pointer ${assignSiteIds.includes(s.id) ? 'border-blue-300/40 bg-blue-500/20 text-blue-100' : 'border-white/15 text-slate-300'}`}>
+                  <input
+                    type="checkbox"
+                    className="sr-only"
+                    checked={assignSiteIds.includes(s.id)}
+                    onChange={() => toggleSite(s.id)}
+                  />
+                  {s.name}
+                </label>
+              ))}
+            </div>
+          )}
+        </GlassCard>
+      </PermissionGate>
     </div>
   );
 }

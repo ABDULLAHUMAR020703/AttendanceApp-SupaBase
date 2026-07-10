@@ -797,26 +797,17 @@ export const getEmployeeWorkModeHistory = async (employeeId) => {
  * @param {string} reason - Reason for request
  * @returns {Promise<boolean>} Success status
  */
-export const createWorkModeRequest = async (employeeId, requestedMode, reason) => {
+export const createWorkModeRequest = async (employeeId, requestedMode, reason, user = null) => {
   try {
-    const requests = await getWorkModeRequests();
-    const request = {
-      id: Date.now().toString(),
-      employeeId,
-      requestedMode,
-      currentMode: null, // Will be filled when processing
+    const { submitWorkModeRequest } = await import('../core/api/workflowApi');
+    const result = await submitWorkModeRequest(user, {
+      requested_work_mode: requestedMode,
       reason,
-      status: 'pending', // pending, approved, rejected
-      requestedAt: new Date().toISOString(),
-      processedAt: null,
-      processedBy: null,
-      adminNotes: null
-    };
-    
-    requests.push(request);
-    await AsyncStorage.setItem(WORK_MODE_REQUESTS_KEY, JSON.stringify(requests));
-    
-    console.log(`Work mode request created for employee ${employeeId}: ${requestedMode}`);
+    });
+    if (!result.success) {
+      console.error('createWorkModeRequest:', result.error);
+      return false;
+    }
     return true;
   } catch (error) {
     console.error('Error creating work mode request:', error);
@@ -824,14 +815,28 @@ export const createWorkModeRequest = async (employeeId, requestedMode, reason) =
   }
 };
 
-/**
- * Get all work mode requests
- * @returns {Promise<Array>} Array of work mode requests
- */
-export const getWorkModeRequests = async () => {
+export const getWorkModeRequests = async (user = null) => {
   try {
-    const requests = await AsyncStorage.getItem(WORK_MODE_REQUESTS_KEY);
-    return requests ? JSON.parse(requests) : [];
+    const { fetchWorkModeRequestsAdmin, fetchMyWorkModeRequests } = await import('../core/api/workflowApi');
+    const isAdmin = user && (user.role === 'super_admin' || user.role === 'manager');
+    const result = isAdmin
+      ? await fetchWorkModeRequestsAdmin(user)
+      : await fetchMyWorkModeRequests(user);
+    if (!result.success) return [];
+    return (result.data || []).map((r) => ({
+      id: r.id,
+      employeeId: `emp_${r.employee_uid}`,
+      requestedMode: r.requested_work_mode,
+      currentMode: r.current_work_mode,
+      reason: r.reason,
+      status: r.status,
+      requestedAt: r.requested_at,
+      processedAt: r.processed_at,
+      processedBy: r.processed_by,
+      adminNotes: r.admin_notes,
+      approvalProgress: r.approvalProgress,
+      employee: r.employee,
+    }));
   } catch (error) {
     console.error('Error getting work mode requests:', error);
     return [];
@@ -860,44 +865,16 @@ export const getPendingWorkModeRequests = async () => {
  * @param {string} adminNotes - Admin notes
  * @returns {Promise<boolean>} Success status
  */
-export const processWorkModeRequest = async (requestId, status, processedBy, adminNotes = '', companyId = null) => {
+export const processWorkModeRequest = async (requestId, status, processedBy, adminNotes = '', companyId = null, user = null) => {
   try {
-    const requests = await getWorkModeRequests();
-    const requestIndex = requests.findIndex(req => req.id === requestId);
-    
-    if (requestIndex === -1) {
-      throw new Error('Request not found');
+    const { processWorkModeRequestApi } = await import('../core/api/workflowApi');
+    const result = await processWorkModeRequestApi(user, requestId, {
+      status,
+      admin_notes: adminNotes,
+    });
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to process request');
     }
-    
-    const request = requests[requestIndex];
-    request.status = status;
-    request.processedAt = new Date().toISOString();
-    request.processedBy = processedBy;
-    request.adminNotes = adminNotes;
-    
-    // If approved, update employee work mode
-    if (status === 'approved') {
-      // processedBy is a username; request.employeeId is emp_<uid> format.
-      const processingUser = await getEmployeeByUsername(processedBy, companyId);
-      if (processingUser) {
-        // EMP-3: employeeId is stored as emp_<uid>, not a username — use getEmployeeById.
-        const employee = await getEmployeeById(request.employeeId, companyId);
-        if (employee) {
-          const result = await updateEmployeeWorkMode(
-            employee.id || employee.uid,
-            request.requestedMode,
-            processingUser
-          );
-          if (!result.success) {
-            console.error('Failed to update work mode:', result.error);
-          }
-        }
-      }
-    }
-    
-    await AsyncStorage.setItem(WORK_MODE_REQUESTS_KEY, JSON.stringify(requests));
-    
-    console.log(`Work mode request ${requestId} ${status} by ${processedBy}`);
     return true;
   } catch (error) {
     console.error('Error processing work mode request:', error);

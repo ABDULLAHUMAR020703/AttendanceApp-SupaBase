@@ -1,80 +1,153 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-body {
-  margin: 0;
-  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  background: linear-gradient(135deg, #0f172a, #1e3a8a, #3b82f6);
-  color: #e2e8f0;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+:root {
+  --color-bg-start: #0f172a;
+  --color-bg-mid: #1e3a8a;
+  --color-bg-end: #3b82f6;
+  --color-text: #e2e8f0;
+  --color-text-muted: #94a3b8;
+  --color-surface: rgba(255, 255, 255, 0.1);
+  --color-surface-border: rgba(255, 255, 255, 0.15);
+  --color-primary: #3b82f6;
+  --color-success: #10b981;
+  --color-error: #ef4444;
+  --color-warning: #f59e0b;
+  --radius-card: 1rem;
+  --radius-input: 0.625rem;
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    margin: 0;
+    font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    background: linear-gradient(135deg, var(--color-bg-start), var(--color-bg-mid), var(--color-bg-end));
+    color: var(--color-text);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    min-height: 100vh;
+  }
+
+  *:focus-visible {
+    outline: 2px solid rgba(96, 165, 250, 0.55);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  .page-container {
+    @apply space-y-section animate-fade-up;
+  }
+
+  .page-title {
+    @apply text-2xl font-semibold tracking-tight text-white;
+  }
+
+  .page-subtitle {
+    @apply mt-1 text-sm text-slate-300;
+  }
+
+  .ui-input {
+    @apply w-full rounded-input border border-white/20 bg-white/10 px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-400 transition-colors duration-200;
+    @apply focus:border-brand-400 focus:bg-white/[0.12] focus:outline-none focus:ring-2 focus:ring-brand-400/30;
+  }
+
+  .ui-select {
+    @apply ui-input glass-select cursor-pointer;
+  }
+
+  .ui-label {
+    @apply mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400;
+  }
+
+  .ui-btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-input px-4 py-2.5 text-sm font-medium transition-all duration-200;
+    @apply disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .ui-btn-primary {
+    @apply ui-btn bg-brand-600 text-white shadow-glow hover:bg-brand-500 active:scale-[0.98];
+  }
+
+  .ui-btn-secondary {
+    @apply ui-btn border border-white/20 bg-white/10 text-slate-100 hover:bg-white/15 active:scale-[0.98];
+  }
+
+  .ui-btn-ghost {
+    @apply ui-btn text-slate-200 hover:bg-white/10;
+  }
+
+  .ui-btn-danger {
+    @apply ui-btn bg-red-600/90 text-white hover:bg-red-500 active:scale-[0.98];
+  }
+
+  .ui-btn-success {
+    @apply ui-btn bg-emerald-600 text-white hover:bg-emerald-500 active:scale-[0.98];
+  }
+
+  .ui-btn-sm {
+    @apply px-3 py-1.5 text-xs;
+  }
+
+  .ui-table-row {
+    @apply border-b border-white/10 transition-colors hover:bg-white/[0.06];
+  }
+
+  .ui-table-cell {
+    @apply p-3 align-middle text-sm text-slate-200;
+  }
 }
 
 @keyframes fadeUp {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @keyframes floatSlow {
-  0% {
-    transform: translate3d(0, 0, 0);
-  }
-  50% {
-    transform: translate3d(12px, -8px, 0);
-  }
-  100% {
-    transform: translate3d(0, 0, 0);
-  }
-}
-
-.animate-fade-up {
-  animation: fadeUp 320ms ease-out;
-}
-
-.animate-fade-in {
-  animation: fadeIn 360ms ease-out;
-}
-
-.animate-float-slow {
-  animation: floatSlow 9s ease-in-out infinite;
-}
-
-.animate-float-slower {
-  animation: floatSlow 12s ease-in-out infinite;
+  0% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(12px, -8px, 0); }
+  100% { transform: translate3d(0, 0, 0); }
 }
 
 @keyframes shimmer {
-  0% {
-    background-position: -300px 0;
-  }
-  100% {
-    background-position: calc(300px + 100%) 0;
-  }
+  0% { background-position: -300px 0; }
+  100% { background-position: calc(300px + 100%) 0; }
 }
+
+.animate-fade-up { animation: fadeUp 280ms ease-out; }
+.animate-fade-in { animation: fadeIn 300ms ease-out; }
+.animate-float-slow { animation: floatSlow 9s ease-in-out infinite; }
+.animate-float-slower { animation: floatSlow 12s ease-in-out infinite; }
 
 .skeleton {
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.08) 25%, rgba(255, 255, 255, 0.2) 37%, rgba(255, 255, 255, 0.08) 63%);
+  background: linear-gradient(90deg, rgba(255,255,255,0.06) 25%, rgba(255,255,255,0.14) 37%, rgba(255,255,255,0.06) 63%);
   background-size: 400px 100%;
   animation: shimmer 1.4s ease infinite;
+  border-radius: var(--radius-input);
 }
 
-/* Native <select> menus use OS styling; force readable option contrast */
 select option {
   color: #0f172a;
   background-color: #f1f5f9;
@@ -86,11 +159,24 @@ select option:hover {
   background-color: #2563eb;
 }
 
-.glass-select {
-  color-scheme: dark;
+.glass-select { color-scheme: dark; }
+
+.chart-content { min-height: 300px; }
+
+.chart-panel:focus-within .chart-surface {
+  outline: 2px solid rgba(96, 165, 250, 0.35);
+  outline-offset: 2px;
 }
 
-.glass-select option {
-  color: #0f172a;
-  background-color: #f1f5f9;
+@media print {
+  body { background: #ffffff !important; color: #0f172a !important; }
+  .print\:hidden { display: none !important; }
+  .analytics-page, .dashboard-page { color: #0f172a !important; }
+  .chart-panel, .chart-surface {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    border-color: #cbd5e1 !important;
+    background: #ffffff !important;
+  }
+  .chart-surface svg { max-width: 100% !important; }
 }

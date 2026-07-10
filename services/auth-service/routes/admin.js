@@ -21,6 +21,12 @@ const {
   writeAuditLog,
 } = require('../lib/permissions');
 const { enrichLeaveRequestsWithEmployees } = require('../lib/leaveEmployeeResolve');
+const {
+  initializeApprovalSteps,
+  getApprovalProgress,
+  processApprovalStep,
+  mapLeaveTypeToRequestType,
+} = require('../lib/approvalEngine');
 
 const router = express.Router();
 
@@ -92,6 +98,17 @@ const hasTenantWidePeopleAccess = async (requester) =>
 
 const requireAdminPermission = async (requester, permissionKey, res) =>
   requirePermission(supabase, requester, permissionKey, res);
+
+const requireAnyAdminPermission = async (requester, permissionKeys, res) => {
+  const ok = await hasAnyPermission(supabase, requester, permissionKeys);
+  if (!ok) {
+    res.status(403).json({ success: false, error: 'Insufficient permissions' });
+    return false;
+  }
+  return true;
+};
+
+const ATTENDANCE_READ_PERMISSIONS = ['view_attendance', 'manual_attendance'];
 
 /**
  * Resolves tenant from X-User-Context (company_id) or users row by uid.
@@ -1030,22 +1047,17 @@ router.post('/employee-sites', async (req, res) => {
       .eq('id', site_id)
       .eq('company_id', companyId)
       .single();
-    const { data: department } = await supabase
-      .from('departments')
-      .select('id, name')
-      .eq('id', site?.department_id)
-      .eq('company_id', companyId)
-      .single();
-    if (!employee || !site || !department) {
+    if (!employee || !site) {
       return res.status(400).json({ success: false, error: 'Invalid employee or site' });
-    }
-    if (employee.department !== department.name) {
-      return res.status(400).json({ success: false, error: 'Cannot assign cross-department employee to site' });
     }
     if (requester.role === ROLES.MANAGER && requester.department !== employee.department) {
       return res.status(403).json({ success: false, error: 'Managers can only assign their department employees' });
     }
-    const { data, error } = await supabase.from('employee_sites').insert({ employee_uid, site_id }).select().single();
+    const { data, error } = await supabase
+      .from('employee_sites')
+      .insert({ employee_uid, site_id })
+      .select()
+      .single();
     if (error) throw error;
     res.status(201).json({ success: true, data });
   } catch (error) {
@@ -1057,7 +1069,7 @@ router.get('/attendance', async (req, res) => {
   const ctx = await withTenantContext(req, res);
   if (!ctx) return;
   const { requester, companyId } = ctx;
-  if (!(await requireAdminPermission(requester, 'view_attendance', res))) return;
+  if (!(await requireAnyAdminPermission(requester, ATTENDANCE_READ_PERMISSIONS, res))) return;
   try {
     let query = supabase
       .from('attendance_records')
@@ -1084,6 +1096,148 @@ router.get('/attendance', async (req, res) => {
     res.status(200).json({ success: true, data: data || [] });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message || 'Failed to fetch attendance' });
+  }
+});
+
+router.post('/attendance', async (req, res) => {
+  const ctx = await withTenantContext(req, res);
+  if (!ctx) return;
+  const { requester, companyId } = ctx;
+  if (!(await requireAdminPermission(requester, 'manual_attendance', res))) return;
+
+  try {
+    const { username, type, timestamp, location, employee_name: employeeName } = req.body || {};
+    if (!username || !type) {
+      return res.status(400).json({ success: false, error: 'username and type are required' });
+    }
+    const normalizedType = String(type).toLowerCase();
+    if (!['checkin', 'checkout'].includes(normalizedType)) {
+      return res.status(400).json({ success: false, error: 'type must be checkin or checkout' });
+    }
+
+    let employeeQuery = supabase
+      .from('users')
+      .select('uid, username, name, department')
+      .eq('company_id', companyId)
+      .eq('username', username)
+      .maybeSingle();
+    const { data: employee, error: employeeError } = await employeeQuery;
+    if (employeeError) throw employeeError;
+    if (!employee) {
+      return res.status(404).json({ success: false, error: 'Employee not found' });
+    }
+    if (requester.role === ROLES.MANAGER && !requester.tenantWidePeopleAccess && employee.department !== requester.department) {
+      return res.status(403).json({ success: false, error: 'Managers can only correct attendance for their department' });
+    }
+
+    const { data, error } = await supabase
+      .from('attendance_records')
+      .insert({
+        user_uid: employee.uid,
+        company_id: companyId,
+        username: employee.username,
+        employee_name: employeeName || employee.name || employee.username,
+        type: normalizedType,
+        timestamp: timestamp || new Date().toISOString(),
+        location: location || null,
+        auth_method: 'manual',
+        is_manual: true,
+        created_by: requester.username || requester.uid,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    res.status(201).json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message || 'Failed to create attendance record' });
+  }
+});
+
+router.patch('/attendance/:id', async (req, res) => {
+  const ctx = await withTenantContext(req, res);
+  if (!ctx) return;
+  const { requester, companyId } = ctx;
+  if (!(await requireAdminPermission(requester, 'manual_attendance', res))) return;
+
+  try {
+    const { id } = req.params;
+    const { type, timestamp, location } = req.body || {};
+    const updates = { updated_at: new Date().toISOString(), updated_by: requester.username || requester.uid };
+    if (type) {
+      const normalizedType = String(type).toLowerCase();
+      if (!['checkin', 'checkout'].includes(normalizedType)) {
+        return res.status(400).json({ success: false, error: 'type must be checkin or checkout' });
+      }
+      updates.type = normalizedType;
+    }
+    if (timestamp) updates.timestamp = timestamp;
+    if (location !== undefined) updates.location = location;
+
+    let existingQuery = supabase.from('attendance_records').select('id, username').eq('id', id).eq('company_id', companyId);
+    const { data: existing, error: existingError } = await existingQuery.maybeSingle();
+    if (existingError) throw existingError;
+    if (!existing) return res.status(404).json({ success: false, error: 'Attendance record not found' });
+
+    if (requester.role === ROLES.MANAGER && !requester.tenantWidePeopleAccess) {
+      const { data: employee } = await supabase
+        .from('users')
+        .select('department')
+        .eq('company_id', companyId)
+        .eq('username', existing.username)
+        .maybeSingle();
+      if (!employee || employee.department !== requester.department) {
+        return res.status(403).json({ success: false, error: 'Managers can only correct attendance for their department' });
+      }
+    }
+
+    const { data, error } = await supabase
+      .from('attendance_records')
+      .update(updates)
+      .eq('id', id)
+      .eq('company_id', companyId)
+      .select()
+      .single();
+    if (error) throw error;
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message || 'Failed to update attendance record' });
+  }
+});
+
+router.delete('/attendance/:id', async (req, res) => {
+  const ctx = await withTenantContext(req, res);
+  if (!ctx) return;
+  const { requester, companyId } = ctx;
+  if (!(await requireAdminPermission(requester, 'manual_attendance', res))) return;
+
+  try {
+    const { id } = req.params;
+    const { data: existing, error: existingError } = await supabase
+      .from('attendance_records')
+      .select('id, username')
+      .eq('id', id)
+      .eq('company_id', companyId)
+      .maybeSingle();
+    if (existingError) throw existingError;
+    if (!existing) return res.status(404).json({ success: false, error: 'Attendance record not found' });
+
+    if (requester.role === ROLES.MANAGER && !requester.tenantWidePeopleAccess) {
+      const { data: employee } = await supabase
+        .from('users')
+        .select('department')
+        .eq('company_id', companyId)
+        .eq('username', existing.username)
+        .maybeSingle();
+      if (!employee || employee.department !== requester.department) {
+        return res.status(403).json({ success: false, error: 'Managers can only correct attendance for their department' });
+      }
+    }
+
+    const { error } = await supabase.from('attendance_records').delete().eq('id', id).eq('company_id', companyId);
+    if (error) throw error;
+    res.status(200).json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message || 'Failed to delete attendance record' });
   }
 });
 
@@ -1137,7 +1291,7 @@ router.patch('/leaves/:id', async (req, res) => {
     const tenantUids = await fetchCompanyUserUids(supabase, companyId);
     const { data: requestRow } = await supabase
       .from('leave_requests')
-      .select('id, employee_uid, status')
+      .select('id, employee_uid, status, leave_type, current_step')
       .eq('id', id)
       .eq('company_id', companyId)
       .single();
@@ -1157,18 +1311,51 @@ router.patch('/leaves/:id', async (req, res) => {
         return res.status(403).json({ success: false, error: 'Managers can only process department leaves' });
       }
     }
+
+    const requestType = mapLeaveTypeToRequestType(requestRow.leave_type);
+    let progress = await getApprovalProgress(supabase, requestType, id);
+    if (!progress.length) {
+      const init = await initializeApprovalSteps(supabase, {
+        companyId,
+        requestType,
+        requestId: id,
+        employeeUid: requestRow.employee_uid,
+      });
+      if (init.workflowId) {
+        await supabase.from('leave_requests').update({ workflow_id: init.workflowId }).eq('id', id);
+      }
+    }
+
+    const action = status === 'approved' ? 'approved' : 'rejected';
+    const result = await processApprovalStep(supabase, {
+      companyId,
+      requestType,
+      requestId: id,
+      employeeUid: requestRow.employee_uid,
+      requester,
+      action,
+      notes: admin_notes,
+      onFinalApprove: async () => {},
+    });
+
+    const finalStatus = result.final ? result.status : 'pending';
+    const updates = {
+      status: finalStatus,
+      current_step: result.currentStep,
+      admin_notes: admin_notes || null,
+    };
+    if (result.final) {
+      updates.processed_at = new Date().toISOString();
+      updates.processed_by = requester.username || requester.email || requester.uid;
+    }
+
     const { error } = await supabase
       .from('leave_requests')
-      .update({
-        status,
-        admin_notes: admin_notes || null,
-        processed_at: new Date().toISOString(),
-        processed_by: requester.username || requester.email || requester.uid,
-      })
+      .update(updates)
       .eq('id', id)
       .eq('company_id', companyId);
     if (error) throw error;
-    res.status(200).json({ success: true });
+    res.status(200).json({ success: true, data: { status: finalStatus, approval: result } });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message || 'Failed to process leave request' });
   }
@@ -1301,5 +1488,10 @@ router.get('/audit-logs', async (req, res) => {
     res.status(500).json({ success: false, error: error.message || 'Failed to fetch audit logs' });
   }
 });
+
+const workflowRoutes = require('./workflowRoutes');
+const opsRoutes = require('./opsRoutes');
+router.use(workflowRoutes);
+router.use(opsRoutes);
 
 module.exports = router;

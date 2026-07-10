@@ -4,7 +4,13 @@
  * Every aggregate path must pass an explicit company_id (tenant scope).
  */
 const { supabase } = require('../config/supabase');
-const { getExtendedSchedule, setExtendedSchedule } = require('./scheduleConfig');
+const {
+  getExtendedSchedule,
+  setExtendedSchedule,
+  computeNextExecution,
+  normalizeFrequency,
+  normalizeDay,
+} = require('./scheduleConfig');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -17,6 +23,34 @@ function normalizeCompanyId(raw) {
 
 function isValidEmail(email) {
   return typeof email === 'string' && EMAIL_RE.test(email.trim());
+}
+
+function dedupeEmails(emails) {
+  const seen = new Set();
+  const out = [];
+  for (const raw of emails || []) {
+    if (!isValidEmail(raw)) continue;
+    const trimmed = raw.trim();
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(trimmed);
+  }
+  return out;
+}
+
+function parseRecipientEmails(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return dedupeEmails(raw);
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? dedupeEmails(parsed) : [];
+    } catch {
+      return dedupeEmails(raw.split(/[,;]+/));
+    }
+  }
+  return [];
 }
 
 async function fetchCompanyUserUids(companyId) {
@@ -202,20 +236,27 @@ async function getSuperAdminEmails(companyId) {
       .eq('is_active', true)
       .eq('company_id', cid);
 
-    if (error) throw error;
-
-    // Prefer report_email if set; fall back to login email; dedupe case-insensitively
-    const seen = new Set();
-    const emails = [];
-    for (const r of data || []) {
-      const raw = (r.report_email && r.report_email.trim()) || r.email;
-      if (!isValidEmail(raw)) continue;
-      const trimmed = raw.trim();
-      const key = trimmed.toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      emails.push(trimmed);
+    if (error) {
+      if (error.message?.includes('report_email')) {
+        const fallback = await supabase
+          .from('users')
+          .select('email, name')
+          .eq('role', 'super_admin')
+          .eq('is_active', true)
+          .eq('company_id', cid);
+        if (fallback.error) throw fallback.error;
+        const emails = dedupeEmails((fallback.data || []).map((r) => r.email));
+        if (emails.length === 0) {
+          console.warn(`[queryService] getSuperAdminEmails: no valid super_admin emails found for company ${cid}`);
+        }
+        return emails;
+      }
+      throw error;
     }
+
+    const emails = dedupeEmails(
+      (data || []).map((r) => (r.report_email && r.report_email.trim()) || r.email)
+    );
 
     if (emails.length === 0) {
       console.warn(`[queryService] getSuperAdminEmails: no valid super_admin emails found for company ${cid}`);
@@ -277,33 +318,83 @@ async function getAllCompanies() {
  * @param {string} companyId
  * @returns {Promise<{day: number, autoSend: boolean}>}
  */
-async function getReportSchedule(companyId) {
+/**
+ * Custom recipient emails stored on the company (in addition to super_admin emails).
+ */
+async function getCompanyRecipientEmails(companyId) {
   const cid = normalizeCompanyId(companyId);
-  if (!cid) return { day: 1, autoSend: true };
+  if (!cid) return [];
 
   try {
     const { data, error } = await supabase
       .from('companies')
-      .select('report_schedule_day, report_auto_send')
+      .select('report_recipient_emails')
+      .eq('id', cid)
+      .maybeSingle();
+
+    if (error) {
+      if (error.message?.includes('report_recipient_emails')) return [];
+      throw error;
+    }
+    return parseRecipientEmails(data?.report_recipient_emails);
+  } catch (err) {
+    console.warn(`[queryService] getCompanyRecipientEmails error for ${cid}:`, err.message);
+    return [];
+  }
+}
+
+/**
+ * All report recipients: super_admin emails + company custom list.
+ */
+async function getReportRecipients(companyId) {
+  const [superAdmins, custom] = await Promise.all([
+    getSuperAdminEmails(companyId),
+    getCompanyRecipientEmails(companyId),
+  ]);
+  return dedupeEmails([...superAdmins, ...custom]);
+}
+
+async function getReportSchedule(companyId) {
+  const cid = normalizeCompanyId(companyId);
+  if (!cid) return { day: 1, autoSend: true, frequency: 'monthly', recipients: [] };
+
+  try {
+    const { data, error } = await supabase
+      .from('companies')
+      .select(
+        'report_schedule_day, report_auto_send, report_frequency, report_recipient_emails, report_schedule_last_execution, report_schedule_last_status'
+      )
       .eq('id', cid)
       .maybeSingle();
 
     if (error) throw error;
-    if (!data) return { day: 1, autoSend: true };
+    if (!data) return { day: 1, autoSend: true, frequency: 'monthly', recipients: [] };
 
-    const day = data.report_schedule_day ?? 1;
-    const extended = getExtendedSchedule(cid);
+    const day = normalizeDay(data.report_schedule_day ?? 1);
+    const frequency = normalizeFrequency(data.report_frequency);
+    const recipients = await getReportRecipients(cid);
+    const dbSchedule = {
+      day,
+      frequency,
+      lastExecution: data.report_schedule_last_execution || null,
+      lastStatus: data.report_schedule_last_status || null,
+    };
+    const extended = getExtendedSchedule(cid, dbSchedule);
+
     return {
-      day: Number.isFinite(day) && day >= 1 && day <= 28 ? day : 1,
+      day,
       autoSend: data.report_auto_send ?? true,
-      frequency: extended.frequency,
+      frequency,
+      recipients,
+      customRecipients: parseRecipientEmails(data.report_recipient_emails),
       lastExecution: extended.lastExecution,
       lastStatus: extended.lastStatus,
       nextExecution: extended.nextExecution,
     };
   } catch (err) {
     console.warn(`[queryService] getReportSchedule error for ${cid} (using defaults):`, err.message);
-    return { day: 1, autoSend: true };
+    const recipients = await getReportRecipients(cid).catch(() => []);
+    return { day: 1, autoSend: true, frequency: 'monthly', recipients };
   }
 }
 
@@ -320,11 +411,7 @@ async function setReportSchedule(companyId, settings) {
   const updates = {};
 
   if (settings.day !== undefined) {
-    const day = parseInt(settings.day, 10);
-    if (!Number.isFinite(day) || day < 1 || day > 28) {
-      throw new Error('report_schedule_day must be between 1 and 28');
-    }
-    updates.report_schedule_day = day;
+    updates.report_schedule_day = normalizeDay(settings.day);
   }
 
   if (settings.autoSend !== undefined) {
@@ -332,18 +419,65 @@ async function setReportSchedule(companyId, settings) {
   }
 
   if (settings.frequency !== undefined) {
-    setExtendedSchedule(cid, { frequency: settings.frequency });
+    updates.report_frequency = normalizeFrequency(settings.frequency);
+    setExtendedSchedule(cid, { frequency: updates.report_frequency });
   }
 
-  if (Object.keys(updates).length === 0 && settings.frequency === undefined) return;
+  if (settings.recipients !== undefined) {
+    const list = dedupeEmails(Array.isArray(settings.recipients) ? settings.recipients : []);
+    if (list.length === 0 && settings.recipients.length > 0) {
+      throw new Error('No valid recipient email addresses provided');
+    }
+    updates.report_recipient_emails = list;
+  }
 
-  if (Object.keys(updates).length > 0) {
-    const { error } = await supabase
+  if (Object.keys(updates).length === 0) return;
+
+  const { error } = await supabase
+    .from('companies')
+    .update(updates)
+    .eq('id', cid);
+
+  if (error) throw error;
+}
+
+async function recordScheduleRun(companyId, status) {
+  const cid = normalizeCompanyId(companyId);
+  if (!cid) return;
+
+  try {
+    await supabase
       .from('companies')
-      .update(updates)
+      .update({
+        report_schedule_last_execution: new Date().toISOString(),
+        report_schedule_last_status: status,
+      })
       .eq('id', cid);
+  } catch (err) {
+    console.warn(`[queryService] recordScheduleRun failed for ${cid}:`, err.message);
+  }
+}
 
-    if (error) throw error;
+async function getReportAuditLogs(companyId, limit = 20) {
+  const cid = normalizeCompanyId(companyId);
+  if (!cid) return [];
+
+  try {
+    const { data, error } = await supabase
+      .from('report_audit_logs')
+      .select('id, report_period, recipients, status, error_message, created_at')
+      .eq('company_id', cid)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      if (error.message?.includes('report_audit_logs')) return [];
+      throw error;
+    }
+    return data || [];
+  } catch (err) {
+    console.warn(`[queryService] getReportAuditLogs error for ${cid}:`, err.message);
+    return [];
   }
 }
 
@@ -387,9 +521,15 @@ module.exports = {
   getLeaveRequests,
   getTickets,
   getSuperAdminEmails,
+  getCompanyRecipientEmails,
+  getReportRecipients,
   getCompany,
   getAllCompanies,
   getReportSchedule,
   setReportSchedule,
+  recordScheduleRun,
+  getReportAuditLogs,
   logReportAudit,
+  dedupeEmails,
+  parseRecipientEmails,
 };

@@ -9,7 +9,7 @@ const {
   updateReport,
 } = require('./reportStorage');
 const { sendReportEmail, generateManualReportEmailBody } = require('./emailService');
-const { getSuperAdminEmails } = require('./queryService');
+const { getReportRecipients, logReportAudit } = require('./queryService');
 
 async function buildReport({
   range,
@@ -70,28 +70,44 @@ async function buildReport({
 
   let emailStatus = 'not_sent';
   let emailError = null;
+  let deliveryRecipients = [];
 
   if (sendEmail) {
     try {
-      const recipients = await getSuperAdminEmails(companyId);
-      if (recipients.length === 0) {
+      deliveryRecipients = await getReportRecipients(companyId);
+      if (deliveryRecipients.length === 0) {
         emailStatus = 'skipped';
-        emailError = 'No valid super admin email addresses found';
-        console.warn(`[ReportBuilder] Email skipped — no recipients for ${companyName}`);
+        emailError = 'No valid recipient email addresses found';
+        console.warn(`[ReportBuilder] Email skipped — no recipients for ${reportData.company.name}`);
       } else {
         const subject = `Attendance Report — ${reportData.company.name} — ${reportData.period.label}`;
         const body = generateManualReportEmailBody(reportData);
-        await sendReportEmail(recipients, subject, body, pdfPath, filename, {
+        await sendReportEmail(deliveryRecipients, subject, body, pdfPath, filename, {
           companyId,
           companyName: reportData.company.name,
           reportType: `${range} Attendance`,
         });
         emailStatus = 'sent';
+        await logReportAudit({
+          companyId,
+          companyName: reportData.company.name,
+          reportPeriod: reportData.period.label,
+          recipients: deliveryRecipients,
+          status: 'sent',
+        });
         console.log(`[ReportBuilder] Email sent for report ${reportId}`);
       }
     } catch (err) {
       emailStatus = 'failed';
       emailError = err.message;
+      await logReportAudit({
+        companyId,
+        companyName: reportData.company.name,
+        reportPeriod: reportData.period.label,
+        recipients: deliveryRecipients,
+        status: 'failed',
+        errorMessage: err.message,
+      });
       console.error(`[ReportBuilder] Email failed for report ${reportId}:`, err.message);
     }
     updateReport(reportId, { emailStatus, emailError });
@@ -104,13 +120,14 @@ async function buildReport({
     fileSize: pdfBuffer.length,
     periodLabel: reportData.period.label,
     downloadFilename: filename,
+    recipients: deliveryRecipients,
   };
 }
 
 async function emailExistingReport(report, companyId) {
-  const recipients = await getSuperAdminEmails(companyId);
+  const recipients = await getReportRecipients(companyId);
   if (recipients.length === 0) {
-    throw new Error('No valid super admin email addresses found for this company');
+    throw new Error('No valid recipient email addresses found for this company');
   }
 
   const reportData = report.reportData;

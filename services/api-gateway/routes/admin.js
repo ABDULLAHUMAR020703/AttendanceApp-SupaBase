@@ -52,9 +52,50 @@ router.get('/sites', (req, res) => forward(req, res, 'get', '/api/admin/sites'))
 router.post('/sites', (req, res) => forward(req, res, 'post', '/api/admin/sites'));
 
 router.post('/employee-sites', (req, res) => forward(req, res, 'post', '/api/admin/employee-sites'));
+router.get('/employee-sites', (req, res) => forward(req, res, 'get', '/api/admin/employee-sites'));
+router.put('/employee-sites/:employeeUid', (req, res) =>
+  forward(req, res, 'put', `/api/admin/employee-sites/${req.params.employeeUid}`)
+);
+router.delete('/employee-sites/:id', (req, res) =>
+  forward(req, res, 'delete', `/api/admin/employee-sites/${req.params.id}`)
+);
+
+router.get('/approval-workflows', (req, res) => forward(req, res, 'get', '/api/admin/approval-workflows'));
+router.put('/approval-workflows/:requestType', (req, res) =>
+  forward(req, res, 'put', `/api/admin/approval-workflows/${req.params.requestType}`)
+);
+router.get('/approval-workflows/:requestType/audit', (req, res) =>
+  forward(req, res, 'get', `/api/admin/approval-workflows/${req.params.requestType}/audit`)
+);
+router.get('/work-mode-requests', (req, res) => forward(req, res, 'get', '/api/admin/work-mode-requests'));
+router.patch('/work-mode-requests/:id', (req, res) =>
+  forward(req, res, 'patch', `/api/admin/work-mode-requests/${req.params.id}`)
+);
 
 router.get('/attendance', (req, res) => forward(req, res, 'get', '/api/admin/attendance'));
+router.post('/attendance', (req, res) => forward(req, res, 'post', '/api/admin/attendance'));
+router.patch('/attendance/:id', (req, res) => forward(req, res, 'patch', `/api/admin/attendance/${req.params.id}`));
+router.delete('/attendance/:id', (req, res) => forward(req, res, 'delete', `/api/admin/attendance/${req.params.id}`));
 router.get('/leaves', (req, res) => forward(req, res, 'get', '/api/admin/leaves'));
 router.patch('/leaves/:id', (req, res) => forward(req, res, 'patch', `/api/admin/leaves/${req.params.id}`));
+
+router.get('/tickets', (req, res) => forward(req, res, 'get', '/api/admin/tickets'));
+router.post('/tickets', (req, res) => forward(req, res, 'post', '/api/admin/tickets'));
+router.patch('/tickets/:id/assign', (req, res) => forward(req, res, 'patch', `/api/admin/tickets/${req.params.id}/assign`));
+router.patch('/tickets/:id/close', (req, res) => forward(req, res, 'patch', `/api/admin/tickets/${req.params.id}/close`));
+
+router.get('/calendar-events', (req, res) => forward(req, res, 'get', '/api/admin/calendar-events'));
+router.post('/calendar-events', (req, res) => forward(req, res, 'post', '/api/admin/calendar-events'));
+router.patch('/calendar-events/:id', (req, res) => forward(req, res, 'patch', `/api/admin/calendar-events/${req.params.id}`));
+router.delete('/calendar-events/:id', (req, res) => forward(req, res, 'delete', `/api/admin/calendar-events/${req.params.id}`));
+
+router.get('/notifications/unread-count', (req, res) => forward(req, res, 'get', '/api/admin/notifications/unread-count'));
+router.get('/notifications', (req, res) => forward(req, res, 'get', '/api/admin/notifications'));
+router.patch('/notifications/:id/read', (req, res) => forward(req, res, 'patch', `/api/admin/notifications/${req.params.id}/read`));
+router.post('/notifications/mark-all-read', (req, res) => forward(req, res, 'post', '/api/admin/notifications/mark-all-read'));
+router.delete('/notifications/:id', (req, res) => forward(req, res, 'delete', `/api/admin/notifications/${req.params.id}`));
+
+router.get('/settings', (req, res) => forward(req, res, 'get', '/api/admin/settings'));
+router.put('/settings', (req, res) => forward(req, res, 'put', '/api/admin/settings'));
 
 module.exports = router;

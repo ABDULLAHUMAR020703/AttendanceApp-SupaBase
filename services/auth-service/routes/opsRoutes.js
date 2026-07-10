@@ -1,0 +1,580 @@
+/**
+ * Tickets, Calendar, Notifications, Settings — tenant-scoped admin APIs
+ */
+const express = require('express');
+const { supabase } = require('../config/supabase');
+const { getTenantCompanyId } = require('../lib/tenantScope');
+const { hasAnyPermission, requirePermission } = require('../lib/permissions');
+const { insertNotification, notifyUsernames } = require('../lib/notificationHelper');
+
+const router = express.Router();
+
+const ROLES = { SUPER_ADMIN: 'super_admin', MANAGER: 'manager', EMPLOYEE: 'employee' };
+const TICKET_PRIORITIES = ['low', 'medium', 'high', 'urgent'];
+const TICKET_STATUSES = ['open', 'in_progress', 'resolved', 'closed'];
+const EVENT_TYPES = ['meeting', 'reminder', 'holiday', 'other'];
+const VISIBILITY = ['all', 'none', 'selected'];
+
+const DEFAULT_APP_SETTINGS = {
+  company: { timezone: 'UTC' },
+  attendance: { autoCheckoutEnabled: true, graceMinutes: 15, requireGps: true },
+  leave: {},
+  tickets: { defaultPriority: 'medium', notifyOnAssign: true },
+  calendar: { defaultVisibility: 'all' },
+  notifications: { emailEnabled: true, pushEnabled: true, inAppEnabled: true },
+  reports: { retentionDays: 90 },
+  geofencing: { defaultRadiusMeters: 100 },
+  security: { sessionTimeoutMinutes: 480, requireStrongPasswords: true },
+  theme: { accent: 'indigo', density: 'comfortable' },
+};
+
+function parseRequester(req) {
+  const raw = req.get('x-user-context');
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+async function withTenantContext(req, res) {
+  const requester = parseRequester(req);
+  if (!requester?.uid) {
+    res.status(401).json({ success: false, error: 'Unauthorized' });
+    return null;
+  }
+  const { data: user } = await supabase
+    .from('users')
+    .select('uid, username, email, role, department, company_id, name')
+    .eq('uid', requester.uid)
+    .eq('is_active', true)
+    .maybeSingle();
+  if (!user?.company_id) {
+    res.status(403).json({ success: false, error: 'Tenant scope required' });
+    return null;
+  }
+  return { requester: user, companyId: user.company_id };
+}
+
+async function requirePerm(requester, key, res) {
+  return requirePermission(supabase, requester, key, res);
+}
+
+async function requireAnyPerm(requester, keys, res) {
+  const ok = await hasAnyPermission(supabase, requester, keys);
+  if (!ok) {
+    res.status(403).json({ success: false, error: 'Insufficient permissions' });
+    return false;
+  }
+  return true;
+}
+
+function mergeSettings(raw) {
+  const base = JSON.parse(JSON.stringify(DEFAULT_APP_SETTINGS));
+  if (!raw || typeof raw !== 'object') return base;
+  for (const section of Object.keys(base)) {
+    if (raw[section] && typeof raw[section] === 'object') {
+      base[section] = { ...base[section], ...raw[section] };
+    }
+  }
+  return base;
+}
+
+// ── Tickets ───────────────────────────────────────────────────────────────────
+
+router.get('/tickets', async (req, res) => {
+  const ctx = await withTenantContext(req, res);
+  if (!ctx) return;
+  const { requester, companyId } = ctx;
+  if (!(await requireAnyPerm(requester, ['view_tickets', 'manage_tickets', 'assign_tickets', 'close_tickets'], res))) return;
+  try {
+    let query = supabase
+      .from('tickets')
+      .select('*')
+      .eq('company_id', companyId)
+      .order('created_at', { ascending: false });
+    const { data, error } = await query;
+    if (error) throw error;
+    let rows = data || [];
+    if (requester.role === ROLES.MANAGER) {
+      const { data: depts } = await supabase
+        .from('departments')
+        .select('id, name')
+        .eq('company_id', companyId)
+        .eq('name', requester.department);
+      const deptIds = new Set((depts || []).map((d) => String(d.id)));
+      rows = rows.filter(
+        (t) =>
+          deptIds.has(String(t.category)) ||
+          t.created_by === requester.username ||
+          t.assigned_to === requester.username
+      );
+    }
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/tickets', async (req, res) => {
+  const ctx = await withTenantContext(req, res);
+  if (!ctx) return;
+  const { requester, companyId } = ctx;
+  if (!(await requirePerm(requester, 'manage_tickets', res))) return;
+  const { category, priority, subject, description } = req.body;
+  if (!subject?.trim() || !description?.trim()) {
+    return res.status(400).json({ success: false, error: 'Subject and description are required' });
+  }
+  if (!TICKET_PRIORITIES.includes(priority)) {
+    return res.status(400).json({ success: false, error: 'Invalid priority' });
+  }
+  try {
+    const { data, error } = await supabase
+      .from('tickets')
+      .insert({
+        company_id: companyId,
+        created_by_uid: requester.uid,
+        created_by: requester.username,
+        category: String(category || ''),
+        priority,
+        subject: subject.trim(),
+        description: description.trim(),
+        status: 'open',
+      })
+      .select()
+      .single();
+    if (error) throw error;
+
+    const { data: managers } = await supabase
+      .from('users')
+      .select('username')
+      .eq('company_id', companyId)
+      .in('role', ['manager', 'super_admin'])
+      .eq('is_active', true);
+    await notifyUsernames(supabase, companyId, (managers || []).map((m) => m.username), {
+      title: 'New support ticket',
+      body: `${requester.username} created: ${subject.trim()}`,
+      type: 'ticket_created',
+      data: { ticketId: data.id },
+    });
+
+    res.status(201).json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.patch('/tickets/:id/assign', async (req, res) => {
+  const ctx = await withTenantContext(req, res);
+  if (!ctx) return;
+  const { requester, companyId } = ctx;
+  if (!(await requirePerm(requester, 'assign_tickets', res))) return;
+  const { assigned_to } = req.body;
+  if (!assigned_to?.trim()) {
+    return res.status(400).json({ success: false, error: 'assigned_to is required' });
+  }
+  try {
+    const { data: assignee } = await supabase
+      .from('users')
+      .select('uid, username')
+      .eq('company_id', companyId)
+      .eq('username', assigned_to.trim())
+      .eq('is_active', true)
+      .maybeSingle();
+    if (!assignee) return res.status(400).json({ success: false, error: 'Assignee not found' });
+
+    const { data, error } = await supabase
+      .from('tickets')
+      .update({
+        assigned_to: assignee.username,
+        status: 'in_progress',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', req.params.id)
+      .eq('company_id', companyId)
+      .select()
+      .single();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ success: false, error: 'Ticket not found' });
+
+    await insertNotification(supabase, {
+      companyId,
+      recipientUid: assignee.uid,
+      recipientUsername: assignee.username,
+      title: 'Ticket assigned to you',
+      body: `You were assigned: ${data.subject}`,
+      type: 'ticket_assigned',
+      data: { ticketId: data.id },
+    });
+
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.patch('/tickets/:id/close', async (req, res) => {
+  const ctx = await withTenantContext(req, res);
+  if (!ctx) return;
+  const { requester, companyId } = ctx;
+  if (!(await requirePerm(requester, 'close_tickets', res))) return;
+  try {
+    const { data: existing } = await supabase
+      .from('tickets')
+      .select('*')
+      .eq('id', req.params.id)
+      .eq('company_id', companyId)
+      .maybeSingle();
+    if (!existing) return res.status(404).json({ success: false, error: 'Ticket not found' });
+
+    const { data, error } = await supabase
+      .from('tickets')
+      .update({
+        status: 'closed',
+        closed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', req.params.id)
+      .eq('company_id', companyId)
+      .select()
+      .single();
+    if (error) throw error;
+
+    if (existing.created_by && existing.created_by !== requester.username) {
+      await notifyUsernames(supabase, companyId, [existing.created_by], {
+        title: 'Ticket closed',
+        body: `Your ticket "${existing.subject}" was closed.`,
+        type: 'ticket_closed',
+        data: { ticketId: data.id },
+      });
+    }
+
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── Calendar ──────────────────────────────────────────────────────────────────
+
+router.get('/calendar-events', async (req, res) => {
+  const ctx = await withTenantContext(req, res);
+  if (!ctx) return;
+  const { requester, companyId } = ctx;
+  if (!(await requireAnyPerm(requester, ['create_events', 'edit_events', 'delete_events'], res))) return;
+  try {
+    const { data, error } = await supabase
+      .from('calendar_events')
+      .select('*')
+      .eq('company_id', companyId)
+      .order('date', { ascending: true });
+    if (error) throw error;
+    res.json({ success: true, data: data || [] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/calendar-events', async (req, res) => {
+  const ctx = await withTenantContext(req, res);
+  if (!ctx) return;
+  const { requester, companyId } = ctx;
+  if (!(await requirePerm(requester, 'create_events', res))) return;
+  const { title, description, date, time, type, color, visibility, visible_to } = req.body;
+  if (!title?.trim() || !date) {
+    return res.status(400).json({ success: false, error: 'Title and date are required' });
+  }
+  if (type && !EVENT_TYPES.includes(type)) {
+    return res.status(400).json({ success: false, error: 'Invalid event type' });
+  }
+  if (visibility && !VISIBILITY.includes(visibility)) {
+    return res.status(400).json({ success: false, error: 'Invalid visibility' });
+  }
+  try {
+    const { data, error } = await supabase
+      .from('calendar_events')
+      .insert({
+        company_id: companyId,
+        title: title.trim(),
+        description: description || null,
+        date,
+        time: time || null,
+        type: type || 'other',
+        color: color || '#3b82f6',
+        visibility: visibility || 'all',
+        visible_to: visible_to || [],
+        assigned_to: visible_to || [],
+        created_by: requester.username,
+        created_by_uid: requester.uid,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+
+    if (visibility === 'selected' && Array.isArray(visible_to) && visible_to.length) {
+      await notifyUsernames(supabase, companyId, visible_to.filter((u) => u !== requester.username), {
+        title: 'New calendar event',
+        body: `${requester.username} invited you to "${title.trim()}" on ${date}`,
+        type: 'calendar_event',
+        data: { eventId: data.id },
+      });
+    }
+
+    res.status(201).json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.patch('/calendar-events/:id', async (req, res) => {
+  const ctx = await withTenantContext(req, res);
+  if (!ctx) return;
+  const { requester, companyId } = ctx;
+  if (!(await requirePerm(requester, 'edit_events', res))) return;
+  const updates = { ...req.body, updated_at: new Date().toISOString() };
+  delete updates.id;
+  delete updates.company_id;
+  if (updates.title !== undefined && !String(updates.title).trim()) {
+    return res.status(400).json({ success: false, error: 'Title cannot be empty' });
+  }
+  try {
+    const { data, error } = await supabase
+      .from('calendar_events')
+      .update(updates)
+      .eq('id', req.params.id)
+      .eq('company_id', companyId)
+      .select()
+      .single();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ success: false, error: 'Event not found' });
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.delete('/calendar-events/:id', async (req, res) => {
+  const ctx = await withTenantContext(req, res);
+  if (!ctx) return;
+  const { requester, companyId } = ctx;
+  if (!(await requirePerm(requester, 'delete_events', res))) return;
+  try {
+    const { error } = await supabase
+      .from('calendar_events')
+      .delete()
+      .eq('id', req.params.id)
+      .eq('company_id', companyId);
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── Notifications ─────────────────────────────────────────────────────────────
+
+router.get('/notifications/unread-count', async (req, res) => {
+  const ctx = await withTenantContext(req, res);
+  if (!ctx) return;
+  const { requester, companyId } = ctx;
+  try {
+    const { count, error } = await supabase
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('company_id', companyId)
+      .eq('recipient_uid', requester.uid)
+      .eq('read', false);
+    if (error) throw error;
+    res.json({ success: true, count: count || 0 });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/notifications', async (req, res) => {
+  const ctx = await withTenantContext(req, res);
+  if (!ctx) return;
+  const { requester, companyId } = ctx;
+  const page = Math.max(1, parseInt(req.query.page || '1', 10));
+  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit || '20', 10)));
+  const readFilter = req.query.read;
+  const typeFilter = req.query.type;
+  const from = (page - 1) * limit;
+  const to = from + limit - 1;
+  try {
+    let query = supabase
+      .from('notifications')
+      .select('*', { count: 'exact' })
+      .eq('company_id', companyId)
+      .eq('recipient_uid', requester.uid)
+      .order('created_at', { ascending: false })
+      .range(from, to);
+    if (readFilter === 'true') query = query.eq('read', true);
+    if (readFilter === 'false') query = query.eq('read', false);
+    if (typeFilter) query = query.eq('type', typeFilter);
+    const { data, error, count } = await query;
+    if (error) throw error;
+    res.json({ success: true, data: data || [], page, limit, total: count || 0 });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.patch('/notifications/:id/read', async (req, res) => {
+  const ctx = await withTenantContext(req, res);
+  if (!ctx) return;
+  const { requester, companyId } = ctx;
+  try {
+    const { data, error } = await supabase
+      .from('notifications')
+      .update({ read: true, read_at: new Date().toISOString() })
+      .eq('id', req.params.id)
+      .eq('company_id', companyId)
+      .eq('recipient_uid', requester.uid)
+      .select()
+      .single();
+    if (error) throw error;
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/notifications/mark-all-read', async (req, res) => {
+  const ctx = await withTenantContext(req, res);
+  if (!ctx) return;
+  const { requester, companyId } = ctx;
+  try {
+    const { error } = await supabase
+      .from('notifications')
+      .update({ read: true, read_at: new Date().toISOString() })
+      .eq('company_id', companyId)
+      .eq('recipient_uid', requester.uid)
+      .eq('read', false);
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.delete('/notifications/:id', async (req, res) => {
+  const ctx = await withTenantContext(req, res);
+  if (!ctx) return;
+  const { requester, companyId } = ctx;
+  try {
+    const { error } = await supabase
+      .from('notifications')
+      .delete()
+      .eq('id', req.params.id)
+      .eq('company_id', companyId)
+      .eq('recipient_uid', requester.uid);
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── Settings ──────────────────────────────────────────────────────────────────
+
+router.get('/settings', async (req, res) => {
+  const ctx = await withTenantContext(req, res);
+  if (!ctx) return;
+  const { requester, companyId } = ctx;
+  if (!(await requirePerm(requester, 'access_system_settings', res))) return;
+  try {
+    const [{ data: company }, { data: leaveSettings }] = await Promise.all([
+      supabase.from('companies').select('id, name, logo_url, app_settings').eq('id', companyId).single(),
+      supabase.from('leave_settings').select('*').eq('company_id', companyId).maybeSingle(),
+    ]);
+    const appSettings = mergeSettings(company?.app_settings);
+    if (leaveSettings) {
+      appSettings.leave = {
+        defaultAnnual: leaveSettings.default_annual_leaves,
+        defaultSick: leaveSettings.default_sick_leaves,
+        defaultCasual: leaveSettings.default_casual_leaves,
+        yearStart: leaveSettings.leave_year_start,
+        yearEnd: leaveSettings.leave_year_end,
+      };
+    }
+    appSettings.company = {
+      ...appSettings.company,
+      name: company?.name,
+      logoUrl: company?.logo_url,
+    };
+    res.json({ success: true, data: appSettings });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.put('/settings', async (req, res) => {
+  const ctx = await withTenantContext(req, res);
+  if (!ctx) return;
+  const { requester, companyId } = ctx;
+  if (!(await requirePerm(requester, 'access_system_settings', res))) return;
+  const { section, values, reset } = req.body;
+  if (!section) return res.status(400).json({ success: false, error: 'section is required' });
+  try {
+    if (section === 'leave' && values) {
+      const row = {
+        company_id: companyId,
+        default_annual_leaves: Number(values.defaultAnnual) || 20,
+        default_sick_leaves: Number(values.defaultSick) || 10,
+        default_casual_leaves: Number(values.defaultCasual) || 5,
+        leave_year_start: values.yearStart || '01-01',
+        leave_year_end: values.yearEnd || '12-31',
+        updated_at: new Date().toISOString(),
+      };
+      const { error } = await supabase.from('leave_settings').upsert(row, { onConflict: 'company_id' });
+      if (error) throw error;
+    } else if (section === 'company' && values) {
+      const updates = { updated_at: new Date().toISOString() };
+      if (values.name) updates.name = String(values.name).trim();
+      if (values.logoUrl !== undefined) updates.logo_url = values.logoUrl;
+      const { error } = await supabase.from('companies').update(updates).eq('id', companyId);
+      if (error) throw error;
+    } else {
+      const { data: company } = await supabase
+        .from('companies')
+        .select('app_settings')
+        .eq('id', companyId)
+        .single();
+      const current = mergeSettings(company?.app_settings);
+      if (reset) {
+        current[section] = DEFAULT_APP_SETTINGS[section] || {};
+      } else if (values) {
+        current[section] = { ...(current[section] || {}), ...values };
+      }
+      const { error } = await supabase
+        .from('companies')
+        .update({ app_settings: current, updated_at: new Date().toISOString() })
+        .eq('id', companyId);
+      if (error) throw error;
+    }
+
+    const [{ data: company }, { data: leaveSettings }] = await Promise.all([
+      supabase.from('companies').select('id, name, logo_url, app_settings').eq('id', companyId).single(),
+      supabase.from('leave_settings').select('*').eq('company_id', companyId).maybeSingle(),
+    ]);
+    const appSettings = mergeSettings(company?.app_settings);
+    if (leaveSettings) {
+      appSettings.leave = {
+        defaultAnnual: leaveSettings.default_annual_leaves,
+        defaultSick: leaveSettings.default_sick_leaves,
+        defaultCasual: leaveSettings.default_casual_leaves,
+        yearStart: leaveSettings.leave_year_start,
+        yearEnd: leaveSettings.leave_year_end,
+      };
+    }
+    appSettings.company = { ...appSettings.company, name: company?.name, logoUrl: company?.logo_url };
+
+    res.json({ success: true, message: reset ? 'Settings reset' : 'Settings saved', data: appSettings });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+module.exports = router;

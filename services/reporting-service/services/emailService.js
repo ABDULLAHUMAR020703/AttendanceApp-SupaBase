@@ -154,38 +154,48 @@ async function sendEmail({ to, subject, html, text, attachments = [], context = 
     : `Hadir.AI Reports <${SMTP_USER}>`;
   const sentAt = new Date().toISOString();
   const { companyId, companyName, reportType } = context;
+  const maxAttempts = 3;
 
-  try {
-    const info = await transporter.sendMail({
-      from: fromAddress,
-      to: recipients.join(', '),
-      subject,
-      html,
-      text: text || htmlToPlainText(html),
-      attachments,
-    });
+  let lastError = null;
 
-    logEmailResult('SUCCESS', {
-      companyId,
-      companyName,
-      reportType,
-      recipients,
-      messageId: info.messageId,
-      timestamp: sentAt,
-    });
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const info = await transporter.sendMail({
+        from: fromAddress,
+        to: recipients.join(', '),
+        subject,
+        html,
+        text: text || htmlToPlainText(html),
+        attachments,
+      });
 
-    return { success: true, messageId: info.messageId, recipients };
-  } catch (error) {
-    logEmailResult('FAILURE', {
-      companyId,
-      companyName,
-      reportType,
-      recipients,
-      error: error.message,
-      timestamp: sentAt,
-    });
-    throw error;
+      logEmailResult('SUCCESS', {
+        companyId,
+        companyName,
+        reportType,
+        recipients,
+        messageId: info.messageId,
+        timestamp: sentAt,
+      });
+
+      return { success: true, messageId: info.messageId, recipients, attempts: attempt };
+    } catch (error) {
+      lastError = error;
+      logEmailResult('FAILURE', {
+        companyId,
+        companyName,
+        reportType,
+        recipients,
+        error: `${error.message} (attempt ${attempt}/${maxAttempts})`,
+        timestamp: sentAt,
+      });
+      if (attempt < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+      }
+    }
   }
+
+  throw lastError;
 }
 
 /**
@@ -201,6 +211,22 @@ async function sendEmail({ to, subject, html, text, attachments = [], context = 
 async function sendReportEmail(to, subject, body, pdfPath, pdfFilename, context = {}) {
   if (!fs.existsSync(pdfPath)) {
     throw new Error(`PDF file not found: ${pdfPath}`);
+  }
+
+  const stat = fs.statSync(pdfPath);
+  if (stat.size < 100) {
+    throw new Error('PDF file is empty or corrupted');
+  }
+
+  const header = Buffer.alloc(4);
+  const fd = fs.openSync(pdfPath, 'r');
+  try {
+    fs.readSync(fd, header, 0, 4, 0);
+  } finally {
+    fs.closeSync(fd);
+  }
+  if (header.toString() !== '%PDF') {
+    throw new Error('PDF file failed validation');
   }
 
   return sendEmail({

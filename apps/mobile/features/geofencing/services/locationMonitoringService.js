@@ -4,9 +4,9 @@
  * if user leaves the 1km office radius while checked in
  */
 import * as Location from 'expo-location';
-import { getCurrentLocation } from './geofenceService';
-import { getOfficeLocation } from './geofenceService';
+import { getCurrentLocation, getOfficeLocation, findMatchingAllowedLocation } from './geofenceService';
 import { isWithin1km, getDistanceInMeters, formatDistance } from '../utils/distance';
+import { normalizeWorkMode, shouldMonitorGeofenceWhileCheckedIn } from '../utils/workModeRules';
 import { getUserAttendanceRecords, saveAttendanceRecord } from '../../../utils/storage';
 import { getCurrentLocationWithAddress } from '../../../utils/location';
 import { isAutoCheckoutEnabled } from '../../attendance/services/attendanceConfigService';
@@ -19,6 +19,8 @@ let isMonitoring = false;
 let currentUser = null;
 let lastKnownLocationState = null; // 'inside' | 'outside' | null
 let lastAutoCheckoutTime = null; // Prevent duplicate checkouts
+let activeCheckInLocation = null; // Site monitored after check-in
+let consecutiveGpsFailures = 0;
 
 /**
  * Configure notification channel for automatic checkout alerts
@@ -245,28 +247,67 @@ const performAutomaticCheckout = async (user, location, distance) => {
 };
 
 /**
+ * Initialize monitoring state immediately after a successful check-in.
+ * @param {Object} user
+ * @param {Object|null} matchedLocation - Location validated at check-in
+ */
+export const resetMonitoringAfterCheckIn = async (user, matchedLocation = null) => {
+  activeCheckInLocation = matchedLocation || null;
+  lastKnownLocationState = 'inside';
+  consecutiveGpsFailures = 0;
+  currentUser = user;
+
+  if (shouldMonitorGeofenceWhileCheckedIn(user) && !isMonitoring) {
+    await startLocationMonitoring(user);
+  }
+};
+
+const resolveMonitoringLocation = async (user) => {
+  if (activeCheckInLocation?.latitude && activeCheckInLocation?.longitude) {
+    return activeCheckInLocation;
+  }
+  return getOfficeLocation(user);
+};
+
+const isWithinMonitoringRadius = (currentLocation, monitorLocation) => {
+  if (!currentLocation || !monitorLocation) return true;
+
+  const distance = getDistanceInMeters(
+    currentLocation.latitude,
+    currentLocation.longitude,
+    monitorLocation.latitude,
+    monitorLocation.longitude
+  );
+  const radiusM = monitorLocation.radius_meters || monitorLocation.radius || 1000;
+  if (radiusM === 1000) {
+    return isWithin1km(
+      currentLocation.latitude,
+      currentLocation.longitude,
+      monitorLocation.latitude,
+      monitorLocation.longitude
+    );
+  }
+  return distance <= radiusM;
+};
+
+/**
  * Check location and perform automatic checkout if needed
  * @param {Object} user - User object
  * @returns {Promise<{isInside: boolean, distance?: number}>}
  */
 const checkLocationAndCheckout = async (user) => {
   try {
-    // Only check for in_office users
-    const workMode = user.workMode || user.work_mode;
-    if (workMode !== 'in_office') {
-      // Skip monitoring for non-office workers
+    if (!shouldMonitorGeofenceWhileCheckedIn(user)) {
       return { isInside: true };
     }
 
-    // Check if user is checked in
     const checkedIn = await isUserCheckedIn(user.username);
     if (!checkedIn) {
-      // User is not checked in, reset state
       lastKnownLocationState = null;
+      activeCheckInLocation = null;
       return { isInside: true };
     }
 
-    // Check location permission
     const { status } = await Location.getForegroundPermissionsAsync();
     if (status !== 'granted') {
       console.warn('[LocationMonitoring] Location permission revoked');
@@ -274,80 +315,82 @@ const checkLocationAndCheckout = async (user) => {
         'Location Permission Required',
         'Location permission is required for attendance monitoring. Please enable it in settings.'
       );
-      return { isInside: null }; // Unknown state
+      return { isInside: null };
     }
 
-    // Get current location
     const currentLocation = await getCurrentLocation();
-    if (!currentLocation || !currentLocation.latitude || !currentLocation.longitude) {
+    if (!currentLocation?.latitude || !currentLocation?.longitude) {
+      consecutiveGpsFailures += 1;
       console.warn('[LocationMonitoring] Unable to get current location');
-      return { isInside: null }; // Unknown state
+      if (consecutiveGpsFailures >= 3) {
+        await sendNotification(
+          'Location Unavailable',
+          'We could not read your GPS while you are checked in. Move to an open area or enable location services.'
+        );
+      }
+      return { isInside: null };
+    }
+    consecutiveGpsFailures = 0;
+
+    let monitorLocation = await resolveMonitoringLocation(user);
+    if (!monitorLocation && currentLocation.latitude && currentLocation.longitude) {
+      const { match } = await findMatchingAllowedLocation(
+        user,
+        currentLocation.latitude,
+        currentLocation.longitude
+      );
+      if (match) {
+        activeCheckInLocation = match;
+        monitorLocation = match;
+        lastKnownLocationState = 'inside';
+      }
     }
 
-    // Get office location
-    const officeLocation = await getOfficeLocation(user);
-    if (!officeLocation) {
-      // No office location configured, skip check
-      console.warn('[LocationMonitoring] No office location configured');
-      return { isInside: true }; // Assume inside if no office location
+    if (!monitorLocation) {
+      console.warn('[LocationMonitoring] No monitoring location configured');
+      return { isInside: true };
     }
 
-    // Calculate distance
     const distance = getDistanceInMeters(
       currentLocation.latitude,
       currentLocation.longitude,
-      officeLocation.latitude,
-      officeLocation.longitude
+      monitorLocation.latitude,
+      monitorLocation.longitude
     );
 
-    const radiusM = officeLocation.radius_meters || 1000;
-    const isWithinRadius =
-      radiusM === 1000
-        ? isWithin1km(
-            currentLocation.latitude,
-            currentLocation.longitude,
-            officeLocation.latitude,
-            officeLocation.longitude
-          )
-        : distance <= radiusM;
+    const isWithinRadius = isWithinMonitoringRadius(currentLocation, monitorLocation);
 
-    // Update state tracking
     const previousState = lastKnownLocationState;
     lastKnownLocationState = isWithinRadius ? 'inside' : 'outside';
 
-    // Only act on state transitions (inside -> outside)
-    if (!isWithinRadius && previousState === 'inside') {
-      console.log('[LocationMonitoring] User left office radius:', {
+    if (!isWithinRadius && (previousState === 'inside' || previousState === null)) {
+      console.log('[LocationMonitoring] User left allowed radius:', {
         username: user.username,
         distance: `${distance.toFixed(0)}m`,
+        site: monitorLocation.name,
       });
 
-      // Check if auto checkout is enabled
-      const autoCheckoutEnabled = await isAutoCheckoutEnabled(true); // Use cache
+      const autoCheckoutEnabled = await isAutoCheckoutEnabled(true);
 
       if (autoCheckoutEnabled) {
-        // Auto checkout enabled - perform automatic checkout
         const success = await performAutomaticCheckout(user, currentLocation, distance);
         if (success) {
-          // Stop monitoring after successful checkout
           console.log('[LocationMonitoring] Auto checkout successful, stopping monitoring');
           stopLocationMonitoring();
           return { isInside: false, distance };
         }
       } else {
-        // Auto checkout disabled - just notify user (don't checkout)
         const distanceFormatted = formatDistance(distance);
         await sendNotification(
-          'Outside Office Area',
-          `You are ${distanceFormatted} away from the office. Manual checkout is blocked until you return within 1km.`
+          'Outside Allowed Work Area',
+          `You are ${distanceFormatted} away from ${monitorLocation.name || 'your work site'}. Manual checkout is blocked until you return.`
         );
       }
     } else if (isWithinRadius && previousState === 'outside') {
-      // User re-entered radius
-      console.log('[LocationMonitoring] User re-entered office radius:', user.username);
+      console.log('[LocationMonitoring] User re-entered allowed radius:', user.username);
       await sendNotification(
-        'Back in Office Area',
-        'You have returned to the office area. You can now check out manually if needed.'
+        'Back in Work Area',
+        `You have returned to ${monitorLocation.name || 'your work site'}. You can check out manually if needed.`
       );
     }
 
@@ -411,7 +454,7 @@ export const startLocationMonitoring = async (user) => {
 
       // Check location and handle accordingly
       await checkLocationAndCheckout(currentUser);
-    }, 60000); // 60 seconds
+    }, 30000); // 30 seconds
 
     isMonitoring = true;
     console.log('[LocationMonitoring] ✓ Location monitoring started for user:', user.username);
@@ -437,6 +480,8 @@ export const stopLocationMonitoring = () => {
     currentUser = null;
     lastKnownLocationState = null;
     lastAutoCheckoutTime = null;
+    activeCheckInLocation = null;
+    consecutiveGpsFailures = 0;
     console.log('[LocationMonitoring] ✓ Location monitoring stopped');
   } catch (error) {
     console.error('[LocationMonitoring] Error stopping location monitoring:', error);

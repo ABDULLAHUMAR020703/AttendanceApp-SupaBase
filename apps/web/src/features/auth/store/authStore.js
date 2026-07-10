@@ -212,4 +212,25 @@ export const useAuthStore = create((set) => ({
     await supabase.auth.signOut();
     set({ user: null, loading: false, error: null });
   },
+  refreshPermissions: async () => {
+    const state = useAuthStore.getState();
+    if (!state.user?.uid) return;
+    try {
+      const { data } = await api.get(apiUrl('/api/auth/me/permissions'));
+      if (data?.success && data?.data) {
+        set({
+          user: {
+            ...state.user,
+            permissions: data.data.permissions || [],
+            role: data.data.role || state.user.role,
+          },
+        });
+        return;
+      }
+    } catch {
+      /* fallback below */
+    }
+    const permissions = await fetchUserPermissions(state.user.uid, state.user.role);
+    set({ user: { ...state.user, permissions } });
+  },
 }));

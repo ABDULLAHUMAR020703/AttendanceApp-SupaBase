@@ -1,12 +1,12 @@
 /**
- * Extended schedule config (frequency, last run) stored on disk.
- * Core day/autoSend settings remain in the companies table.
+ * Report schedule helpers — frequency, next run, cron eligibility
  */
 const fs = require('fs');
 const path = require('path');
 
 const CONFIG_PATH = path.join(__dirname, '../data/schedule-config.json');
 const VALID_FREQUENCIES = ['daily', 'weekly', 'monthly'];
+const SCHEDULE_HOUR_UTC = 2;
 
 function ensureConfigFile() {
   const dir = path.dirname(CONFIG_PATH);
@@ -30,15 +30,109 @@ function saveConfig(config) {
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf8');
 }
 
-function getExtendedSchedule(companyId) {
+function normalizeFrequency(value) {
+  return VALID_FREQUENCIES.includes(value) ? value : 'monthly';
+}
+
+function normalizeDay(day) {
+  const n = Number(day);
+  if (!Number.isFinite(n)) return 1;
+  return Math.min(28, Math.max(1, Math.floor(n)));
+}
+
+/**
+ * Compute the next scheduled run (02:00 UTC) from now.
+ */
+function computeNextExecution({ frequency = 'monthly', day = 1 } = {}) {
+  const freq = normalizeFrequency(frequency);
+  const targetDay = normalizeDay(day);
+  const now = new Date();
+
+  if (freq === 'daily') {
+    const next = new Date(Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
+      SCHEDULE_HOUR_UTC,
+      0,
+      0,
+      0
+    ));
+    if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
+    return next.toISOString();
+  }
+
+  if (freq === 'weekly') {
+    let next = new Date(Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
+      SCHEDULE_HOUR_UTC,
+      0,
+      0,
+      0
+    ));
+    while (next.getUTCDay() !== 1 || next <= now) {
+      next.setUTCDate(next.getUTCDate() + 1);
+    }
+    return next.toISOString();
+  }
+
+  let candidate = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    targetDay,
+    SCHEDULE_HOUR_UTC,
+    0,
+    0,
+    0
+  ));
+  if (candidate <= now) {
+    candidate = new Date(Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth() + 1,
+      targetDay,
+      SCHEDULE_HOUR_UTC,
+      0,
+      0,
+      0
+    ));
+  }
+  return candidate.toISOString();
+}
+
+/**
+ * Whether the scheduled job should run for this company today (02:00 UTC cron).
+ */
+function shouldRunScheduledReport(schedule, now = new Date()) {
+  if (!schedule?.autoSend) return false;
+
+  const frequency = normalizeFrequency(schedule.frequency);
+  const utcDay = now.getUTCDate();
+  const utcDow = now.getUTCDay();
+
+  switch (frequency) {
+    case 'daily':
+      return true;
+    case 'weekly':
+      return utcDow === 1;
+    case 'monthly':
+    default:
+      return utcDay === normalizeDay(schedule.day);
+  }
+}
+
+function getExtendedSchedule(companyId, dbSchedule = {}) {
   const config = loadConfig();
   const entry = config[companyId] || {};
-  const frequency = VALID_FREQUENCIES.includes(entry.frequency) ? entry.frequency : 'monthly';
+  const frequency = normalizeFrequency(dbSchedule.frequency || entry.frequency);
+  const day = normalizeDay(dbSchedule.day ?? entry.day ?? 1);
+
   return {
     frequency,
-    lastExecution: entry.lastExecution || null,
-    lastStatus: entry.lastStatus || null,
-    nextExecution: computeNextExecution(frequency, entry),
+    lastExecution: dbSchedule.lastExecution || entry.lastExecution || null,
+    lastStatus: dbSchedule.lastStatus || entry.lastStatus || null,
+    nextExecution: computeNextExecution({ frequency, day }),
   };
 }
 
@@ -52,7 +146,7 @@ function setExtendedSchedule(companyId, { frequency }) {
     config[companyId].frequency = frequency;
   }
   saveConfig(config);
-  return getExtendedSchedule(companyId);
+  return getExtendedSchedule(companyId, { frequency });
 }
 
 function recordScheduleExecution(companyId, status) {
@@ -63,32 +157,13 @@ function recordScheduleExecution(companyId, status) {
   saveConfig(config);
 }
 
-function computeNextExecution(frequency, entry) {
-  const now = new Date();
-  const next = new Date(now);
-
-  switch (frequency) {
-    case 'daily':
-      next.setUTCDate(next.getUTCDate() + 1);
-      next.setUTCHours(2, 0, 0, 0);
-      break;
-    case 'weekly':
-      next.setUTCDate(next.getUTCDate() + ((8 - next.getUTCDay()) % 7 || 7));
-      next.setUTCHours(2, 0, 0, 0);
-      break;
-    case 'monthly':
-    default:
-      next.setUTCMonth(next.getUTCMonth() + 1, 1);
-      next.setUTCHours(2, 0, 0, 0);
-      break;
-  }
-
-  return next.toISOString();
-}
-
 module.exports = {
   getExtendedSchedule,
   setExtendedSchedule,
   recordScheduleExecution,
+  computeNextExecution,
+  shouldRunScheduledReport,
+  normalizeFrequency,
+  normalizeDay,
   VALID_FREQUENCIES,
 };

@@ -1,7 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../features/auth/store/authStore';
 import { canAccessFeature, isSuperAdmin, PERMISSIONS } from '../../features/admin/permissions';
+import { useNotificationStore } from '../../features/notifications/store/notificationStore';
+import { useSilentPoll } from '../hooks/useSilentPoll';
 import { PermissionGate } from './PermissionGate';
 
 const navItems = [
@@ -59,6 +61,17 @@ const navItems = [
         <path d="M8 2v4M16 2v4M3 10h18" />
         <rect x="3" y="4" width="18" height="18" rx="2" />
         <path d="m8 15 2 2 5-5" />
+      </svg>
+    ),
+  },
+  {
+    to: '/work-mode-requests',
+    label: 'Work Mode',
+    feature: 'workModeRequests',
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M3 12h18M12 3v18" />
+        <circle cx="12" cy="12" r="9" />
       </svg>
     ),
   },
@@ -144,6 +157,18 @@ const navItems = [
     ),
   },
   {
+    to: '/approval-workflows',
+    label: 'Approvals',
+    superAdminOnly: true,
+    feature: 'approvalWorkflows',
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M4 6h16M4 12h10M4 18h16" />
+        <circle cx="18" cy="12" r="2" />
+      </svg>
+    ),
+  },
+  {
     to: '/manager-permissions',
     label: 'Permissions',
     superAdminOnly: true,
@@ -158,12 +183,27 @@ const navItems = [
 ];
 
 export function AppShell() {
-  const { user, logout } = useAuthStore();
+  const { user, logout, refreshPermissions } = useAuthStore();
+  const { unreadCount, refresh: refreshBadge } = useNotificationStore();
   const location = useLocation();
   const navigate = useNavigate();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    if (!user) return undefined;
+    refreshBadge();
+    const onFocus = () => {
+      refreshPermissions();
+      refreshBadge();
+    };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [user?.uid, refreshPermissions, refreshBadge]);
+
+  useSilentPoll(() => refreshBadge(), 30000, [user?.uid]);
 
   const items = useMemo(() => {
     return navItems.filter((item) => {
@@ -177,6 +217,15 @@ export function AppShell() {
     const matched = items.find((i) => i.to === location.pathname);
     return matched?.label || 'Dashboard';
   }, [items, location.pathname]);
+
+  const mobileNavItems = useMemo(() => {
+    const primary = ['/', '/attendance', '/leaves', '/notifications'];
+    return items.filter((item) => primary.includes(item.to));
+  }, [items]);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
 
   const initials = (user?.name || user?.username || 'A')
     .split(' ')
@@ -216,8 +265,18 @@ export function AppShell() {
                   : 'text-slate-200 hover:bg-white/10 border border-transparent'
               }`}
             >
-              <span className="text-blue-200">{item.icon}</span>
-              {!isCollapsed && <span>{item.label}</span>}
+              <span className="text-blue-200 relative">
+                {item.icon}
+                {item.to === '/notifications' && unreadCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[1rem] h-4 px-1 rounded-full bg-red-500 text-[10px] font-semibold text-white grid place-items-center">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </span>
+              {!isCollapsed && <span className="flex-1">{item.label}</span>}
+              {!isCollapsed && item.to === '/notifications' && unreadCount > 0 && (
+                <span className="text-xs rounded-full bg-red-500/80 px-1.5 py-0.5 text-white">{unreadCount > 99 ? '99+' : unreadCount}</span>
+              )}
             </NavLink>
           ))}
         </div>
@@ -229,17 +288,27 @@ export function AppShell() {
         </div>
       </aside>
 
-      <div className="relative flex-1 min-w-0 p-4 pl-0 md:pl-0">
-        <header className="h-16 rounded-2xl border border-white/15 bg-white/10 backdrop-blur-xl px-4 md:px-6 flex items-center gap-4">
-          <p className="text-sm md:text-base font-semibold text-slate-100 min-w-fit">{pageTitle}</p>
+      <div className="relative flex-1 min-w-0 p-2 md:p-4 md:pl-0">
+        <header className="h-14 md:h-16 rounded-card border border-white/15 bg-white/10 backdrop-blur-xl px-3 md:px-6 flex items-center gap-3 md:gap-4">
+          <button
+            type="button"
+            className="md:hidden rounded-input border border-white/20 p-2 text-slate-100"
+            onClick={() => setMobileNavOpen(true)}
+            aria-label="Open navigation menu"
+          >
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <path d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+          <p className="text-sm md:text-base font-semibold text-slate-100 min-w-fit truncate">{pageTitle}</p>
 
-          <div className="flex-1 max-w-xl">
+          <div className="flex-1 max-w-xl hidden sm:block">
             <div className="relative">
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search users, roles..."
-                className="w-full rounded-xl border border-white/20 bg-white/10 py-2 pl-9 pr-3 text-sm text-slate-100 placeholder:text-slate-300/80 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-300/40 transition-all duration-200"
+                className="ui-input py-2 pl-9"
               />
               <svg viewBox="0 0 24 24" className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <circle cx="11" cy="11" r="7" />
@@ -259,7 +328,11 @@ export function AppShell() {
                 <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" />
                 <path d="M9 17a3 3 0 0 0 6 0" />
               </svg>
-              <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-blue-600" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[1rem] h-4 px-1 rounded-full bg-red-500 text-[10px] font-semibold text-white grid place-items-center">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
             </button>
           </PermissionGate>
 
@@ -285,9 +358,60 @@ export function AppShell() {
           </div>
         </header>
 
-        <main className="p-4 md:p-6">
+        <main className="p-3 md:p-6 pb-24 md:pb-6">
           <Outlet context={{ globalSearch: search }} />
         </main>
+
+        <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-white/15 bg-slate-900/80 backdrop-blur-xl px-2 pb-safe">
+          <div className="flex items-stretch justify-around">
+            {mobileNavItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) => `relative flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[10px] ${isActive ? 'text-brand-300' : 'text-slate-400'}`}
+              >
+                <span className="relative">{item.icon}</span>
+                <span>{item.label}</span>
+                {item.to === '/notifications' && unreadCount > 0 && (
+                  <span className="absolute top-1 right-[calc(50%-1.25rem)] min-w-[0.9rem] h-3.5 px-0.5 rounded-full bg-red-500 text-[9px] font-bold text-white grid place-items-center">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </NavLink>
+            ))}
+            <button
+              type="button"
+              onClick={() => setMobileNavOpen(true)}
+              className="flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[10px] text-slate-400"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 6h16M4 12h10M4 18h16" /></svg>
+              <span>More</span>
+            </button>
+          </div>
+        </nav>
+
+        <div className={`md:hidden fixed inset-0 z-40 ${mobileNavOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}>
+          <div className={`absolute inset-0 bg-slate-950/60 transition-opacity ${mobileNavOpen ? 'opacity-100' : 'opacity-0'}`} onClick={() => setMobileNavOpen(false)} />
+          <aside className={`absolute left-0 top-0 h-full w-[min(20rem,85vw)] border-r border-white/15 bg-slate-900/95 backdrop-blur-2xl transition-transform ${mobileNavOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+            <div className="flex items-center justify-between border-b border-white/10 px-4 h-14">
+              <p className="font-semibold text-white">Hadir.ai</p>
+              <button type="button" onClick={() => setMobileNavOpen(false)} className="p-2 text-slate-400" aria-label="Close menu">✕</button>
+            </div>
+            <div className="p-3 space-y-1 overflow-y-auto max-h-[calc(100%-3.5rem)]">
+              {items.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  className={({ isActive }) => `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm ${isActive ? 'bg-brand-500/20 text-white' : 'text-slate-300'}`}
+                >
+                  {item.icon}
+                  {item.label}
+                </NavLink>
+              ))}
+              <button onClick={logout} className="mt-4 w-full rounded-input border border-white/20 px-3 py-2.5 text-sm text-slate-200">Logout</button>
+            </div>
+          </aside>
+        </div>
       </div>
     </div>
   );

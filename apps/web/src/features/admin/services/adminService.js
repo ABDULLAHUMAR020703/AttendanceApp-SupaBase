@@ -43,6 +43,34 @@ async function trySaveEmail(uid, email, originalUsername) {
   }
 }
 
+async function fetchReportBlob(reportId, mode = 'download') {
+  const path = mode === 'preview' ? `/api/reports/preview/${reportId}` : `/api/reports/download/${reportId}`;
+  try {
+    const response = await api.get(apiUrl(path), { responseType: 'blob', timeout: 120000 });
+    const contentType = response.headers['content-type'] || '';
+    if (contentType.includes('application/json')) {
+      const text = await response.data.text();
+      const err = JSON.parse(text);
+      throw new Error(err.message || err.error || 'Unable to load report');
+    }
+    if (!contentType.includes('pdf') && response.data.type && !response.data.type.includes('pdf')) {
+      throw new Error('Unable to load report. Invalid response format.');
+    }
+    return response.data;
+  } catch (error) {
+    if (error.response?.data instanceof Blob) {
+      try {
+        const text = await error.response.data.text();
+        const err = JSON.parse(text);
+        throw new Error(err.message || err.error || 'Unable to load report');
+      } catch {
+        throw new Error('Unable to load report');
+      }
+    }
+    throw new Error(extractApiMessage(error, 'Unable to load report'));
+  }
+}
+
 export const adminService = {
   getStats: async () =>
     executeApiCall(async () => (await api.get(apiUrl('/api/admin/dashboard/stats'))).data.data, 'Failed to load dashboard stats'),
@@ -248,6 +276,12 @@ export const adminService = {
     executeApiCall(async () => (await api.post(apiUrl('/api/admin/employee-sites'), payload)).data, 'Failed to assign site'),
   getAttendance: async () =>
     executeApiCall(async () => (await api.get(apiUrl('/api/admin/attendance'))).data.data, 'Failed to load attendance'),
+  createManualAttendance: async (payload) =>
+    executeApiCall(async () => (await api.post(apiUrl('/api/admin/attendance'), payload)).data.data, 'Failed to create attendance record'),
+  updateAttendance: async (id, payload) =>
+    executeApiCall(async () => (await api.patch(apiUrl(`/api/admin/attendance/${id}`), payload)).data.data, 'Failed to update attendance record'),
+  deleteAttendance: async (id) =>
+    executeApiCall(async () => (await api.delete(apiUrl(`/api/admin/attendance/${id}`))).data, 'Failed to delete attendance record'),
   getLeaves: async () => {
     const leaves = await executeApiCall(
       async () => (await api.get(apiUrl('/api/admin/leaves'))).data.data,
@@ -302,50 +336,24 @@ export const adminService = {
       async () => (await api.delete(apiUrl(`/api/reports/${reportId}`))).data,
       'Failed to delete report'
     ),
-  fetchReportBlob: async (reportId, mode = 'download') => {
-    const path = mode === 'preview' ? `/api/reports/preview/${reportId}` : `/api/reports/download/${reportId}`;
-    try {
-      const response = await api.get(apiUrl(path), { responseType: 'blob', timeout: 120000 });
-      const contentType = response.headers['content-type'] || '';
-      if (contentType.includes('application/json')) {
-        const text = await response.data.text();
-        const err = JSON.parse(text);
-        throw new Error(err.message || err.error || 'Unable to load report');
-      }
-      if (!contentType.includes('pdf') && response.data.type && !response.data.type.includes('pdf')) {
-        throw new Error('Unable to load report. Invalid response format.');
-      }
-      return response.data;
-    } catch (error) {
-      if (error.response?.data instanceof Blob) {
-        try {
-          const text = await error.response.data.text();
-          const err = JSON.parse(text);
-          throw new Error(err.message || err.error || 'Unable to load report');
-        } catch {
-          throw new Error('Unable to load report');
-        }
-      }
-      throw new Error(extractApiMessage(error, 'Unable to load report'));
-    }
-  },
+  fetchReportBlob,
   downloadReportFile: async (reportId, filename = 'report.pdf') => {
-    const path = `/api/reports/download/${reportId}`;
-    const response = await api.get(apiUrl(path), { responseType: 'blob', timeout: 120000 });
-    const contentType = response.headers['content-type'] || '';
-    if (contentType.includes('application/json') || (response.data.type && response.data.type.includes('json'))) {
-      const text = await response.data.text();
-      const err = JSON.parse(text);
-      throw new Error(err.message || err.error || 'Unable to load report');
+    const blob = await fetchReportBlob(reportId, 'download');
+    if (!blob || blob.size < 100) {
+      throw new Error('Downloaded file is empty or corrupted.');
     }
-    const url = URL.createObjectURL(response.data);
+    const header = await blob.slice(0, 4).text();
+    if (!header.startsWith('%PDF')) {
+      throw new Error('Downloaded file is not a valid PDF.');
+    }
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
     document.body.appendChild(a);
     a.click();
     a.remove();
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
   },
   previewReport: async (reportId) => {
     const path = `/api/reports/preview/${reportId}`;
@@ -366,4 +374,66 @@ export const adminService = {
     executeApiCall(async () => (await api.get(apiUrl('/api/reports/schedule'))).data.schedule, 'Failed to load report schedule'),
   updateReportSchedule: async (payload) =>
     executeApiCall(async () => (await api.put(apiUrl('/api/reports/schedule'), payload)).data.schedule, 'Failed to update report schedule'),
+  getReportDeliveryLogs: async () =>
+    executeApiCall(async () => (await api.get(apiUrl('/api/reports/delivery-logs'))).data.logs, 'Failed to load delivery logs'),
+
+  getApprovalWorkflows: async () =>
+    executeApiCall(async () => (await api.get(apiUrl('/api/admin/approval-workflows'))).data.data, 'Failed to load workflows'),
+  updateApprovalWorkflow: async (requestType, payload) =>
+    executeApiCall(async () => (await api.put(apiUrl(`/api/admin/approval-workflows/${requestType}`), payload)).data.data, 'Failed to save workflow'),
+  getWorkModeRequests: async () =>
+    executeApiCall(async () => (await api.get(apiUrl('/api/admin/work-mode-requests'))).data.data, 'Failed to load work mode requests'),
+  processWorkModeRequest: async (id, payload) =>
+    executeApiCall(async () => (await api.patch(apiUrl(`/api/admin/work-mode-requests/${id}`), payload)).data, 'Failed to process request'),
+  getEmployeeSites: async (employeeUid) =>
+    executeApiCall(async () => {
+      const q = employeeUid ? `?employee_uid=${encodeURIComponent(employeeUid)}` : '';
+      return (await api.get(apiUrl(`/api/admin/employee-sites${q}`))).data.data;
+    }, 'Failed to load site assignments'),
+  setEmployeeSites: async (employeeUid, siteIds) =>
+    executeApiCall(async () => (await api.put(apiUrl(`/api/admin/employee-sites/${employeeUid}`), { site_ids: siteIds })).data.data, 'Failed to save site assignments'),
+  refreshMyPermissions: async () =>
+    executeApiCall(async () => (await api.get(apiUrl('/api/auth/me/permissions'))).data.data, 'Failed to refresh permissions'),
+
+  getTickets: async () =>
+    executeApiCall(async () => (await api.get(apiUrl('/api/admin/tickets'))).data.data, 'Failed to load tickets'),
+  createTicket: async (payload) =>
+    executeApiCall(async () => (await api.post(apiUrl('/api/admin/tickets'), payload)).data.data, 'Failed to create ticket'),
+  assignTicket: async (id, assigned_to) =>
+    executeApiCall(async () => (await api.patch(apiUrl(`/api/admin/tickets/${id}/assign`), { assigned_to })).data.data, 'Failed to assign ticket'),
+  closeTicket: async (id) =>
+    executeApiCall(async () => (await api.patch(apiUrl(`/api/admin/tickets/${id}/close`), {})).data.data, 'Failed to close ticket'),
+
+  getCalendarEvents: async () =>
+    executeApiCall(async () => (await api.get(apiUrl('/api/admin/calendar-events'))).data.data, 'Failed to load events'),
+  createCalendarEvent: async (payload) =>
+    executeApiCall(async () => (await api.post(apiUrl('/api/admin/calendar-events'), payload)).data.data, 'Failed to create event'),
+  updateCalendarEvent: async (id, payload) =>
+    executeApiCall(async () => (await api.patch(apiUrl(`/api/admin/calendar-events/${id}`), payload)).data.data, 'Failed to update event'),
+  deleteCalendarEvent: async (id) =>
+    executeApiCall(async () => (await api.delete(apiUrl(`/api/admin/calendar-events/${id}`))).data, 'Failed to delete event'),
+
+  getNotifications: async (params = {}) =>
+    executeApiCall(async () => {
+      const q = new URLSearchParams();
+      if (params.page) q.set('page', params.page);
+      if (params.limit) q.set('limit', params.limit);
+      if (params.read != null) q.set('read', params.read);
+      if (params.type) q.set('type', params.type);
+      const suffix = q.toString() ? `?${q.toString()}` : '';
+      return (await api.get(apiUrl(`/api/admin/notifications${suffix}`))).data;
+    }, 'Failed to load notifications'),
+  getUnreadNotificationCount: async () =>
+    executeApiCall(async () => (await api.get(apiUrl('/api/admin/notifications/unread-count'))).data.count, 'Failed to load count'),
+  markNotificationRead: async (id) =>
+    executeApiCall(async () => (await api.patch(apiUrl(`/api/admin/notifications/${id}/read`), {})).data, 'Failed to mark read'),
+  markAllNotificationsRead: async () =>
+    executeApiCall(async () => (await api.post(apiUrl('/api/admin/notifications/mark-all-read'), {})).data, 'Failed to mark all read'),
+  deleteNotification: async (id) =>
+    executeApiCall(async () => (await api.delete(apiUrl(`/api/admin/notifications/${id}`))).data, 'Failed to delete notification'),
+
+  getSettings: async () =>
+    executeApiCall(async () => (await api.get(apiUrl('/api/admin/settings'))).data.data, 'Failed to load settings'),
+  saveSettingsSection: async (section, values, reset = false) =>
+    executeApiCall(async () => (await api.put(apiUrl('/api/admin/settings'), { section, values, reset })).data, 'Failed to save settings'),
 };

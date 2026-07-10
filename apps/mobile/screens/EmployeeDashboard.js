@@ -10,6 +10,8 @@ import {
   Modal,
   TextInput,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -50,8 +52,11 @@ import { useNavigation } from '@react-navigation/native';
 
 export default function EmployeeDashboard({ route }) {
   const navigation = useNavigation();
-  const { user } = route.params;
-  const { handleLogout } = useAuth();
+  const { user: routeUser } = route.params || {};
+  const { user: authUser, handleLogout } = useAuth();
+  const user = authUser
+    ? { ...(routeUser || {}), ...authUser, workMode: authUser.workMode ?? authUser.work_mode ?? routeUser?.workMode, work_mode: authUser.work_mode ?? authUser.workMode ?? routeUser?.work_mode }
+    : routeUser;
   const { colors } = useTheme();
   const tablet = isTablet();
   const tabletContentStyle = {
@@ -286,7 +291,8 @@ export default function EmployeeDashboard({ route }) {
       const success = await createWorkModeRequest(
         user.username,
         selectedWorkMode,
-        requestReason.trim()
+        requestReason.trim(),
+        user
       );
 
       if (success) {
@@ -1208,6 +1214,10 @@ export default function EmployeeDashboard({ route }) {
         animationType="slide"
         onRequestClose={() => setShowWorkModeModal(false)}
       >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+        >
         <View className="flex-1 justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
           <View className="rounded-xl p-6 mx-4 w-full max-w-sm" style={{ backgroundColor: colors.surface }}>
             <Text className="text-xl font-bold mb-4" style={{ color: colors.text }}>
@@ -1267,6 +1277,7 @@ export default function EmployeeDashboard({ route }) {
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );

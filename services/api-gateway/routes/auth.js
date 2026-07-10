@@ -189,6 +189,11 @@ router.get('/departments', (req, res) => forwardWithUserContext(req, res, 'get',
 router.get('/position-suggestions', (req, res) =>
   forwardWithUserContext(req, res, 'get', '/api/auth/position-suggestions')
 );
+router.get('/me/permissions', (req, res) => forwardWithUserContext(req, res, 'get', '/api/auth/me/permissions'));
+router.post('/work-mode-requests', (req, res) => forwardWithUserContext(req, res, 'post', '/api/auth/work-mode-requests'));
+router.get('/work-mode-requests/mine', (req, res) =>
+  forwardWithUserContext(req, res, 'get', '/api/auth/work-mode-requests/mine')
+);
 
 /**
  * Forward username check request to auth-service

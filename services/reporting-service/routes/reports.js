@@ -15,7 +15,7 @@ const {
   verifyReportAccess,
   toPublicRecord,
 } = require('../services/reportStorage');
-const { getSuperAdminEmails, getReportSchedule, setReportSchedule } = require('../services/queryService');
+const { getReportRecipients, getReportSchedule, setReportSchedule, getReportAuditLogs } = require('../services/queryService');
 const { supabase } = require('../config/supabase');
 
 const VALID_RANGES = ['daily', 'weekly', 'monthly', 'yearly', 'all', 'custom'];
@@ -119,6 +119,20 @@ function getGeneratedBy(user) {
   return user.name || user.email || user.username || 'Super Admin';
 }
 
+function validatePdfOnDisk(filePath) {
+  if (!fs.existsSync(filePath)) return false;
+  const stat = fs.statSync(filePath);
+  if (stat.size < 100) return false;
+  const header = Buffer.alloc(4);
+  const fd = fs.openSync(filePath, 'r');
+  try {
+    fs.readSync(fd, header, 0, 4, 0);
+  } finally {
+    fs.closeSync(fd);
+  }
+  return header.toString() === '%PDF';
+}
+
 function streamReportFile(req, res, report, disposition) {
   const timestamp = new Date().toISOString();
 
@@ -130,12 +144,12 @@ function streamReportFile(req, res, report, disposition) {
     });
   }
 
-  if (!fs.existsSync(report.filePath)) {
+  if (!validatePdfOnDisk(report.filePath)) {
     deleteReport(report.reportId);
     return res.status(404).json({
       success: false,
       error: 'Report not found',
-      message: 'Unable to load report. The file is no longer available.',
+      message: 'Unable to load report. The file is missing or corrupted.',
     });
   }
 
@@ -174,7 +188,6 @@ router.post('/generate-pdf', verifySuperAdmin, async (req, res) => {
     const result = await buildReport({
       ...params,
       companyId: req.user.company_id,
-      companyName: req.user.company_id,
       generatedBy: getGeneratedBy(req.user),
       sendEmail: false,
     });
@@ -377,19 +390,17 @@ router.delete('/:reportId', verifySuperAdmin, (req, res) => {
 // ── Schedule recipients summary ───────────────────────────────────────────────
 router.get('/recipients', verifySuperAdmin, async (req, res) => {
   try {
-    const recipients = await getSuperAdminEmails(req.user.company_id);
+    const recipients = await getReportRecipients(req.user.company_id);
     res.json({ success: true, recipients, count: recipients.length });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to load recipients' });
   }
 });
 
-// ── Schedule settings ─────────────────────────────────────────────────────────
 router.get('/schedule', verifySuperAdmin, async (req, res) => {
   try {
     const schedule = await getReportSchedule(req.user.company_id);
-    const recipients = await getSuperAdminEmails(req.user.company_id);
-    res.json({ success: true, schedule: { ...schedule, recipients } });
+    res.json({ success: true, schedule });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to load schedule settings' });
   }
@@ -397,13 +408,40 @@ router.get('/schedule', verifySuperAdmin, async (req, res) => {
 
 router.put('/schedule', verifySuperAdmin, async (req, res) => {
   try {
-    const { day, autoSend, frequency } = req.body;
-    await setReportSchedule(req.user.company_id, { day, autoSend, frequency });
+    const { day, autoSend, frequency, recipients } = req.body;
+
+    if (frequency !== undefined && !['daily', 'weekly', 'monthly'].includes(frequency)) {
+      return res.status(400).json({ success: false, error: 'frequency must be daily, weekly, or monthly' });
+    }
+
+    if (day !== undefined) {
+      const d = Number(day);
+      if (!Number.isFinite(d) || d < 1 || d > 28) {
+        return res.status(400).json({ success: false, error: 'day must be between 1 and 28' });
+      }
+      if (frequency === 'monthly' || (frequency === undefined && req.body.frequency !== 'daily' && req.body.frequency !== 'weekly')) {
+        /* monthly day validated */
+      }
+    }
+
+    if (recipients !== undefined && !Array.isArray(recipients)) {
+      return res.status(400).json({ success: false, error: 'recipients must be an array of email addresses' });
+    }
+
+    await setReportSchedule(req.user.company_id, { day, autoSend, frequency, recipients });
     const updated = await getReportSchedule(req.user.company_id);
-    const recipients = await getSuperAdminEmails(req.user.company_id);
-    res.json({ success: true, schedule: { ...updated, recipients } });
+    res.json({ success: true, schedule: updated });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message || 'Failed to update schedule settings' });
+  }
+});
+
+router.get('/delivery-logs', verifySuperAdmin, async (req, res) => {
+  try {
+    const logs = await getReportAuditLogs(req.user.company_id, 30);
+    res.json({ success: true, logs });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to load delivery logs' });
   }
 });
 

@@ -1,77 +1,23 @@
-export const managerPermissionGroups = [
-  {
-    group: 'User Management',
-    permissions: [
-      ['create_user', 'Create Users'],
-      ['edit_user', 'Edit Users'],
-      ['delete_user', 'Delete Users'],
-      ['activate_user', 'Activate Users'],
-      ['deactivate_user', 'Deactivate Users'],
-      ['change_user_role', 'Change User Roles'],
-      ['view_employees', 'View Employees'],
-    ],
-  },
-  {
-    group: 'Attendance',
-    permissions: [
-      ['manual_attendance', 'Manual Attendance'],
-      ['view_attendance', 'View Attendance'],
-      ['export_attendance', 'Export Attendance'],
-      ['attendance_analytics', 'Attendance Analytics'],
-    ],
-  },
-  {
-    group: 'Leave',
-    permissions: [
-      ['view_leave_requests', 'View Leave Requests'],
-      ['approve_leave', 'Approve Leave'],
-      ['reject_leave', 'Reject Leave'],
-      ['edit_leave_balance', 'Edit Leave Balance'],
-    ],
-  },
-  {
-    group: 'Tickets',
-    permissions: [
-      ['view_tickets', 'View Tickets'],
-      ['manage_tickets', 'Manage Tickets'],
-      ['assign_tickets', 'Assign Tickets'],
-      ['close_tickets', 'Close Tickets'],
-    ],
-  },
-  {
-    group: 'Geofencing',
-    permissions: [
-      ['manage_geofencing', 'Manage Geofencing'],
-      ['update_office_location', 'Update Office Location'],
-      ['update_attendance_radius', 'Update Attendance Radius'],
-    ],
-  },
-  {
-    group: 'Analytics',
-    permissions: [
-      ['view_hr_dashboard', 'View HR Dashboard'],
-      ['view_analytics', 'View Analytics'],
-      ['export_reports', 'Export Reports'],
-    ],
-  },
-  {
-    group: 'Calendar',
-    permissions: [
-      ['create_events', 'Create Events'],
-      ['edit_events', 'Edit Events'],
-      ['delete_events', 'Delete Events'],
-    ],
-  },
-  {
-    group: 'System',
-    permissions: [
-      ['manage_notifications', 'Manage Notifications'],
-      ['approve_signup_requests', 'Approve Signup Requests'],
-      ['manage_departments', 'Manage Departments'],
-      ['access_system_settings', 'Access System Settings'],
-    ],
-  },
-];
+/**
+ * Re-exports from shared permission catalog (single source of truth).
+ */
+import {
+  MANAGER_PERMISSION_GROUPS,
+  ALL_MANAGER_PERMISSIONS,
+  DEFAULT_MANAGER_PERMISSIONS,
+  TENANT_WIDE_PEOPLE_PERMISSIONS,
+  FEATURE_PERMISSIONS,
+  hasPermission as catalogHasPermission,
+  hasAnyPermission as catalogHasAnyPermission,
+  canAccessFeature as catalogCanAccessFeature,
+  isSuperAdmin,
+  hasTenantWidePeopleAccess,
+} from '../../../../../shared/permissions/catalog.cjs';
+
+export const managerPermissionGroups = MANAGER_PERMISSION_GROUPS;
+export const allManagerPermissions = ALL_MANAGER_PERMISSIONS;
+export const defaultManagerPermissions = DEFAULT_MANAGER_PERMISSIONS;
+export { TENANT_WIDE_PEOPLE_PERMISSIONS, FEATURE_PERMISSIONS, isSuperAdmin, hasTenantWidePeopleAccess };
 
 export const PERMISSIONS = {
   CREATE_USER: 'create_user',
@@ -89,6 +35,9 @@ export const PERMISSIONS = {
   APPROVE_LEAVE: 'approve_leave',
   REJECT_LEAVE: 'reject_leave',
   EDIT_LEAVE_BALANCE: 'edit_leave_balance',
+  VIEW_WORK_MODE_REQUESTS: 'view_work_mode_requests',
+  APPROVE_WORK_MODE: 'approve_work_mode',
+  REJECT_WORK_MODE: 'reject_work_mode',
   VIEW_TICKETS: 'view_tickets',
   MANAGE_TICKETS: 'manage_tickets',
   ASSIGN_TICKETS: 'assign_tickets',
@@ -105,81 +54,16 @@ export const PERMISSIONS = {
   MANAGE_NOTIFICATIONS: 'manage_notifications',
   APPROVE_SIGNUP_REQUESTS: 'approve_signup_requests',
   MANAGE_DEPARTMENTS: 'manage_departments',
+  MANAGE_APPROVAL_WORKFLOWS: 'manage_approval_workflows',
   ACCESS_SYSTEM_SETTINGS: 'access_system_settings',
 };
 
-export const FEATURE_PERMISSIONS = {
-  dashboard: [],
-  users: [
-    PERMISSIONS.VIEW_EMPLOYEES,
-    PERMISSIONS.CREATE_USER,
-    PERMISSIONS.EDIT_USER,
-    PERMISSIONS.DELETE_USER,
-    PERMISSIONS.ACTIVATE_USER,
-    PERMISSIONS.DEACTIVATE_USER,
-    PERMISSIONS.CHANGE_USER_ROLE,
-  ],
-  departments: [PERMISSIONS.MANAGE_DEPARTMENTS],
-  analytics: [PERMISSIONS.VIEW_ANALYTICS],
-  reports: [PERMISSIONS.EXPORT_REPORTS],
-  settings: [PERMISSIONS.ACCESS_SYSTEM_SETTINGS],
-  permissions: [],
-  sites: [PERMISSIONS.MANAGE_GEOFENCING],
-  attendance: [PERMISSIONS.MANUAL_ATTENDANCE, PERMISSIONS.VIEW_ATTENDANCE],
-  leaves: [PERMISSIONS.VIEW_LEAVE_REQUESTS, PERMISSIONS.APPROVE_LEAVE, PERMISSIONS.REJECT_LEAVE],
-  tickets: [
-    PERMISSIONS.VIEW_TICKETS,
-    PERMISSIONS.MANAGE_TICKETS,
-    PERMISSIONS.ASSIGN_TICKETS,
-    PERMISSIONS.CLOSE_TICKETS,
-  ],
-  calendar: [PERMISSIONS.CREATE_EVENTS, PERMISSIONS.EDIT_EVENTS, PERMISSIONS.DELETE_EVENTS],
-  notifications: [PERMISSIONS.MANAGE_NOTIFICATIONS],
-};
-
-export const allManagerPermissions = managerPermissionGroups.flatMap((group) =>
-  group.permissions.map(([key]) => key)
-);
-
-export const defaultManagerPermissions = [
-  'view_employees',
-  'edit_user',
-  'manual_attendance',
-  'view_attendance',
-  'view_leave_requests',
-  'approve_leave',
-  'reject_leave',
-  'view_tickets',
-  'manage_tickets',
-  'view_hr_dashboard',
-  'view_analytics',
-  'create_events',
-  'edit_events',
-  'delete_events',
-];
-
-export const isSuperAdmin = (user) => user?.role === 'super_admin';
-
-export const hasPermission = (user, permission) => {
-  if (!user || !permission) return false;
-  if (isSuperAdmin(user)) return true;
-  return Array.isArray(user.permissions) && user.permissions.includes(permission);
-};
-
-export const hasAnyPermission = (user, permissions = []) => {
-  if (!user) return false;
-  if (isSuperAdmin(user)) return true;
-  return permissions.some((permission) => hasPermission(user, permission));
-};
+export const hasPermission = catalogHasPermission;
+export const hasAnyPermission = catalogHasAnyPermission;
+export const canAccessFeature = catalogCanAccessFeature;
 
 export const hasAllPermissions = (user, permissions = []) => {
   if (!user) return false;
   if (isSuperAdmin(user)) return true;
   return permissions.every((permission) => hasPermission(user, permission));
-};
-
-export const canAccessFeature = (user, featureKey) => {
-  if (isSuperAdmin(user)) return true;
-  const permissions = FEATURE_PERMISSIONS[featureKey] || [];
-  return permissions.length === 0 || hasAnyPermission(user, permissions);
 };

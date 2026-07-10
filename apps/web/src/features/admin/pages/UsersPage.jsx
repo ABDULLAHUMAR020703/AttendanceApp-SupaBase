@@ -10,22 +10,18 @@ import { hasPermission, PERMISSIONS } from '../permissions';
 
 function SkeletonRow() {
   return (
-    <tr className="border-b border-slate-100">
-      <td className="p-3"><div className="h-4 w-4 rounded bg-slate-200 animate-pulse" /></td>
-      <td className="p-3"><div className="h-8 w-44 rounded bg-slate-200 animate-pulse" /></td>
-      <td className="p-3"><div className="h-6 w-20 rounded bg-slate-200 animate-pulse" /></td>
-      <td className="p-3"><div className="h-6 w-24 rounded bg-slate-200 animate-pulse" /></td>
-      <td className="p-3"><div className="h-6 w-20 rounded bg-slate-200 animate-pulse" /></td>
-      <td className="p-3"><div className="h-6 w-28 rounded bg-slate-200 animate-pulse" /></td>
-      <td className="p-3"><div className="h-6 w-36 rounded bg-slate-200 animate-pulse" /></td>
+    <tr className="border-b border-white/10">
+      {Array.from({ length: 7 }).map((_, i) => (
+        <td key={i} className="p-3"><div className="h-4 skeleton w-full max-w-[6rem]" /></td>
+      ))}
     </tr>
   );
 }
 
 const roleStyles = {
-  super_admin: 'bg-blue-50 text-blue-700 border-blue-100',
-  manager: 'bg-indigo-50 text-indigo-700 border-indigo-100',
-  employee: 'bg-slate-100 text-slate-700 border-slate-200',
+  super_admin: 'bg-brand-500/20 text-brand-100 border-brand-400/30',
+  manager: 'bg-indigo-500/20 text-indigo-100 border-indigo-400/30',
+  employee: 'bg-slate-500/20 text-slate-200 border-slate-400/25',
 };
 
 const EMPTY_CREATE_FORM = {
@@ -457,11 +453,11 @@ export function UsersPage() {
                   </td>
                   <td className="p-3">
                     <button type="button" className="flex items-center gap-3" onClick={() => openUserPanel(u)}>
-                      <span className="grid h-8 w-8 place-items-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700">
+                      <span className="grid h-8 w-8 place-items-center rounded-full bg-brand-500/20 text-xs font-semibold text-brand-100">
                         {initials(u.name || u.username)}
                       </span>
                       <span>
-                        <span className="block text-slate-900 font-medium">{u.name || u.username}</span>
+                        <span className="block text-white font-medium">{u.name || u.username}</span>
                         <span className="block text-xs text-slate-300">{u.email}</span>
                       </span>
                     </button>

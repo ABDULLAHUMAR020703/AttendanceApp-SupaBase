@@ -8,20 +8,21 @@ import {
 } from 'react-native';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
-import { saveAttendanceRecord } from '../utils/storage';
-import { 
-  verifyFace, 
-  checkFaceRecognitionAvailability
+import { validateCheckInLocation } from '../features/geofencing';
+import { isLocationRequiredForCheckIn } from '../features/geofencing/utils/workModeRules';
+import { getUserAttendanceRecords, saveAttendanceRecord } from '../utils/storage';
+import {
+  verifyFace,
+  checkFaceRecognitionAvailability,
 } from '../utils/faceVerification';
-import { 
-  authenticateWithBiometric, 
+import {
+  authenticateWithBiometric,
   checkBiometricAvailability,
-  getBiometricTypeName 
+  getBiometricTypeName,
 } from '../utils/biometricAuth';
 import { getCurrentLocationWithAddress, formatAddressForDisplay } from '../utils/location';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../core/contexts/AuthContext';
-import { validateCheckInLocation } from '../features/geofencing';
 
 export default function AuthenticationScreen({ navigation, route }) {
   const { type, user: routeUser, authMethod = 'face' } = route.params;
@@ -221,8 +222,10 @@ export default function AuthenticationScreen({ navigation, route }) {
       } else {
         setAuthStatus('failed');
         Alert.alert(
-          'Face ID Authentication Failed',
-          verificationResult.error || 'Face ID authentication failed. Please try again.',
+          'Face ID Authentication Cancelled',
+          verificationResult.error?.includes('cancel')
+            ? 'Authentication was cancelled. No attendance record was saved.'
+            : verificationResult.error || 'Face ID authentication did not complete. Please try again.',
           [
             { text: 'Retry', onPress: () => {
               setAuthStatus(null);
@@ -312,8 +315,10 @@ export default function AuthenticationScreen({ navigation, route }) {
       } else {
         setAuthStatus('failed');
         Alert.alert(
-          'Authentication Failed',
-          authResult.error || 'Biometric authentication failed. Please try again.',
+          'Biometric Authentication Cancelled',
+          authResult.error?.includes('cancel')
+            ? 'Authentication was cancelled. No attendance record was saved.'
+            : authResult.error || 'Biometric authentication did not complete. Please try again.',
           [
             { 
               text: 'Retry', 
@@ -363,28 +368,49 @@ export default function AuthenticationScreen({ navigation, route }) {
   };
 
   const saveAttendance = async (photoUri, locationData) => {
+    setIsLoading(true);
     try {
-      // Ensure location is properly formatted (handle null/undefined)
-      const location = locationData || {
+      let location = locationData || {
         latitude: null,
         longitude: null,
         accuracy: null,
-        address: 'Location unavailable'
+        address: 'Location unavailable',
       };
 
-      // GEOFENCING VALIDATION
+      const locationRequired = isLocationRequiredForCheckIn(user);
+
+      if (locationRequired && (!location.latitude || !location.longitude)) {
+        const refreshed = await getCurrentLocationWithAddress();
+        if (refreshed?.latitude && refreshed?.longitude) {
+          location = refreshed;
+          setLocation(refreshed);
+        }
+      }
+
+      const records = await getUserAttendanceRecords(user.username);
+      const lastRecord = records?.[0];
+      const lastType = lastRecord?.type;
+
+      if (type === 'checkin' && lastType === 'checkin') {
+        Alert.alert('Already Checked In', 'You are already checked in. Check out before checking in again.');
+        return;
+      }
+      if (type === 'checkout' && lastType !== 'checkin') {
+        Alert.alert('Not Checked In', 'You must check in before you can check out.');
+        return;
+      }
+
+      let matchedLocation = null;
+
       if (type === 'checkin') {
-        // Validate location coordinates are available
-        if (!location.latitude || !location.longitude) {
+        if (locationRequired && (!location.latitude || !location.longitude)) {
           Alert.alert(
             'Location Required',
-            'Unable to get your current location. Please enable location services and try again.',
-            [{ text: 'OK' }]
+            'Unable to get your current location. Please enable location services and try again.'
           );
           return;
         }
 
-        // Validate check-in location based on work mode
         const validation = await validateCheckInLocation(
           user,
           location.latitude,
@@ -392,35 +418,32 @@ export default function AuthenticationScreen({ navigation, route }) {
         );
 
         if (!validation.valid) {
-          // Block check-in if validation fails
           Alert.alert(
             'Check-In Blocked',
-            validation.error || 'You must be within the office location to check in.',
+            validation.error || 'You are not within an allowed work location.',
             [{ text: 'OK' }]
           );
           return;
         }
 
-        // Log warning if present (non-blocking)
+        matchedLocation = validation.matchedLocation || null;
+
         if (validation.warning) {
           console.warn('[AuthenticationScreen] Location validation warning:', validation.warning);
         }
       } else if (type === 'checkout') {
-        // Validate checkout location (only if auto_checkout is disabled)
         const { validateCheckoutLocation } = await import('../features/geofencing/services/checkoutValidationService');
         const validation = await validateCheckoutLocation(user, location);
 
         if (!validation.valid) {
-          // Block checkout if validation fails
           Alert.alert(
             'Check-Out Blocked',
-            validation.error || 'You must be within 1km of the office to check out.',
+            validation.error || 'You must be within an allowed work location to check out.',
             [{ text: 'OK' }]
           );
           return;
         }
 
-        // Log warning if present (non-blocking)
         if (validation.warning) {
           console.warn('[AuthenticationScreen] Checkout validation warning:', validation.warning);
         }
@@ -429,19 +452,20 @@ export default function AuthenticationScreen({ navigation, route }) {
       const attendanceRecord = {
         id: Date.now().toString(),
         username: user.username,
-        type: type,
+        type,
         timestamp: new Date().toISOString(),
-        photo: null, // No photo needed for device-native authentication
-        location: location,
-        authMethod: authMethod, // Store which authentication method was used
+        photo: null,
+        location: locationRequired || location.latitude
+          ? {
+              ...location,
+              site_id: matchedLocation?.id || null,
+              site_name: matchedLocation?.name || null,
+            }
+          : location.latitude
+            ? location
+            : null,
+        authMethod: authMethod,
       };
-
-      console.log('Saving attendance record:', {
-        username: attendanceRecord.username,
-        type: attendanceRecord.type,
-        hasLocation: !!attendanceRecord.location,
-        locationAddress: attendanceRecord.location?.address || 'N/A'
-      });
 
       const saveResult = await saveAttendanceRecord(attendanceRecord);
 
@@ -449,10 +473,26 @@ export default function AuthenticationScreen({ navigation, route }) {
         Alert.alert(
           'Could Not Save',
           saveResult?.error ||
-            'Your check-in could not be saved. Please try again or contact support.',
+            'Your attendance could not be saved. Please try again or contact support.',
           [{ text: 'OK' }]
         );
         return;
+      }
+
+      if (type === 'checkin') {
+        try {
+          const { resetMonitoringAfterCheckIn } = await import('../features/geofencing/services/locationMonitoringService');
+          await resetMonitoringAfterCheckIn(user, matchedLocation);
+        } catch (monitorErr) {
+          console.warn('[AuthenticationScreen] Could not start location monitoring:', monitorErr?.message);
+        }
+      } else {
+        try {
+          const { stopLocationMonitoring } = await import('../features/geofencing/services/locationMonitoringService');
+          stopLocationMonitoring();
+        } catch {
+          /* ignore */
+        }
       }
 
       const actionLabel = type === 'checkin' ? 'checked in' : 'checked out';
@@ -460,19 +500,20 @@ export default function AuthenticationScreen({ navigation, route }) {
       const message =
         saveResult.source === 'supabase'
           ? `Successfully ${actionLabel}!`
-          : `You are ${actionLabel} on this device. We will sync to the server when the connection is available.`;
+          : `You are ${actionLabel} on this device. We will sync when the connection is available.`;
 
       Alert.alert(title, message, [
         {
           text: 'OK',
-          onPress: () => {
-            navigation.goBack();
-          },
+          onPress: () => navigation.goBack(),
         },
       ]);
     } catch (error) {
       console.error('Error saving attendance:', error);
-      Alert.alert('Error', 'Failed to save attendance record');
+      Alert.alert('Error', 'Failed to save attendance record. Please try again.');
+    } finally {
+      setIsLoading(false);
+      setIsVerifying(false);
     }
   };
 

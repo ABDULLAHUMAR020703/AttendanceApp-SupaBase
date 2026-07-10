@@ -1,6 +1,30 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, useTransition } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { GlassCard } from '../../../shared/components/GlassCard';
+import {
+  AnalyticsKpiGrid,
+  ChartPanel,
+  ChartSkeleton,
+  DateRangeSelector,
+} from '../../../shared/components/charts';
+import { useAnalyticsMetrics } from '../../../shared/components/charts/useAnalyticsMetrics';
 import { adminService } from '../services/adminService';
+import {
+  formatRangeLabel,
+  getAggregationLabel,
+  hasSeriesData,
+} from '../utils/analyticsCharts';
+
+const DepartmentBarChart = lazy(() =>
+  import('../../../shared/components/charts/DepartmentBarChart').then((m) => ({
+    default: m.DepartmentBarChart,
+  }))
+);
+const AttendanceLineChart = lazy(() =>
+  import('../../../shared/components/charts/AttendanceLineChart').then((m) => ({
+    default: m.AttendanceLineChart,
+  }))
+);
 
 function buildDistributionFromUsers(users, departments) {
   const deptByKey = new Map();
@@ -38,72 +62,62 @@ function buildDistributionFromUsers(users, departments) {
   return rows;
 }
 
-function filterAttendanceLast7Days(attendance) {
-  const start = new Date();
-  start.setDate(start.getDate() - 7);
-  start.setHours(0, 0, 0, 0);
-  return (attendance || []).filter((row) => {
-    const raw = row.timestamp || row.created_at || row.check_in_at;
-    if (!raw) return false;
-    return new Date(raw) >= start;
-  });
+function ChartSuspense({ children }) {
+  return <Suspense fallback={<ChartSkeleton height={300} />}>{children}</Suspense>;
 }
 
 export function AnalyticsPage() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [distribution, setDistribution] = useState([]);
-  const [insights, setInsights] = useState(null);
+  const [attendanceRecords, setAttendanceRecords] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [datePreset, setDatePreset] = useState('last_30d');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+  const [isPending, startTransition] = useTransition();
 
   const load = useCallback(async () => {
     setError('');
     setLoading(true);
     try {
-      const analytics = await adminService.getAnalytics();
-      if (analytics) {
-        setDistribution(analytics.departmentDistribution || []);
-        setInsights(analytics.insights || null);
-        return;
-      }
-
-      const [usersData, attendanceData, deptOverview] = await Promise.all([
+      const [analytics, usersData, attendanceData, deptOverview] = await Promise.all([
+        adminService.getAnalytics().catch(() => null),
         adminService.getUsers(),
         adminService.getAttendance(),
         adminService.getDepartmentsOverview(),
       ]);
-      const users = usersData || [];
-      const last7 = filterAttendanceLast7Days(attendanceData);
-      const activeUsers = users.filter((u) => u.is_active).length;
-      const deptRows = buildDistributionFromUsers(users, deptOverview);
 
-      if (deptRows.length === 0 && (deptOverview || []).length > 0) {
-        const maxFromOverview = Math.max(...deptOverview.map((d) => d.employeeCount || 0), 0);
-        if (maxFromOverview > 0) {
-          setDistribution(
-            deptOverview
-              .filter((d) => (d.employeeCount || 0) > 0)
-              .map((d) => ({
-                id: d.id,
-                name: d.name,
-                employeeCount: d.employeeCount || 0,
-                activeCount: d.employeeCount || 0,
-              }))
-          );
+      const userRows = usersData || [];
+      setUsers(userRows);
+      setAttendanceRecords(attendanceData || []);
+
+      if (analytics?.departmentDistribution?.length) {
+        setDistribution(analytics.departmentDistribution);
+      } else {
+        const deptRows = buildDistributionFromUsers(userRows, deptOverview);
+
+        if (deptRows.length === 0 && (deptOverview || []).length > 0) {
+          const maxFromOverview = Math.max(...deptOverview.map((d) => d.employeeCount || 0), 0);
+          if (maxFromOverview > 0) {
+            setDistribution(
+              deptOverview
+                .filter((d) => (d.employeeCount || 0) > 0)
+                .map((d) => ({
+                  id: d.id,
+                  name: d.name,
+                  employeeCount: d.employeeCount || 0,
+                  activeCount: d.employeeCount || 0,
+                }))
+            );
+          } else {
+            setDistribution(deptRows);
+          }
         } else {
           setDistribution(deptRows);
         }
-      } else {
-        setDistribution(deptRows);
       }
-
-      setInsights({
-        totalUsers: users.length,
-        activeUsers,
-        attendanceLast7Days: last7.length,
-        avgAttendancePerActiveUser7d: activeUsers ? Math.round((last7.length / activeUsers) * 100) / 100 : 0,
-        trackedDepartments: (deptOverview || []).length,
-        unassignedUsers: deptRows.find((d) => d.id === 'unassigned')?.employeeCount || 0,
-      });
     } catch (err) {
       setError(err?.message || 'Failed to load analytics');
     } finally {
@@ -115,114 +129,249 @@ export function AnalyticsPage() {
     load();
   }, [load]);
 
-  const departmentBars = useMemo(() => {
-    if (!distribution.length) return [];
-    const max = Math.max(...distribution.map((d) => d.employeeCount || 0), 1);
-    return distribution.map((d) => ({
-      label: d.name,
-      value: d.employeeCount || 0,
-      active: d.activeCount ?? d.employeeCount ?? 0,
-      percent: Math.max(((d.employeeCount || 0) / max) * 100, (d.employeeCount || 0) > 0 ? 14 : 0),
-    }));
-  }, [distribution]);
+  const { selectedRange, rangeInvalid, departmentChartData, attendanceSeries, kpis } =
+    useAnalyticsMetrics({
+      datePreset,
+      customFrom,
+      customTo,
+      attendanceRecords,
+      users,
+      distribution,
+    });
 
-  const insightRows = insights
+  const recalculating = isPending && !loading;
+
+  const hasDepartmentData = hasSeriesData(departmentChartData, ['total', 'active']);
+  const hasAttendanceData = hasSeriesData(attendanceSeries.data, ['checkins', 'checkouts', 'events']);
+
+  const handlePresetChange = useCallback((value) => {
+    startTransition(() => setDatePreset(value));
+  }, []);
+
+  const handleCustomFromChange = useCallback((value) => {
+    startTransition(() => setCustomFrom(value));
+  }, []);
+
+  const handleCustomToChange = useCallback((value) => {
+    startTransition(() => setCustomTo(value));
+  }, []);
+
+  const handleDrillDown = useCallback(
+    (target) => {
+      if (target?.type === 'department' && target.id !== 'unassigned') {
+        navigate('/users', { state: { departmentFilter: target.label } });
+      }
+    },
+    [navigate]
+  );
+
+  const suggestWiderRange = useCallback(() => {
+    startTransition(() => setDatePreset('last_90d'));
+  }, []);
+
+  const suggestThisMonth = useCallback(() => {
+    startTransition(() => setDatePreset('this_month'));
+  }, []);
+
+  const kpiItems = useMemo(
+    () => [
+      {
+        id: 'attendance-events',
+        label: 'Attendance events',
+        value: kpis.attendanceEvents,
+        hint: selectedRange ? formatRangeLabel(selectedRange.start, selectedRange.end) : 'Select a range',
+        accent: 'blue',
+      },
+      {
+        id: 'checkins',
+        label: 'Check-ins',
+        value: kpis.checkins,
+        hint: 'In selected period',
+        accent: 'green',
+      },
+      {
+        id: 'checkouts',
+        label: 'Check-outs',
+        value: kpis.checkouts,
+        hint: 'In selected period',
+        accent: 'green',
+      },
+      {
+        id: 'unique-attendees',
+        label: 'Unique attendees',
+        value: kpis.uniqueAttendees,
+        hint: 'Users with activity in range',
+        accent: 'purple',
+      },
+      {
+        id: 'new-registrations',
+        label: 'New registrations',
+        value: kpis.newRegistrations,
+        hint: 'Users created in range',
+        accent: 'amber',
+      },
+      {
+        id: 'avg-events',
+        label: 'Avg events / attendee',
+        value: kpis.avgEventsPerAttendee.toFixed(2),
+        hint: 'Per unique attendee',
+        accent: 'blue',
+      },
+    ],
+    [kpis, selectedRange]
+  );
+
+  const insightRows = selectedRange && !rangeInvalid
     ? [
-        { label: 'Total users', value: insights.totalUsers },
-        { label: 'Total active users', value: insights.activeUsers },
-        { label: 'Attendance records in last 7 days', value: insights.attendanceLast7Days },
-        {
-          label: 'Avg attendance events per active user (7d)',
-          value: Number(insights.avgAttendancePerActiveUser7d ?? 0).toFixed(2),
-        },
-        { label: 'Tracked departments', value: insights.trackedDepartments },
-        ...(insights.unassignedUsers > 0
-          ? [{ label: 'Users without department', value: insights.unassignedUsers }]
+        { label: 'Total accounts', value: kpis.totalUsers },
+        { label: 'Active accounts (current)', value: kpis.activeAccounts },
+        { label: 'Tracked departments', value: kpis.trackedDepartments },
+        ...(kpis.unassignedUsers > 0
+          ? [{ label: 'Users without department', value: kpis.unassignedUsers }]
           : []),
       ]
     : [];
 
+  const attendanceSubtitle = selectedRange
+    ? `${getAggregationLabel(attendanceSeries.granularity)} check-in and check-out events · ${formatRangeLabel(selectedRange.start, selectedRange.end)}`
+    : 'Check-in and check-out events per period';
+
   return (
-    <div className="space-y-6 animate-fade-up">
-      <section className="flex items-start justify-between gap-3">
+    <div className="analytics-page space-y-6 animate-fade-up print:text-slate-900">
+      <section className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between print:hidden">
         <div>
           <h1 className="text-2xl font-semibold text-white">Analytics</h1>
-          <p className="mt-1 text-sm text-slate-200">Department headcount and attendance activity for your company.</p>
+          <p className="mt-1 text-sm text-slate-200">
+            Department headcount and attendance activity for your company.
+          </p>
         </div>
         <button
           type="button"
           onClick={load}
           disabled={loading}
-          className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-xs text-slate-100 hover:bg-white/20 transition-all duration-200 disabled:opacity-50"
+          aria-busy={loading}
+          className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-xs text-slate-100 transition-all duration-200 hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300/50 disabled:opacity-50"
         >
           {loading ? 'Loading…' : 'Refresh'}
         </button>
       </section>
 
       {error && (
-        <GlassCard className="p-4">
+        <GlassCard className="p-4" role="alert">
           <p className="text-sm text-red-100">{error}</p>
         </GlassCard>
       )}
 
-      <div className="grid lg:grid-cols-2 gap-6">
-        <GlassCard className="p-5">
-          <h2 className="text-sm font-medium text-white mb-1">Department Size Distribution</h2>
-          <p className="text-xs text-slate-400 mb-4">Headcount per department (all users assigned to each dept)</p>
-          <div className="h-56 flex items-end gap-3 px-1">
-            {loading &&
-              Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="flex-1 flex flex-col items-center justify-end gap-2">
-                  <div className="w-full h-32 rounded-t-md skeleton" />
-                  <div className="h-3 w-12 rounded skeleton" />
-                </div>
-              ))}
-            {!loading && departmentBars.length === 0 && (
-              <div className="w-full h-full grid place-items-center text-sm text-slate-300 text-center px-4">
-                No department data yet. Assign users to departments on the Users page.
-              </div>
-            )}
-            {!loading &&
-              departmentBars.map((bar) => (
-                <div key={bar.label} className="flex-1 flex flex-col items-center justify-end gap-2 min-w-0">
-                  <span className="text-[11px] font-medium text-blue-100">{bar.value}</span>
-                  <div
-                    className="w-full max-w-[72px] rounded-t-md bg-gradient-to-t from-blue-600/80 to-blue-400/60 border border-blue-300/30 transition-all duration-500"
-                    style={{ height: `${bar.percent}%`, minHeight: bar.value > 0 ? '1.5rem' : 0 }}
-                    title={`${bar.label}: ${bar.value} users (${bar.active} active)`}
-                  />
-                  <span className="text-[10px] text-slate-300 text-center truncate w-full" title={bar.label}>
-                    {bar.label}
-                  </span>
-                </div>
-              ))}
-          </div>
+      <GlassCard className="p-5 print:hidden">
+        <DateRangeSelector
+          preset={datePreset}
+          customFrom={customFrom}
+          customTo={customTo}
+          selectedRange={selectedRange}
+          rangeInvalid={rangeInvalid}
+          onPresetChange={handlePresetChange}
+          onCustomFromChange={handleCustomFromChange}
+          onCustomToChange={handleCustomToChange}
+        />
+      </GlassCard>
+
+      <AnalyticsKpiGrid items={kpiItems} loading={loading || recalculating} className="print:grid-cols-3" />
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <GlassCard className="flex h-full flex-col p-5">
+          <ChartPanel
+            exportId="chart-department-distribution"
+            title="Department Size Distribution"
+            subtitle="Current headcount snapshot by department (not filtered by date)"
+            loading={loading}
+            recalculating={recalculating}
+            isEmpty={!hasDepartmentData}
+            emptyState={{
+              title: 'No department data yet',
+              description:
+                'Users have not been assigned to departments. Assign departments on the Users page to populate this chart.',
+              actions: [{ label: 'Manage users', onClick: () => navigate('/users') }],
+            }}
+          >
+            <ChartSuspense>
+              <DepartmentBarChart
+                data={departmentChartData}
+                onDrillDown={handleDrillDown}
+                enableDrillDown
+              />
+            </ChartSuspense>
+            <p className="mt-2 text-center text-[11px] text-slate-400" aria-hidden="true">
+              Department
+            </p>
+          </ChartPanel>
         </GlassCard>
 
-        <GlassCard className="p-5">
-          <h2 className="text-sm font-medium text-white mb-4">Insights</h2>
-          {loading && (
-            <ul className="space-y-3">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <li key={i} className="h-4 rounded skeleton w-3/4" />
-              ))}
-            </ul>
-          )}
-          {!loading && insightRows.length > 0 && (
-            <ul className="space-y-3 text-sm text-slate-200">
-              {insightRows.map((row) => (
-                <li key={row.label} className="flex items-center justify-between gap-4 border-b border-white/5 pb-2 last:border-0">
-                  <span className="text-slate-300">{row.label}</span>
-                  <span className="font-semibold text-white tabular-nums">{row.value}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-          {!loading && !insightRows.length && (
-            <p className="text-sm text-slate-300">No insights available.</p>
-          )}
+        <GlassCard className="flex h-full flex-col p-5">
+          <ChartPanel
+            exportId="chart-attendance-activity"
+            title="Attendance Activity"
+            subtitle={attendanceSubtitle}
+            loading={loading}
+            recalculating={recalculating}
+            isEmpty={rangeInvalid || !hasAttendanceData}
+            emptyState={
+              rangeInvalid
+                ? {
+                    title: 'Select a valid date range',
+                    description:
+                      'Choose both a start and end date, or switch to a preset such as Last 30 Days.',
+                    actions: [{ label: 'Use Last 30 Days', onClick: () => handlePresetChange('last_30d') }],
+                  }
+                : {
+                    title: 'No attendance activity in this period',
+                    description:
+                      'There are no check-in or check-out records for the selected range. Try expanding the period or verify attendance is being recorded.',
+                    actions: [
+                      { label: 'Try Last 90 Days', onClick: suggestWiderRange },
+                      { label: 'Try This Month', onClick: suggestThisMonth },
+                    ],
+                  }
+            }
+          >
+            <ChartSuspense>
+              <AttendanceLineChart
+                data={attendanceSeries.data}
+                granularity={attendanceSeries.granularity}
+              />
+            </ChartSuspense>
+          </ChartPanel>
         </GlassCard>
       </div>
+
+      <GlassCard className="p-5">
+        <h2 className="mb-1 text-sm font-medium text-white">Organization insights</h2>
+        <p className="mb-4 text-xs text-slate-400">
+          Account and structure metrics alongside your filtered attendance period
+        </p>
+        {loading && (
+          <ul className="space-y-3" aria-hidden="true">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <li key={i} className="h-4 w-3/4 rounded skeleton" />
+            ))}
+          </ul>
+        )}
+        {!loading && insightRows.length > 0 && (
+          <ul className="space-y-3 text-sm text-slate-200">
+            {insightRows.map((row) => (
+              <li
+                key={row.label}
+                className="flex items-center justify-between gap-4 border-b border-white/5 pb-2 last:border-0"
+              >
+                <span className="text-slate-300">{row.label}</span>
+                <span className="font-semibold tabular-nums text-white">{row.value}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {!loading && !insightRows.length && (
+          <p className="text-sm text-slate-300">Select a valid date range to view insights.</p>
+        )}
+      </GlassCard>
     </div>
   );
 }

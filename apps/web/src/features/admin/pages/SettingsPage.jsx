@@ -1,83 +1,202 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { GlassCard } from '../../../shared/components/GlassCard';
+import { PermissionGate } from '../../../shared/components/PermissionGate';
 import { adminService } from '../services/adminService';
+import { PERMISSIONS } from '../permissions';
+
+const SECTIONS = [
+  { id: 'company', label: 'Company' },
+  { id: 'attendance', label: 'Attendance' },
+  { id: 'leave', label: 'Leave' },
+  { id: 'tickets', label: 'Tickets' },
+  { id: 'calendar', label: 'Calendar' },
+  { id: 'notifications', label: 'Notifications' },
+  { id: 'reports', label: 'Reports' },
+  { id: 'geofencing', label: 'Geofencing' },
+  { id: 'security', label: 'Security' },
+  { id: 'theme', label: 'Theme' },
+];
+
+function SectionFields({ section, values, onChange }) {
+  if (!values) return null;
+  const field = (key, label, type = 'text') => (
+    <label key={key} className="flex flex-col gap-1 text-sm">
+      <span className="text-slate-400 text-xs">{label}</span>
+      {type === 'checkbox' ? (
+        <input type="checkbox" checked={!!values[key]} onChange={(e) => onChange(key, e.target.checked)} className="h-4 w-4" />
+      ) : (
+        <input type={type} value={values[key] ?? ''} onChange={(e) => onChange(key, type === 'number' ? Number(e.target.value) : e.target.value)} className="rounded border border-white/20 bg-white/10 px-3 py-2 text-slate-100" />
+      )}
+    </label>
+  );
+
+  switch (section) {
+    case 'company':
+      return (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {field('name', 'Company name')}
+          {field('logoUrl', 'Logo URL')}
+          {field('timezone', 'Timezone')}
+        </div>
+      );
+    case 'attendance':
+      return (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {field('graceMinutes', 'Grace minutes (late)', 'number')}
+          {field('autoCheckoutEnabled', 'Auto checkout', 'checkbox')}
+          {field('requireGps', 'Require GPS', 'checkbox')}
+        </div>
+      );
+    case 'leave':
+      return (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {field('defaultAnnual', 'Default annual days', 'number')}
+          {field('defaultSick', 'Default sick days', 'number')}
+          {field('defaultCasual', 'Default casual days', 'number')}
+          {field('yearStart', 'Year start (MM-DD)')}
+          {field('yearEnd', 'Year end (MM-DD)')}
+        </div>
+      );
+    case 'tickets':
+      return (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {field('defaultPriority', 'Default priority')}
+          {field('notifyOnAssign', 'Notify on assign', 'checkbox')}
+        </div>
+      );
+    case 'calendar':
+      return <div className="grid gap-3">{field('defaultVisibility', 'Default visibility (all/none/selected)')}</div>;
+    case 'notifications':
+      return (
+        <div className="grid gap-3 sm:grid-cols-3">
+          {field('emailEnabled', 'Email', 'checkbox')}
+          {field('pushEnabled', 'Push', 'checkbox')}
+          {field('inAppEnabled', 'In-app', 'checkbox')}
+        </div>
+      );
+    case 'reports':
+      return <div className="grid gap-3">{field('retentionDays', 'Retention days', 'number')}</div>;
+    case 'geofencing':
+      return <div className="grid gap-3">{field('defaultRadiusMeters', 'Default radius (m)', 'number')}</div>;
+    case 'security':
+      return (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {field('sessionTimeoutMinutes', 'Session timeout (min)', 'number')}
+          {field('requireStrongPasswords', 'Strong passwords', 'checkbox')}
+        </div>
+      );
+    case 'theme':
+      return (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {field('accent', 'Accent color')}
+          {field('density', 'Density (comfortable/compact)')}
+        </div>
+      );
+    default:
+      return null;
+  }
+}
 
 export function SettingsPage() {
+  const [active, setActive] = useState('company');
+  const [settings, setSettings] = useState(null);
+  const [draft, setDraft] = useState({});
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [departments, setDepartments] = useState([]);
-  const [users, setUsers] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState(null);
 
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      setError('');
-      try {
-        const [departmentData, userData] = await Promise.all([
-          adminService.getDepartmentsOverview(),
-          adminService.getUsers(),
-        ]);
-        setDepartments(departmentData || []);
-        setUsers(userData || []);
-      } catch (err) {
-        setError(err?.response?.data?.error || err?.message || 'Failed to load settings data');
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await adminService.getSettings();
+      setSettings(data);
+    } catch (err) {
+      setMessage({ ok: false, text: err.message });
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const roleCounts = useMemo(() => {
-    const map = new Map();
-    for (const user of users) {
-      const role = user.role || 'unknown';
-      map.set(role, (map.get(role) || 0) + 1);
+  useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (settings) setDraft({ ...(settings[active] || {}) });
+  }, [active, settings]);
+
+  function onFieldChange(key, value) {
+    setDraft((d) => ({ ...d, [key]: value }));
+  }
+
+  async function save() {
+    setSaving(true);
+    setMessage(null);
+    try {
+      const res = await adminService.saveSettingsSection(active, draft);
+      setSettings(res.data);
+      setMessage({ ok: true, text: res.message || 'Saved' });
+    } catch (err) {
+      setMessage({ ok: false, text: err.message });
+    } finally {
+      setSaving(false);
     }
-    return Array.from(map.entries()).map(([role, count]) => ({ role, count }));
-  }, [users]);
+  }
+
+  async function resetSection() {
+    if (!window.confirm(`Reset ${active} settings to defaults?`)) return;
+    setSaving(true);
+    try {
+      const res = await adminService.saveSettingsSection(active, null, true);
+      setSettings(res.data);
+      setDraft(res.data?.[active] || {});
+      setMessage({ ok: true, text: 'Reset to defaults' });
+    } catch (err) {
+      setMessage({ ok: false, text: err.message });
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
-    <div className="space-y-6 animate-fade-up">
-      <h1 className="text-2xl font-semibold text-white">Settings</h1>
-      <GlassCard className="p-5 space-y-4">
-        <h2 className="text-sm font-medium text-white">Live System Metadata</h2>
-        {error && <p className="text-sm text-red-100">{error}</p>}
-        {loading ? (
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="h-20 rounded-xl skeleton" />
-            <div className="h-20 rounded-xl skeleton" />
-          </div>
-        ) : (
-          <div className="grid md:grid-cols-2 gap-4 text-sm">
-            <div className="rounded-lg border border-white/20 bg-white/10 px-4 py-3">
-              <p className="text-slate-300">Departments</p>
-              <p className="text-xl font-semibold text-white mt-1">{departments.length}</p>
-            </div>
-            <div className="rounded-lg border border-white/20 bg-white/10 px-4 py-3">
-              <p className="text-slate-300">Role Types</p>
-              <p className="text-xl font-semibold text-white mt-1">{roleCounts.length}</p>
-            </div>
-            <div className="md:col-span-2 rounded-lg border border-white/20 bg-white/10 px-4 py-3">
-              <p className="text-slate-300 mb-2">Roles Distribution</p>
-              {roleCounts.length === 0 ? (
-                <p className="text-slate-200">No role data available.</p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {roleCounts.map((item) => (
-                    <span key={item.role} className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-slate-100">
-                      {item.role}: {item.count}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
+    <PermissionGate permission={PERMISSIONS.ACCESS_SYSTEM_SETTINGS}>
+      <div className="space-y-5 animate-fade-up">
+        <h1 className="text-2xl font-semibold text-white">Settings</h1>
+
+        {message && (
+          <div className={`rounded-lg border px-4 py-3 text-sm ${message.ok ? 'border-green-300/25 bg-green-500/15 text-green-100' : 'border-red-300/25 bg-red-500/15 text-red-100'}`}>
+            {message.text}
           </div>
         )}
-        <div className="rounded-lg border border-blue-300/20 bg-blue-500/10 px-4 py-3 text-xs text-blue-100">
-          This page is backend-driven and auto-syncs role/department metadata from live data.
+
+        <div className="grid gap-4 lg:grid-cols-4">
+          <GlassCard className="p-3 space-y-1">
+            {SECTIONS.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => setActive(s.id)}
+                className={`w-full text-left rounded-lg px-3 py-2 text-sm ${active === s.id ? 'bg-blue-500/20 text-blue-100' : 'text-slate-300 hover:bg-white/10'}`}
+              >
+                {s.label}
+              </button>
+            ))}
+          </GlassCard>
+
+          <GlassCard className="p-5 lg:col-span-3 space-y-4">
+            <h2 className="text-base font-medium text-white capitalize">{active} settings</h2>
+            {loading ? (
+              <div className="h-32 skeleton rounded-lg" />
+            ) : (
+              <>
+                <SectionFields section={active} values={draft} onChange={onFieldChange} />
+                <div className="flex gap-3 pt-2">
+                  <button type="button" onClick={save} disabled={saving} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white disabled:opacity-50">Save</button>
+                  <button type="button" onClick={resetSection} disabled={saving} className="rounded-lg border border-white/20 px-4 py-2 text-sm text-slate-200">Reset</button>
+                </div>
+              </>
+            )}
+          </GlassCard>
         </div>
-      </GlassCard>
-    </div>
+      </div>
+    </PermissionGate>
   );
 }

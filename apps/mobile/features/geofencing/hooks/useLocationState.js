@@ -5,10 +5,11 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { getCurrentLocationState } from '../services/locationMonitoringService';
-import { getOfficeLocation } from '../services/geofenceService';
+import { getOfficeLocation, findMatchingAllowedLocation } from '../services/geofenceService';
 import { getCurrentLocation } from '../services/geofenceService';
 import { isWithin1km, getDistanceInMeters, formatDistance } from '../utils/distance';
 import { isAutoCheckoutEnabled } from '../../attendance/services/attendanceConfigService';
+import { shouldMonitorGeofenceWhileCheckedIn } from '../utils/workModeRules';
 
 /**
  * Hook to track location state
@@ -31,10 +32,8 @@ export const useLocationState = (user, isCheckedIn, pollInterval = 30000) => {
       return;
     }
 
-    // Only check for in_office users
-    const workMode = user.workMode || user.work_mode;
-    if (workMode !== 'in_office') {
-      setIsInside(true); // Remote workers are always "inside"
+    if (!shouldMonitorGeofenceWhileCheckedIn(user)) {
+      setIsInside(true);
       setDistance(null);
       return;
     }
@@ -43,34 +42,42 @@ export const useLocationState = (user, isCheckedIn, pollInterval = 30000) => {
       setIsLoading(true);
       setError(null);
 
-      // Get auto checkout setting
       const autoCheckout = await isAutoCheckoutEnabled(true);
       setAutoCheckoutEnabled(autoCheckout);
 
-      // Get office location
-      const officeLocation = await getOfficeLocation(user);
-      if (!officeLocation) {
-        setIsInside(true); // Assume inside if no office location
-        setDistance(null);
-        return;
-      }
-
-      // Get current location
       const currentLocation = await getCurrentLocation();
-      if (!currentLocation || !currentLocation.latitude || !currentLocation.longitude) {
+      if (!currentLocation?.latitude || !currentLocation?.longitude) {
         setError('Unable to get location');
         return;
       }
 
-      // Calculate distance
-      const dist = getDistanceInMeters(
+      const { match, closest, distance: dist } = await findMatchingAllowedLocation(
+        user,
+        currentLocation.latitude,
+        currentLocation.longitude
+      );
+
+      if (match) {
+        setIsInside(true);
+        setDistance(dist);
+        return;
+      }
+
+      const officeLocation = closest || (await getOfficeLocation(user));
+      if (!officeLocation) {
+        setIsInside(true);
+        setDistance(null);
+        return;
+      }
+
+      const distance = dist ?? getDistanceInMeters(
         currentLocation.latitude,
         currentLocation.longitude,
         officeLocation.latitude,
         officeLocation.longitude
       );
 
-      const radiusM = officeLocation.radius_meters || 1000;
+      const radiusM = officeLocation.radius_meters || officeLocation.radius || 1000;
       const inside =
         radiusM === 1000
           ? isWithin1km(
@@ -79,10 +86,10 @@ export const useLocationState = (user, isCheckedIn, pollInterval = 30000) => {
               officeLocation.latitude,
               officeLocation.longitude
             )
-          : dist <= radiusM;
+          : distance <= radiusM;
 
       setIsInside(inside);
-      setDistance(dist);
+      setDistance(distance);
     } catch (err) {
       console.error('[useLocationState] Error checking location:', err);
       setError(err.message || 'Error checking location');

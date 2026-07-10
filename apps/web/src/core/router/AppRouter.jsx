@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuthStore } from '../../features/auth/store/authStore';
 import { canAccessFeature, isSuperAdmin } from '../../features/admin/permissions';
 import { AccessDenied } from '../../shared/components/PermissionGate';
+import { AppLoader } from '../../shared/components/ui';
 import { LoginPage } from '../../features/auth/pages/LoginPage';
 import { CompanyOnboardingPage } from '../../features/auth/pages/CompanyOnboardingPage';
 import { AppShell } from '../../shared/components/AppShell';
@@ -18,11 +19,13 @@ import { AnalyticsPage } from '../../features/admin/pages/AnalyticsPage';
 import { ReportsPage } from '../../features/admin/pages/ReportsPage';
 import { SettingsPage } from '../../features/admin/pages/SettingsPage';
 import { ManagerPermissionsPage } from '../../features/admin/pages/ManagerPermissionsPage';
+import { ApprovalWorkflowsPage } from '../../features/admin/pages/ApprovalWorkflowsPage';
+import { WorkModeRequestsPage } from '../../features/admin/pages/WorkModeRequestsPage';
 import { NotificationsPage } from '../../features/admin/pages/NotificationsPage';
 
 function Protected({ children }) {
   const { user, loading } = useAuthStore();
-  if (loading) return <div className="min-h-screen bg-slate-50 text-slate-700 p-8">Loading...</div>;
+  if (loading) return <AppLoader />;
   if (!user) return <Navigate to="/login" replace />;
   return children;
 }
@@ -58,6 +61,8 @@ export function AppRouter() {
         <Route path="sites" element={<PermissionRoute feature="sites"><SitesPage /></PermissionRoute>} />
         <Route path="attendance" element={<PermissionRoute feature="attendance"><AttendancePage /></PermissionRoute>} />
         <Route path="leaves" element={<PermissionRoute feature="leaves"><LeavesPage /></PermissionRoute>} />
+        <Route path="work-mode-requests" element={<PermissionRoute feature="workModeRequests"><WorkModeRequestsPage /></PermissionRoute>} />
+        <Route path="approval-workflows" element={<PermissionRoute feature="approvalWorkflows" superAdminOnly><ApprovalWorkflowsPage /></PermissionRoute>} />
         <Route path="tickets" element={<PermissionRoute feature="tickets"><TicketsPage /></PermissionRoute>} />
         <Route path="calendar" element={<PermissionRoute feature="calendar"><CalendarPage /></PermissionRoute>} />
         <Route path="notifications" element={<PermissionRoute feature="notifications"><NotificationsPage /></PermissionRoute>} />
