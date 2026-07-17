@@ -9,6 +9,7 @@ under [`supabase/legacy_migrations`](../supabase/legacy_migrations/README.md).
 | [PRODUCT_DOCUMENTATION_AND_USE_CASES.md](PRODUCT_DOCUMENTATION_AND_USE_CASES.md) | Product behavior and role-based use cases |
 | [DEPARTMENT_USAGE_AUDIT.md](DEPARTMENT_USAGE_AUDIT.md) | Department normalization and permission model |
 | [COMPANY_LOGO_IMPLEMENTATION.md](COMPANY_LOGO_IMPLEMENTATION.md) | Company logo storage and setup |
+| [ENV_CONFIGURATION_REPORT.md](ENV_CONFIGURATION_REPORT.md) | Env var audit, Coolify minimal set, compose anchors |
 
 ## Platform-specific and root documentation
 

@@ -259,21 +259,70 @@ For detailed setup instructions, see [SETUP.md](SETUP.md).
 
 ### Environment Variables
 
-#### Backend (`services/auth-service/.env`)
-```env
-PORT=3001
-HOST=0.0.0.0
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-```
+Canonical Coolify / Docker Compose template: **[`.env.example`](.env.example)** (root).  
+Local `npm start` still uses `services/<name>/.env`. Web and mobile use their own files (not Coolify).
 
-#### Frontend (`apps/mobile/.env`)
-```env
-EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-```
+#### Coolify / Docker Compose (backend)
 
-#### Frontend (`apps/mobile/app.json`)
+Paste these into Coolify → Environment Variables (or a root `.env` for local compose).  
+Compose wires `NODE_ENV`, `HOST`, `PORT`, `AUTH_SERVICE_URL`, and `REPORTING_SERVICE_URL` — do not set those in Coolify.
+
+| Variable | Required | Default | Services | Description |
+|----------|----------|---------|----------|-------------|
+| `SUPABASE_URL` | Yes | — | auth, reporting | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes | — | auth, reporting | Service-role JWT (secret; bypasses RLS) |
+| `COMPANY_ONBOARDING_SECRET` | After first company | _(empty)_ | auth | `X-Onboarding-Key` for additional tenants |
+| `SMTP_HOST` | For email | `smtp.gmail.com` | reporting | SMTP hostname |
+| `SMTP_PORT` | For email | `587` | reporting | SMTP port (`465` for implicit TLS) |
+| `SMTP_USER` | For email | _(empty)_ | reporting | SMTP username |
+| `SMTP_PASS` | For email | _(empty)_ | reporting | SMTP password / app password |
+| `EMAIL_FROM` | No | `SMTP_USER` | reporting | From address for report emails |
+| `GIT_COMMIT_SHA` | No | _(empty)_ | gateway, auth, reporting | Build identity on `/health` |
+| `GATEWAY_PUBLISH_PORT` | No | `3000` | local override only | Host port when using `docker-compose.override.yml` |
+
+**Not set in Coolify** (hardcoded / defaults in `docker-compose.yml`):
+
+| Variable | Value in production compose | Services |
+|----------|----------------------------|----------|
+| `NODE_ENV` | `production` | all |
+| `HOST` | `0.0.0.0` | all |
+| `PORT` | `80` / `3001` / `3002` | gateway / auth / reporting |
+| `AUTH_SERVICE_URL` | `http://auth-service:3001` | gateway |
+| `REPORTING_SERVICE_URL` | `http://reporting-service:3002` | gateway |
+
+JWT tokens are issued by **Supabase Auth** — there is no app-level `JWT_SECRET`.
+
+#### Local npm (`services/*/`)
+
+| Variable | Required | Default | Service | Description |
+|----------|----------|---------|---------|-------------|
+| `PORT` | No | `3000` / `3001` / `3002` | each | Listen port |
+| `HOST` | No | `0.0.0.0` | each | Bind address |
+| `AUTH_SERVICE_URL` | No | `http://localhost:3001` | gateway | Auth upstream |
+| `REPORTING_SERVICE_URL` | No | `http://localhost:3002` | gateway | Reporting upstream |
+| `SUPABASE_URL` | Yes | — | auth, reporting | Same as Coolify |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes | — | auth, reporting | Same as Coolify |
+| `COMPANY_ONBOARDING_SECRET` | After first company | — | auth | Same as Coolify |
+| `SMTP_*` / `EMAIL_FROM` | For email | see above | reporting | Same as Coolify |
+
+#### Web portal — Vercel (`apps/web/.env.example`)
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `VITE_API_GATEWAY_URL` | Yes (prod) | — | Public API gateway origin (`https://api…`) |
+| `NEXT_PUBLIC_API_URL` | No (alt) | — | Same as above (Vercel-compatible alias) |
+| `VITE_SUPABASE_URL` | Yes | — | Supabase project URL |
+| `VITE_SUPABASE_ANON_KEY` | Yes | — | Supabase anon key |
+
+#### Mobile — Expo (`apps/mobile/.env.example`)
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `EXPO_PUBLIC_SUPABASE_URL` | Yes | — | Supabase project URL |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Yes | — | Supabase anon key |
+
+Gateway URL for mobile builds: `apps/mobile/app.json` → `expo.extra.apiGatewayUrl`.
+
 ```json
 {
   "expo": {
@@ -286,14 +335,11 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 }
 ```
 
-**Important:** 
-- Backend uses `service_role` key (secret, admin privileges)
-- Frontend uses `anon` key (public, safe for client)
-- Frontend variables must have `EXPO_PUBLIC_` prefix
-- Deep linking scheme `hadirai` is required for password reset flow
-- Add `hadirai://reset-password` to Supabase Dashboard → Authentication → URL Configuration
-
-See `.env.example` files in each directory for detailed instructions.
+**Important:**
+- Backend uses `service_role` (secret). Clients use `anon` only.
+- Mobile vars need the `EXPO_PUBLIC_` prefix.
+- Add `hadirai://reset-password` to Supabase → Authentication → Redirect URLs.
+- Audit notes: [`docs/ENV_CONFIGURATION_REPORT.md`](docs/ENV_CONFIGURATION_REPORT.md)
 
 ---
 

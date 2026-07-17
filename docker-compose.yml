@@ -7,7 +7,7 @@
 #
 # Coolify setup:
 # 1. New Resource → Docker Compose → this repo / docker-compose.yml
-# 2. Paste secrets from .env.example into Coolify Environment Variables
+# 2. Paste secrets from root .env.example into Coolify Environment Variables
 # 3. Assign domain ONLY to api-gateway: https://api.yourdomain.com
 #    (no port suffix; gateway listens on 80 which Traefik defaults to)
 # 4. Do NOT assign domains to auth-service or reporting-service
@@ -16,6 +16,10 @@
 # Local smoke test without Coolify:
 #   cp docker-compose.override.example.yml docker-compose.override.yml
 #   docker compose up --build
+#
+# Environment: set variables once in Coolify / root .env. Compose injects only
+# what each service needs. Do not override PORT, AUTH_SERVICE_URL, or
+# REPORTING_SERVICE_URL in Coolify (wired below for Docker DNS).
 
 name: attendance-backend
 
@@ -26,6 +30,17 @@ x-logging: &default-logging
     max-file: "3"
 
 x-restart: &default-restart "unless-stopped"
+
+# Shared across all three services (no secrets).
+x-app-env: &app-env
+  NODE_ENV: production
+  HOST: 0.0.0.0
+  GIT_COMMIT_SHA: ${GIT_COMMIT_SHA:-}
+
+# Shared by auth-service + reporting-service only.
+x-supabase-env: &supabase-env
+  SUPABASE_URL: ${SUPABASE_URL:?SUPABASE_URL is required}
+  SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:?SUPABASE_SERVICE_ROLE_KEY is required}
 
 services:
   auth-service:
@@ -42,13 +57,9 @@ services:
     tmpfs:
       - /tmp:size=64m,mode=1777
     environment:
-      NODE_ENV: production
-      HOST: 0.0.0.0
+      <<: [*app-env, *supabase-env]
       PORT: "3001"
-      SUPABASE_URL: ${SUPABASE_URL:?SUPABASE_URL is required}
-      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:?SUPABASE_SERVICE_ROLE_KEY is required}
       COMPANY_ONBOARDING_SECRET: ${COMPANY_ONBOARDING_SECRET:-}
-      GIT_COMMIT_SHA: ${GIT_COMMIT_SHA:-}
     expose:
       - "3001"
     networks:
@@ -79,17 +90,13 @@ services:
     security_opt:
       - no-new-privileges:true
     environment:
-      NODE_ENV: production
-      HOST: 0.0.0.0
+      <<: [*app-env, *supabase-env]
       PORT: "3002"
-      SUPABASE_URL: ${SUPABASE_URL:?SUPABASE_URL is required}
-      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:?SUPABASE_SERVICE_ROLE_KEY is required}
       SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       EMAIL_FROM: ${EMAIL_FROM:-}
-      GIT_COMMIT_SHA: ${GIT_COMMIT_SHA:-}
     expose:
       - "3002"
     volumes:
@@ -126,13 +133,12 @@ services:
     tmpfs:
       - /tmp:size=32m,mode=1777
     environment:
-      NODE_ENV: production
-      HOST: 0.0.0.0
+      <<: *app-env
       # Port 80 = Coolify Traefik default backend. Public URL is https://domain (443).
       PORT: "80"
+      # Docker DNS — do not set these in Coolify.
       AUTH_SERVICE_URL: http://auth-service:3001
       REPORTING_SERVICE_URL: http://reporting-service:3002
-      GIT_COMMIT_SHA: ${GIT_COMMIT_SHA:-}
     # Traefik reaches this over the Docker network. No host port publish.
     expose:
       - "80"
