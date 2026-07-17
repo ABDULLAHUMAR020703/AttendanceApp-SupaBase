@@ -139,9 +139,13 @@ services:
       # Docker DNS — do not set these in Coolify.
       AUTH_SERVICE_URL: http://auth-service:3001
       REPORTING_SERVICE_URL: http://reporting-service:3002
-    # Traefik reaches this over the Docker network. No host port publish.
+    # Traefik reaches this over the Docker network via expose.
     expose:
       - "80"
+    # TEMPORARY: Expose API Gateway on host port 8080 for testing without a domain.
+    # Remove this when a domain is configured and Traefik is used.
+    ports:
+      - "8080:80"
     networks:
       - backend
     depends_on:
