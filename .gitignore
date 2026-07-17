@@ -106,7 +106,7 @@ pnpm-lock.yaml
 # Expo
 .expo/
 .expo-shared/
-.expo/
+.expo-build-check/
 dist/
 web-build/
 
@@ -201,6 +201,9 @@ obj/
 .env.*
 !.env.example
 !.env.template
+
+# Local Docker Compose overrides (use docker-compose.override.example.yml)
+docker-compose.override.yml
 
 # ============================================
 # Supabase
@@ -312,6 +315,7 @@ supabase/legacy_migrations/data/
 # User data files (legacy - contains sensitive data)
 users.txt
 users.json
+new_users.txt
 # Note: asyncStorage-users-example.json is kept as it's a template/example file
 
 # ============================================

@@ -101,7 +101,7 @@ The service sends report emails via **Gmail SMTP** using [Nodemailer](https://no
 1. **Create or use a dedicated Gmail account** for sending reports.
 2. **Enable 2-Step Verification** on the Google account.
 3. **Generate an App Password** at https://myaccount.google.com/apppasswords
-4. **Set environment variables on Render** (or in `.env` locally):
+4. **Set environment variables in Coolify** (or in `.env` locally):
    - `SMTP_HOST`: `smtp.gmail.com` (default)
    - `SMTP_PORT`: `587` (default; use `465` for implicit TLS)
    - `SMTP_USER`: Gmail account address

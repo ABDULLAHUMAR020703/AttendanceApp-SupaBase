@@ -10,6 +10,11 @@ const reportRoutes = require('./routes/reports');
 const { startMonthlyReportJob } = require('./jobs/monthlyReportJob');
 const { cleanupExpiredReports } = require('./services/reportStorage');
 const { deletePDFFile } = require('./services/pdfGenerator');
+const {
+  checkSupabase,
+  checkDataDirWritable,
+  checkSmtpConfig,
+} = require('./lib/health');
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -33,12 +38,31 @@ app.use((req, res, next) => {
 // Routes
 app.use('/api/reports', reportRoutes);
 
-// Health check route
-app.get('/health', (req, res) => {
-  res.status(200).json({
+// Health / readiness. Docker Compose probes /health?deep=1.
+app.get('/health', async (req, res) => {
+  const deep = String(req.query.deep || '') === '1';
+  const payload = {
     status: 'ok',
     message: 'Reporting Service is running',
     timestamp: new Date().toISOString(),
+    build: process.env.GIT_COMMIT_SHA || process.env.RENDER_GIT_COMMIT || 'local-dev',
+  };
+
+  if (!deep) {
+    return res.status(200).json(payload);
+  }
+
+  const [supabase, filesystem, smtp] = await Promise.all([
+    checkSupabase(),
+    Promise.resolve(checkDataDirWritable()),
+    Promise.resolve(checkSmtpConfig()),
+  ]);
+
+  const ready = supabase.ok && filesystem.ok;
+  return res.status(ready ? 200 : 503).json({
+    ...payload,
+    status: ready ? 'ok' : 'degraded',
+    checks: { supabase, filesystem, smtp },
   });
 });
 

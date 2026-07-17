@@ -4,6 +4,7 @@ require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
+const { checkSupabase } = require('./lib/health');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -32,17 +33,26 @@ app.use((req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 
-// Health check route
-app.get('/health', (req, res) => {
-  res.status(200).json({
+// Health / readiness. Docker Compose probes /health?deep=1.
+app.get('/health', async (req, res) => {
+  const deep = String(req.query.deep || '') === '1';
+  const payload = {
     status: 'ok',
     message: 'Auth Service is running',
     timestamp: new Date().toISOString(),
-    build:
-      process.env.RENDER_GIT_COMMIT ||
-      process.env.GIT_COMMIT_SHA ||
-      'local-dev',
-    createUserFix: 'department-text-only-ae84bba',
+    build: process.env.GIT_COMMIT_SHA || process.env.RENDER_GIT_COMMIT || 'local-dev',
+  };
+
+  if (!deep) {
+    return res.status(200).json(payload);
+  }
+
+  const supabase = await checkSupabase();
+  const ready = supabase.ok;
+  return res.status(ready ? 200 : 503).json({
+    ...payload,
+    status: ready ? 'ok' : 'degraded',
+    checks: { supabase },
   });
 });
 

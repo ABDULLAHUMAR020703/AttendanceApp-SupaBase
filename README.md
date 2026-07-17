@@ -185,18 +185,17 @@ Supabase (PostgreSQL + Auth)
    
    See [SETUP.md](SETUP.md) for detailed instructions on getting Supabase credentials.
 
-4. **Set up Supabase database:**
-   
-   Create users via script:
+4. **Set up Supabase:**
+
+   Link the project and apply the current migrations:
    ```bash
-   # Option 1: Automated user creation (recommended)
-   node scripts/create-new-users-automated.js
-   
-   # Option 2: Manual user creation
-   node scripts/create-users-supabase.js
+   npm run db:link
+   npm run db:push
    ```
-   
-   See `scripts/README_AUTOMATED_USER_CREATION.md` for detailed instructions.
+
+   Create the first tenant and super admin through
+   `POST /api/auth/onboard-company`. Do not use the removed legacy demo-user
+   scripts; they predated mandatory tenant scoping.
 
 5. **Start the services:**
    
@@ -224,7 +223,7 @@ For detailed setup instructions, see [SETUP.md](SETUP.md).
 
 ### Development
 
-1. **Start backend services** (API Gateway + Auth Service)
+1. **Start backend services** (API Gateway + Auth Service + Reporting Service)
 2. **Start Expo development server:**
    ```bash
    cd apps/mobile
@@ -303,20 +302,20 @@ See `.env.example` files in each directory for detailed instructions.
 ```
 AttendanceApp-SupaBase/
 ├── apps/
-│   └── mobile/              # React Native/Expo mobile app
+│   ├── mobile/              # React Native/Expo mobile app
 │       ├── core/            # Core infrastructure
 │       ├── features/        # Feature modules
 │       ├── shared/          # Shared components/utilities
 │       └── screens/         # Screen components
+│   └── web/                 # React/Vite admin portal (Vercel)
 │
 ├── services/
 │   ├── api-gateway/         # API Gateway (port 3000)
-│   └── auth-service/        # Auth Service (port 3001)
+│   ├── auth-service/        # Auth Service (port 3001)
+│   └── reporting-service/   # Reporting Service (port 3002)
 │
 ├── scripts/
-│   ├── create-users-supabase.js          # Manual user creation script
-│   ├── create-new-users-automated.js     # Automated user creation script
-│   └── README_AUTOMATED_USER_CREATION.md # User creation documentation
+│   └── sync-all-auth-metadata.js # Maintenance after tenant/company changes
 │
 ├── supabase/                # Supabase CLI + database SQL
 │   ├── migrations/          # Timestamped migrations applied by `npm run db:push`
@@ -325,11 +324,10 @@ AttendanceApp-SupaBase/
 │   └── README.md
 │
 ├── docs/                    # Documentation
-│   ├── SYSTEM_ARCHITECTURE.md
-│   ├── TECHNICAL_DOCUMENTATION.md
-│   ├── APP_FEATURES.md
-│   ├── MODULAR_ARCHITECTURE.md
-│   └── STRUCTURE_SUMMARY.md
+│   ├── BACKEND_TECHNICAL_WORKFLOW.md
+│   ├── PRODUCT_DOCUMENTATION_AND_USE_CASES.md
+│   └── README.md
+├── docker-compose.yml       # Coolify production backend stack
 ├── SETUP.md                 # Detailed setup guide
 └── README.md                # This file
 ```
@@ -362,26 +360,12 @@ AttendanceApp-SupaBase/
 
 ---
 
-## 🔐 Default Login Credentials
-
-After running the user creation script:
-
-- **Super Admin:** `testadmin` / `testadmin123`
-- **Manager:** `techmanager` / `techmanager123`
-- **Employee:** `testuser` / `testuser123`
-
-See `scripts/README_AUTOMATED_USER_CREATION.md` for all demo users and creation instructions.
-
----
-
 ## 📚 Documentation
 
 - **[SETUP.md](SETUP.md)** - Complete setup guide
-- **[docs/TECHNICAL_DOCUMENTATION.md](docs/TECHNICAL_DOCUMENTATION.md)** - Technical details and API documentation
-- **[docs/SYSTEM_ARCHITECTURE.md](docs/SYSTEM_ARCHITECTURE.md)** - System architecture and user management
-- **[docs/APP_FEATURES.md](docs/APP_FEATURES.md)** - Complete feature documentation
-- **[docs/MODULAR_ARCHITECTURE.md](docs/MODULAR_ARCHITECTURE.md)** - Code structure and migration status
-- **[docs/STRUCTURE_SUMMARY.md](docs/STRUCTURE_SUMMARY.md)** - Quick reference for code organization
+- **[docs/README.md](docs/README.md)** - Current documentation index
+- **[docs/BACKEND_TECHNICAL_WORKFLOW.md](docs/BACKEND_TECHNICAL_WORKFLOW.md)** - Backend architecture and operations
+- **[docs/PRODUCT_DOCUMENTATION_AND_USE_CASES.md](docs/PRODUCT_DOCUMENTATION_AND_USE_CASES.md)** - Product behavior and use cases
 
 ---
 
@@ -396,8 +380,9 @@ See `scripts/README_AUTOMATED_USER_CREATION.md` for all demo users and creation 
 ./start-services.sh     # Linux/macOS
 
 # Or manually
-cd services/api-gateway && npm start
 cd services/auth-service && npm start
+cd services/reporting-service && npm start
+cd services/api-gateway && npm start
 ```
 
 **Mobile App:**

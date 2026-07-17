@@ -31,7 +31,8 @@ The server will start on port 3000 (or the port specified in the `PORT` environm
 
 ## Configuration
 
-Set environment variables in a `.env` file (for local development) or in Render Dashboard (for production):
+Set environment variables in the shell for local development. Production values
+are defined by the root `docker-compose.yml` and configured in Coolify:
 
 ### Local Development:
 ```env
@@ -40,13 +41,17 @@ AUTH_SERVICE_URL=http://localhost:3001
 REPORTING_SERVICE_URL=http://localhost:3002
 ```
 
-### Render Production:
+### Docker / Coolify:
 ```env
-AUTH_SERVICE_URL=https://attendanceapp-supabase.onrender.com
-REPORTING_SERVICE_URL=https://reporting-service-ki0r.onrender.com
+PORT=80
+AUTH_SERVICE_URL=http://auth-service:3001
+REPORTING_SERVICE_URL=http://reporting-service:3002
 ```
 
-**Important:** For Render deployment, set these in Render Dashboard → Environment tab, not in `.env` file.
+Only the API Gateway receives a public Coolify domain
+(`https://api.yourdomain.com` — no port). It listens on container port **80**;
+Traefik terminates TLS on 443. Auth and Reporting stay private on the Compose
+network. Deep health: `GET /health?deep=1`.
 
 ## Connecting from Mobile App
 

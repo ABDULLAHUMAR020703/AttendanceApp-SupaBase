@@ -1,184 +1,98 @@
-# PowerShell script to start all microservices
-# Run this from the project root directory
-# 
-# This script:
-# - Checks for required directories
-# - Verifies ports are available
-# - Installs dependencies if needed
-# - Starts API Gateway (port 3000)
-# - Starts Auth Service (port 3001)
-# - Starts Reporting Service (port 3002)
-# - Connects to Supabase (cloud service)
+$ErrorActionPreference = "Stop"
 
-Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  Starting Microservices" -ForegroundColor Green
-Write-Host "  (Supabase Backend)" -ForegroundColor Green
-Write-Host "========================================" -ForegroundColor Cyan
-Write-Host ""
+# Local development only. Production uses docker-compose.yml through Coolify.
+$root = Split-Path -Parent $MyInvocation.MyCommand.Path
+Set-Location $root
 
-# Check if we're in the project root
-if (-not (Test-Path "services\api-gateway") -or -not (Test-Path "services\auth-service") -or -not (Test-Path "services\reporting-service")) {
-    Write-Host "Error: Please run this script from the project root directory" -ForegroundColor Red
-    Write-Host "Current directory: $(Get-Location)" -ForegroundColor Yellow
+$services = @(
+    "services\api-gateway",
+    "services\auth-service",
+    "services\reporting-service"
+)
+
+foreach ($service in $services) {
+    if (-not (Test-Path $service -PathType Container)) {
+        throw "Missing service: $service"
+    }
+    if (-not (Test-Path "$service\node_modules" -PathType Container)) {
+        Write-Host "Installing dependencies for $service..."
+        Push-Location $service
+        try {
+            npm ci
+            if ($LASTEXITCODE -ne 0) { throw "npm ci failed for $service" }
+        }
+        finally {
+            Pop-Location
+        }
+    }
+}
+
+function Start-LocalService {
+    param(
+        [Parameter(Mandatory)][string]$Name,
+        [Parameter(Mandatory)][string]$Directory
+    )
+    $path = (Resolve-Path $Directory).Path
+    Write-Host "Starting $Name..." -ForegroundColor Yellow
+    Start-Process powershell `
+        -ArgumentList "-NoExit", "-Command", "Set-Location '$path'; npm start" `
+        -WindowStyle Normal `
+        -PassThru
+}
+
+function Wait-ServiceHealth {
+    param(
+        [Parameter(Mandatory)][string]$Name,
+        [Parameter(Mandatory)][int]$Port,
+        [Parameter(Mandatory)][System.Diagnostics.Process]$Process
+    )
+    for ($attempt = 1; $attempt -le 30; $attempt++) {
+        if ($Process.HasExited) { throw "$Name exited before becoming healthy." }
+        try {
+            $response = Invoke-WebRequest `
+                -Uri "http://127.0.0.1:$Port/health" `
+                -UseBasicParsing `
+                -TimeoutSec 2
+            if ($response.StatusCode -eq 200) {
+                Write-Host "$Name is healthy on port $Port." -ForegroundColor Green
+                return
+            }
+        }
+        catch {
+            Start-Sleep -Seconds 1
+        }
+    }
+    throw "$Name health check timed out."
+}
+
+$started = @()
+try {
+    # Start private dependencies first.
+    $auth = Start-LocalService "auth-service" "services\auth-service"
+    $started += $auth
+    $reporting = Start-LocalService "reporting-service" "services\reporting-service"
+    $started += $reporting
+    Wait-ServiceHealth "auth-service" 3001 $auth
+    Wait-ServiceHealth "reporting-service" 3002 $reporting
+
+    # Start the gateway only when its dependencies are ready.
+    $gateway = Start-LocalService "api-gateway" "services\api-gateway"
+    $started += $gateway
+    Wait-ServiceHealth "api-gateway" 3000 $gateway
+}
+catch {
+    Write-Host $_.Exception.Message -ForegroundColor Red
+    foreach ($process in $started) {
+        if (-not $process.HasExited) {
+            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+        }
+    }
     exit 1
 }
 
-# Function to check if port is in use
-function Test-Port {
-    param([int]$Port)
-    $connection = Test-NetConnection -ComputerName localhost -Port $Port -WarningAction SilentlyContinue -InformationLevel Quiet
-    return $connection
-}
-
-# Check if ports are already in use
-Write-Host "Checking ports..." -ForegroundColor Yellow
-if (Test-Port -Port 3000) {
-    Write-Host "Warning: Port 3000 is already in use (API Gateway)" -ForegroundColor Yellow
-    $continue = Read-Host "Continue anyway? (y/n)"
-    if ($continue -ne "y") {
-        exit 1
-    }
-}
-
-if (Test-Port -Port 3001) {
-    Write-Host "Warning: Port 3001 is already in use (Auth Service)" -ForegroundColor Yellow
-    $continue = Read-Host "Continue anyway? (y/n)"
-    if ($continue -ne "y") {
-        exit 1
-    }
-}
-
-if (Test-Port -Port 3002) {
-    Write-Host "Warning: Port 3002 is already in use (Reporting Service)" -ForegroundColor Yellow
-    $continue = Read-Host "Continue anyway? (y/n)"
-    if ($continue -ne "y") {
-        exit 1
-    }
-}
-
-# Check and install dependencies for API Gateway
 Write-Host ""
-Write-Host "Checking API Gateway dependencies..." -ForegroundColor Yellow
-if (-not (Test-Path "services\api-gateway\node_modules")) {
-    Write-Host "Installing API Gateway dependencies..." -ForegroundColor Yellow
-    Set-Location "services\api-gateway"
-    npm install
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "Error: Failed to install API Gateway dependencies" -ForegroundColor Red
-        Set-Location ..\..
-        exit 1
-    }
-    Set-Location ..\..
-} else {
-    Write-Host "API Gateway dependencies already installed" -ForegroundColor Green
-}
-
-# Check and install dependencies for Auth Service
-Write-Host "Checking Auth Service dependencies..." -ForegroundColor Yellow
-if (-not (Test-Path "services\auth-service\node_modules")) {
-    Write-Host "Installing Auth Service dependencies..." -ForegroundColor Yellow
-    Set-Location "services\auth-service"
-    npm install
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "Error: Failed to install Auth Service dependencies" -ForegroundColor Red
-        Set-Location ..\..
-        exit 1
-    }
-    Set-Location ..\..
-} else {
-    Write-Host "Auth Service dependencies already installed" -ForegroundColor Green
-}
-
-# Check and install dependencies for Reporting Service
-Write-Host "Checking Reporting Service dependencies..." -ForegroundColor Yellow
-if (-not (Test-Path "services\reporting-service\node_modules")) {
-    Write-Host "Installing Reporting Service dependencies..." -ForegroundColor Yellow
-    Set-Location "services\reporting-service"
-    npm install
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "Error: Failed to install Reporting Service dependencies" -ForegroundColor Red
-        Set-Location ..\..
-        exit 1
-    }
-    Set-Location ..\..
-} else {
-    Write-Host "Reporting Service dependencies already installed" -ForegroundColor Green
-}
-
-Write-Host ""
-Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  Starting Services" -ForegroundColor Green
-Write-Host "========================================" -ForegroundColor Cyan
-Write-Host ""
-
-# Start API Gateway
-Write-Host "Starting API Gateway on port 3000..." -ForegroundColor Yellow
-$apiGatewayPath = (Resolve-Path "services\api-gateway").Path
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$apiGatewayPath'; Write-Host 'API Gateway starting...' -ForegroundColor Green; npm start" -WindowStyle Normal
-
-# Wait a bit for API Gateway to start
-Start-Sleep -Seconds 3
-
-# Start Auth Service
-Write-Host "Starting Auth Service on port 3001..." -ForegroundColor Yellow
-$authServicePath = (Resolve-Path "services\auth-service").Path
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$authServicePath'; Write-Host 'Auth Service starting...' -ForegroundColor Green; npm start" -WindowStyle Normal
-
-# Wait a bit for Auth Service to start
-Start-Sleep -Seconds 2
-
-# Start Reporting Service
-Write-Host "Starting Reporting Service on port 3002..." -ForegroundColor Yellow
-$reportingServicePath = (Resolve-Path "services\reporting-service").Path
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$reportingServicePath'; Write-Host 'Reporting Service starting...' -ForegroundColor Green; npm start" -WindowStyle Normal
-
-# Wait a bit for Reporting Service to start
-Start-Sleep -Seconds 2
-
-Write-Host ""
-Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  Services Started!" -ForegroundColor Green
-Write-Host "========================================" -ForegroundColor Cyan
-Write-Host ""
-Write-Host "Backend Services:" -ForegroundColor Yellow
-Write-Host "  - API Gateway:      http://localhost:3000" -ForegroundColor Cyan
-Write-Host "  - Auth Service:      http://localhost:3001" -ForegroundColor Cyan
-Write-Host "  - Reporting Service: http://localhost:3002" -ForegroundColor Cyan
-Write-Host ""
-Write-Host "Health Checks:" -ForegroundColor Yellow
-Write-Host "  - API Gateway:      http://localhost:3000/health" -ForegroundColor White
-Write-Host "  - Auth Service:      http://localhost:3001/health" -ForegroundColor White
-Write-Host "  - Reporting Service: http://localhost:3002/health" -ForegroundColor White
-Write-Host ""
-Write-Host "Supabase Connection:" -ForegroundColor Yellow
-Write-Host "  - Supabase is a cloud service (no local server needed)" -ForegroundColor White
-Write-Host "  - Backend services connect to Supabase automatically" -ForegroundColor White
-Write-Host "  - Make sure SUPABASE_URL and keys are set in .env files" -ForegroundColor White
-Write-Host ""
-Write-Host "Environment Check:" -ForegroundColor Yellow
-# Check if .env files exist
-if (Test-Path "services\auth-service\.env") {
-    Write-Host "  [OK] Auth Service .env found" -ForegroundColor Green
-} else {
-    Write-Host "  [WARNING] Auth Service .env missing - create it with SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY" -ForegroundColor Yellow
-}
-if (Test-Path "services\reporting-service\.env") {
-    Write-Host "  [OK] Reporting Service .env found" -ForegroundColor Green
-} else {
-    Write-Host "  [WARNING] Reporting Service .env missing - create it with SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and EMAIL config" -ForegroundColor Yellow
-}
-if (Test-Path "apps\mobile\.env") {
-    Write-Host "  [OK] Mobile App .env found" -ForegroundColor Green
-} else {
-    Write-Host "  [WARNING] Mobile App .env missing - create it with EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY" -ForegroundColor Yellow
-}
-Write-Host ""
-Write-Host "For Expo App:" -ForegroundColor Yellow
-Write-Host "  - iOS Simulator: http://localhost:3000" -ForegroundColor White
-Write-Host "  - Android Emulator: http://10.0.2.2:3000" -ForegroundColor White
-Write-Host "  - Physical Device: http://YOUR-COMPUTER-IP:3000" -ForegroundColor White
-Write-Host ""
-Write-Host "Note: Services are running in separate windows." -ForegroundColor Yellow
-Write-Host "      Close those windows to stop the services." -ForegroundColor Yellow
-Write-Host ""
-
+Write-Host "All backend services are healthy:" -ForegroundColor Green
+Write-Host "  API Gateway:       http://localhost:3000"
+Write-Host "  Auth Service:      http://localhost:3001"
+Write-Host "  Reporting Service: http://localhost:3002"
+Write-Host "Close the service windows to stop them."

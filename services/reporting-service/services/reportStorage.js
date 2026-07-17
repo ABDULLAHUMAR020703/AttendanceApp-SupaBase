@@ -4,7 +4,7 @@
  */
 const fs = require('fs');
 const path = require('path');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
 
 const DATA_DIR = path.join(__dirname, '../data/reports');
 const INDEX_FILE = path.join(DATA_DIR, 'index.json');
@@ -35,7 +35,7 @@ function saveIndex(index) {
 }
 
 function generateReportId() {
-  return uuidv4();
+  return randomUUID();
 }
 
 function cleanupExpiredFromIndex(index) {
