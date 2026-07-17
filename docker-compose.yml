@@ -145,7 +145,7 @@ services:
     # TEMPORARY: Expose API Gateway on host port 8080 for testing without a domain.
     # Remove this when a domain is configured and Traefik is used.
     ports:
-      - "8080:80"
+      - "8081:80"
     networks:
       - backend
     depends_on:
