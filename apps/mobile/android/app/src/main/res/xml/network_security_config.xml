@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  TEMPORARY — internal testing only.
+  Allows cleartext HTTP solely to the VPS API gateway host (91.98.153.199).
+  Remove this file and the android:networkSecurityConfig attribute from
+  AndroidManifest.xml once the backend is served over HTTPS.
+-->
+<network-security-config>
+    <!-- Keep cleartext disabled for all other hosts. -->
+    <base-config cleartextTrafficPermitted="false" />
+
+    <!-- Opt in cleartext only for the temporary VPS IP used by apiGatewayUrl. -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">91.98.153.199</domain>
+    </domain-config>
+</network-security-config>

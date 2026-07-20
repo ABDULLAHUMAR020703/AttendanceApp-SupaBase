@@ -99,7 +99,8 @@
         }
       ],
       "expo-web-browser",
-      "expo-updates"
+      "expo-updates",
+      "./plugins/withVpsCleartextTraffic.js"
     ],
     "extra": {
       "apiGatewayUrl": "http://91.98.153.199:8081",
