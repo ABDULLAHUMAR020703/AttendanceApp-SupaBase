@@ -159,7 +159,7 @@ flowchart TB
 
 | Service | Port | Stack |
 |---------|------|-------|
-| `api-gateway` | 3000 | Express 5, Axios, CORS |
+| `gateway` | 3000 | Express 5, Axios, CORS |
 | `auth-service` | 3001 | Express 5, Supabase service-role client |
 | `reporting-service` | 3002 | Express, PDF generation, Resend email API |
 
@@ -1339,7 +1339,7 @@ npm run sync-auth-metadata
 ### 29.3 Service Restart Order
 
 1. `auth-service`
-2. `api-gateway`
+2. `gateway`
 3. `reporting-service` (if used)
 4. Web dev server hard-refresh / mobile app reload
 

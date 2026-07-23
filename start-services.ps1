@@ -76,9 +76,9 @@ try {
     Wait-ServiceHealth "reporting-service" 3002 $reporting
 
     # Start the gateway only when its dependencies are ready.
-    $gateway = Start-LocalService "api-gateway" "services\api-gateway"
+    $gateway = Start-LocalService "gateway" "services\api-gateway"
     $started += $gateway
-    Wait-ServiceHealth "api-gateway" 3000 $gateway
+    Wait-ServiceHealth "gateway" 3000 $gateway
 }
 catch {
     Write-Host $_.Exception.Message -ForegroundColor Red

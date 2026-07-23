@@ -1262,7 +1262,7 @@ cd apps/mobile && npm start
    - Attendance check-in on physical device
 ```
 
-Assign the public Coolify domain only to `api-gateway` as
+Assign the public Coolify domain only to `gateway` as
 `https://api.yourdomain.com` (no port). The gateway listens on container port
 **80**; Traefik terminates TLS on 443. End users never use `:3000`.
 `auth-service:3001` and `reporting-service:3002` remain internal.

@@ -81,7 +81,7 @@ For new setups prefer `GIT_COMMIT_SHA` over the legacy Render injector name.
 
 | Service | Receives | Does not receive |
 |---------|----------|------------------|
-| **api-gateway** | `NODE_ENV`, `HOST`, `PORT=80`, `AUTH_SERVICE_URL`, `REPORTING_SERVICE_URL`, `GIT_COMMIT_SHA` | Supabase, SMTP, onboarding |
+| **gateway** | `NODE_ENV`, `HOST`, `PORT=80`, `AUTH_SERVICE_URL`, `REPORTING_SERVICE_URL`, `GIT_COMMIT_SHA` | Supabase, SMTP, onboarding |
 | **auth-service** | `NODE_ENV`, `HOST`, `PORT=3001`, `SUPABASE_*`, `COMPANY_ONBOARDING_SECRET`, `GIT_COMMIT_SHA` | SMTP, gateway URLs |
 | **reporting-service** | `NODE_ENV`, `HOST`, `PORT=3002`, `SUPABASE_*`, `SMTP_*`, `EMAIL_FROM`, `GIT_COMMIT_SHA` | Onboarding, gateway URLs |
 

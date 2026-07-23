@@ -67,9 +67,9 @@ wait_for_health "auth-service" 3001 "$AUTH_PID"
 wait_for_health "reporting-service" 3002 "$REPORTING_PID"
 
 # Start the gateway only when its dependencies are ready.
-start_service "api-gateway" "services/api-gateway"
+start_service "gateway" "services/api-gateway"
 GATEWAY_PID=$LAST_PID
-wait_for_health "api-gateway" 3000 "$GATEWAY_PID"
+wait_for_health "gateway" 3000 "$GATEWAY_PID"
 
 echo "All services are healthy. Press Ctrl+C to stop."
 wait

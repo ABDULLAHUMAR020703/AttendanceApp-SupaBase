@@ -1,6 +1,6 @@
 # Production backend stack for Coolify (Ubuntu 24.04 / Docker Engine / Traefik)
 #
-# Public:  api-gateway listens on container port 80 → Coolify Traefik → https://api.example.com
+# Public:  gateway listens on container port 80 → Coolify Traefik → https://api.example.com
 #          End users never use :3000. Traefik terminates TLS on 443.
 # Internal: auth-service:3001, reporting-service:3002 (no public domain)
 # External: Supabase Cloud + SMTP
@@ -8,7 +8,7 @@
 # Coolify setup:
 # 1. New Resource → Docker Compose → this repo / docker-compose.yml
 # 2. Paste secrets from root .env.example into Coolify Environment Variables
-# 3. Assign domain ONLY to api-gateway: https://api.yourdomain.com
+# 3. Assign domain ONLY to gateway: https://api.yourdomain.com
 #    (no port suffix; gateway listens on 80 which Traefik defaults to)
 # 4. Do NOT assign domains to auth-service or reporting-service
 # 5. Do NOT publish host Ports Mappings for HTTP (that bypasses Traefik/HTTPS)
@@ -119,7 +119,7 @@ services:
     stop_grace_period: 60s
     mem_limit: 768m
 
-  api-gateway:
+  gateway:
     build:
       context: .
       dockerfile: services/api-gateway/Dockerfile

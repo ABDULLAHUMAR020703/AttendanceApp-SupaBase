@@ -7,7 +7,7 @@
 # Coolify must NOT use host port publishing (bypasses Traefik/HTTPS).
 
 services:
-  api-gateway:
+  gateway:
     environment:
       # Keep familiar local port when running compose on a workstation
       PORT: "3000"
