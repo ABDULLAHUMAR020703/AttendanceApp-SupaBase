@@ -12,9 +12,10 @@ export const WORK_MODE_LABELS = {
 };
 
 export const WORK_MODE_DESCRIPTIONS = {
-  [WORK_MODES.IN_OFFICE]: 'Employee must work from office location',
-  [WORK_MODES.SEMI_REMOTE]: 'Employee can work from home or office',
-  [WORK_MODES.FULLY_REMOTE]: 'Employee works remotely from any location'
+  [WORK_MODES.IN_OFFICE]: 'Must check in from the office geofence',
+  [WORK_MODES.SEMI_REMOTE]:
+    'May check in from home or other approved remote locations (no office geofence required)',
+  [WORK_MODES.FULLY_REMOTE]: 'May check in from any location'
 };
 
 export const WORK_MODE_COLORS = {

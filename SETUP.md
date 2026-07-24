@@ -180,26 +180,19 @@ Replace `192.168.18.38` with your computer's IP address:
 
 If the database is already configured, skip to step 5.
 
-#### Option B: Create Database Schema
+#### Option B: Apply the Current Database Schema
 
-1. Go to Supabase Dashboard → **SQL Editor**
-2. Apply schema from the SQL files under `supabase/legacy_migrations/` in dependency order (see `supabase/README.md`), or use `npm run db:push` after linking the project for CLI-managed migrations under `supabase/migrations/`.
-3. Or use the Node.js script to create users:
+Use the timestamped migrations in `supabase/migrations/`:
 
 ```bash
-node scripts/create-users-supabase.js
+npm run db:link
+npm run db:push
 ```
 
-This will create:
-- All 11 demo users in Supabase Auth
-- All user profiles in the database
-
-**Login Credentials:**
-- Super Admin: `testadmin` / `testadmin123`
-- Manager: `techmanager` / `techmanager123`
-- Employee: `testuser` / `testuser123`
-
-See `MANUAL_USER_CREATION_GUIDE.md` for all credentials.
+Files in `supabase/legacy_migrations/` are historical references and must not be
+replayed wholesale. Create the first tenant and super admin through
+`POST /api/auth/onboard-company`. Legacy demo-user scripts were removed because
+they predated mandatory tenant scoping.
 
 ---
 
@@ -213,10 +206,11 @@ See `MANUAL_USER_CREATION_GUIDE.md` for all credentials.
 ```
 
 This will:
-- ✅ Check ports 3000 and 3001
+- ✅ Check ports 3000, 3001, and 3002
 - ✅ Install dependencies if needed
-- ✅ Start API Gateway (port 3000)
 - ✅ Start Auth Service (port 3001)
+- ✅ Start Reporting Service (port 3002)
+- ✅ Start API Gateway (port 3000) after dependencies are healthy
 - ✅ Open separate terminal windows for each service
 
 #### Linux/macOS (Bash)
@@ -296,7 +290,7 @@ Expected: `{"status":"ok","message":"Auth Service is running",...}`
 ```bash
 curl -X POST http://localhost:3001/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"usernameOrEmail":"testadmin","password":"testadmin123"}'
+  -d '{"usernameOrEmail":"<username>","password":"<password>"}'
 ```
 
 Expected: `{"success":true,"user":{...}}`
@@ -304,9 +298,7 @@ Expected: `{"success":true,"user":{...}}`
 ### 3. Check Mobile App Connection
 
 1. Open the app in simulator/emulator
-2. Try logging in with:
-   - Username: `testadmin`
-   - Password: `testadmin123`
+2. Log in with an account created through the current onboarding/admin flow.
 
 ---
 
@@ -333,23 +325,25 @@ AttendanceApp-SupaBase/
 │   ├── api-gateway/          # API Gateway service
 │   │   └── index.js
 │   │
-│   └── auth-service/         # Authentication service
+│   ├── auth-service/         # Authentication service
 │       ├── config/
 │       │   └── supabase.js   # Supabase backend config
 │       ├── routes/
 │       │   └── auth.js       # Auth endpoints
 │       ├── index.js
 │       └── .env              # Backend env vars
+│   └── reporting-service/    # PDF/email reporting service
 │
 ├── scripts/
-│   └── create-users-supabase.js  # User creation script
+│   └── sync-all-auth-metadata.js # Auth metadata maintenance
 │
 ├── supabase/
 │   ├── migrations/               # CLI-managed (db push)
 │   ├── legacy_migrations/      # Historical SQL
 │   └── config.toml
 │
-└── start-services.ps1        # Start script (Windows)
+├── docker-compose.yml        # Coolify production backend stack
+└── start-services.ps1        # Local Windows startup
 ```
 
 ---
@@ -516,8 +510,7 @@ The project includes `.env.example` files in each service directory. These are t
 After setup is complete:
 
 1. ✅ **Test Login**
-   - Use credentials from `MANUAL_USER_CREATION_GUIDE.md`
-   - Try: `testadmin` / `testadmin123`
+   - Use an account created through the current onboarding or admin flow.
 
 2. ✅ **Explore Features**
    - Check attendance tracking

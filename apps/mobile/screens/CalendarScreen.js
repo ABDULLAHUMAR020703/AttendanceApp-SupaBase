@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
@@ -13,6 +13,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { getKeyboardAvoidingBehavior, formScrollViewProps } from '../shared/components/KeyboardAwareScreen';
 import { Ionicons } from '@expo/vector-icons';
 import {
   getCalendarEvents,
@@ -143,7 +144,7 @@ export default function CalendarScreen({ navigation, route }) {
         return prevSelected.filter(username => validUsernames.has(username));
       });
       
-      console.log(`[CalendarScreen] ✓ Loaded ${empList.length} employees from Supabase`);
+      console.log(`[CalendarScreen] âœ“ Loaded ${empList.length} employees from Supabase`);
     } catch (error) {
       console.error('Error loading employees:', error);
       setEmployees([]); // Set empty array on error to prevent stale data
@@ -804,8 +805,8 @@ export default function CalendarScreen({ navigation, route }) {
       >
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+          behavior={getKeyboardAvoidingBehavior({ inModal: true })}
+          keyboardVerticalOffset={0}
         >
           <View
             style={{
@@ -831,6 +832,8 @@ export default function CalendarScreen({ navigation, route }) {
               <ScrollView 
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
+                automaticallyAdjustKeyboardInsets={true}
+                keyboardDismissMode="on-drag"
               >
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                 <Text
@@ -1165,6 +1168,8 @@ export default function CalendarScreen({ navigation, route }) {
                         style={{ maxHeight: 150 }}
                         nestedScrollEnabled
                         keyboardShouldPersistTaps="handled"
+                        automaticallyAdjustKeyboardInsets={true}
+                        keyboardDismissMode="on-drag"
                       >
                         {getFilteredEmployees().length > 0 ? (
                           getFilteredEmployees().map((emp) => {

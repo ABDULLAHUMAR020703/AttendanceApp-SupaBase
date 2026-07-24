@@ -102,7 +102,7 @@
       "expo-updates"
     ],
     "extra": {
-      "apiGatewayUrl": "https://attendanceapp-supabase-1.onrender.com",
+      "apiGatewayUrl": "https://api.hadir.techdotglobal.com",
       "supabaseRedirectUrl": "hadirai://reset-password",
       "supabaseUrl": "https://lxnwldnoxttxtgucvmlf.supabase.co",
       "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx4bndsZG5veHR0eHRndWN2bWxmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY2NzM0MjEsImV4cCI6MjA4MjI0OTQyMX0.AWdwWtQOIzza3XbaJTipAwyOOU-xesGLyyB-IN_u9Lo",

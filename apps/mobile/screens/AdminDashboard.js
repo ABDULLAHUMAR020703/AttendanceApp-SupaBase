@@ -924,11 +924,13 @@ export default function AdminDashboard({ route }) {
       <View style={{ flex: 1 }}>
         {isAttendanceTab ? (
         <FlatList
-          key={`adm-att-${attendanceGridColumns}`}
           style={{ flex: 1 }}
           data={filteredRecords}
           keyExtractor={(item) => String(item.id)}
           numColumns={attendanceGridColumns}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets={true}
+          keyboardDismissMode="on-drag"
           renderItem={({ item }) => (
             <View
               style={{

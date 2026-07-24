@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useLocationState } from '../features/geofencing/hooks/useLocationState';
 import {
   View,
@@ -10,10 +10,9 @@ import {
   Modal,
   TextInput,
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAwareScreen } from '../shared/components/KeyboardAwareScreen';
 import { Ionicons } from '@expo/vector-icons';
 import { getUserAttendanceRecords, getOfflineQueuedRecordsForUser } from '../utils/storage';
 import { useAuth } from '../contexts/AuthContext';
@@ -49,6 +48,7 @@ import Logo from '../components/Logo';
 import Trademark from '../components/Trademark';
 import HamburgerButton from '../shared/components/HamburgerButton';
 import { useNavigation } from '@react-navigation/native';
+import { useStaleWhileRevalidate } from '../shared/hooks/useStaleWhileRevalidate';
 
 export default function EmployeeDashboard({ route }) {
   const navigation = useNavigation();
@@ -70,6 +70,7 @@ export default function EmployeeDashboard({ route }) {
   const [showWorkModeModal, setShowWorkModeModal] = useState(false);
   const [selectedWorkMode, setSelectedWorkMode] = useState(null);
   const [requestReason, setRequestReason] = useState('');
+  const [submittingWorkModeRequest, setSubmittingWorkModeRequest] = useState(false);
   const [myRequests, setMyRequests] = useState([]);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricType, setBiometricType] = useState('');
@@ -85,20 +86,134 @@ export default function EmployeeDashboard({ route }) {
   const [quickStatsLoading, setQuickStatsLoading] = useState(true);
   const [quickStatsError, setQuickStatsError] = useState(null);
 
+  const loadNotificationCount = useCallback(async () => {
+    try {
+      if (!user?.username) return;
+      const count = await getUnreadNotificationCount(user.username);
+      setUnreadNotificationCount(count);
+    } catch (error) {
+      console.error('Error loading notification count:', error);
+    }
+  }, [user?.username]);
+
+  const loadLastRecord = useCallback(async () => {
+    try {
+      if (!user?.username) return;
+      const [onlineRecords, offlineRecords] = await Promise.all([
+        getUserAttendanceRecords(user.username),
+        getOfflineQueuedRecordsForUser(user.username),
+      ]);
+      const all = [...onlineRecords, ...offlineRecords];
+      if (all.length > 0) {
+        const sortedRecords = all.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        setLastRecord(sortedRecords[0]);
+      }
+    } catch (error) {
+      console.error('Error loading last record:', error);
+    }
+  }, [user?.username]);
+
+  const loadEmployeeData = useCallback(async () => {
+    try {
+      if (!user?.username) return;
+      const employeeData = await getEmployeeByUsername(user.username, user.companyId);
+      setEmployee(employeeData);
+    } catch (error) {
+      console.error('Error loading employee data:', error);
+    }
+  }, [user?.username, user?.companyId]);
+
+  const loadMyRequests = useCallback(async () => {
+    try {
+      if (!user?.uid) return;
+      const requests = await getWorkModeRequests(user);
+      setMyRequests(
+        requests.filter(
+          (req) =>
+            req.employeeUid === user.uid ||
+            req.employeeId === `emp_${user.uid}` ||
+            req.employeeId === user.username
+        )
+      );
+    } catch (error) {
+      console.error('Error loading my requests:', error);
+    }
+  }, [user?.uid, user?.username]);
+
+  const hasPendingWorkModeRequest = myRequests.some((r) => r.status === 'pending');
+
+  const loadQuickStats = useCallback(async ({ showLoading = false } = {}) => {
+    if (!user?.username) {
+      setQuickStatsLoading(false);
+      return;
+    }
+    if (showLoading) setQuickStatsLoading(true);
+    setQuickStatsError(null);
+    try {
+      const result = await getEmployeeQuickStats(user.username);
+      if (result.success) {
+        setQuickStats({
+          daysWorked: result.daysWorked ?? 0,
+          hoursLogged: result.hoursLogged ?? 0,
+          thisMonth: result.thisMonth ?? 0,
+        });
+      } else {
+        setQuickStatsError(result.error || 'Could not load stats');
+      }
+    } catch (error) {
+      console.error('Error loading quick stats:', error);
+      setQuickStatsError('Could not load stats');
+    } finally {
+      setQuickStatsLoading(false);
+    }
+  }, [user?.username]);
+
+  const loadLeaveBalance = useCallback(async () => {
+    try {
+      if (employee) {
+        const balance = await getEmployeeLeaveBalance(employee.id);
+        const remaining = calculateRemainingLeaves(balance);
+        setLeaveBalance(balance);
+        setRemainingLeaves(remaining);
+      }
+    } catch (error) {
+      console.error('Error loading leave balance:', error);
+    }
+  }, [employee]);
+
+  const loadData = useCallback(async () => {
+    await Promise.all([
+      loadLastRecord(),
+      loadEmployeeData(),
+      loadMyRequests(),
+      loadNotificationCount(),
+      loadLeaveBalance(),
+      loadQuickStats({ showLoading: false }),
+    ]);
+  }, [
+    loadLastRecord,
+    loadEmployeeData,
+    loadMyRequests,
+    loadNotificationCount,
+    loadLeaveBalance,
+    loadQuickStats,
+  ]);
+
+  const { refreshOnFocus, refreshForced } = useStaleWhileRevalidate(loadData, {
+    minIntervalMs: 2500,
+  });
+
   useEffect(() => {
-    loadData();
-    // Delay biometric check to avoid crashes on app load
+    void refreshForced();
     setTimeout(() => {
       checkBiometricSupport();
     }, 1000);
-    
-    // Reload data when screen comes into focus (returning from AuthenticationScreen)
-    // Safely check if navigation and addListener exist
+
     let unsubscribe = null;
     if (navigation && typeof navigation.addListener === 'function') {
       try {
         unsubscribe = navigation.addListener('focus', () => {
-          loadData();
+          void refreshOnFocus();
         });
       } catch (error) {
         if (__DEV__) {
@@ -107,23 +222,19 @@ export default function EmployeeDashboard({ route }) {
       }
     }
 
-    // Set up interval to check notifications every 30 seconds
     const notificationInterval = setInterval(() => {
       loadNotificationCount();
     }, 30000);
-    
-    // Listen for app state changes (foreground/background) - CRITICAL for notification reliability
+
     const { AppState } = require('react-native');
     const handleAppStateChange = (nextAppState) => {
       if (nextAppState === 'active') {
-        // App came to foreground - refresh notifications immediately
         loadNotificationCount();
       }
     };
     const appStateSubscription = AppState.addEventListener('change', handleAppStateChange);
 
     return () => {
-      // Only call unsubscribe if it's a function
       if (typeof unsubscribe === 'function') {
         try {
           unsubscribe();
@@ -136,7 +247,7 @@ export default function EmployeeDashboard({ route }) {
       clearInterval(notificationInterval);
       appStateSubscription?.remove();
     };
-  }, [navigation]);
+  }, [navigation, refreshForced, refreshOnFocus, loadNotificationCount]);
 
   const checkBiometricSupport = async () => {
     try {
@@ -156,103 +267,10 @@ export default function EmployeeDashboard({ route }) {
     }
   };
 
-  const loadData = async () => {
-    await Promise.all([
-      loadLastRecord(),
-      loadEmployeeData(),
-      loadMyRequests(),
-      loadNotificationCount(),
-      loadLeaveBalance(),
-      loadQuickStats(),
-    ]);
-  };
-
-  const loadQuickStats = async () => {
-    if (!user?.username) {
-      setQuickStatsLoading(false);
-      return;
-    }
-    setQuickStatsError(null);
-    try {
-      const result = await getEmployeeQuickStats(user.username);
-      if (result.success) {
-        setQuickStats({
-          daysWorked: result.daysWorked ?? 0,
-          hoursLogged: result.hoursLogged ?? 0,
-          thisMonth: result.thisMonth ?? 0,
-        });
-      } else {
-        setQuickStatsError(result.error || 'Could not load stats');
-      }
-    } catch (error) {
-      console.error('Error loading quick stats:', error);
-      setQuickStatsError('Could not load stats');
-    } finally {
-      setQuickStatsLoading(false);
-    }
-  };
-
-  const loadLeaveBalance = async () => {
-    try {
-      if (employee) {
-        const balance = await getEmployeeLeaveBalance(employee.id);
-        const remaining = calculateRemainingLeaves(balance);
-        setLeaveBalance(balance);
-        setRemainingLeaves(remaining);
-      }
-    } catch (error) {
-      console.error('Error loading leave balance:', error);
-    }
-  };
-
-  const loadNotificationCount = async () => {
-    try {
-      const count = await getUnreadNotificationCount(user.username);
-      setUnreadNotificationCount(count);
-    } catch (error) {
-      console.error('Error loading notification count:', error);
-    }
-  };
-
-  const loadLastRecord = async () => {
-    try {
-      const [onlineRecords, offlineRecords] = await Promise.all([
-        getUserAttendanceRecords(user.username),
-        getOfflineQueuedRecordsForUser(user.username),
-      ]);
-      const all = [...onlineRecords, ...offlineRecords];
-      if (all.length > 0) {
-        const sortedRecords = all.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-        setLastRecord(sortedRecords[0]);
-      }
-    } catch (error) {
-      console.error('Error loading last record:', error);
-    }
-  };
-
-  const loadEmployeeData = async () => {
-    try {
-      const employeeData = await getEmployeeByUsername(user.username, user.companyId);
-      setEmployee(employeeData);
-    } catch (error) {
-      console.error('Error loading employee data:', error);
-    }
-  };
-
-  const loadMyRequests = async () => {
-    try {
-      const requests = await getWorkModeRequests();
-      const myRequests = requests.filter(req => req.employeeId === user.username);
-      setMyRequests(myRequests);
-    } catch (error) {
-      console.error('Error loading my requests:', error);
-    }
-  };
-
   const onRefresh = async () => {
     setIsRefreshing(true);
-    setQuickStatsLoading(true);
-    await loadData();
+    await loadQuickStats({ showLoading: true });
+    await refreshForced();
     setIsRefreshing(false);
   };
 
@@ -277,39 +295,54 @@ export default function EmployeeDashboard({ route }) {
   };
 
   const handleWorkModeRequest = (workMode) => {
+    if (hasPendingWorkModeRequest) {
+      Alert.alert(
+        'Pending Request',
+        'A pending work mode request already exists. Wait for it to be processed before submitting another.'
+      );
+      return;
+    }
     setSelectedWorkMode(workMode);
     setShowWorkModeModal(true);
   };
 
   const submitWorkModeRequest = async () => {
+    if (submittingWorkModeRequest) return;
     if (!selectedWorkMode || !requestReason.trim()) {
-      Alert.alert('Error', 'Please select a work mode and provide a reason');
+      Alert.alert('Validation failed', 'Please select a work mode and provide a reason');
+      return;
+    }
+    if (hasPendingWorkModeRequest) {
+      Alert.alert('Pending Request', 'A pending request already exists.');
       return;
     }
 
+    setSubmittingWorkModeRequest(true);
     try {
-      const success = await createWorkModeRequest(
+      const result = await createWorkModeRequest(
         user.username,
         selectedWorkMode,
         requestReason.trim(),
         user
       );
 
-      if (success) {
+      if (result?.success) {
         Alert.alert(
           'Request Submitted',
-          'Your work mode change request has been submitted for admin approval.'
+          result.message || 'Your work mode change request has been submitted for admin approval.'
         );
         setShowWorkModeModal(false);
         setSelectedWorkMode(null);
         setRequestReason('');
         await loadMyRequests();
       } else {
-        Alert.alert('Error', 'Failed to submit request');
+        Alert.alert('Error', result?.error || 'Failed to submit request');
       }
     } catch (error) {
       console.error('Error submitting work mode request:', error);
-      Alert.alert('Error', 'Failed to submit request');
+      Alert.alert('Error', error?.message || 'Failed to submit request');
+    } finally {
+      setSubmittingWorkModeRequest(false);
     }
   };
 
@@ -1075,7 +1108,9 @@ export default function EmployeeDashboard({ route }) {
 
             {/* Work Mode Request Buttons */}
             <Text className="text-sm mb-3" style={{ color: colors.textSecondary }}>
-              Request a different work mode:
+              {hasPendingWorkModeRequest
+                ? 'You have a pending work mode request. New requests are disabled until it is processed.'
+                : 'Request a different work mode:'}
             </Text>
             <View className="space-y-2">
               {getAllWorkModes()
@@ -1084,7 +1119,11 @@ export default function EmployeeDashboard({ route }) {
                   <TouchableOpacity
                     key={mode.value}
                     className="flex-row items-center p-3 rounded-lg"
-                    style={{ backgroundColor: colors.background }}
+                    style={{
+                      backgroundColor: colors.background,
+                      opacity: hasPendingWorkModeRequest ? 0.5 : 1,
+                    }}
+                    disabled={hasPendingWorkModeRequest}
                     onPress={() => handleWorkModeRequest(mode.value)}
                   >
                     <Ionicons 
@@ -1214,12 +1253,18 @@ export default function EmployeeDashboard({ route }) {
         animationType="slide"
         onRequestClose={() => setShowWorkModeModal(false)}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1 }}
+        <KeyboardAwareScreen
+          inModal
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+          contentContainerStyle={{
+            flexGrow: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            paddingHorizontal: 16,
+          }}
+          extraScrollHeight={40}
         >
-        <View className="flex-1 justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
-          <View className="rounded-xl p-6 mx-4 w-full max-w-sm" style={{ backgroundColor: colors.surface }}>
+          <View className="rounded-xl p-6 w-full max-w-sm" style={{ backgroundColor: colors.surface }}>
             <Text className="text-xl font-bold mb-4" style={{ color: colors.text }}>
               Request Work Mode Change
             </Text>
@@ -1269,15 +1314,22 @@ export default function EmployeeDashboard({ route }) {
               
               <TouchableOpacity
                 className="rounded-lg p-3 flex-1"
-                style={{ backgroundColor: colors.primary }}
+                style={{
+                  backgroundColor: colors.primary,
+                  opacity: submittingWorkModeRequest ? 0.7 : 1,
+                }}
+                disabled={submittingWorkModeRequest}
                 onPress={submitWorkModeRequest}
               >
-                <Text className="text-center font-medium text-white">Submit Request</Text>
+                {submittingWorkModeRequest ? (
+                  <ActivityIndicator color="#ffffff" />
+                ) : (
+                  <Text className="text-center font-medium text-white">Submit Request</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
-        </View>
-        </KeyboardAvoidingView>
+        </KeyboardAwareScreen>
       </Modal>
     </SafeAreaView>
   );

@@ -1,21 +1,29 @@
 # Documentation Index
 
-Documentation for the Hadir.AI Attendance App (Supabase).
+Current documentation for Hadir.AI. Historical schema SQL is documented separately
+under [`supabase/legacy_migrations`](../supabase/legacy_migrations/README.md).
 
 | Document | Description |
 |----------|-------------|
-| [APP_FEATURES.md](APP_FEATURES.md) | Complete application features, roles, and use cases |
-| [SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md) | System architecture, auth, user roles, Supabase, ticket routing |
-| [TECHNICAL_DOCUMENTATION.md](TECHNICAL_DOCUMENTATION.md) | Tech stack, APIs, development setup, build & deployment |
-| [MODULAR_ARCHITECTURE.md](MODULAR_ARCHITECTURE.md) | Modular/feature-based structure and migration status |
-| [STRUCTURE_SUMMARY.md](STRUCTURE_SUMMARY.md) | Quick reference for code organization and imports |
+| [BACKEND_TECHNICAL_WORKFLOW.md](BACKEND_TECHNICAL_WORKFLOW.md) | Backend architecture, service flows, APIs, Coolify deployment |
+| [PRODUCT_DOCUMENTATION_AND_USE_CASES.md](PRODUCT_DOCUMENTATION_AND_USE_CASES.md) | Product behavior and role-based use cases |
+| [DEPARTMENT_USAGE_AUDIT.md](DEPARTMENT_USAGE_AUDIT.md) | Department normalization and permission model |
+| [COMPANY_LOGO_IMPLEMENTATION.md](COMPANY_LOGO_IMPLEMENTATION.md) | Company logo storage and setup |
+| [ENV_CONFIGURATION_REPORT.md](ENV_CONFIGURATION_REPORT.md) | Env var audit, Coolify minimal set, compose anchors |
 
-## Root-level docs
+## Platform-specific and root documentation
 
-- [SETUP.md](../SETUP.md) – Setup and Supabase configuration  
-- [README.md](../README.md) – Project overview and quick start  
-- [DEEP_LINK_TESTING_GUIDE.md](../DEEP_LINK_TESTING_GUIDE.md) – Testing deep links (e.g. password reset)  
-- [FORGOT_PASSWORD_VERIFICATION_REPORT.md](../FORGOT_PASSWORD_VERIFICATION_REPORT.md) – Forgot password flow verification  
-- [WEEKLY_UPDATE_REPORT.md](../WEEKLY_UPDATE_REPORT.md) – Recent weekly changes (when generated)
+- [README.md](../README.md) — Repository overview and quick start
+- [SETUP.md](../SETUP.md) — Local development and Supabase setup
+- [hadir.ai_workflow.md](../hadir.ai_workflow.md) — Full platform workflow
+- [hisab ai web portal workflow.md](../hisab%20ai%20web%20portal%20workflow.md) — Web portal workflow
+- [Mobile OTA updates](../apps/mobile/OTA_UPDATES.md) — Expo update operations
+- [Supabase migrations](../supabase/README.md) — Database migration workflow
 
-*Last Updated: 2026-01-23*
+## Service documentation
+
+- [API Gateway](../services/api-gateway/README.md)
+- [Auth Service](../services/auth-service/README.md)
+- [Reporting Service](../services/reporting-service/README.md)
+
+*Last reviewed: 2026-07-17*

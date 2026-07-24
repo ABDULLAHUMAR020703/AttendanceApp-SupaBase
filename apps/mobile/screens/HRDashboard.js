@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -33,6 +33,7 @@ import { generateAttendanceReport, generateLeaveReport, shareCSVFile } from '../
 import { ROUTES } from '../shared/constants/routes';
 import { spacing, fontSize, responsivePadding, responsiveFont, iconSize, isTablet } from '../shared/utils/responsive';
 import { isHRAdmin } from '../shared/constants/roles';
+import { useStaleWhileRevalidate } from '../shared/hooks/useStaleWhileRevalidate';
 
 export default function HRDashboard({ navigation, route }) {
   const { user: routeUser, initialTab, openLeaveRequests, ticketId } = route.params || {};
@@ -106,15 +107,30 @@ export default function HRDashboard({ navigation, route }) {
     );
   };
 
+  // Latest loaders via ref so focus SWR stays stable without remounting effects.
+  const loadDataRef = React.useRef(async () => {});
+  loadDataRef.current = async () => {
+    await Promise.all([
+      loadOverviewStats(),
+      activeTab === 'attendance' && loadAttendanceData(),
+      activeTab === 'leaves' && loadLeaveData(),
+      activeTab === 'tickets' && loadTicketData(),
+    ]);
+  };
+
+  const stableLoad = useCallback(() => loadDataRef.current(), []);
+  const { refreshOnFocus, refreshForced } = useStaleWhileRevalidate(stableLoad, {
+    minIntervalMs: 2500,
+  });
+
   useEffect(() => {
-    loadData();
-    
-    // Safely check if navigation and addListener exist
+    void refreshForced();
+
     let unsubscribe = null;
     if (navigation && typeof navigation.addListener === 'function') {
       try {
         unsubscribe = navigation.addListener('focus', () => {
-          loadData();
+          void refreshOnFocus();
         });
       } catch (error) {
         if (__DEV__) {
@@ -122,9 +138,8 @@ export default function HRDashboard({ navigation, route }) {
         }
       }
     }
-    
+
     return () => {
-      // Only call unsubscribe if it's a function
       if (typeof unsubscribe === 'function') {
         try {
           unsubscribe();
@@ -135,7 +150,12 @@ export default function HRDashboard({ navigation, route }) {
         }
       }
     };
-  }, [navigation, activeTab, ticketFilter]);
+  }, [navigation, refreshForced, refreshOnFocus]);
+
+  // Soft reload when tab/filter changes — keep existing lists visible (SWR).
+  useEffect(() => {
+    void refreshOnFocus();
+  }, [activeTab, ticketFilter, refreshOnFocus]);
   
   // Handle navigation params (e.g., from notifications)
   // IMPORTANT: This only changes the active tab - it does NOT trigger any actions
@@ -160,15 +180,6 @@ export default function HRDashboard({ navigation, route }) {
       // Optionally, you could highlight the specific ticket here
     }
   }, [initialTab, openLeaveRequests, ticketId]);
-
-  const loadData = async () => {
-    await Promise.all([
-      loadOverviewStats(),
-      activeTab === 'attendance' && loadAttendanceData(),
-      activeTab === 'leaves' && loadLeaveData(),
-      activeTab === 'tickets' && loadTicketData(),
-    ]);
-  };
 
   const loadOverviewStats = async () => {
     try {
@@ -246,7 +257,7 @@ export default function HRDashboard({ navigation, route }) {
 
   const onRefresh = async () => {
     setIsRefreshing(true);
-    await loadData();
+    await refreshForced();
     setIsRefreshing(false);
   };
 

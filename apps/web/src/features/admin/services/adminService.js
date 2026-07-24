@@ -4,17 +4,38 @@ import { enrichLeavesWithUsers } from '../utils/leaveDisplay';
 
 const extractApiMessage = (error, fallbackMessage) => {
   const apiError = error?.response?.data?.error;
-  if (apiError) return apiError;
+  if (typeof apiError === 'string' && apiError.trim()) return apiError;
+
   const status = error?.response?.status;
+  const data = error?.response?.data;
+  const rawBody = typeof data === 'string' ? data : '';
+  if (/service suspended/i.test(rawBody)) {
+    return 'API gateway URL points to a suspended host. Update VITE_API_GATEWAY_URL to the Coolify HTTPS domain and redeploy the web app.';
+  }
+  if (status === 401) return 'Authentication expired or missing. Sign out and sign in again.';
+  if (status === 403) {
+    return (
+      (typeof data?.error === 'string' && data.error) ||
+      'Permission denied for this action.'
+    );
+  }
   if (status === 404) {
     return (
       fallbackMessage ||
-      'Server API is missing this feature. Redeploy auth-service and api-gateway on Render from the latest code.'
+      'Server API is missing this feature. Redeploy gateway and auth-service from the latest code.'
     );
   }
-  if (status === 503) return 'Backend is unavailable. Wait a minute and try again.';
+  if (status === 502 || status === 503 || status === 504) {
+    return 'Backend is unavailable (gateway or upstream service). Check Coolify health and try again.';
+  }
+  if (error?.code === 'ERR_NETWORK' || /network error/i.test(String(error?.message || ''))) {
+    return 'Cannot reach the API gateway. Verify VITE_API_GATEWAY_URL / NEXT_PUBLIC_API_URL and network connectivity.';
+  }
+  if (error?.code === 'ECONNABORTED' || /timeout/i.test(String(error?.message || ''))) {
+    return 'The API request timed out. The gateway or backend may be overloaded.';
+  }
   if (fallbackMessage) return fallbackMessage;
-  return 'Request failed. Check the browser console for details.';
+  return error?.message || 'Request failed. Check the browser console for details.';
 };
 
 const executeApiCall = async (call, fallbackMessage) => {

@@ -1,22 +1,65 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColorScheme } from 'react-native';
 
 const ThemeContext = createContext();
 const THEME_STORAGE_KEY = '@app_theme';
 
+/** Stable palettes — never recreated per render. */
+const LIGHT_COLORS = Object.freeze({
+  background: '#f9fafb',
+  surface: '#ffffff',
+  text: '#111827',
+  textSecondary: '#6b7280',
+  textTertiary: '#9ca3af',
+  primary: '#3b82f6',
+  primaryLight: '#dbeafe',
+  success: '#10b981',
+  successLight: '#d1fae5',
+  error: '#ef4444',
+  errorLight: '#fee2e2',
+  warning: '#f59e0b',
+  warningLight: '#fef3c7',
+  border: '#e5e7eb',
+  borderLight: '#f3f4f6',
+  shadow: 'rgba(0, 0, 0, 0.1)',
+});
+
+const DARK_COLORS = Object.freeze({
+  background: '#111827',
+  surface: '#1f2937',
+  text: '#f9fafb',
+  textSecondary: '#d1d5db',
+  textTertiary: '#9ca3af',
+  primary: '#60a5fa',
+  primaryLight: '#1e3a8a',
+  success: '#34d399',
+  successLight: '#065f46',
+  error: '#f87171',
+  errorLight: '#7f1d1d',
+  warning: '#fbbf24',
+  warningLight: '#78350f',
+  border: '#374151',
+  borderLight: '#4b5563',
+  shadow: 'rgba(0, 0, 0, 0.5)',
+});
+
+const THEME_PALETTES = Object.freeze({
+  light: LIGHT_COLORS,
+  dark: DARK_COLORS,
+});
+
 export function ThemeProvider({ children }) {
   const systemColorScheme = useColorScheme();
   const [theme, setTheme] = useState('system'); // 'light', 'dark', or 'system'
   const [isLoading, setIsLoading] = useState(true);
-  const [actualTheme, setActualTheme] = useState('light'); // The actual theme being used
+  const [actualTheme, setActualTheme] = useState('light');
 
   useEffect(() => {
     loadTheme();
   }, []);
 
   useEffect(() => {
-    // Update actual theme based on theme preference and system setting
     if (theme === 'system') {
       setActualTheme(systemColorScheme || 'light');
     } else {
@@ -30,7 +73,6 @@ export function ThemeProvider({ children }) {
       if (savedTheme) {
         setTheme(savedTheme);
       } else {
-        // Default to system theme
         setTheme('system');
       }
     } catch (error) {
@@ -41,72 +83,32 @@ export function ThemeProvider({ children }) {
     }
   };
 
-  const setThemeMode = async (newTheme) => {
+  const setThemeMode = useCallback(async (newTheme) => {
     try {
       setTheme(newTheme);
       await AsyncStorage.setItem(THEME_STORAGE_KEY, newTheme);
     } catch (error) {
       console.error('Error saving theme:', error);
     }
-  };
+  }, []);
 
-  const toggleTheme = () => {
-    if (actualTheme === 'light') {
-      setThemeMode('dark');
-    } else {
-      setThemeMode('light');
-    }
-  };
+  const toggleTheme = useCallback(() => {
+    setThemeMode(actualTheme === 'light' ? 'dark' : 'light');
+  }, [actualTheme, setThemeMode]);
 
-  const colors = {
-    light: {
-      background: '#f9fafb', // gray-50
-      surface: '#ffffff',
-      text: '#111827', // gray-900
-      textSecondary: '#6b7280', // gray-500
-      textTertiary: '#9ca3af', // gray-400
-      primary: '#3b82f6', // blue-500
-      primaryLight: '#dbeafe', // blue-100
-      success: '#10b981', // green-500
-      successLight: '#d1fae5', // green-100
-      error: '#ef4444', // red-500
-      errorLight: '#fee2e2', // red-100
-      warning: '#f59e0b', // amber-500
-      warningLight: '#fef3c7', // amber-100
-      border: '#e5e7eb', // gray-200
-      borderLight: '#f3f4f6', // gray-100
-      shadow: 'rgba(0, 0, 0, 0.1)',
-    },
-    dark: {
-      background: '#111827', // gray-900
-      surface: '#1f2937', // gray-800
-      text: '#f9fafb', // gray-50
-      textSecondary: '#d1d5db', // gray-300
-      textTertiary: '#9ca3af', // gray-400
-      primary: '#60a5fa', // blue-400
-      primaryLight: '#1e3a8a', // blue-900
-      success: '#34d399', // green-400
-      successLight: '#065f46', // green-900
-      error: '#f87171', // red-400
-      errorLight: '#7f1d1d', // red-900
-      warning: '#fbbf24', // amber-400
-      warningLight: '#78350f', // amber-900
-      border: '#374151', // gray-700
-      borderLight: '#4b5563', // gray-600
-      shadow: 'rgba(0, 0, 0, 0.5)',
-    },
-  };
+  const themeColors = actualTheme === 'dark' ? THEME_PALETTES.dark : THEME_PALETTES.light;
 
-  const themeColors = colors[actualTheme];
-
-  const value = {
-    theme: actualTheme,
-    themePreference: theme,
-    colors: themeColors,
-    setTheme: setThemeMode,
-    toggleTheme,
-    isLoading,
-  };
+  const value = useMemo(
+    () => ({
+      theme: actualTheme,
+      themePreference: theme,
+      colors: themeColors,
+      setTheme: setThemeMode,
+      toggleTheme,
+      isLoading,
+    }),
+    [actualTheme, theme, themeColors, setThemeMode, toggleTheme, isLoading]
+  );
 
   return (
     <ThemeContext.Provider value={value}>
@@ -122,4 +124,3 @@ export function useTheme() {
   }
   return context;
 }
-

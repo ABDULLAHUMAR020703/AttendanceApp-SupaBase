@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Generate Report Button Component
  * Allows Super Admin to generate reports with different date ranges
  */
@@ -13,7 +13,10 @@ import {
   StyleSheet,
   ScrollView,
   TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
+import { getKeyboardAvoidingBehavior, formScrollViewProps } from '../../../shared/components/KeyboardAwareScreen';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../core/contexts/ThemeContext';
 import { useAuth } from '../../../core/contexts/AuthContext';
@@ -177,6 +180,10 @@ export default function GenerateReportButton({ style }) {
           }
         }}
       >
+        <KeyboardAvoidingView
+          behavior={getKeyboardAvoidingBehavior({ inModal: true })}
+          style={{ flex: 1 }}
+        >
         <View style={styles.modalOverlay}>
           <View
             style={[
@@ -217,6 +224,9 @@ export default function GenerateReportButton({ style }) {
               style={styles.modalBody}
               contentContainerStyle={styles.modalBodyContent}
               showsVerticalScrollIndicator={true}
+              keyboardShouldPersistTaps="handled"
+              automaticallyAdjustKeyboardInsets={true}
+              keyboardDismissMode="on-drag"
             >
               <Text
                 style={[
@@ -396,6 +406,7 @@ export default function GenerateReportButton({ style }) {
             </ScrollView>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
     </>
   );

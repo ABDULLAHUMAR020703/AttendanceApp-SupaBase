@@ -22,17 +22,32 @@ export function isInOffice(user) {
   return normalizeWorkMode(user) === WORK_MODES.IN_OFFICE;
 }
 
-/** Whether GPS coordinates are required before check-in. */
+/** Hybrid: office or assigned sites (schedule-driven). Not a DB enum yet; supported if present. */
+export function isHybrid(user) {
+  return normalizeWorkMode(user) === 'hybrid';
+}
+
+/**
+ * Whether GPS coordinates are required before check-in.
+ * Fully remote: optional. All other modes: required for audit / geofence.
+ */
 export function isLocationRequiredForCheckIn(user) {
   return !isFullyRemote(user);
 }
 
-/** Whether geofence radius should be enforced for check-in. */
+/**
+ * Whether geofence radius should be enforced for check-in.
+ * - in_office / hybrid: yes
+ * - semi_remote / fully_remote: no (semi-remote may check in from home or approved remote locations)
+ */
 export function requiresGeofenceForCheckIn(user) {
-  return isInOffice(user) || isSemiRemote(user);
+  return isInOffice(user) || isHybrid(user);
 }
 
-/** Whether automatic geofence checkout monitoring applies while checked in. */
+/**
+ * Whether automatic geofence checkout monitoring applies while checked in.
+ * Only office and hybrid employees are constrained to work sites while checked in.
+ */
 export function shouldMonitorGeofenceWhileCheckedIn(user) {
-  return isInOffice(user) || isSemiRemote(user);
+  return isInOffice(user) || isHybrid(user);
 }

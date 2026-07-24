@@ -60,12 +60,24 @@ export const saveAttendanceRecord = async (attendanceRecord) => {
       return { success: false, error: 'You must check in before checking out.' };
     }
 
-    // Get user UID from current Supabase session
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-    if (authError || !authUser) {
-      console.error('Error getting Supabase session:', authError);
-      const record = await saveAttendanceRecordFallback(attendanceRecord);
-      return { success: true, source: 'offline', record };
+    // Prefer local session (no network round-trip). Fall back to getUser() only if needed.
+    let authUser = null;
+    try {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (!sessionError && session?.user) {
+        authUser = session.user;
+      }
+    } catch (sessionErr) {
+      console.warn('[attendance] getSession failed, trying getUser:', sessionErr?.message || sessionErr);
+    }
+    if (!authUser) {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        console.error('Error getting Supabase session:', authError);
+        const record = await saveAttendanceRecordFallback(attendanceRecord);
+        return { success: true, source: 'offline', reason: 'auth_unavailable', record };
+      }
+      authUser = user;
     }
 
     // Get employee data for employee_name
@@ -73,7 +85,7 @@ export const saveAttendanceRecord = async (attendanceRecord) => {
     if (!tenantCid) {
       console.error('[tenant] saveAttendanceRecord: missing company_id');
       const record = await saveAttendanceRecordFallback(attendanceRecord);
-      return { success: true, source: 'offline', record };
+      return { success: true, source: 'offline', reason: 'missing_tenant', record };
     }
     const employee = await getEmployeeByUsername(attendanceRecord.username, tenantCid);
     
@@ -103,6 +115,7 @@ export const saveAttendanceRecord = async (attendanceRecord) => {
       return {
         success: true,
         source: 'offline',
+        reason: 'network',
         record,
         error: error.message,
       };
@@ -120,6 +133,7 @@ export const saveAttendanceRecord = async (attendanceRecord) => {
     return {
       success: true,
       source: 'offline',
+      reason: 'network',
       record,
       error: error?.message,
     };

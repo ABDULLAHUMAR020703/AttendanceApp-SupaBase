@@ -1,7 +1,7 @@
 -- ============================================
 -- Storage: company-logos bucket policies
 -- ============================================
--- Run this AFTER creating the bucket "company-logos" in Supabase Dashboard (see STORAGE_SETUP.md).
+-- Run this AFTER creating the public "company-logos" bucket in Supabase Dashboard.
 -- Run in Supabase SQL Editor.
 -- ============================================
 

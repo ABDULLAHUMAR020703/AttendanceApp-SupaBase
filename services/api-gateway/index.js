@@ -4,9 +4,15 @@ const cors = require('cors');
 const authRoutes = require('./routes/auth');
 const reportRoutes = require('./routes/reports');
 const adminRoutes = require('./routes/admin');
+const { probeHttp } = require('./lib/health');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const AUTH_SERVICE_URL = (process.env.AUTH_SERVICE_URL || 'http://localhost:3001').replace(/\/+$/, '');
+const REPORTING_SERVICE_URL = (process.env.REPORTING_SERVICE_URL || 'http://localhost:3002').replace(
+  /\/+$/,
+  ''
+);
 
 // Middleware
 app.use(cors());
@@ -33,17 +39,36 @@ app.use('/api/auth', authRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/admin', adminRoutes);
 
-// Health check route
-app.get('/health', (req, res) => {
-  res.status(200).json({
+// Liveness: process is up (used for basic restarts)
+app.get('/health', async (req, res) => {
+  const deep = String(req.query.deep || '') === '1';
+  const payload = {
     status: 'ok',
     message: 'API Gateway is running',
     timestamp: new Date().toISOString(),
-    build:
-      process.env.RENDER_GIT_COMMIT ||
-      process.env.GIT_COMMIT_SHA ||
-      'local-dev',
-    authServiceUrl: (process.env.AUTH_SERVICE_URL || 'http://localhost:3001').replace(/\/+$/, ''),
+    build: process.env.GIT_COMMIT_SHA || process.env.RENDER_GIT_COMMIT || 'local-dev',
+    authServiceUrl: AUTH_SERVICE_URL,
+    reportingServiceUrl: REPORTING_SERVICE_URL,
+  };
+
+  if (!deep) {
+    return res.status(200).json(payload);
+  }
+
+  const [auth, reporting] = await Promise.all([
+    probeHttp(`${AUTH_SERVICE_URL}/health`),
+    probeHttp(`${REPORTING_SERVICE_URL}/health`),
+  ]);
+
+  const ready = auth.ok;
+  return res.status(ready ? 200 : 503).json({
+    ...payload,
+    status: ready ? 'ok' : 'degraded',
+    checks: {
+      authService: auth,
+      // Reporting is soft: gateway can still serve auth/admin if reporting is down.
+      reportingService: reporting,
+    },
   });
 });
 

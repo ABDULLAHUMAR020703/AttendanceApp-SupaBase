@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const axios = require('axios');
 
 const router = express.Router();
@@ -151,7 +151,17 @@ router.post('/sync-metadata', async (req, res) => {
 
 const forwardWithUserContext = async (req, res, method, path) => {
   const timestamp = new Date().toISOString();
+  const hasUserContext = Boolean(req.get('x-user-context') || req.get('X-User-Context'));
   try {
+    if (path.includes('work-mode-requests')) {
+      console.log(`[${timestamp}] API Gateway: work-mode forward`, {
+        method: method.toUpperCase(),
+        path,
+        hasUserContext,
+        hasAuthorization: Boolean(req.headers.authorization || req.get('Authorization')),
+        bodyKeys: req.body && typeof req.body === 'object' ? Object.keys(req.body) : [],
+      });
+    }
     const response = await axios({
       method,
       url: `${AUTH_SERVICE_URL}${path}`,
@@ -159,8 +169,9 @@ const forwardWithUserContext = async (req, res, method, path) => {
       headers: {
         'Content-Type': 'application/json',
         'x-user-context': req.get('x-user-context') || req.get('X-User-Context') || '',
+        Authorization: req.headers.authorization || req.get('Authorization') || '',
       },
-      timeout: 10000,
+      timeout: 15000,
       params: req.query,
     });
     console.log(`[${timestamp}] API Gateway: ${method.toUpperCase()} ${path} -> ${response.status}`);
@@ -168,6 +179,12 @@ const forwardWithUserContext = async (req, res, method, path) => {
   } catch (error) {
     console.error(`[${timestamp}] API Gateway - ${method} ${path} error:`, error.message);
     if (error.response) {
+      if (path.includes('work-mode-requests')) {
+        console.error(`[${timestamp}] API Gateway: work-mode backend response`, {
+          status: error.response.status,
+          data: error.response.data,
+        });
+      }
       res.status(error.response.status).json(error.response.data);
     } else if (error.request) {
       res.status(503).json({
@@ -249,6 +266,7 @@ router.post('/users', async (req, res) => {
         // Forward caller identity so auth-service can enforce tenant isolation
         // (must include role + company_id of the requester).
         'x-user-context': req.get('x-user-context') || req.get('X-User-Context') || '',
+        Authorization: req.headers.authorization || req.get('Authorization') || '',
       },
       timeout: 10000,
     });
@@ -291,6 +309,7 @@ router.delete('/users/:uid', async (req, res) => {
       headers: {
         'Content-Type': 'application/json',
         'x-user-context': req.get('x-user-context') || req.get('X-User-Context') || '',
+        Authorization: req.headers.authorization || req.get('Authorization') || '',
       },
       data: req.body || {},
       timeout: 10000,
@@ -320,7 +339,7 @@ router.delete('/users/:uid', async (req, res) => {
 });
 
 /**
- * PATCH /api/auth/users/uid/:uid/role — update role by user id (preferred)
+ * PATCH /api/auth/users/uid/:uid/role â€” update role by user id (preferred)
  */
 router.patch('/users/uid/:uid/role', async (req, res) => {
   const timestamp = new Date().toISOString();
@@ -334,6 +353,7 @@ router.patch('/users/uid/:uid/role', async (req, res) => {
         headers: {
           'Content-Type': 'application/json',
           'x-user-context': req.get('x-user-context') || req.get('X-User-Context') || '',
+          Authorization: req.headers.authorization || req.get('Authorization') || '',
         },
         timeout: 10000,
       }
@@ -369,6 +389,7 @@ router.patch('/users/:username/role', async (req, res) => {
         headers: {
           'Content-Type': 'application/json',
           'x-user-context': req.get('x-user-context') || req.get('X-User-Context') || '',
+          Authorization: req.headers.authorization || req.get('Authorization') || '',
         },
         timeout: 10000,
       }
@@ -410,6 +431,7 @@ router.patch('/users/uid/:uid/username', async (req, res) => {
         headers: {
           'Content-Type': 'application/json',
           'x-user-context': req.get('x-user-context') || req.get('X-User-Context') || '',
+          Authorization: req.headers.authorization || req.get('Authorization') || '',
         },
         timeout: 10000,
       }
@@ -435,6 +457,7 @@ router.patch('/users/uid/:uid/email', async (req, res) => {
         headers: {
           'Content-Type': 'application/json',
           'x-user-context': req.get('x-user-context') || req.get('X-User-Context') || '',
+          Authorization: req.headers.authorization || req.get('Authorization') || '',
         },
         timeout: 10000,
       }
@@ -460,6 +483,7 @@ router.patch('/users/uid/:uid/password', async (req, res) => {
         headers: {
           'Content-Type': 'application/json',
           'x-user-context': req.get('x-user-context') || req.get('X-User-Context') || '',
+          Authorization: req.headers.authorization || req.get('Authorization') || '',
         },
         timeout: 10000,
       }
@@ -485,6 +509,7 @@ router.patch('/users/:username/password', async (req, res) => {
         headers: {
           'Content-Type': 'application/json',
           'x-user-context': req.get('x-user-context') || req.get('X-User-Context') || '',
+          Authorization: req.headers.authorization || req.get('Authorization') || '',
         },
         timeout: 10000,
       }
@@ -510,6 +535,7 @@ router.patch('/users/:username/email', async (req, res) => {
         headers: {
           'Content-Type': 'application/json',
           'x-user-context': req.get('x-user-context') || req.get('X-User-Context') || '',
+          Authorization: req.headers.authorization || req.get('Authorization') || '',
         },
         timeout: 10000,
       }
@@ -540,6 +566,7 @@ router.patch('/users/:username', async (req, res) => {
         headers: {
           'Content-Type': 'application/json',
           'x-user-context': req.get('x-user-context') || req.get('X-User-Context') || '',
+          Authorization: req.headers.authorization || req.get('Authorization') || '',
         },
         timeout: 10000,
       }

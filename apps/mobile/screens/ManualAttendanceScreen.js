@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { getKeyboardAvoidingBehavior, formScrollViewProps } from '../shared/components/KeyboardAwareScreen';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { 
@@ -23,6 +24,7 @@ import { getManageableEmployees, canManageEmployee } from '../utils/employees';
 import DatePickerCalendar from '../components/DatePickerCalendar';
 import { spacing, fontSize, responsivePadding, responsiveFont, iconSize, isTablet } from '../shared/utils/responsive';
 import { useAuth } from '../contexts/AuthContext';
+import { useStaleWhileRevalidate } from '../shared/hooks/useStaleWhileRevalidate';
 
 export default function ManualAttendanceScreen({ navigation }) {
   const { user: authUser } = useAuth();
@@ -41,37 +43,6 @@ export default function ManualAttendanceScreen({ navigation }) {
   const [location, setLocation] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    loadData();
-    
-    // Safely check if navigation and addListener exist
-    let unsubscribe = null;
-    if (navigation && typeof navigation.addListener === 'function') {
-      try {
-        unsubscribe = navigation.addListener('focus', () => {
-          loadData();
-        });
-      } catch (error) {
-        if (__DEV__) {
-          console.warn('[ManualAttendanceScreen] Failed to add navigation listener:', error);
-        }
-      }
-    }
-    
-    return () => {
-      // Only call unsubscribe if it's a function
-      if (typeof unsubscribe === 'function') {
-        try {
-          unsubscribe();
-        } catch (error) {
-          if (__DEV__) {
-            console.warn('[ManualAttendanceScreen] Error unsubscribing navigation listener:', error);
-          }
-        }
-      }
-    };
-  }, [navigation, user?.uid]);
-
   const loadData = async () => {
     if (!user?.uid) {
       setEmployees([]);
@@ -83,6 +54,42 @@ export default function ManualAttendanceScreen({ navigation }) {
       loadAttendanceRecords()
     ]);
   };
+
+  const loadDataRef = useRef(async () => {});
+  loadDataRef.current = loadData;
+  const stableLoad = useCallback(() => loadDataRef.current(), []);
+  const { refreshOnFocus, refreshForced } = useStaleWhileRevalidate(stableLoad, {
+    minIntervalMs: 2500,
+  });
+
+  useEffect(() => {
+    refreshForced();
+
+    let unsubscribe = null;
+    if (navigation && typeof navigation.addListener === 'function') {
+      try {
+        unsubscribe = navigation.addListener('focus', () => {
+          refreshOnFocus();
+        });
+      } catch (error) {
+        if (__DEV__) {
+          console.warn('[ManualAttendanceScreen] Failed to add navigation listener:', error);
+        }
+      }
+    }
+
+    return () => {
+      if (typeof unsubscribe === 'function') {
+        try {
+          unsubscribe();
+        } catch (error) {
+          if (__DEV__) {
+            console.warn('[ManualAttendanceScreen] Error unsubscribing navigation listener:', error);
+          }
+        }
+      }
+    };
+  }, [navigation, user?.uid, refreshForced, refreshOnFocus]);
 
   const loadEmployees = async () => {
     try {
@@ -316,7 +323,7 @@ export default function ManualAttendanceScreen({ navigation }) {
         
         {item.location?.address && (
           <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary, marginTop: spacing.xs / 2 }}>
-            📍 {item.location.address}
+            ðŸ“ {item.location.address}
           </Text>
         )}
 
@@ -371,7 +378,7 @@ export default function ManualAttendanceScreen({ navigation }) {
         {employee.name}
       </Text>
       <Text numberOfLines={1} style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
-        {employee.username} • {employee.department}
+        {employee.username} â€¢ {employee.department}
       </Text>
     </TouchableOpacity>
   );
@@ -439,8 +446,8 @@ export default function ManualAttendanceScreen({ navigation }) {
       >
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+          behavior={getKeyboardAvoidingBehavior({ inModal: true })}
+          keyboardVerticalOffset={0}
         >
           <View style={{ flex: 1, justifyContent: tablet ? 'center' : 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
             <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, borderBottomLeftRadius: tablet ? 20 : 0, borderBottomRightRadius: tablet ? 20 : 0, maxHeight: tablet ? '85%' : '90%', width: '100%', maxWidth: tablet ? 700 : undefined, alignSelf: 'center', padding: responsivePadding(20) }}>
@@ -448,6 +455,8 @@ export default function ManualAttendanceScreen({ navigation }) {
                 showsVerticalScrollIndicator={false} 
                 contentContainerStyle={{ paddingBottom: spacing['2xl'] }}
                 keyboardShouldPersistTaps="handled"
+                automaticallyAdjustKeyboardInsets={true}
+                keyboardDismissMode="on-drag"
               >
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg }}>
                 <Text style={{ fontSize: responsiveFont(20), fontWeight: 'bold', color: colors.text }}>
@@ -468,6 +477,8 @@ export default function ManualAttendanceScreen({ navigation }) {
                   nestedScrollEnabled={true}
                   showsVerticalScrollIndicator={true}
                   keyboardShouldPersistTaps="handled"
+                  automaticallyAdjustKeyboardInsets={true}
+                  keyboardDismissMode="on-drag"
                 >
                   {employees.length === 0 ? (
                     <View style={{ padding: spacing.md, alignItems: 'center' }}>
@@ -633,8 +644,8 @@ export default function ManualAttendanceScreen({ navigation }) {
       >
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+          behavior={getKeyboardAvoidingBehavior({ inModal: true })}
+          keyboardVerticalOffset={0}
         >
           <View style={{ flex: 1, justifyContent: tablet ? 'center' : 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
             <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, borderBottomLeftRadius: tablet ? 20 : 0, borderBottomRightRadius: tablet ? 20 : 0, maxHeight: tablet ? '85%' : '90%', width: '100%', maxWidth: tablet ? 700 : undefined, alignSelf: 'center', padding: responsivePadding(20) }}>
@@ -642,6 +653,8 @@ export default function ManualAttendanceScreen({ navigation }) {
                 showsVerticalScrollIndicator={false} 
                 contentContainerStyle={{ paddingBottom: spacing['2xl'] }}
                 keyboardShouldPersistTaps="handled"
+                automaticallyAdjustKeyboardInsets={true}
+                keyboardDismissMode="on-drag"
               >
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg }}>
                 <Text style={{ fontSize: responsiveFont(20), fontWeight: 'bold', color: colors.text }}>

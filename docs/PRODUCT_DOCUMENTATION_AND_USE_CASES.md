@@ -455,7 +455,8 @@ Why this architecture:
 ### Production Deployment Pattern
 
 1. Merge/push to repository.
-2. Redeploy backend services on Render.
+2. Coolify automatically rebuilds and deploys the backend from the root
+   `docker-compose.yml` (Traefik serves `https://api.yourdomain.com`).
 3. Deploy/update web app on Vercel (`apps/web` root).
 4. Smoke-test:
    - login,

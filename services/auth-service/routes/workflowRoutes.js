@@ -19,7 +19,7 @@ const router = express.Router();
 const ROLES = { SUPER_ADMIN: 'super_admin', MANAGER: 'manager', EMPLOYEE: 'employee' };
 
 const parseRequester = (req) => {
-  const raw = req.get('x-user-context');
+  const raw = req.get('x-user-context') || req.get('X-User-Context');
   if (!raw) return null;
   try {
     return JSON.parse(raw);
@@ -29,15 +29,16 @@ const parseRequester = (req) => {
 };
 
 async function withTenantContext(req, res) {
-  const requester = parseRequester(req);
-  if (!requester?.uid) {
-    res.status(401).json({ success: false, error: 'Unauthorized' });
+  const { resolveRequester } = require('../lib/resolveRequester');
+  const requesterIdentity = await resolveRequester(req);
+  if (!requesterIdentity?.uid) {
+    res.status(401).json({ success: false, error: 'Authentication expired. Please sign in again.' });
     return null;
   }
   const { data: user } = await supabase
     .from('users')
     .select('uid, username, email, role, department, company_id, name')
-    .eq('uid', requester.uid)
+    .eq('uid', requesterIdentity.uid)
     .eq('is_active', true)
     .maybeSingle();
   if (!user?.company_id) {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,10 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  getKeyboardAvoidingBehavior,
+  formScrollViewProps,
+} from '../shared/components/KeyboardAwareScreen';
 import { 
   getEmployeeLeaveBalance,
   calculateRemainingLeaves,
@@ -28,6 +32,7 @@ import { getEmployeeByUsername } from '../utils/employees';
 import DatePickerCalendar from '../components/DatePickerCalendar';
 import { useTheme } from '../contexts/ThemeContext';
 import { isTablet, responsivePadding, responsiveFont, spacing } from '../shared/utils/responsive';
+import { useStaleWhileRevalidate } from '../shared/hooks/useStaleWhileRevalidate';
 
 export default function LeaveRequestScreen({ navigation, route }) {
   const { user } = route.params;
@@ -87,15 +92,38 @@ export default function LeaveRequestScreen({ navigation, route }) {
   };
 
   useEffect(() => {
-    loadData();
+    if (showRequestModal) {
+      loadDepartments();
+    }
+  }, [showRequestModal]);
+
+  useEffect(() => {
     loadDepartments();
-    
-    // Safely check if navigation and addListener exist
+  }, []);
+
+  const loadData = async () => {
+    await Promise.all([
+      loadLeaveBalance(),
+      loadMyRequests(),
+      loadEmployee()
+    ]);
+  };
+
+  const loadDataRef = useRef(async () => {});
+  loadDataRef.current = loadData;
+  const stableLoad = useCallback(() => loadDataRef.current(), []);
+  const { refreshOnFocus, refreshForced } = useStaleWhileRevalidate(stableLoad, {
+    minIntervalMs: 2500,
+  });
+
+  useEffect(() => {
+    refreshForced();
+
     let unsubscribe = null;
     if (navigation && typeof navigation.addListener === 'function') {
       try {
         unsubscribe = navigation.addListener('focus', () => {
-          loadData();
+          refreshOnFocus();
         });
       } catch (error) {
         if (__DEV__) {
@@ -103,9 +131,8 @@ export default function LeaveRequestScreen({ navigation, route }) {
         }
       }
     }
-    
+
     return () => {
-      // Only call unsubscribe if it's a function
       if (typeof unsubscribe === 'function') {
         try {
           unsubscribe();
@@ -116,15 +143,7 @@ export default function LeaveRequestScreen({ navigation, route }) {
         }
       }
     };
-  }, [navigation]);
-
-  const loadData = async () => {
-    await Promise.all([
-      loadLeaveBalance(),
-      loadMyRequests(),
-      loadEmployee()
-    ]);
-  };
+  }, [navigation, refreshForced, refreshOnFocus]);
 
   const loadEmployee = async () => {
     try {
@@ -172,7 +191,7 @@ export default function LeaveRequestScreen({ navigation, route }) {
 
   const onRefresh = async () => {
     setIsRefreshing(true);
-    await loadData();
+    await refreshForced();
     setIsRefreshing(false);
   };
 
@@ -454,14 +473,15 @@ export default function LeaveRequestScreen({ navigation, route }) {
       >
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-      >
+          behavior={getKeyboardAvoidingBehavior({ inModal: true })}
+          keyboardVerticalOffset={0}
+        >
         <View className="flex-1" style={{ justifyContent: tablet ? 'center' : 'flex-end', backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
           <View className="rounded-t-3xl p-6" style={{ backgroundColor: colors.surface, maxHeight: tablet ? '85%' : '90%', width: '100%', maxWidth: tablet ? 700 : undefined, alignSelf: 'center', borderBottomLeftRadius: tablet ? 24 : 0, borderBottomRightRadius: tablet ? 24 : 0 }}>
               <ScrollView 
+                {...formScrollViewProps}
                 showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={{ paddingBottom: 24 }}
               >
               <View className="flex-row items-center justify-between mb-4">
                 <Text className="text-xl font-bold" style={{ color: colors.text }}>

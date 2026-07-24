@@ -12,7 +12,7 @@ import {
   canAccessFeature as catalogCanAccessFeature,
   isSuperAdmin,
   hasTenantWidePeopleAccess,
-} from '../../../../../shared/permissions/catalog.cjs';
+} from '@shared/permissions/catalog.cjs';
 
 export const managerPermissionGroups = MANAGER_PERMISSION_GROUPS;
 export const allManagerPermissions = ALL_MANAGER_PERMISSIONS;

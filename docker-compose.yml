@@ -1,0 +1,174 @@
+# Production backend stack for Coolify (Ubuntu 24.04 / Docker Engine / Traefik)
+#
+# Public:  gateway listens on container port 80 → Coolify Traefik → https://api.example.com
+#          End users never use :3000. Traefik terminates TLS on 443.
+# Internal: auth-service:3001, reporting-service:3002 (no public domain)
+# External: Supabase Cloud + SMTP
+#
+# Coolify setup:
+# 1. New Resource → Docker Compose → this repo / docker-compose.yml
+# 2. Paste secrets from root .env.example into Coolify Environment Variables
+# 3. Assign domain ONLY to gateway: https://api.yourdomain.com
+#    (no port suffix; gateway listens on 80 which Traefik defaults to)
+# 4. Do NOT assign domains to auth-service or reporting-service
+# 5. Do NOT publish host Ports Mappings for HTTP (that bypasses Traefik/HTTPS)
+#
+# Local smoke test without Coolify:
+#   cp docker-compose.override.example.yml docker-compose.override.yml
+#   docker compose up --build
+#
+# Environment: set variables once in Coolify / root .env. Compose injects only
+# what each service needs. Do not override PORT, AUTH_SERVICE_URL, or
+# REPORTING_SERVICE_URL in Coolify (wired below for Docker DNS).
+
+name: attendance-backend
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-restart: &default-restart "unless-stopped"
+
+# Shared across all three services (no secrets).
+x-app-env: &app-env
+  NODE_ENV: production
+  HOST: 0.0.0.0
+  GIT_COMMIT_SHA: ${GIT_COMMIT_SHA:-}
+
+# Shared by auth-service + reporting-service only.
+x-supabase-env: &supabase-env
+  SUPABASE_URL: ${SUPABASE_URL:?SUPABASE_URL is required}
+  SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:?SUPABASE_SERVICE_ROLE_KEY is required}
+
+services:
+  auth-service:
+    build:
+      context: .
+      dockerfile: services/auth-service/Dockerfile
+    restart: *default-restart
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    environment:
+      <<: [*app-env, *supabase-env]
+      PORT: "3001"
+      COMPANY_ONBOARDING_SECRET: ${COMPANY_ONBOARDING_SECRET:-}
+    expose:
+      - "3001"
+    networks:
+      - backend
+    logging: *default-logging
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3001/health?deep=1').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 8s
+      retries: 3
+      start_period: 40s
+    stop_grace_period: 15s
+    mem_limit: 512m
+
+  reporting-service:
+    build:
+      context: .
+      dockerfile: services/reporting-service/Dockerfile
+    restart: *default-restart
+    init: true
+    # Entrypoint starts as root to chown the volume, then drops to app via su-exec.
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      <<: [*app-env, *supabase-env]
+      PORT: "3002"
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+    expose:
+      - "3002"
+    volumes:
+      - reporting-data:/app/data
+    networks:
+      - backend
+    logging: *default-logging
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3002/health?deep=1').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 8s
+      retries: 3
+      start_period: 45s
+    stop_grace_period: 60s
+    mem_limit: 768m
+
+  gateway:
+    build:
+      context: .
+      dockerfile: services/api-gateway/Dockerfile
+    restart: *default-restart
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    environment:
+      <<: *app-env
+      # Port 80 = Coolify Traefik default backend. Public URL is https://domain (443).
+      PORT: "80"
+      # Docker DNS — do not set these in Coolify.
+      AUTH_SERVICE_URL: http://auth-service:3001
+      REPORTING_SERVICE_URL: http://reporting-service:3002
+    # Traefik reaches this over the Docker network via expose.
+    expose:
+      - "80"
+    networks:
+      - backend
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      reporting-service:
+        condition: service_started
+    logging: *default-logging
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:80/health?deep=1').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 8s
+      retries: 3
+      start_period: 40s
+    stop_grace_period: 15s
+    mem_limit: 256m
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  reporting-data:
+    driver: local

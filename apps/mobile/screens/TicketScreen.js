@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { getKeyboardAvoidingBehavior, formScrollViewProps } from '../shared/components/KeyboardAwareScreen';
 import { Ionicons } from '@expo/vector-icons';
 import {
   createTicket,
@@ -29,6 +30,7 @@ import {
 } from '../utils/ticketDepartments';
 import { useTheme } from '../contexts/ThemeContext';
 import { spacing, fontSize, responsivePadding, responsiveFont, iconSize, isTablet } from '../shared/utils/responsive';
+import { useStaleWhileRevalidate } from '../shared/hooks/useStaleWhileRevalidate';
 
 export default function TicketScreen({ navigation, route }) {
   const { user } = route.params;
@@ -82,15 +84,48 @@ export default function TicketScreen({ navigation, route }) {
   };
 
   useEffect(() => {
+    if (showCreateModal) {
+      loadDepartments();
+    }
+  }, [showCreateModal]);
+
+  useEffect(() => {
     loadDepartments();
-    loadTickets();
-    
-    // Safely check if navigation and addListener exist
+  }, []);
+
+  const loadTickets = async () => {
+    try {
+      const userTickets = await getUserTickets(user.username);
+      const sorted = userTickets.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+      let filtered = sorted;
+      if (filter !== 'all') {
+        filtered = sorted.filter(ticket => ticket.status === filter);
+      }
+
+      setTickets(filtered);
+    } catch (error) {
+      console.error('Error loading tickets:', error);
+    }
+  };
+
+  const loadTicketsRef = useRef(async () => {});
+  loadTicketsRef.current = loadTickets;
+  const stableLoad = useCallback(() => loadTicketsRef.current(), []);
+  const { refreshOnFocus, refreshForced } = useStaleWhileRevalidate(stableLoad, {
+    minIntervalMs: 2500,
+  });
+
+  useEffect(() => {
+    refreshForced();
+  }, [filter, refreshForced]);
+
+  useEffect(() => {
     let unsubscribe = null;
     if (navigation && typeof navigation.addListener === 'function') {
       try {
         unsubscribe = navigation.addListener('focus', () => {
-          loadTickets();
+          refreshOnFocus();
         });
       } catch (error) {
         if (__DEV__) {
@@ -98,9 +133,8 @@ export default function TicketScreen({ navigation, route }) {
         }
       }
     }
-    
+
     return () => {
-      // Only call unsubscribe if it's a function
       if (typeof unsubscribe === 'function') {
         try {
           unsubscribe();
@@ -111,35 +145,11 @@ export default function TicketScreen({ navigation, route }) {
         }
       }
     };
-  }, [navigation, filter]);
-
-  useEffect(() => {
-    if (showCreateModal) {
-      loadDepartments();
-    }
-  }, [showCreateModal]);
-
-  const loadTickets = async () => {
-    try {
-      const userTickets = await getUserTickets(user.username);
-      // Sort by created date (newest first)
-      const sorted = userTickets.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      
-      // Apply filter
-      let filtered = sorted;
-      if (filter !== 'all') {
-        filtered = sorted.filter(ticket => ticket.status === filter);
-      }
-      
-      setTickets(filtered);
-    } catch (error) {
-      console.error('Error loading tickets:', error);
-    }
-  };
+  }, [navigation, refreshOnFocus]);
 
   const onRefresh = async () => {
     setIsRefreshing(true);
-    await loadTickets();
+    await refreshForced();
     setIsRefreshing(false);
   };
 
@@ -285,7 +295,7 @@ export default function TicketScreen({ navigation, route }) {
         </Text>
         {item.assignedTo && (
           <>
-            <Text style={{ color: colors.textTertiary, marginHorizontal: spacing.xs }}>•</Text>
+            <Text style={{ color: colors.textTertiary, marginHorizontal: spacing.xs }}>â€¢</Text>
             <Ionicons name="person-outline" size={iconSize.sm} color={colors.textSecondary} />
             <Text
               style={{
@@ -480,8 +490,8 @@ export default function TicketScreen({ navigation, route }) {
       >
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+          behavior={getKeyboardAvoidingBehavior({ inModal: true })}
+          keyboardVerticalOffset={0}
         >
           <View
             style={{
@@ -505,9 +515,9 @@ export default function TicketScreen({ navigation, route }) {
               }}
             >
               <ScrollView 
+                {...formScrollViewProps}
                 showsVerticalScrollIndicator={false} 
                 contentContainerStyle={{ paddingBottom: spacing['2xl'] }}
-                keyboardShouldPersistTaps="handled"
               >
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.base }}>
                 <Text
@@ -532,7 +542,7 @@ export default function TicketScreen({ navigation, route }) {
                 </Text>
                 {departmentsLoading ? (
                   <Text style={{ color: colors.textSecondary, fontSize: fontSize.sm }}>
-                    Loading departments…
+                    Loading departmentsâ€¦
                   </Text>
                 ) : departmentsError ? (
                   <View>

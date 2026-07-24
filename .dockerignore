@@ -1,0 +1,51 @@
+# Docker build context = monorepo root for all backend images.
+# Keep context small; never send secrets or client apps.
+
+# VCS / IDE / agent tooling
+.git
+.github
+.claude
+.cursor
+.expo-build-check
+.idea
+.vscode
+*.code-workspace
+
+# Dependencies (installed inside the image)
+**/node_modules
+**/npm-debug.log*
+**/.npm
+
+# Secrets — never bake into layers
+**/.env
+**/.env.*
+!**/.env.example
+
+# Client apps (not containerized)
+apps
+
+# Infra / docs / ops not needed in runtime images
+docs
+scripts
+supabase
+*.md
+package.json
+package-lock.json
+start-services.ps1
+start-services.sh
+docker-compose*.yml
+.env.example
+
+# Service junk (keep source; drop local artifacts)
+**/*.log
+**/.DS_Store
+**/Thumbs.db
+services/*/data
+services/*/README.md
+services/*/.gitignore
+services/*/test-*.js
+services/*/Dockerfile
+services/temp
+
+# Build metadata that does not need to be in the context tarball
+**/.dockerignore

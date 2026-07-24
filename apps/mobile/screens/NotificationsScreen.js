@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,7 @@ import {
 import { useTheme } from '../contexts/ThemeContext';
 import { handleNotificationNavigation } from '../utils/notificationNavigation';
 import { isTablet, responsivePadding, responsiveFont, spacing } from '../shared/utils/responsive';
+import { useStaleWhileRevalidate } from '../shared/hooks/useStaleWhileRevalidate';
 
 export default function NotificationsScreen({ navigation, route }) {
   const { user } = route.params;
@@ -35,15 +36,42 @@ export default function NotificationsScreen({ navigation, route }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [filter, setFilter] = useState('all'); // all, unread, read
 
+  const loadNotifications = async () => {
+    try {
+      const allNotifications = await getUserNotifications(user.username);
+      const unread = await getUnreadNotificationCount(user.username);
+      setUnreadCount(unread);
+
+      let filtered = allNotifications;
+      if (filter === 'unread') {
+        filtered = allNotifications.filter(n => !n.read && !n.isRead);
+      } else if (filter === 'read') {
+        filtered = allNotifications.filter(n => n.read || n.isRead);
+      }
+
+      setNotifications(filtered);
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+    }
+  };
+
+  const loadNotificationsRef = useRef(async () => {});
+  loadNotificationsRef.current = loadNotifications;
+  const stableLoad = useCallback(() => loadNotificationsRef.current(), []);
+  const { refreshOnFocus, refreshForced } = useStaleWhileRevalidate(stableLoad, {
+    minIntervalMs: 2500,
+  });
+
   useEffect(() => {
-    loadNotifications();
-    
-    // Safely check if navigation and addListener exist
+    refreshForced();
+  }, [filter, refreshForced]);
+
+  useEffect(() => {
     let unsubscribe = null;
     if (navigation && typeof navigation.addListener === 'function') {
       try {
         unsubscribe = navigation.addListener('focus', () => {
-          loadNotifications();
+          refreshOnFocus();
         });
       } catch (error) {
         if (__DEV__) {
@@ -51,9 +79,8 @@ export default function NotificationsScreen({ navigation, route }) {
         }
       }
     }
-    
+
     return () => {
-      // Only call unsubscribe if it's a function
       if (typeof unsubscribe === 'function') {
         try {
           unsubscribe();
@@ -64,31 +91,11 @@ export default function NotificationsScreen({ navigation, route }) {
         }
       }
     };
-  }, [navigation, filter]);
-
-  const loadNotifications = async () => {
-    try {
-      const allNotifications = await getUserNotifications(user.username);
-      const unread = await getUnreadNotificationCount(user.username);
-      setUnreadCount(unread);
-      
-      // Apply filter - check both read and isRead for compatibility
-      let filtered = allNotifications;
-      if (filter === 'unread') {
-        filtered = allNotifications.filter(n => !n.read && !n.isRead);
-      } else if (filter === 'read') {
-        filtered = allNotifications.filter(n => n.read || n.isRead);
-      }
-      
-      setNotifications(filtered);
-    } catch (error) {
-      console.error('Error loading notifications:', error);
-    }
-  };
+  }, [navigation, refreshOnFocus]);
 
   const onRefresh = async () => {
     setIsRefreshing(true);
-    await loadNotifications();
+    await refreshForced();
     setIsRefreshing(false);
   };
 

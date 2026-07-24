@@ -1249,9 +1249,9 @@ cd apps/mobile && npm start
 ```
 1. Merge to main branch
 2. npm run db:push                    → apply Supabase migrations
-3. Deploy Auth Service               → Render / similar
-4. Deploy Reporting Service          → Render / similar
-5. Deploy API Gateway                → Render (point to service URLs)
+3. Coolify detects the GitHub push    → builds root docker-compose.yml
+4. Coolify starts Auth + Reporting   → private backend Docker network
+5. Coolify starts API Gateway        → container port 80 behind Traefik
 6. Set Vercel env vars for web       → VITE_API_GATEWAY_URL, Supabase keys
 7. Deploy web portal                 → apps/web to Vercel
 8. EAS build mobile app              → eas build with production secrets
@@ -1261,6 +1261,11 @@ cd apps/mobile && npm start
    - Report generation + email delivery
    - Attendance check-in on physical device
 ```
+
+Assign the public Coolify domain only to `gateway` as
+`https://api.yourdomain.com` (no port). The gateway listens on container port
+**80**; Traefik terminates TLS on 443. End users never use `:3000`.
+`auth-service:3001` and `reporting-service:3002` remain internal.
 
 ### GitHub Actions CI
 
@@ -1396,8 +1401,8 @@ npm run sync-auth-metadata
 |----------|------|-------|
 | Full platform workflow | `hadir.ai_workflow.md` | All features including geofencing, tickets, calendar |
 | Web portal workflow | `hisab ai web portal workflow.md` | Web-only deep dive |
-| System architecture | `docs/SYSTEM_ARCHITECTURE.md` | Architecture diagrams |
-| Technical documentation | `docs/TECHNICAL_DOCUMENTATION.md` | Stack, CI/CD, troubleshooting |
+| Product documentation | `docs/PRODUCT_DOCUMENTATION_AND_USE_CASES.md` | Roles and use cases |
+| Department audit | `docs/DEPARTMENT_USAGE_AUDIT.md` | Department and permission behavior |
 | Setup guide | `SETUP.md` | Initial project setup |
 
 ---

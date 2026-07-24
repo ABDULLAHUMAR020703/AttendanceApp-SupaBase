@@ -123,7 +123,7 @@ ${message.trim()}`;
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['bottom']}>
       <KeyboardAwareScreen
         contentContainerStyle={{ padding: responsivePadding(16), paddingBottom: spacing['2xl'] }}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 24}
+        headerHeight={88}
       >
         <View style={{ backgroundColor: colors.surface, borderRadius: 16, padding: responsivePadding(20), marginBottom: spacing.lg }}>
           <View style={{ alignSelf: 'center', width: 64, height: 64, borderRadius: 32, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md }}>

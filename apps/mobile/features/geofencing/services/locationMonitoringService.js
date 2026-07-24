@@ -467,6 +467,17 @@ export const startLocationMonitoring = async (user) => {
 };
 
 /**
+ * Update the in-memory user used by an already-running monitor (e.g. workMode / profile refresh)
+ * without tearing down the interval. No-op if monitoring is not active.
+ * @param {Object} user
+ */
+export const updateLocationMonitoringUser = (user) => {
+  if (isMonitoring && user) {
+    currentUser = user;
+  }
+};
+
+/**
  * Stop location monitoring
  */
 export const stopLocationMonitoring = () => {

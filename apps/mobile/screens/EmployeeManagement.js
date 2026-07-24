@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
   Platform,
   RefreshControl,
 } from 'react-native';
+import { getKeyboardAvoidingBehavior, formScrollViewProps } from '../shared/components/KeyboardAwareScreen';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { 
@@ -65,7 +66,7 @@ export default function EmployeeManagement({
 }) {
   const { user: routeUser, openLeaveRequests } = route.params || {};
   const { user: authUser, isLoading: authContextLoading } = useAuth();
-  /** Single source of truth for identity and tenant — never use stale navigation params. */
+  /** Single source of truth for identity and tenant â€” never use stale navigation params. */
   const user = authUser;
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -240,7 +241,7 @@ export default function EmployeeManagement({
 
   const loadPendingRequests = async () => {
     try {
-      const requests = await getPendingWorkModeRequests();
+      const requests = await getPendingWorkModeRequests(user);
       setPendingRequests(requests);
     } catch (error) {
       console.error('Error loading pending requests:', error);
@@ -369,26 +370,27 @@ export default function EmployeeManagement({
 
   const handleProcessRequest = async (requestId, status) => {
     try {
-      const success = await processWorkModeRequest(
+      const result = await processWorkModeRequest(
         requestId, 
         status, 
         user.username,
         status === 'approved' ? 'Request approved' : 'Request rejected',
-        user.companyId
+        user.companyId,
+        user
       );
       
-      if (success) {
+      if (result?.success) {
         Alert.alert(
           'Success', 
           `Request ${status} successfully`
         );
         await loadData();
       } else {
-        Alert.alert('Error', 'Failed to process request');
+        Alert.alert('Error', result?.error || 'Failed to process request');
       }
     } catch (error) {
       console.error('Error processing request:', error);
-      Alert.alert('Error', 'Failed to process request');
+      Alert.alert('Error', error?.message || 'Failed to process request');
     }
   };
 
@@ -689,7 +691,7 @@ export default function EmployeeManagement({
             numberOfLines={1}
             ellipsizeMode="tail"
           >
-            {item.department} • {item.position}
+            {item.department} â€¢ {item.position}
           </Text>
             {/* HR Role Display */}
             {item.position && (
@@ -896,7 +898,7 @@ export default function EmployeeManagement({
         
         <Text className="mb-2" style={{ color: colors.textSecondary }}>
           <Text className="font-medium">{getLeaveTypeLabel(item.leaveType)}</Text>
-          {' • '}
+          {' â€¢ '}
           <Text className="font-medium">
             {item.isHalfDay ? 'Half day' : `${item.days} day${item.days !== 1 ? 's' : ''}`}
           </Text>
@@ -1194,12 +1196,13 @@ export default function EmployeeManagement({
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <FlatList
-        key={`emp-${employeeGridColumns}`}
         style={{ flex: 1 }}
         data={filteredEmployees}
         keyExtractor={(item) => item.id}
         numColumns={employeeGridColumns}
         keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets={true}
+        keyboardDismissMode="on-drag"
         ListHeaderComponent={employeeListHeader}
         ListEmptyComponent={
           <View
@@ -1394,8 +1397,8 @@ const LeaveSettingsModal = ({ visible, onClose, defaultSettings, onSave, onSetti
     >
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        behavior={getKeyboardAvoidingBehavior({ inModal: true })}
+        keyboardVerticalOffset={0}
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <View className="flex-1 justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
@@ -1503,7 +1506,7 @@ const LeaveSettingsModal = ({ visible, onClose, defaultSettings, onSave, onSetti
                   disabled={isSaving}
                 >
                   <Text className="text-center font-medium text-white">
-                    {isSaving ? 'Saving…' : 'Save'}
+                    {isSaving ? 'Savingâ€¦' : 'Save'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -1547,14 +1550,16 @@ const EmployeeLeaveModal = ({ visible, onClose, employeeData, leaveInputs, onInp
     >
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        behavior={getKeyboardAvoidingBehavior({ inModal: true })}
+        keyboardVerticalOffset={0}
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <View className="flex-1 justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
             <TouchableWithoutFeedback onPress={() => {}}>
               <View className="rounded-xl p-6 mx-4 w-full max-w-sm max-h-96" style={{ backgroundColor: colors.surface }}>
-                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"
+                automaticallyAdjustKeyboardInsets={true}
+                keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets={true} keyboardDismissMode="on-drag">
                 {/* Header with Back Button */}
                 <View className="flex-row items-center justify-between mb-2">
                   <TouchableOpacity

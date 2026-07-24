@@ -31,12 +31,15 @@ async function notifyUsers(supabase, { companyId, recipientUids, title, message,
     company_id: companyId,
     recipient_uid: uid,
     title,
-    message,
+    body: message,
     type,
     read: false,
   }));
   try {
-    await supabase.from('notifications').insert(rows);
+    const { error } = await supabase.from('notifications').insert(rows);
+    if (error) {
+      console.warn('[approvalEngine] notification insert failed:', error.message);
+    }
   } catch (err) {
     console.warn('[approvalEngine] notification insert failed:', err.message);
   }

@@ -1,0 +1,47 @@
+# syntax=docker/dockerfile:1
+# Build context: monorepo root
+#
+# reportStorage.js uses path.join(__dirname, '../data/reports')
+# with code under /app/services → data lives at /app/data (named volume).
+
+FROM node:20-alpine AS deps
+WORKDIR /app
+ENV NODE_ENV=production
+COPY services/reporting-service/package.json services/reporting-service/package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --omit=dev
+
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production \
+    PORT=3002 \
+    HOST=0.0.0.0
+
+RUN addgroup -S app && adduser -S app -G app \
+  && apk add --no-cache su-exec \
+  && mkdir -p /app/data/reports \
+  && chown -R app:app /app
+
+COPY --from=deps --chown=app:app /app/node_modules ./node_modules
+COPY --chown=app:app services/reporting-service/package.json ./
+COPY --chown=app:app services/reporting-service/package-lock.json ./
+COPY --chown=app:app services/reporting-service/index.js ./
+COPY --chown=app:app services/reporting-service/config ./config
+COPY --chown=app:app services/reporting-service/jobs ./jobs
+COPY --chown=app:app services/reporting-service/routes ./routes
+COPY --chown=app:app services/reporting-service/services ./services
+COPY --chown=app:app services/reporting-service/utils ./utils
+COPY --chown=app:app services/reporting-service/lib ./lib
+COPY --chown=root:root services/reporting-service/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+
+RUN chmod 755 /usr/local/bin/docker-entrypoint.sh
+
+# Remain root for ENTRYPOINT (volume chown); entrypoint drops to app.
+EXPOSE 3002
+
+HEALTHCHECK --interval=30s --timeout=8s --start-period=30s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3002)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["node", "index.js"]

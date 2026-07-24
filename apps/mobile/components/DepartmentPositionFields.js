@@ -173,6 +173,8 @@ export default function DepartmentPositionFields({
           >
             <FlatList
               keyboardShouldPersistTaps="handled"
+                automaticallyAdjustKeyboardInsets={true}
+                keyboardDismissMode="on-drag"
               nestedScrollEnabled
               data={filteredDepartments}
               keyExtractor={(item) => item.id}
@@ -226,6 +228,8 @@ export default function DepartmentPositionFields({
           >
             <FlatList
               keyboardShouldPersistTaps="handled"
+                automaticallyAdjustKeyboardInsets={true}
+                keyboardDismissMode="on-drag"
               nestedScrollEnabled
               data={filteredPositions}
               keyExtractor={(item) => item}

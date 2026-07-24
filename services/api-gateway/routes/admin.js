@@ -12,9 +12,10 @@ const forward = async (req, res, method, path) => {
       data: req.body,
       headers: {
         'Content-Type': 'application/json',
-        'x-user-context': req.get('x-user-context') || '',
+        'x-user-context': req.get('x-user-context') || req.get('X-User-Context') || '',
+        Authorization: req.headers.authorization || req.get('Authorization') || '',
       },
-      timeout: 10000,
+      timeout: 15000,
       params: req.query,
     });
     res.status(response.status).json(response.data);

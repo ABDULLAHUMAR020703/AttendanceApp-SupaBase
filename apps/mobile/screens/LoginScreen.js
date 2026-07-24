@@ -5,9 +5,6 @@ import {
   TextInput,
   TouchableOpacity,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -26,6 +23,7 @@ import {
   normalize,
 } from '../utils/responsive';
 import { saveCredentials, loadCredentials, clearCredentials } from '../utils/credentialsStorage';
+import { KeyboardAwareScreen } from '../shared/components/KeyboardAwareScreen';
 import { 
   checkBiometricAvailability, 
   authenticateWithBiometric, 
@@ -205,22 +203,14 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top', 'bottom']}>
-      <KeyboardAvoidingView 
+      <KeyboardAwareScreen
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        contentContainerStyle={{
+          justifyContent: tablet ? 'center' : 'flex-start',
+          paddingVertical: tablet ? spacing['2xl'] : 0,
+        }}
+        extraScrollHeight={spacing['3xl']}
       >
-        <ScrollView 
-          style={{ flex: 1 }}
-          contentContainerStyle={{
-            flexGrow: 1,
-            paddingBottom: spacing['3xl'],
-            justifyContent: tablet ? 'center' : 'flex-start',
-            paddingVertical: tablet ? spacing['2xl'] : 0,
-          }}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
           <View
             style={{
               width: '100%',
@@ -515,9 +505,8 @@ export default function LoginScreen() {
             <Logo size="medium" />
             <Trademark position="bottom" style={{ marginTop: spacing.md }} />
           </View>
-        </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+          </View>
+      </KeyboardAwareScreen>
     </SafeAreaView>
   );
 }

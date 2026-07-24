@@ -1,7 +1,7 @@
 /**
  * Authenticated API Gateway helpers.
- * Privileged auth-service routes require X-User-Context so the backend can
- * derive company_id from the caller (never trust client-supplied tenant).
+ * Privileged auth-service routes require X-User-Context and/or Authorization Bearer
+ * so the backend can derive company_id from the caller (never trust client-supplied tenant).
  */
 import { supabase } from '../config/supabase';
 import { requireValidCompanyId } from '../tenant/tenantScope';
@@ -28,20 +28,36 @@ export function toRequesterContext(user) {
 }
 
 /**
- * Build headers for gateway mutations (POST/PATCH/DELETE on /api/auth/users*).
+ * Build headers for gateway mutations.
+ * Always prefers a live Supabase access token (Authorization) so identity survives
+ * proxies that drop custom headers; also sends X-User-Context when available.
  * @param {object|null|undefined} requester
  * @param {Record<string, string>} [extra]
+ * @returns {Promise<Record<string, string>>}
  */
-export function buildGatewayAuthHeaders(requester, extra = {}) {
-  const ctx = toRequesterContext(requester);
-  if (!ctx) {
-    return { 'Content-Type': 'application/json', ...extra };
-  }
-  return {
+export async function buildGatewayAuthHeaders(requester, extra = {}) {
+  const headers = {
     'Content-Type': 'application/json',
-    'X-User-Context': JSON.stringify(ctx),
     ...extra,
   };
+
+  const ctx = toRequesterContext(requester);
+  if (ctx) {
+    headers['X-User-Context'] = JSON.stringify(ctx);
+  }
+
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      headers.Authorization = `Bearer ${session.access_token}`;
+    }
+  } catch (e) {
+    if (__DEV__) {
+      console.warn('[gatewayRequest] getSession for Authorization failed:', e?.message || e);
+    }
+  }
+
+  return headers;
 }
 
 /**

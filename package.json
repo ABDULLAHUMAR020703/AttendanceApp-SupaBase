@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "Attendance App - Supabase Migration",
   "scripts": {
-    "create-users": "node scripts/create-users-supabase.js",
     "supabase": "supabase",
     "db:login": "supabase login",
     "db:link": "supabase link",
@@ -20,8 +19,5 @@
     "dotenv": "^17.2.3",
     "supabase": "^2.98.2"
   },
-  "private": true,
-  "dependencies": {
-    "nodemailer": "^8.0.10"
-  }
+  "private": true
 }

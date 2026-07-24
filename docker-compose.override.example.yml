@@ -1,0 +1,25 @@
+# Optional local override — DO NOT commit a real docker-compose.override.yml
+# with production secrets. Copy this file for local Docker without Coolify:
+#
+#   cp docker-compose.override.example.yml docker-compose.override.yml
+#   docker compose up --build
+#
+# Coolify must NOT use host port publishing (bypasses Traefik/HTTPS).
+
+services:
+  gateway:
+    environment:
+      # Keep familiar local port when running compose on a workstation
+      PORT: "3000"
+    expose:
+      - "3000"
+    ports:
+      - "${GATEWAY_PUBLISH_PORT:-3000}:3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/health?deep=1').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
