@@ -2,7 +2,7 @@
  * Attendance Settings Screen
  * Super Admin only - Configure global attendance settings
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -19,9 +19,9 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   isAutoCheckoutEnabled,
   setAutoCheckoutEnabled,
-  clearAllConfigCache,
 } from '../features/attendance/services/attendanceConfigService';
 import { fontSize, spacing, iconSize, responsivePadding, responsiveFont } from '../utils/responsive';
+import { useStaleWhileRevalidate } from '../shared/hooks/useStaleWhileRevalidate';
 
 export default function AttendanceSettingsScreen({ navigation, route }) {
   const { user } = useAuth();
@@ -29,30 +29,45 @@ export default function AttendanceSettingsScreen({ navigation, route }) {
   const [autoCheckoutEnabled, setAutoCheckoutEnabledState] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const hasLoadedOnceRef = useRef(false);
+
+  const loadSettings = async ({ soft = false } = {}) => {
+    const showFullLoader = !soft && !hasLoadedOnceRef.current;
+    try {
+      if (showFullLoader) {
+        setIsLoading(true);
+      }
+      const enabled = await isAutoCheckoutEnabled(false);
+      setAutoCheckoutEnabledState(enabled);
+      hasLoadedOnceRef.current = true;
+    } catch (error) {
+      console.error('[AttendanceSettings] Error loading settings:', error);
+      if (!hasLoadedOnceRef.current) {
+        Alert.alert('Error', 'Failed to load attendance settings');
+      }
+    } finally {
+      if (showFullLoader) {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  const loadSettingsRef = useRef(async () => {});
+  loadSettingsRef.current = () => loadSettings({ soft: true });
+  const stableLoad = useCallback(() => loadSettingsRef.current(), []);
+  const { refreshOnFocus } = useStaleWhileRevalidate(stableLoad, {
+    minIntervalMs: 2500,
+  });
 
   useEffect(() => {
-    loadSettings();
-    
-    // Refresh when screen comes into focus
+    loadSettings({ soft: false });
+
     const unsubscribe = navigation.addListener('focus', () => {
-      loadSettings();
+      refreshOnFocus();
     });
 
     return unsubscribe;
-  }, [navigation]);
-
-  const loadSettings = async () => {
-    try {
-      setIsLoading(true);
-      const enabled = await isAutoCheckoutEnabled(false); // Don't use cache on load
-      setAutoCheckoutEnabledState(enabled);
-    } catch (error) {
-      console.error('[AttendanceSettings] Error loading settings:', error);
-      Alert.alert('Error', 'Failed to load attendance settings');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [navigation, refreshOnFocus]);
 
   const handleToggleAutoCheckout = async (value) => {
     if (user?.role !== 'super_admin') {
@@ -62,7 +77,7 @@ export default function AttendanceSettingsScreen({ navigation, route }) {
 
     try {
       setIsSaving(true);
-      
+
       const result = await setAutoCheckoutEnabled(value);
 
       if (result.success) {
@@ -74,20 +89,20 @@ export default function AttendanceSettingsScreen({ navigation, route }) {
         );
       } else {
         Alert.alert('Error', result.error || 'Failed to update setting');
-        // Reload to get correct value
-        await loadSettings();
+        await loadSettings({ soft: true });
       }
     } catch (error) {
       console.error('[AttendanceSettings] Error updating setting:', error);
       Alert.alert('Error', 'Failed to update setting');
-      // Reload to get correct value
-      await loadSettings();
+      await loadSettings({ soft: true });
     } finally {
       setIsSaving(false);
     }
   };
 
-  if (isLoading) {
+  const showInitialLoader = isLoading && !hasLoadedOnceRef.current;
+
+  if (showInitialLoader) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -227,7 +242,7 @@ export default function AttendanceSettingsScreen({ navigation, route }) {
                 }}
               >
                 • Location is monitored every 60 seconds while employees are checked in{'\n'}
-                • Only applies to employees with "in_office" work mode{'\n'}
+                • Only applies to office (and hybrid) work modes — not semi-remote or fully remote{'\n'}
                 • Office location and 1km radius are configured in GeoFencing settings{'\n'}
                 • Managers receive notifications when their department employees are auto checked out
               </Text>

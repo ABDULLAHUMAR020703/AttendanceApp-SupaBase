@@ -1,5 +1,5 @@
 import { API_GATEWAY_URL } from '../config/api';
-import { buildGatewayAuthHeaders, resolveCurrentRequester } from './gatewayRequest';
+import { buildGatewayAuthHeaders, resolveCurrentRequester, toRequesterContext } from './gatewayRequest';
 
 function gatewayBase() {
   return typeof API_GATEWAY_URL === 'string'
@@ -8,12 +8,12 @@ function gatewayBase() {
 }
 
 export async function refreshPermissionsFromServer(requester = null) {
-  const ctx = requester || (await resolveCurrentRequester());
+  const ctx = toRequesterContext(requester) || (await resolveCurrentRequester());
   if (!ctx?.uid) return { success: false, permissions: [] };
   try {
     const response = await fetch(`${gatewayBase()}/api/auth/me/permissions`, {
       method: 'GET',
-      headers: buildGatewayAuthHeaders(ctx),
+      headers: await buildGatewayAuthHeaders(ctx),
     });
     const body = await response.json().catch(() => ({}));
     if (!response.ok || !body.success) {
@@ -26,31 +26,64 @@ export async function refreshPermissionsFromServer(requester = null) {
 }
 
 export async function submitWorkModeRequest(requester, { requested_work_mode, reason }) {
-  const ctx = requester || (await resolveCurrentRequester());
-  if (!ctx) return { success: false, error: 'Sign in required' };
+  const ctx = toRequesterContext(requester) || (await resolveCurrentRequester());
+  if (!ctx?.uid) return { success: false, error: 'Authentication expired. Please sign in again.' };
+  const url = `${gatewayBase()}/api/auth/work-mode-requests`;
+  const payload = { requested_work_mode, reason };
   try {
-    const response = await fetch(`${gatewayBase()}/api/auth/work-mode-requests`, {
+    const headers = await buildGatewayAuthHeaders(ctx);
+    if (__DEV__) {
+      console.log('[workflowApi] POST work-mode-requests', {
+        url,
+        payload,
+        uid: ctx.uid,
+        hasAuth: Boolean(headers.Authorization),
+        hasUserContext: Boolean(headers['X-User-Context']),
+      });
+    }
+    const response = await fetch(url, {
       method: 'POST',
-      headers: buildGatewayAuthHeaders(ctx),
-      body: JSON.stringify({ requested_work_mode, reason }),
+      headers,
+      body: JSON.stringify(payload),
     });
     const body = await response.json().catch(() => ({}));
-    if (!response.ok || !body.success) {
-      return { success: false, error: body.error || 'Failed to submit request' };
+    if (__DEV__) {
+      console.log('[workflowApi] work-mode-requests response', {
+        status: response.status,
+        success: body.success,
+        error: body.error,
+      });
     }
-    return { success: true, data: body.data };
+    if (!response.ok || !body.success) {
+      const statusError =
+        response.status === 401
+          ? 'Authentication expired. Please sign in again.'
+          : response.status === 403
+            ? body.error || 'You do not have permission to submit this request.'
+            : response.status === 409
+              ? 'A pending request already exists.'
+              : response.status === 503
+                ? 'Auth service unavailable. Try again shortly.'
+                : null;
+      return {
+        success: false,
+        error: body.error || statusError || 'Unable to save request.',
+      };
+    }
+    return { success: true, data: body.data, message: body.message };
   } catch (e) {
-    return { success: false, error: e?.message || 'Network error' };
+    console.error('[workflowApi] work-mode-requests network error:', e?.message);
+    return { success: false, error: e?.message || 'Network error. Check your connection and try again.' };
   }
 }
 
 export async function fetchMyWorkModeRequests(requester = null) {
-  const ctx = requester || (await resolveCurrentRequester());
-  if (!ctx) return { success: false, data: [] };
+  const ctx = toRequesterContext(requester) || (await resolveCurrentRequester());
+  if (!ctx?.uid) return { success: false, data: [] };
   try {
     const response = await fetch(`${gatewayBase()}/api/auth/work-mode-requests/mine`, {
       method: 'GET',
-      headers: buildGatewayAuthHeaders(ctx),
+      headers: await buildGatewayAuthHeaders(ctx),
     });
     const body = await response.json().catch(() => ({}));
     if (!response.ok || !body.success) {
@@ -63,12 +96,12 @@ export async function fetchMyWorkModeRequests(requester = null) {
 }
 
 export async function processWorkModeRequestApi(requester, id, { status, admin_notes }) {
-  const ctx = requester || (await resolveCurrentRequester());
-  if (!ctx) return { success: false, error: 'Sign in required' };
+  const ctx = toRequesterContext(requester) || (await resolveCurrentRequester());
+  if (!ctx?.uid) return { success: false, error: 'Authentication expired. Please sign in again.' };
   try {
     const response = await fetch(`${gatewayBase()}/api/admin/work-mode-requests/${id}`, {
       method: 'PATCH',
-      headers: buildGatewayAuthHeaders(ctx),
+      headers: await buildGatewayAuthHeaders(ctx),
       body: JSON.stringify({ status, admin_notes }),
     });
     const body = await response.json().catch(() => ({}));
@@ -77,17 +110,17 @@ export async function processWorkModeRequestApi(requester, id, { status, admin_n
     }
     return { success: true, data: body.data };
   } catch (e) {
-    return { success: false, error: e?.message || 'Network error' };
+    return { success: false, error: e?.message || 'Network error. Check your connection and try again.' };
   }
 }
 
 export async function fetchWorkModeRequestsAdmin(requester = null) {
-  const ctx = requester || (await resolveCurrentRequester());
-  if (!ctx) return { success: false, data: [] };
+  const ctx = toRequesterContext(requester) || (await resolveCurrentRequester());
+  if (!ctx?.uid) return { success: false, data: [] };
   try {
     const response = await fetch(`${gatewayBase()}/api/admin/work-mode-requests`, {
       method: 'GET',
-      headers: buildGatewayAuthHeaders(ctx),
+      headers: await buildGatewayAuthHeaders(ctx),
     });
     const body = await response.json().catch(() => ({}));
     if (!response.ok || !body.success) {

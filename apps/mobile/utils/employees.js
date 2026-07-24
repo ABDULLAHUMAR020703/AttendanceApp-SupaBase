@@ -790,53 +790,176 @@ export const getEmployeeWorkModeHistory = async (employeeId) => {
   }
 };
 
+const VALID_WORK_MODE_VALUES = Object.values(WORK_MODES);
+
+function mapWorkModeRequestRow(r) {
+  return {
+    id: r.id,
+    employeeId: `emp_${r.employee_uid}`,
+    employeeUid: r.employee_uid,
+    requestedMode: r.requested_work_mode,
+    currentMode: r.current_work_mode,
+    reason: r.reason,
+    status: r.status,
+    requestedAt: r.requested_at,
+    processedAt: r.processed_at,
+    processedBy: r.processed_by,
+    adminNotes: r.admin_notes,
+    approvalProgress: r.approvalProgress,
+    employee: r.employee,
+    companyId: r.company_id,
+  };
+}
+
+function mapWorkModeRequestDbError(error) {
+  const msg = String(error?.message || '');
+  const code = String(error?.code || '');
+  if (code === '42501' || /row-level security/i.test(msg)) {
+    return 'You do not have permission to submit this request.';
+  }
+  if (code === '23505' || /duplicate/i.test(msg)) {
+    return 'A pending request already exists.';
+  }
+  if (code === '23514' || /check constraint/i.test(msg)) {
+    return 'Validation failed. Check the requested work mode and try again.';
+  }
+  if (/Could not find the table|PGRST205|relation .* does not exist/i.test(msg)) {
+    return 'Unable to save request. Database schema is incomplete. Contact support.';
+  }
+  if (/Failed to fetch|Network request failed|network/i.test(msg)) {
+    return 'Network error. Check your connection and try again.';
+  }
+  return msg || 'Unable to save request.';
+}
+
 /**
- * Create work mode change request
- * @param {string} employeeId - Employee ID
+ * Create work mode change request via API gateway (auth-service insert + approval init).
+ * @param {string} employeeId - Unused legacy arg (username/id); identity comes from session/requester
  * @param {string} requestedMode - Requested work mode
  * @param {string} reason - Reason for request
- * @returns {Promise<boolean>} Success status
+ * @param {object|null} user - Auth user (for X-User-Context)
+ * @returns {Promise<{success: boolean, error?: string, data?: object}>}
  */
 export const createWorkModeRequest = async (employeeId, requestedMode, reason, user = null) => {
   try {
+    if (!VALID_WORK_MODE_VALUES.includes(requestedMode)) {
+      return { success: false, error: 'Invalid work mode.' };
+    }
+    const trimmedReason = String(reason || '').trim();
+    if (!trimmedReason) {
+      return { success: false, error: 'Please provide a reason for the request.' };
+    }
+
     const { submitWorkModeRequest } = await import('../core/api/workflowApi');
     const result = await submitWorkModeRequest(user, {
       requested_work_mode: requestedMode,
-      reason,
+      reason: trimmedReason,
     });
+
     if (!result.success) {
       console.error('createWorkModeRequest:', result.error);
-      return false;
+      return { success: false, error: result.error || 'Unable to save request.' };
     }
-    return true;
+
+    return {
+      success: true,
+      data: result.data ? mapWorkModeRequestRow(result.data) : result.data,
+      message: result.message || 'Work mode request submitted successfully.',
+    };
   } catch (error) {
     console.error('Error creating work mode request:', error);
-    return false;
+    return { success: false, error: mapWorkModeRequestDbError(error) };
   }
 };
 
+/**
+ * List work mode requests visible to the caller (RLS-scoped Supabase read).
+ * @param {object|null} user - Auth user; admins see company requests, employees see own
+ * @returns {Promise<Array>}
+ */
 export const getWorkModeRequests = async (user = null) => {
   try {
-    const { fetchWorkModeRequestsAdmin, fetchMyWorkModeRequests } = await import('../core/api/workflowApi');
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user?.id) {
+      // Fall back to gateway when session is unavailable but requester context exists
+      if (user?.uid) {
+        const { fetchWorkModeRequestsAdmin, fetchMyWorkModeRequests } = await import('../core/api/workflowApi');
+        const isAdmin = user.role === 'super_admin' || user.role === 'manager';
+        const result = isAdmin
+          ? await fetchWorkModeRequestsAdmin(user)
+          : await fetchMyWorkModeRequests(user);
+        if (!result.success) return [];
+        return (result.data || []).map(mapWorkModeRequestRow);
+      }
+      return [];
+    }
+
+    const uid = String(session.user.id);
     const isAdmin = user && (user.role === 'super_admin' || user.role === 'manager');
-    const result = isAdmin
-      ? await fetchWorkModeRequestsAdmin(user)
-      : await fetchMyWorkModeRequests(user);
-    if (!result.success) return [];
-    return (result.data || []).map((r) => ({
-      id: r.id,
-      employeeId: `emp_${r.employee_uid}`,
-      requestedMode: r.requested_work_mode,
-      currentMode: r.current_work_mode,
-      reason: r.reason,
-      status: r.status,
-      requestedAt: r.requested_at,
-      processedAt: r.processed_at,
-      processedBy: r.processed_by,
-      adminNotes: r.admin_notes,
-      approvalProgress: r.approvalProgress,
-      employee: r.employee,
-    }));
+    const companyId = user ? resolveCompanyIdFromUser(user) : null;
+
+    let query = supabase
+      .from('work_mode_requests')
+      .select('*')
+      .order('requested_at', { ascending: false })
+      .limit(100);
+
+    if (isAdmin && companyId) {
+      query = query.eq('company_id', companyId);
+      if (user.role === 'manager' && user.department) {
+        const { data: deptUsers } = await supabase
+          .from('users')
+          .select('uid')
+          .eq('company_id', companyId)
+          .eq('department', user.department);
+        const deptUids = (deptUsers || []).map((u) => u.uid).filter(Boolean);
+        query = query.in(
+          'employee_uid',
+          deptUids.length ? deptUids : ['00000000-0000-0000-0000-000000000000']
+        );
+      }
+    } else {
+      query = query.eq('employee_uid', uid);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      console.error('getWorkModeRequests:', error.message);
+      // Gateway fallback if PostgREST/schema issues
+      try {
+        const { fetchWorkModeRequestsAdmin, fetchMyWorkModeRequests } = await import('../core/api/workflowApi');
+        const result = isAdmin
+          ? await fetchWorkModeRequestsAdmin(user)
+          : await fetchMyWorkModeRequests(user);
+        if (result.success) return (result.data || []).map(mapWorkModeRequestRow);
+      } catch {
+        /* ignore */
+      }
+      return [];
+    }
+
+    const rows = data || [];
+    if (!isAdmin || rows.length === 0) {
+      return rows.map(mapWorkModeRequestRow);
+    }
+
+    // Enrich with employee profile for admin UI
+    const uids = [...new Set(rows.map((r) => r.employee_uid).filter(Boolean))];
+    let employeesByUid = {};
+    if (uids.length) {
+      const { data: emps } = await supabase
+        .from('users')
+        .select('uid, name, username, email, department')
+        .in('uid', uids);
+      employeesByUid = Object.fromEntries((emps || []).map((e) => [e.uid, e]));
+    }
+
+    return rows.map((r) =>
+      mapWorkModeRequestRow({
+        ...r,
+        employee: employeesByUid[r.employee_uid] || r.employee || null,
+      })
+    );
   } catch (error) {
     console.error('Error getting work mode requests:', error);
     return [];
@@ -845,12 +968,13 @@ export const getWorkModeRequests = async (user = null) => {
 
 /**
  * Get pending work mode requests
+ * @param {object|null} user - Auth user (required for admin company scope)
  * @returns {Promise<Array>} Array of pending requests
  */
-export const getPendingWorkModeRequests = async () => {
+export const getPendingWorkModeRequests = async (user = null) => {
   try {
-    const requests = await getWorkModeRequests();
-    return requests.filter(request => request.status === 'pending');
+    const requests = await getWorkModeRequests(user);
+    return requests.filter((request) => request.status === 'pending');
   } catch (error) {
     console.error('Error getting pending work mode requests:', error);
     return [];
@@ -858,12 +982,14 @@ export const getPendingWorkModeRequests = async () => {
 };
 
 /**
- * Process work mode request (approve or reject)
+ * Process work mode request (approve or reject) via API gateway / approval engine.
  * @param {string} requestId - Request ID
  * @param {string} status - 'approved' or 'rejected'
  * @param {string} processedBy - Username of admin who processed
  * @param {string} adminNotes - Admin notes
- * @returns {Promise<boolean>} Success status
+ * @param {string|null} companyId - Tenant id (unused; derived from requester)
+ * @param {object|null} user - Auth user (required for X-User-Context)
+ * @returns {Promise<{success: boolean, error?: string}>}
  */
 export const processWorkModeRequest = async (requestId, status, processedBy, adminNotes = '', companyId = null, user = null) => {
   try {
@@ -873,12 +999,12 @@ export const processWorkModeRequest = async (requestId, status, processedBy, adm
       admin_notes: adminNotes,
     });
     if (!result.success) {
-      throw new Error(result.error || 'Failed to process request');
+      return { success: false, error: result.error || 'Failed to process request' };
     }
-    return true;
+    return { success: true, data: result.data };
   } catch (error) {
     console.error('Error processing work mode request:', error);
-    return false;
+    return { success: false, error: error?.message || 'Failed to process request' };
   }
 };
 

@@ -5,9 +5,6 @@ import {
   TextInput,
   TouchableOpacity,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { createEmployee } from '../utils/employees';
@@ -21,6 +18,7 @@ import DepartmentPositionFields, {
   normalizeDepartmentDisplay,
   normalizePositionDisplay,
 } from '../components/DepartmentPositionFields';
+import { KeyboardAwareScreen } from '../shared/components/KeyboardAwareScreen';
 
 const ROLES = [
   { value: 'employee', label: 'Employee' },
@@ -142,15 +140,12 @@ export default function CreateUserScreen({ navigation }) {
   };
 
   return (
-    <KeyboardAvoidingView
-      className="flex-1"
+    <KeyboardAwareScreen
       style={{ backgroundColor: colors.background }}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      contentContainerStyle={{ padding: responsivePadding(24) }}
+      headerHeight={56}
+      extraScrollHeight={48}
     >
-      <ScrollView
-        contentContainerStyle={{ flexGrow: 1, padding: responsivePadding(24) }}
-        keyboardShouldPersistTaps="handled"
-      >
         {/* Header */}
         <View className="items-center" style={{ marginBottom: spacing['2xl'] }}>
           <Logo size="medium" style={{ marginBottom: spacing.md }} />
@@ -409,8 +404,7 @@ export default function CreateUserScreen({ navigation }) {
 
         {/* Trademark */}
         <Trademark position="bottom" style={{ marginTop: spacing['2xl'] }} />
-      </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAwareScreen>
   );
 }
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { validateCheckInLocation } from '../features/geofencing';
 import { isLocationRequiredForCheckIn } from '../features/geofencing/utils/workModeRules';
@@ -20,7 +19,11 @@ import {
   checkBiometricAvailability,
   getBiometricTypeName,
 } from '../utils/biometricAuth';
-import { getCurrentLocationWithAddress, formatAddressForDisplay } from '../utils/location';
+import {
+  formatAddressForDisplay,
+  hasValidCoordinates,
+  acquireLocationProgressive,
+} from '../utils/location';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../core/contexts/AuthContext';
 
@@ -51,47 +54,75 @@ export default function AuthenticationScreen({ navigation, route }) {
   const [biometricType, setBiometricType] = useState('');
   const [faceIDAvailable, setFaceIDAvailable] = useState(false);
 
+  /** Always holds the freshest progressive fix for geofence / save (survives stale closures). */
+  const locationRef = useRef(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  const applyLocationUpdate = (loc) => {
+    if (!hasValidCoordinates(loc)) return;
+    locationRef.current = loc;
+    if (mountedRef.current) {
+      setLocation(loc);
+    }
+  };
+
+  /**
+   * Start (or join) progressive GPS: last-known → fresh fix; address fills in later.
+   * Coalesced in location.js so Authenticate won't start a duplicate hardware request.
+   */
+  const startLocationAcquisition = () =>
+    acquireLocationProgressive({
+      onUpdate: applyLocationUpdate,
+      resolveAddress: true,
+    });
+
   useEffect(() => {
     if (authMethod === 'biometric') {
       checkBiometric();
     } else {
       checkFaceRecognition();
     }
-    // Get location
-    getLocation();
+    startLocationAcquisition().catch((err) => {
+      console.warn('[AuthenticationScreen] location acquisition error:', err?.message || err);
+    });
   }, [authMethod]);
 
-  const getLocation = async () => {
-    try {
-      console.log('Fetching location...');
-      const currentLocation = await getCurrentLocationWithAddress();
-      if (currentLocation) {
-        console.log('Location fetched successfully:', {
-          latitude: currentLocation.latitude,
-          longitude: currentLocation.longitude,
-          address: currentLocation.address ? currentLocation.address.substring(0, 50) + '...' : 'N/A'
-        });
-        setLocation(currentLocation);
-      } else {
-        console.warn('Location fetch returned null - location may not be available');
-        // Set a default location object so the UI doesn't break
-        setLocation({
-          latitude: null,
-          longitude: null,
-          accuracy: null,
-          address: 'Location unavailable'
-        });
+  /**
+   * Prefer an existing valid fix; otherwise wait for (or start) progressive acquisition.
+   * Does not block on reverse geocoding.
+   */
+  const resolveValidLocation = async (existing) => {
+    if (hasValidCoordinates(existing)) {
+      // Prefer in-ref GPS if newer than what auth captured (e.g. lastKnown then upgraded).
+      const latest = locationRef.current;
+      if (
+        hasValidCoordinates(latest) &&
+        latest.source === 'gps' &&
+        existing.source !== 'gps'
+      ) {
+        return latest;
       }
-    } catch (error) {
-      console.error('Error getting location:', error);
-      // Set a default location object so the UI doesn't break
-      setLocation({
-        latitude: null,
-        longitude: null,
-        accuracy: null,
-        address: 'Location unavailable'
-      });
+      if (hasValidCoordinates(latest) && (latest.timestamp ?? 0) >= (existing.timestamp ?? 0)) {
+        return latest;
+      }
+      return existing;
     }
+    if (hasValidCoordinates(locationRef.current)) {
+      return locationRef.current;
+    }
+    console.log('No valid coordinates yet — waiting for progressive GPS...');
+    const result = await startLocationAcquisition();
+    if (hasValidCoordinates(locationRef.current)) {
+      return locationRef.current;
+    }
+    return hasValidCoordinates(result) ? result : null;
   };
 
   const checkBiometric = async () => {
@@ -179,24 +210,7 @@ export default function AuthenticationScreen({ navigation, route }) {
     setAuthStatus(null);
 
     try {
-      // Get location first (with error handling)
-      let currentLocation = location; // Use existing location if available
-      if (!currentLocation) {
-        console.log('Fetching location for Face ID authentication...');
-        currentLocation = await getCurrentLocationWithAddress();
-        if (currentLocation) {
-          setLocation(currentLocation);
-        } else {
-          // Continue without location if it fails
-          console.warn('Location fetch failed, continuing without location');
-          currentLocation = {
-            latitude: null,
-            longitude: null,
-            accuracy: null,
-            address: 'Location unavailable'
-          };
-        }
-      }
+      const currentLocation = await resolveValidLocation(location);
 
       // Authenticate with Face ID
       const verificationResult = await verifyFace(
@@ -222,7 +236,7 @@ export default function AuthenticationScreen({ navigation, route }) {
       } else {
         setAuthStatus('failed');
         Alert.alert(
-          'Face ID Authentication Cancelled',
+          'Authentication Failed',
           verificationResult.error?.includes('cancel')
             ? 'Authentication was cancelled. No attendance record was saved.'
             : verificationResult.error || 'Face ID authentication did not complete. Please try again.',
@@ -244,7 +258,7 @@ export default function AuthenticationScreen({ navigation, route }) {
       setIsVerifying(false);
       setAuthStatus('error');
       Alert.alert(
-        'Error', 
+        'Authentication Failed', 
         'Failed to authenticate with Face ID. Please try again.',
         [
           { text: 'Retry', onPress: () => {
@@ -266,24 +280,7 @@ export default function AuthenticationScreen({ navigation, route }) {
     setAuthStatus(null);
 
     try {
-      // Get location first (with error handling)
-      let currentLocation = location; // Use existing location if available
-      if (!currentLocation) {
-        console.log('Fetching location for biometric authentication...');
-        currentLocation = await getCurrentLocationWithAddress();
-        if (currentLocation) {
-          setLocation(currentLocation);
-        } else {
-          // Continue without location if it fails
-          console.warn('Location fetch failed, continuing without location');
-          currentLocation = {
-            latitude: null,
-            longitude: null,
-            accuracy: null,
-            address: 'Location unavailable'
-          };
-        }
-      }
+      const currentLocation = await resolveValidLocation(location);
 
       // Authenticate with biometric
       const authResult = await authenticateWithBiometric(
@@ -315,7 +312,7 @@ export default function AuthenticationScreen({ navigation, route }) {
       } else {
         setAuthStatus('failed');
         Alert.alert(
-          'Biometric Authentication Cancelled',
+          'Authentication Failed',
           authResult.error?.includes('cancel')
             ? 'Authentication was cancelled. No attendance record was saved.'
             : authResult.error || 'Biometric authentication did not complete. Please try again.',
@@ -344,7 +341,7 @@ export default function AuthenticationScreen({ navigation, route }) {
       setIsVerifying(false);
       setAuthStatus('error');
       Alert.alert(
-        'Error',
+        'Authentication Failed',
         'Failed to authenticate. Please try again.',
         [
           { 
@@ -370,20 +367,17 @@ export default function AuthenticationScreen({ navigation, route }) {
   const saveAttendance = async (photoUri, locationData) => {
     setIsLoading(true);
     try {
-      let location = locationData || {
-        latitude: null,
-        longitude: null,
-        accuracy: null,
-        address: 'Location unavailable',
-      };
+      // Prefer freshest progressive fix (GPS over last-known) for geofence accuracy.
+      let location = await resolveValidLocation(
+        hasValidCoordinates(locationRef.current) ? locationRef.current : locationData
+      );
 
       const locationRequired = isLocationRequiredForCheckIn(user);
 
-      if (locationRequired && (!location.latitude || !location.longitude)) {
-        const refreshed = await getCurrentLocationWithAddress();
-        if (refreshed?.latitude && refreshed?.longitude) {
+      if (locationRequired && !hasValidCoordinates(location)) {
+        const refreshed = await resolveValidLocation(null);
+        if (hasValidCoordinates(refreshed)) {
           location = refreshed;
-          setLocation(refreshed);
         }
       }
 
@@ -403,10 +397,11 @@ export default function AuthenticationScreen({ navigation, route }) {
       let matchedLocation = null;
 
       if (type === 'checkin') {
-        if (locationRequired && (!location.latitude || !location.longitude)) {
+        if (locationRequired && !hasValidCoordinates(location)) {
           Alert.alert(
-            'Location Required',
-            'Unable to get your current location. Please enable location services and try again.'
+            'GPS Unavailable',
+            'Could not get your GPS position after retrying. Please enable location services, wait a moment for a GPS fix, and try again.',
+            [{ text: 'OK' }]
           );
           return;
         }
@@ -419,8 +414,8 @@ export default function AuthenticationScreen({ navigation, route }) {
 
         if (!validation.valid) {
           Alert.alert(
-            'Check-In Blocked',
-            validation.error || 'You are not within an allowed work location.',
+            'Outside Work Location',
+            validation.error || 'You are not within an allowed work location for check-in.',
             [{ text: 'OK' }]
           );
           return;
@@ -455,15 +450,13 @@ export default function AuthenticationScreen({ navigation, route }) {
         type,
         timestamp: new Date().toISOString(),
         photo: null,
-        location: locationRequired || location.latitude
+        location: hasValidCoordinates(location)
           ? {
               ...location,
               site_id: matchedLocation?.id || null,
               site_name: matchedLocation?.name || null,
             }
-          : location.latitude
-            ? location
-            : null,
+          : null,
         authMethod: authMethod,
       };
 
@@ -496,11 +489,19 @@ export default function AuthenticationScreen({ navigation, route }) {
       }
 
       const actionLabel = type === 'checkin' ? 'checked in' : 'checked out';
-      const title = saveResult.source === 'supabase' ? 'Success' : 'Saved Offline';
-      const message =
-        saveResult.source === 'supabase'
-          ? `Successfully ${actionLabel}!`
-          : `You are ${actionLabel} on this device. We will sync when the connection is available.`;
+      let title = 'Success';
+      let message = `Successfully ${actionLabel}!`;
+
+      if (saveResult.source === 'offline') {
+        title = 'Saved Offline';
+        if (saveResult.reason === 'auth_unavailable') {
+          message = `You are ${actionLabel} on this device, but your session could not be verified with the server. We will sync when authentication is available.`;
+        } else if (saveResult.reason === 'missing_tenant') {
+          message = `You are ${actionLabel} on this device, but tenant information was unavailable. We will sync when the connection is restored.`;
+        } else {
+          message = `You are ${actionLabel} on this device. We will sync when the connection is available.`;
+        }
+      }
 
       Alert.alert(title, message, [
         {
@@ -571,10 +572,12 @@ export default function AuthenticationScreen({ navigation, route }) {
             {/* Location Display */}
             <View style={{ backgroundColor: colors.background, borderRadius: 12, padding: 12, marginBottom: 24, width: '100%' }}>
               <Text style={{ color: colors.text, fontSize: 12, textAlign: 'center' }}>
-                {location ? (
-                  location.address ? 
-                    `📍 ${formatAddressForDisplay(location.address, 40)}` : 
-                    '📍 Location captured'
+                {location && hasValidCoordinates(location) ? (
+                  location.address
+                    ? `📍 ${formatAddressForDisplay(location.address, 40)}`
+                    : location.source === 'lastKnown'
+                      ? '📍 Location ready (refining GPS…)'
+                      : '📍 Location captured (resolving address…)'
                 ) : '📍 Getting location...'}
               </Text>
             </View>
@@ -667,10 +670,12 @@ export default function AuthenticationScreen({ navigation, route }) {
           {/* Location Display */}
           <View style={{ backgroundColor: colors.background, borderRadius: 12, padding: 12, marginBottom: 24, width: '100%' }}>
             <Text style={{ color: colors.text, fontSize: 12, textAlign: 'center' }}>
-                {location ? (
-                  location.address ? 
-                    `📍 ${formatAddressForDisplay(location.address, 40)}` : 
-                    '📍 Location captured'
+                {location && hasValidCoordinates(location) ? (
+                  location.address
+                    ? `📍 ${formatAddressForDisplay(location.address, 40)}`
+                    : location.source === 'lastKnown'
+                      ? '📍 Location ready (refining GPS…)'
+                      : '📍 Location captured (resolving address…)'
                 ) : '📍 Getting location...'}
               </Text>
             </View>

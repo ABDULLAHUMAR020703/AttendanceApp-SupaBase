@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -28,26 +28,33 @@ export default function CompanySettingsScreen({ navigation, route }) {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
+  const hasLoadedOnceRef = useRef(false);
 
   useEffect(() => {
     if (currentUser?.role !== 'super_admin') {
       navigation.replace('AdminDashboard', { user: currentUser });
       return;
     }
-    loadCompany();
+    loadCompany({ soft: false });
   }, [currentUser?.role]);
 
-  const loadCompany = async () => {
-    setLoading(true);
+  const loadCompany = async ({ soft = false } = {}) => {
+    const showFullLoader = !soft && !hasLoadedOnceRef.current;
+    if (showFullLoader) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const data = await getCompany(currentUser?.companyId);
       setCompany(data);
+      hasLoadedOnceRef.current = true;
     } catch (e) {
       console.error('[CompanySettingsScreen] loadCompany:', e);
       setError(e.message || 'Failed to load company');
     } finally {
-      setLoading(false);
+      if (showFullLoader) {
+        setLoading(false);
+      }
     }
   };
 
@@ -82,7 +89,7 @@ export default function CompanySettingsScreen({ navigation, route }) {
         type: asset.mimeType || 'image/png',
       });
       await refreshCompany();
-      await loadCompany();
+      await loadCompany({ soft: true });
       Alert.alert('Success', 'Company logo updated. It will appear across the app.');
     } catch (e) {
       console.error('[CompanySettingsScreen] update logo:', e);
@@ -97,7 +104,9 @@ export default function CompanySettingsScreen({ navigation, route }) {
     return null;
   }
 
-  if (loading) {
+  const showInitialLoader = loading && !hasLoadedOnceRef.current;
+
+  if (showInitialLoader) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -210,6 +219,24 @@ export default function CompanySettingsScreen({ navigation, route }) {
           </Text>
         ) : null}
       </ScrollView>
+
+      {loading && hasLoadedOnceRef.current && (
+        <View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: 'rgba(0,0,0,0.15)',
+          }}
+          pointerEvents="none"
+        >
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      )}
     </SafeAreaView>
   );
 }

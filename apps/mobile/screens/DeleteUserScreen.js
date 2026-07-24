@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -26,6 +26,7 @@ export default function DeleteUserScreen({ route }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [deletingUid, setDeletingUid] = useState(null);
+  const hasLoadedOnceRef = useRef(false);
 
   const canAccess = useMemo(() => {
     if (!currentUser) return false;
@@ -66,11 +67,16 @@ export default function DeleteUserScreen({ route }) {
     return false;
   };
 
-  const loadUsers = useCallback(async () => {
+  const loadUsers = useCallback(async ({ soft = false } = {}) => {
     if (!canAccess) {
       setUsers([]);
       setIsLoading(false);
       return;
+    }
+
+    const showFullLoader = !soft && !hasLoadedOnceRef.current;
+    if (showFullLoader) {
+      setIsLoading(true);
     }
 
     try {
@@ -85,17 +91,20 @@ export default function DeleteUserScreen({ route }) {
       }
 
       setUsers(Array.isArray(data) ? data : []);
+      hasLoadedOnceRef.current = true;
     } catch (error) {
       console.error('Error loading users:', error);
       Alert.alert('Error', error.message || 'Failed to load users');
     } finally {
-      setIsLoading(false);
+      if (showFullLoader) {
+        setIsLoading(false);
+      }
       setIsRefreshing(false);
     }
   }, [canAccess]);
 
   useEffect(() => {
-    loadUsers();
+    loadUsers({ soft: false });
   }, [loadUsers]);
 
   const handleDelete = (targetUser) => {
@@ -122,7 +131,7 @@ export default function DeleteUserScreen({ route }) {
               }
 
               showSuccessToast('User deleted successfully');
-              await loadUsers();
+              await loadUsers({ soft: true });
             } catch (error) {
               Alert.alert('Error', error.message || 'Failed to delete user');
             } finally {
@@ -206,7 +215,7 @@ export default function DeleteUserScreen({ route }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background, padding: responsivePadding(16) }}>
-      {isLoading ? (
+      {isLoading && users.length === 0 ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={{ marginTop: spacing.sm, color: colors.textSecondary }}>Loading users...</Text>
@@ -219,7 +228,7 @@ export default function DeleteUserScreen({ route }) {
           refreshing={isRefreshing}
           onRefresh={() => {
             setIsRefreshing(true);
-            loadUsers();
+            loadUsers({ soft: true });
           }}
           ListEmptyComponent={
             <View style={{ paddingTop: spacing['2xl'], alignItems: 'center' }}>
@@ -230,6 +239,24 @@ export default function DeleteUserScreen({ route }) {
           }
           contentContainerStyle={{ paddingBottom: spacing.xl }}
         />
+      )}
+
+      {isLoading && users.length > 0 && (
+        <View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: 'rgba(0,0,0,0.15)',
+          }}
+          pointerEvents="none"
+        >
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
       )}
     </View>
   );

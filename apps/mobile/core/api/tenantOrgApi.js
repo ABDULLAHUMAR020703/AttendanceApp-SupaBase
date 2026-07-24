@@ -24,7 +24,7 @@ export async function fetchTenantDepartments(requester = null, options = {}) {
   try {
     const response = await fetch(`${gatewayBase()}/api/auth/departments${query}`, {
       method: 'GET',
-      headers: buildGatewayAuthHeaders(ctx),
+      headers: await buildGatewayAuthHeaders(ctx),
     });
     const body = await response.json().catch(() => ({}));
     if (!response.ok || !body.success) {
@@ -49,7 +49,7 @@ export async function fetchTenantPositionSuggestions(requester = null) {
   try {
     const response = await fetch(`${gatewayBase()}/api/auth/position-suggestions`, {
       method: 'GET',
-      headers: buildGatewayAuthHeaders(ctx),
+      headers: await buildGatewayAuthHeaders(ctx),
     });
     const body = await response.json().catch(() => ({}));
     if (!response.ok || !body.success) {

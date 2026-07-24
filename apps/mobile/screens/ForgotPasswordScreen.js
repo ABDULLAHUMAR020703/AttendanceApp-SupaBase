@@ -15,9 +15,6 @@ import {
   TextInput,
   TouchableOpacity,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
   ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -27,6 +24,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { fontSize, spacing, iconSize, componentSize, responsivePadding, responsiveFont } from '../utils/responsive';
 import Logo from '../components/Logo';
 import Trademark from '../components/Trademark';
+import { KeyboardAwareScreen } from '../shared/components/KeyboardAwareScreen';
 
 export default function ForgotPasswordScreen() {
   const navigation = useNavigation();
@@ -128,19 +126,15 @@ export default function ForgotPasswordScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: colors.background }}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    <KeyboardAwareScreen
+      style={{ backgroundColor: colors.background }}
+      contentContainerStyle={{ justifyContent: 'center', paddingHorizontal: responsivePadding(32) }}
+      extraScrollHeight={48}
     >
-      <ScrollView
-        contentContainerStyle={{ flexGrow: 1 }}
-        keyboardShouldPersistTaps="handled"
-      >
         <View
           style={{
             flex: 1,
             justifyContent: 'center',
-            paddingHorizontal: responsivePadding(32),
           }}
         >
           {/* Header */}
@@ -336,7 +330,6 @@ export default function ForgotPasswordScreen() {
           {/* Trademark */}
           <Trademark position="bottom" style={{ marginTop: spacing['2xl'] }} />
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAwareScreen>
   );
 }

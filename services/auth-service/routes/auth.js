@@ -1491,35 +1491,65 @@ router.get('/me/permissions', async (req, res) => {
 });
 
 router.post('/work-mode-requests', async (req, res) => {
-  const requester = parseRequester(req);
+  const timestamp = new Date().toISOString();
+  const { resolveRequester } = require('../lib/resolveRequester');
+  const requester = await resolveRequester(req);
   if (!requester?.uid) {
-    return res.status(401).json({ success: false, error: 'Unauthorized' });
+    console.warn(`[${timestamp}] work-mode-requests: missing identity (X-User-Context / Bearer)`);
+    return res.status(401).json({ success: false, error: 'Authentication expired. Please sign in again.' });
   }
-  const { requested_work_mode, reason } = req.body;
+  const { requested_work_mode, reason } = req.body || {};
   const validModes = ['in_office', 'semi_remote', 'fully_remote'];
+  console.log(`[${timestamp}] work-mode-requests: submit`, {
+    uid: requester.uid,
+    requested_work_mode,
+    hasReason: Boolean(reason && String(reason).trim()),
+  });
   if (!validModes.includes(requested_work_mode)) {
-    return res.status(400).json({ success: false, error: 'Invalid work mode' });
+    return res.status(400).json({ success: false, error: 'Invalid work mode.' });
+  }
+  if (!reason || !String(reason).trim()) {
+    return res.status(400).json({ success: false, error: 'Please provide a reason for the request.' });
   }
   try {
-    const { data: user } = await supabase
+    const { data: user, error: userError } = await supabase
       .from('users')
-      .select('uid, work_mode, company_id')
+      .select('uid, work_mode, company_id, is_active')
       .eq('uid', requester.uid)
       .eq('is_active', true)
-      .single();
-    if (!user?.company_id) return res.status(403).json({ success: false, error: 'Tenant required' });
-    if (user.work_mode === requested_work_mode) {
-      return res.status(400).json({ success: false, error: 'You are already on this work mode' });
+      .maybeSingle();
+    if (userError) {
+      console.error(`[${timestamp}] work-mode-requests: user lookup failed`, userError.message);
+      return res.status(500).json({ success: false, error: 'Database unavailable.' });
+    }
+    if (!user) {
+      return res.status(403).json({ success: false, error: 'Employee profile not found or inactive.' });
+    }
+    if (!user.company_id) {
+      return res.status(403).json({ success: false, error: 'Tenant required.' });
+    }
+    if ((user.work_mode || 'in_office') === requested_work_mode) {
+      return res.status(400).json({ success: false, error: 'Requested work mode is already assigned.' });
     }
 
-    const { data: pending } = await supabase
+    const { data: pending, error: pendingError } = await supabase
       .from('work_mode_requests')
       .select('id')
       .eq('employee_uid', user.uid)
       .eq('status', 'pending')
+      .limit(1)
       .maybeSingle();
+    if (pendingError) {
+      console.error(`[${timestamp}] work-mode-requests: pending check failed`, pendingError.message);
+      return res.status(500).json({
+        success: false,
+        error: pendingError.message?.includes('Could not find the table') || pendingError.code === 'PGRST205'
+          ? 'Unable to save request. Database schema is incomplete.'
+          : 'Unable to save request.',
+      });
+    }
     if (pending) {
-      return res.status(400).json({ success: false, error: 'You already have a pending work mode request' });
+      return res.status(409).json({ success: false, error: 'A pending request already exists.' });
     }
 
     const { initializeApprovalSteps, REQUEST_TYPES } = require('../lib/approvalEngine');
@@ -1528,36 +1558,65 @@ router.post('/work-mode-requests', async (req, res) => {
       .insert({
         company_id: user.company_id,
         employee_uid: user.uid,
-        current_work_mode: user.work_mode,
+        current_work_mode: user.work_mode || 'in_office',
         requested_work_mode,
-        reason: reason || null,
+        reason: String(reason).trim(),
         status: 'pending',
         current_step: 1,
       })
       .select()
       .single();
-    if (error) throw error;
-
-    const init = await initializeApprovalSteps(supabase, {
-      companyId: user.company_id,
-      requestType: REQUEST_TYPES.REMOTE_WORK,
-      requestId: row.id,
-      employeeUid: user.uid,
-    });
-    if (init.workflowId) {
-      await supabase.from('work_mode_requests').update({ workflow_id: init.workflowId }).eq('id', row.id);
+    if (error) {
+      console.error(`[${timestamp}] work-mode-requests: insert failed`, error.message, error.code);
+      const schemaMissing =
+        error.code === 'PGRST205' ||
+        /Could not find the table|relation .* does not exist/i.test(error.message || '');
+      return res.status(schemaMissing ? 503 : 500).json({
+        success: false,
+        error: schemaMissing
+          ? 'Unable to save request. Database schema is incomplete.'
+          : error.message || 'Unable to save request.',
+      });
     }
 
-    return res.status(201).json({ success: true, data: row });
+    console.log(`[${timestamp}] work-mode-requests: created`, { id: row.id, uid: user.uid });
+
+    try {
+      const init = await initializeApprovalSteps(supabase, {
+        companyId: user.company_id,
+        requestType: REQUEST_TYPES.REMOTE_WORK,
+        requestId: row.id,
+        employeeUid: user.uid,
+      });
+      if (init.workflowId) {
+        await supabase.from('work_mode_requests').update({ workflow_id: init.workflowId }).eq('id', row.id);
+        row.workflow_id = init.workflowId;
+      }
+      console.log(`[${timestamp}] work-mode-requests: approval initialized`, {
+        id: row.id,
+        workflowId: init.workflowId,
+        steps: init.steps?.length || 0,
+      });
+    } catch (initErr) {
+      console.warn(`[${timestamp}] work-mode-requests: approval init deferred`, initErr.message);
+    }
+
+    return res.status(201).json({
+      success: true,
+      data: row,
+      message: 'Work mode request submitted successfully.',
+    });
   } catch (error) {
+    console.error(`[${timestamp}] work-mode-requests: unexpected`, error.message);
     return res.status(500).json({ success: false, error: error.message || 'Failed to submit request' });
   }
 });
 
 router.get('/work-mode-requests/mine', async (req, res) => {
-  const requester = parseRequester(req);
+  const { resolveRequester } = require('../lib/resolveRequester');
+  const requester = await resolveRequester(req);
   if (!requester?.uid) {
-    return res.status(401).json({ success: false, error: 'Unauthorized' });
+    return res.status(401).json({ success: false, error: 'Authentication expired. Please sign in again.' });
   }
   try {
     const { data, error } = await supabase

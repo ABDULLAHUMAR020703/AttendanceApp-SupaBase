@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { getKeyboardAvoidingBehavior, formScrollViewProps } from '../shared/components/KeyboardAwareScreen';
 import { Ionicons } from '@expo/vector-icons';
 import {
   getTicketById,
@@ -50,6 +51,7 @@ function TicketManagementList({ user, onSelectTicket }) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [loadError, setLoadError] = useState(null);
   const [ticketFilter, setTicketFilter] = useState('all');
+  const hasLoadedOnceRef = useRef(false);
 
   const LOAD_TIMEOUT_MS = 20000;
 
@@ -73,21 +75,30 @@ function TicketManagementList({ user, onSelectTicket }) {
       }
       setTickets(result.data || []);
       setDepartments(result.departments || []);
+      hasLoadedOnceRef.current = true;
     } catch (error) {
       console.error('[TicketManagementList] load error:', error);
       setTickets([]);
       setLoadError(error?.message || 'Failed to load tickets. Please try again.');
     }
-  }, [user]);
+  }, [user?.uid, user?.role, user?.companyId, user?.department]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      setIsLoading(true);
+      const isInitial = !hasLoadedOnceRef.current;
+      if (isInitial) {
+        setIsLoading(true);
+      } else {
+        setIsRefreshing(true);
+      }
       try {
         await loadTickets();
       } finally {
-        if (!cancelled) setIsLoading(false);
+        if (!cancelled) {
+          setIsLoading(false);
+          setIsRefreshing(false);
+        }
       }
     })();
     return () => {
@@ -106,7 +117,7 @@ function TicketManagementList({ user, onSelectTicket }) {
       ? tickets
       : tickets.filter((t) => t.status === ticketFilter);
 
-  if (isLoading) {
+  if (isLoading && tickets.length === 0 && !loadError) {
     return (
       <View
         style={{
@@ -119,7 +130,7 @@ function TicketManagementList({ user, onSelectTicket }) {
       >
         <ActivityIndicator size="large" color={colors.primary} />
         <Text style={{ color: colors.textSecondary, marginTop: spacing.md }}>
-          Loading tickets…
+          Loading ticketsâ€¦
         </Text>
       </View>
     );
@@ -264,7 +275,7 @@ function TicketManagementList({ user, onSelectTicket }) {
                 {item.subject}
               </Text>
               <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 4 }}>
-                By {item.createdBy} • {formatTicketDate(item.createdAt)}
+                By {item.createdBy} â€¢ {formatTicketDate(item.createdAt)}
               </Text>
               <View
                 style={{
@@ -298,13 +309,31 @@ function TicketManagementList({ user, onSelectTicket }) {
                 </Text>
                 {item.assignedTo ? (
                   <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
-                    → {item.assignedTo}
+                    â†’ {item.assignedTo}
                   </Text>
                 ) : null}
               </View>
             </TouchableOpacity>
           )}
         />
+      )}
+
+      {isLoading && tickets.length > 0 && (
+        <View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: 'rgba(0,0,0,0.15)',
+          }}
+          pointerEvents="none"
+        >
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
       )}
     </View>
   );
@@ -342,7 +371,7 @@ export default function TicketManagementScreen({ navigation, route }) {
           }}
         >
           <ActivityIndicator size="large" />
-          <Text style={{ marginTop: 12, color: '#6b7280' }}>Loading account…</Text>
+          <Text style={{ marginTop: 12, color: '#6b7280' }}>Loading accountâ€¦</Text>
         </View>
       );
     }
@@ -601,7 +630,7 @@ function TicketManagementDetail({ navigation, user, initialTicket, onBack }) {
       >
         <ActivityIndicator size="large" color={colors.primary} />
         <Text style={{ color: colors.textSecondary, marginTop: spacing.md }}>
-          Loading ticket…
+          Loading ticketâ€¦
         </Text>
       </View>
     );
@@ -684,6 +713,9 @@ function TicketManagementDetail({ navigation, user, initialTicket, onBack }) {
       ) : null}
       <ScrollView
         style={{ flex: 1 }}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets={true}
+        keyboardDismissMode="on-drag"
         refreshControl={
           <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
         }
@@ -721,7 +753,7 @@ function TicketManagementDetail({ navigation, user, initialTicket, onBack }) {
                     color: colors.textTertiary,
                   }}
                 >
-                  Created by {ticket.createdBy} • {formatDate(ticket.createdAt)}
+                  Created by {ticket.createdBy} â€¢ {formatDate(ticket.createdAt)}
                 </Text>
               </View>
               <View style={{ alignItems: 'flex-end' }}>
@@ -772,7 +804,7 @@ function TicketManagementDetail({ navigation, user, initialTicket, onBack }) {
               </Text>
               {ticket.assignedTo && (
                 <>
-                  <Text style={{ color: colors.textTertiary, marginHorizontal: 8 }}>•</Text>
+                  <Text style={{ color: colors.textTertiary, marginHorizontal: 8 }}>â€¢</Text>
                   <Ionicons name="person-outline" size={16} color={colors.textSecondary} />
                   <Text style={{ fontSize: 14, color: colors.textSecondary, marginLeft: 6 }}>
                     Assigned to {ticket.assignedTo}
@@ -956,7 +988,7 @@ function TicketManagementDetail({ navigation, user, initialTicket, onBack }) {
                   const displayName = item.name || item.username || 'Unknown';
                   const displayPosition = item.position || '';
                   const displayText = displayPosition 
-                    ? `${displayName} — ${displayPosition} (${roleLabel})`
+                    ? `${displayName} â€” ${displayPosition} (${roleLabel})`
                     : `${displayName} (${roleLabel})`;
                   
                   return (
@@ -1025,9 +1057,15 @@ function TicketManagementDetail({ navigation, user, initialTicket, onBack }) {
         animationType="slide"
         onRequestClose={() => setShowResponseModal(false)}
       >
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={getKeyboardAvoidingBehavior({ inModal: true })} style={{ flex: 1 }}>
         <View style={{ flex: 1, justifyContent: tablet ? 'center' : 'flex-end', backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
-          <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderBottomLeftRadius: tablet ? 24 : 0, borderBottomRightRadius: tablet ? 24 : 0, padding: 24, width: '100%', maxWidth: tablet ? 700 : undefined, alignSelf: 'center' }}>
+          <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderBottomLeftRadius: tablet ? 24 : 0, borderBottomRightRadius: tablet ? 24 : 0, padding: 24, width: '100%', maxWidth: tablet ? 700 : undefined, alignSelf: 'center', maxHeight: '90%' }}>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              automaticallyAdjustKeyboardInsets={true}
+              keyboardDismissMode="on-drag"
+              showsVerticalScrollIndicator={false}
+            >
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
               <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text }}>Add Response</Text>
               <TouchableOpacity onPress={() => setShowResponseModal(false)}>
@@ -1069,6 +1107,7 @@ function TicketManagementDetail({ navigation, user, initialTicket, onBack }) {
                 </Text>
               </TouchableOpacity>
             </View>
+            </ScrollView>
           </View>
         </View>
         </KeyboardAvoidingView>

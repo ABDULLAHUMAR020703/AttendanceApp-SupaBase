@@ -475,7 +475,7 @@ export const addUserToFile = async (userData) => {
     const gatewayUrl = typeof API_GATEWAY_URL === 'string' ? API_GATEWAY_URL : String(API_GATEWAY_URL || 'http://localhost:3000');
     const response = await fetch(`${gatewayUrl}/api/auth/users`, {
       method: 'POST',
-      headers: buildGatewayAuthHeaders(requester),
+      headers: await buildGatewayAuthHeaders(requester),
       body: JSON.stringify({
         username,
         password,
@@ -530,7 +530,7 @@ export const updateUserRole = async (username, newRole) => {
       const gatewayUrl = typeof API_GATEWAY_URL === 'string' ? API_GATEWAY_URL : String(API_GATEWAY_URL || 'http://localhost:3000');
       const response = await fetch(`${gatewayUrl}/api/auth/users/${username}/role`, {
         method: 'PATCH',
-        headers: buildGatewayAuthHeaders(requester),
+        headers: await buildGatewayAuthHeaders(requester),
         body: JSON.stringify({ role: newRole }),
       });
       
@@ -605,7 +605,7 @@ export const updateUserInfo = async (username, updates) => {
       const gatewayUrl = typeof API_GATEWAY_URL === 'string' ? API_GATEWAY_URL : String(API_GATEWAY_URL || 'http://localhost:3000');
       const response = await fetch(`${gatewayUrl}/api/auth/users/${username}`, {
         method: 'PATCH',
-        headers: buildGatewayAuthHeaders(requester),
+        headers: await buildGatewayAuthHeaders(requester),
         body: JSON.stringify(updates), // API Gateway handles conversion
       });
       
@@ -664,7 +664,7 @@ export const deleteUserAccount = async (uid, requester) => {
 
     const response = await fetch(`${gatewayUrl}/api/auth/users/${uid}`, {
       method: 'DELETE',
-      headers: buildGatewayAuthHeaders(ctx),
+      headers: await buildGatewayAuthHeaders(ctx),
       body: JSON.stringify({
         requester: {
           uid: ctx.uid,

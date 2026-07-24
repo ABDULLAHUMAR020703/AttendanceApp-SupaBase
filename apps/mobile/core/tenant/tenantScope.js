@@ -79,16 +79,32 @@ export async function fetchCompanyUsernames(supabase, companyId, context = 'user
 
 /**
  * Company_id for the currently signed-in Supabase user (from public.users).
+ * Prefers local getSession() (no network) and falls back to getUser() only if needed.
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
  * @returns {Promise<string|null>}
  */
 export async function fetchSessionUserCompanyId(supabase) {
-  const { data: authData, error: authErr } = await supabase.auth.getUser();
-  if (authErr || !authData?.user?.id) return null;
+  let userId = null;
+
+  try {
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (!sessionError && session?.user?.id) {
+      userId = session.user.id;
+    }
+  } catch (e) {
+    console.warn('[tenant:session] getSession failed:', e?.message || e);
+  }
+
+  if (!userId) {
+    const { data: authData, error: authErr } = await supabase.auth.getUser();
+    if (authErr || !authData?.user?.id) return null;
+    userId = authData.user.id;
+  }
+
   const { data, error } = await supabase
     .from('users')
     .select('company_id')
-    .eq('uid', authData.user.id)
+    .eq('uid', userId)
     .maybeSingle();
   if (error || !data?.company_id) return null;
   return requireValidCompanyId(data.company_id, 'session');

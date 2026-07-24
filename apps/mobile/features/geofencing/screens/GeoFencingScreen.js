@@ -37,6 +37,7 @@ export default function GeoFencingScreen({ navigation, route }) {
 
   const [officeLocation, setOfficeLocation] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState(null);
   const [isLocked, setIsLocked] = useState(false); // Track if marker is locked (dragging disabled)
@@ -96,9 +97,14 @@ export default function GeoFencingScreen({ navigation, route }) {
     };
   }, [selectedDepartmentId]);
 
-  const loadOfficeLocation = async () => {
+  const loadOfficeLocation = async ({ soft = false } = {}) => {
+    const useSoftLoader = soft || officeLocation != null;
     try {
-      setIsLoading(true);
+      if (useSoftLoader) {
+        setIsRefreshing(true);
+      } else {
+        setIsLoading(true);
+      }
       setError(null);
 
       const scopedUser =
@@ -155,7 +161,11 @@ export default function GeoFencingScreen({ navigation, route }) {
       console.error('[GeoFencingScreen] Error loading office location:', err);
       setError(err.message || 'Failed to load office location');
     } finally {
-      setIsLoading(false);
+      if (useSoftLoader) {
+        setIsRefreshing(false);
+      } else {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -608,7 +618,7 @@ export default function GeoFencingScreen({ navigation, route }) {
     },
   });
 
-  if (isLoading) {
+  if (isLoading && !officeLocation) {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
@@ -633,14 +643,19 @@ export default function GeoFencingScreen({ navigation, route }) {
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Office Location</Text>
-        <TouchableOpacity onPress={loadOfficeLocation}>
+        <TouchableOpacity onPress={() => loadOfficeLocation({ soft: true })}>
           <Ionicons name="refresh" size={24} color="#fff" />
         </TouchableOpacity>
       </View>
 
       <ScrollView
         style={{ flex: 1 }}
-        refreshControl={<RefreshControl refreshing={isLoading} onRefresh={loadOfficeLocation} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={() => loadOfficeLocation({ soft: true })}
+          />
+        }
       >
         {/* Map Container */}
         <View style={styles.mapContainer}>

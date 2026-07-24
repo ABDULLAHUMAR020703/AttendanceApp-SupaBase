@@ -1,5 +1,10 @@
-// Location utilities for reverse geocoding using OpenStreetMap Nominatim
+// Location utilities — progressive GPS for Check-In (coords first; address async).
 import * as Location from 'expo-location';
+
+/** JS-side timeout: expo-location no longer honors native `timeout` on getCurrentPositionAsync. */
+const DEFAULT_GPS_TIMEOUT_MS = 12000;
+const LAST_KNOWN_MAX_AGE_MS = 60000;
+const ADDRESS_TIMEOUT_MS = 5000;
 
 /**
  * Request location permissions
@@ -7,17 +12,15 @@ import * as Location from 'expo-location';
  */
 export const requestLocationPermissions = async () => {
   try {
-    // Check current permission status
     const { status: existingStatus } = await Location.getForegroundPermissionsAsync();
-    
+
     if (existingStatus === 'granted') {
       console.log('Location permissions already granted');
       return true;
     }
 
-    // Request permissions
     const { status } = await Location.requestForegroundPermissionsAsync();
-    
+
     if (status !== 'granted') {
       console.warn('Location permission denied');
       return false;
@@ -32,46 +35,142 @@ export const requestLocationPermissions = async () => {
 };
 
 /**
- * Get current location with coordinates
- * @returns {Promise<{latitude: number, longitude: number, accuracy: number} | null>}
+ * True only when latitude/longitude are finite numbers.
+ * @param {object|null|undefined} location
+ * @returns {boolean}
  */
-export const getCurrentLocation = async () => {
+export const hasValidCoordinates = (location) => {
+  if (!location || typeof location !== 'object') return false;
+  const { latitude, longitude } = location;
+  return (
+    typeof latitude === 'number' &&
+    Number.isFinite(latitude) &&
+    typeof longitude === 'number' &&
+    Number.isFinite(longitude)
+  );
+};
+
+const toCoords = (locationObject, source) => {
+  if (!locationObject?.coords) return null;
+  const { latitude, longitude, accuracy } = locationObject.coords;
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  return {
+    latitude,
+    longitude,
+    accuracy: accuracy ?? null,
+    address: null,
+    source: source || 'gps',
+    timestamp: locationObject.timestamp ?? Date.now(),
+  };
+};
+
+/**
+ * Prefer a fresher / more authoritative fix. GPS beats last-known; keep address if new fix lacks one.
+ */
+const mergeLocationUpdate = (current, next) => {
+  if (!hasValidCoordinates(next)) return current;
+  if (!hasValidCoordinates(current)) return next;
+
+  const currentIsGps = current.source === 'gps';
+  const nextIsGps = next.source === 'gps';
+
+  if (nextIsGps && !currentIsGps) {
+    return {
+      ...next,
+      address: next.address || current.address || null,
+    };
+  }
+  if (!nextIsGps && currentIsGps) {
+    // Ignore stale last-known after we already have GPS, unless only address improved on same fix.
+    if (
+      next.address &&
+      !current.address &&
+      next.latitude === current.latitude &&
+      next.longitude === current.longitude
+    ) {
+      return { ...current, address: next.address };
+    }
+    return current;
+  }
+
+  // Same tier: prefer newer timestamp; preserve address if missing on next.
+  const currentTs = current.timestamp ?? 0;
+  const nextTs = next.timestamp ?? 0;
+  if (nextTs >= currentTs) {
+    return {
+      ...next,
+      address: next.address || current.address || null,
+    };
+  }
+  return {
+    ...current,
+    address: current.address || next.address || null,
+  };
+};
+
+/**
+ * Cached / last-known position (fast). Does not request a new hardware fix.
+ * @param {{ maxAge?: number }} [options]
+ * @returns {Promise<object|null>}
+ */
+export const getLastKnownLocationCoords = async (options = {}) => {
   try {
-    // Request permissions first
+    const hasPermission = await requestLocationPermissions();
+    if (!hasPermission) return null;
+
+    const maxAge = options.maxAge ?? LAST_KNOWN_MAX_AGE_MS;
+    const last = await Location.getLastKnownPositionAsync({ maxAge });
+    return toCoords(last, 'lastKnown');
+  } catch (error) {
+    console.warn('[location] getLastKnownPositionAsync failed:', error?.message || error);
+    return null;
+  }
+};
+
+/**
+ * Get current location with coordinates (fresh hardware fix).
+ * Uses a JavaScript timeout because expo-location ignores native timeout/maximumAge.
+ * @param {{ timeoutMs?: number, accuracy?: number }} [options]
+ * @returns {Promise<{latitude: number, longitude: number, accuracy: number, source: string, timestamp: number, address: null} | null>}
+ */
+export const getCurrentLocation = async (options = {}) => {
+  const timeoutMs = options.timeoutMs ?? DEFAULT_GPS_TIMEOUT_MS;
+  const accuracy = options.accuracy ?? Location.Accuracy.Balanced;
+
+  try {
     const hasPermission = await requestLocationPermissions();
     if (!hasPermission) {
       console.warn('Location permission not granted, cannot get location');
       return null;
     }
 
-    // Check if location services are enabled
     const isEnabled = await Location.hasServicesEnabledAsync();
     if (!isEnabled) {
       console.warn('Location services are disabled');
       return null;
     }
 
-    // Get current position
-    const location = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Balanced,
-      timeout: 10000, // 10 second timeout
-      maximumAge: 60000, // Accept cached location up to 1 minute old
+    const positionPromise = Location.getCurrentPositionAsync({ accuracy });
+    let timeoutId;
+    const timeoutPromise = new Promise((_, reject) => {
+      timeoutId = setTimeout(() => {
+        const err = new Error('Location request timed out');
+        err.code = 'E_LOCATION_TIMEOUT';
+        reject(err);
+      }, timeoutMs);
     });
 
-    if (!location || !location.coords) {
-      console.warn('Invalid location data received');
-      return null;
+    let location;
+    try {
+      location = await Promise.race([positionPromise, timeoutPromise]);
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
     }
 
-    return {
-      latitude: location.coords.latitude,
-      longitude: location.coords.longitude,
-      accuracy: location.coords.accuracy,
-    };
+    return toCoords(location, 'gps');
   } catch (error) {
     console.error('Error getting location:', error);
-    
-    // Provide more specific error messages
+
     if (error.code === 'E_LOCATION_SERVICES_DISABLED') {
       console.error('Location services are disabled. Please enable them in device settings.');
     } else if (error.code === 'E_LOCATION_UNAVAILABLE') {
@@ -79,27 +178,26 @@ export const getCurrentLocation = async () => {
     } else if (error.code === 'E_LOCATION_TIMEOUT') {
       console.error('Location request timed out. Please try again.');
     }
-    
+
     return null;
   }
 };
 
 /**
  * Convert coordinates to human-readable address using OpenStreetMap Nominatim
- * @param {number} latitude - Latitude coordinate
- * @param {number} longitude - Longitude coordinate
- * @returns {Promise<string>} Human-readable address or fallback to coordinates
+ * @param {number} latitude
+ * @param {number} longitude
+ * @returns {Promise<string>}
  */
 export const getAddressFromCoordinates = async (latitude, longitude) => {
   try {
     console.log(`Getting address for coordinates: ${latitude}, ${longitude}`);
-    
-    // Call Nominatim reverse geocoding API
+
     const response = await fetch(
       `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1&zoom=18`,
       {
         headers: {
-          'User-Agent': 'AttendanceApp/1.0', // Required by Nominatim
+          'User-Agent': 'AttendanceApp/1.0',
         },
       }
     );
@@ -109,54 +207,179 @@ export const getAddressFromCoordinates = async (latitude, longitude) => {
     }
 
     const data = await response.json();
-    
+
     if (data && data.display_name) {
       console.log('Address found:', data.display_name);
       return data.display_name;
-    } else {
-      throw new Error('No address found in response');
     }
+    throw new Error('No address found in response');
   } catch (error) {
     console.error('Error getting address from coordinates:', error);
-    // Fallback to coordinates if address lookup fails
-    // Defensive: Handle null/undefined values
     return `${(latitude ?? 0).toFixed(6)}, ${(longitude ?? 0).toFixed(6)}`;
   }
 };
 
 /**
- * Get current location with both coordinates and address
- * @returns {Promise<{latitude: number, longitude: number, accuracy: number, address: string} | null>}
+ * Resolve address without blocking the caller. Invokes onAddress when done.
+ */
+export const resolveAddressInBackground = (latitude, longitude, onAddress) => {
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+
+  Promise.race([
+    getAddressFromCoordinates(latitude, longitude),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Address lookup timeout')), ADDRESS_TIMEOUT_MS)
+    ),
+  ])
+    .then((address) => {
+      if (typeof onAddress === 'function') onAddress(address);
+    })
+    .catch((err) => {
+      console.warn('[location] background geocode failed:', err?.message || err);
+      const fallback = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+      if (typeof onAddress === 'function') onAddress(fallback);
+    });
+};
+
+/** Coalesce concurrent progressive acquisitions (shared listeners). */
+let progressiveInFlight = null;
+let progressiveLatest = null;
+const progressiveListeners = new Set();
+
+const notifyProgressiveListeners = (location) => {
+  progressiveListeners.forEach((fn) => {
+    try {
+      fn(location);
+    } catch (e) {
+      console.warn('[location] onUpdate listener error:', e?.message || e);
+    }
+  });
+};
+
+const addProgressiveListener = (onUpdate) => {
+  if (typeof onUpdate !== 'function') return () => {};
+  progressiveListeners.add(onUpdate);
+  if (hasValidCoordinates(progressiveLatest)) {
+    try {
+      onUpdate(progressiveLatest);
+    } catch (e) {
+      console.warn('[location] onUpdate listener error:', e?.message || e);
+    }
+  }
+  return () => {
+    progressiveListeners.delete(onUpdate);
+  };
+};
+
+/**
+ * Progressive location for Check-In:
+ * 1) Emit last-known coords immediately (if any)
+ * 2) Acquire fresh GPS in parallel (JS timeout)
+ * 3) Reverse-geocode in background; never blocks return / Check-In
+ *
+ * @param {{
+ *   onUpdate?: (loc: object) => void,
+ *   timeoutMs?: number,
+ *   lastKnownMaxAgeMs?: number,
+ *   resolveAddress?: boolean,
+ * }} [options]
+ * @returns {Promise<object|null>} Best location available when fresh GPS settles (may lack address)
+ */
+export const acquireLocationProgressive = async (options = {}) => {
+  const {
+    onUpdate,
+    timeoutMs = DEFAULT_GPS_TIMEOUT_MS,
+    lastKnownMaxAgeMs = LAST_KNOWN_MAX_AGE_MS,
+    resolveAddress = true,
+  } = options;
+
+  const removeListener = addProgressiveListener(onUpdate);
+
+  if (progressiveInFlight) {
+    try {
+      return await progressiveInFlight;
+    } finally {
+      removeListener();
+    }
+  }
+
+  progressiveInFlight = (async () => {
+    let best = hasValidCoordinates(progressiveLatest) ? progressiveLatest : null;
+
+    const emit = (partial) => {
+      best = mergeLocationUpdate(best, partial);
+      progressiveLatest = best;
+      if (hasValidCoordinates(best)) {
+        notifyProgressiveListeners(best);
+      }
+    };
+
+    // 1) Instant cached fix
+    const lastKnown = await getLastKnownLocationCoords({ maxAge: lastKnownMaxAgeMs });
+    if (lastKnown) {
+      console.log('[location] Using last-known position for immediate UI');
+      emit(lastKnown);
+      if (resolveAddress) {
+        resolveAddressInBackground(lastKnown.latitude, lastKnown.longitude, (address) => {
+          emit({ ...lastKnown, address });
+        });
+      }
+    }
+
+    // 2) Fresh GPS (does not wait on address)
+    const fresh = await getCurrentLocation({ timeoutMs });
+    if (fresh) {
+      console.log('[location] Fresh GPS fix acquired');
+      emit(fresh);
+      if (resolveAddress) {
+        resolveAddressInBackground(fresh.latitude, fresh.longitude, (address) => {
+          emit({ ...fresh, address });
+        });
+      }
+    } else if (!hasValidCoordinates(best)) {
+      console.warn('[location] Fresh GPS failed and no last-known available');
+    }
+
+    return hasValidCoordinates(best) ? best : null;
+  })();
+
+  try {
+    return await progressiveInFlight;
+  } finally {
+    progressiveInFlight = null;
+    removeListener();
+  }
+};
+
+/**
+ * Get current location with both coordinates and address (blocking address).
+ * Prefer acquireLocationProgressive for Check-In UI. Kept for other callers.
  */
 export const getCurrentLocationWithAddress = async () => {
   try {
-    // Get coordinates first
     const location = await getCurrentLocation();
-    
-    if (!location) {
+
+    if (!location || !hasValidCoordinates(location)) {
       console.warn('Could not get location coordinates');
       return null;
     }
 
-    // Get address from coordinates (with timeout to prevent hanging)
     let address;
     try {
       address = await Promise.race([
         getAddressFromCoordinates(location.latitude, location.longitude),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Address lookup timeout')), 5000)
-        )
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Address lookup timeout')), ADDRESS_TIMEOUT_MS)
+        ),
       ]);
     } catch (addressError) {
       console.warn('Error getting address, using coordinates:', addressError.message);
-      // Fallback to coordinates if address lookup fails or times out
-      // Defensive: Handle null/undefined values
       address = `${(location.latitude ?? 0).toFixed(6)}, ${(location.longitude ?? 0).toFixed(6)}`;
     }
-    
+
     return {
       ...location,
-      address: address,
+      address,
     };
   } catch (error) {
     console.error('Error getting location with address:', error);
@@ -165,52 +388,58 @@ export const getCurrentLocationWithAddress = async () => {
 };
 
 /**
+ * Ensure coordinates are available. Does not wait for reverse geocoding.
+ * Coalesces with acquireLocationProgressive to avoid duplicate GPS work.
+ */
+export const ensureLocationWithAddress = async (options = {}) => {
+  return acquireLocationProgressive({
+    onUpdate: options.onUpdate,
+    timeoutMs: options.timeoutMs,
+    lastKnownMaxAgeMs: options.lastKnownMaxAgeMs,
+    resolveAddress: options.resolveAddress !== false,
+  });
+};
+
+/**
  * Format address for display (shorten if too long)
- * @param {string} address - Full address string
- * @param {number} maxLength - Maximum length for display
- * @returns {string} Formatted address
  */
 export const formatAddressForDisplay = (address, maxLength = 50) => {
   if (!address) return 'Location not available';
-  
+
   if (address.length <= maxLength) {
     return address;
   }
-  
-  // Try to find a good break point (comma, space, etc.)
+
   const breakPoints = [', ', ' ', '-'];
   let bestBreak = maxLength;
-  
+
   for (const breakPoint of breakPoints) {
     const lastIndex = address.lastIndexOf(breakPoint, maxLength);
-    if (lastIndex > maxLength * 0.7) { // At least 70% of max length
+    if (lastIndex > maxLength * 0.7) {
       bestBreak = lastIndex;
       break;
     }
   }
-  
+
   return address.substring(0, bestBreak) + '...';
 };
 
 /**
  * Extract city and country from full address
- * @param {string} address - Full address string
- * @returns {Object} {city: string, country: string}
  */
 export const extractCityAndCountry = (address) => {
   if (!address) {
     return { city: 'Unknown', country: 'Unknown' };
   }
-  
-  // Split by comma and get the last two parts (usually city, country)
-  const parts = address.split(',').map(part => part.trim());
-  
+
+  const parts = address.split(',').map((part) => part.trim());
+
   if (parts.length >= 2) {
     return {
       city: parts[parts.length - 2] || 'Unknown',
       country: parts[parts.length - 1] || 'Unknown',
     };
   }
-  
+
   return { city: 'Unknown', country: 'Unknown' };
 };

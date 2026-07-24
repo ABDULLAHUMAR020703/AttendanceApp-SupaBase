@@ -774,7 +774,8 @@ export const findMatchingAllowedLocation = async (user, userLat, userLon) => {
 /**
  * Validate check-in location based on work mode
  * - in_office: office geofence only
- * - semi_remote: office OR any assigned remote site
+ * - hybrid: office OR any assigned site (schedule-driven)
+ * - semi_remote: home or approved remote — GPS captured, no strict office/site geofence
  * - fully_remote: any location (GPS optional)
  */
 export const validateCheckInLocation = async (user, userLat, userLon) => {
@@ -785,6 +786,36 @@ export const validateCheckInLocation = async (user, userLat, userLon) => {
       return { valid: true, locationRequired: false };
     }
 
+    // Semi-remote: may check in from home or other approved remote locations.
+    // Capture GPS for audit when available; do not enforce office/assigned geofence.
+    if (workMode === 'semi_remote') {
+      const hasCoords =
+        typeof userLat === 'number' &&
+        typeof userLon === 'number' &&
+        !isNaN(userLat) &&
+        !isNaN(userLon);
+
+      if (!hasCoords) {
+        return {
+          valid: false,
+          locationRequired: true,
+          error: 'Unable to get your current location. Please enable location services and try again.',
+        };
+      }
+
+      // Best-effort match for audit metadata only — never block on miss.
+      try {
+        const { match, distance } = await findMatchingAllowedLocation(user, userLat, userLon);
+        if (match) {
+          return { valid: true, matchedLocation: match, distance, locationRequired: true };
+        }
+      } catch (matchErr) {
+        console.warn('[GeofenceService] semi_remote site match skipped:', matchErr?.message);
+      }
+
+      return { valid: true, locationRequired: true };
+    }
+
     if (typeof userLat !== 'number' || typeof userLon !== 'number' || isNaN(userLat) || isNaN(userLon)) {
       return {
         valid: false,
@@ -793,7 +824,8 @@ export const validateCheckInLocation = async (user, userLat, userLon) => {
       };
     }
 
-    if (workMode === 'semi_remote') {
+    // Hybrid: office or assigned work locations (strict geofence).
+    if (workMode === 'hybrid') {
       const { match, closest, distance } = await findMatchingAllowedLocation(user, userLat, userLon);
       if (match) {
         return { valid: true, matchedLocation: match, distance, locationRequired: true };
