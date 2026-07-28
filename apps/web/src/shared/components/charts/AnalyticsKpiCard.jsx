@@ -9,10 +9,10 @@ export const AnalyticsKpiCard = memo(function AnalyticsKpiCard({
   accent = 'blue',
 }) {
   const accentClasses = {
-    blue: 'bg-blue-400/20 text-blue-100 shadow-[0_0_0_1px_rgba(59,130,246,0.35)]',
+    blue: 'bg-[#014871]/40 text-[#A0EBCF] shadow-[0_0_0_1px_rgba(160,235,207,0.25)]',
     green: 'bg-emerald-400/20 text-emerald-100 shadow-[0_0_0_1px_rgba(16,185,129,0.35)]',
     amber: 'bg-amber-400/20 text-amber-100 shadow-[0_0_0_1px_rgba(245,158,11,0.35)]',
-    purple: 'bg-violet-400/20 text-violet-100 shadow-[0_0_0_1px_rgba(139,92,246,0.35)]',
+    purple: 'bg-[#5BA8C8]/25 text-sky-100 shadow-[0_0_0_1px_rgba(91,168,200,0.35)]',
   };
 
   if (loading) {

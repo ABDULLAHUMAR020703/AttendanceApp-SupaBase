@@ -6,6 +6,7 @@ import { AccessDenied } from '../../shared/components/PermissionGate';
 import { AppLoader } from '../../shared/components/ui';
 import { LoginPage } from '../../features/auth/pages/LoginPage';
 import { CompanyOnboardingPage } from '../../features/auth/pages/CompanyOnboardingPage';
+import { LandingPage } from '../../features/landing/pages/LandingPage';
 import { AppShell } from '../../shared/components/AppShell';
 import { DashboardPage } from '../../features/admin/pages/DashboardPage';
 import { UsersPage } from '../../features/admin/pages/UsersPage';
@@ -47,11 +48,13 @@ export function AppRouter() {
 
   return (
     <Routes>
+      <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/onboard" element={<CompanyOnboardingPage />} />
       <Route path="/unauthorized" element={<Unauthorized />} />
-      <Route path="/" element={<Protected><AppShell /></Protected>}>
-        <Route index element={<DashboardPage />} />
+      {/* Pathless layout: keeps /users, /attendance, etc. while freeing / for marketing */}
+      <Route element={<Protected><AppShell /></Protected>}>
+        <Route path="dashboard" element={<DashboardPage />} />
         <Route path="users" element={<PermissionRoute feature="users"><UsersPage /></PermissionRoute>} />
         <Route path="departments" element={<PermissionRoute feature="departments"><DepartmentsPage /></PermissionRoute>} />
         <Route path="analytics" element={<PermissionRoute feature="analytics"><AnalyticsPage /></PermissionRoute>} />
@@ -67,6 +70,7 @@ export function AppRouter() {
         <Route path="calendar" element={<PermissionRoute feature="calendar"><CalendarPage /></PermissionRoute>} />
         <Route path="notifications" element={<PermissionRoute feature="notifications"><NotificationsPage /></PermissionRoute>} />
       </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

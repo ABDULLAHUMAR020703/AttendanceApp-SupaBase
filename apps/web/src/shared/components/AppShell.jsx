@@ -8,7 +8,7 @@ import { PermissionGate } from './PermissionGate';
 
 const navItems = [
   {
-    to: '/',
+    to: '/dashboard',
     label: 'Dashboard',
     icon: (
       <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -219,7 +219,7 @@ export function AppShell() {
   }, [items, location.pathname]);
 
   const mobileNavItems = useMemo(() => {
-    const primary = ['/', '/attendance', '/leaves', '/notifications'];
+    const primary = ['/dashboard', '/attendance', '/leaves', '/notifications'];
     return items.filter((item) => primary.includes(item.to));
   }, [items]);
 
@@ -234,17 +234,17 @@ export function AppShell() {
     .join('');
 
   return (
-    <div className="relative min-h-screen flex text-slate-100 overflow-hidden">
-      <div className="absolute inset-0 bg-[linear-gradient(135deg,#0F172A,#1E3A8A,#3B82F6)]" />
-      <div className="absolute -left-40 -top-24 h-[28rem] w-[28rem] rounded-full bg-blue-400/20 blur-3xl animate-float-slow" />
-      <div className="absolute -right-32 bottom-0 h-[26rem] w-[26rem] rounded-full bg-cyan-300/20 blur-3xl animate-float-slower" />
+    <div className="relative flex min-h-screen overflow-hidden text-slate-100">
+      <div className="absolute inset-0 bg-[#0D0F12]" />
+      <div className="absolute -left-40 -top-24 h-[28rem] w-[28rem] rounded-full bg-[#014871]/25 blur-3xl animate-float-slow" />
+      <div className="absolute -right-32 bottom-0 h-[26rem] w-[26rem] rounded-full bg-[#A0EBCF]/15 blur-3xl animate-float-slower" />
 
-      <aside className={`relative hidden md:flex flex-col m-4 rounded-2xl border border-white/15 bg-white/10 backdrop-blur-xl transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-64'}`}>
-        <div className="h-16 px-4 border-b border-white/10 flex items-center justify-between">
-          {!isCollapsed && <p className="font-semibold text-slate-100">Hadir.ai Admin</p>}
+      <aside className={`relative m-4 hidden flex-col rounded-2xl border border-[#2A2E35] bg-[#1A1D21]/90 backdrop-blur-xl transition-all duration-300 md:flex ${isCollapsed ? 'w-20' : 'w-64'}`}>
+        <div className="flex h-16 items-center justify-between border-b border-[#2A2E35] px-4">
+          {!isCollapsed && <p className="font-semibold tracking-tight text-white">Hadir.ai Admin</p>}
           <button
             type="button"
-            className="rounded-md border border-white/20 p-1.5 text-slate-200 hover:bg-white/10"
+            className="rounded-md border border-[#2A2E35] p-1.5 text-slate-200 hover:bg-white/[0.06]"
             onClick={() => setIsCollapsed((prev) => !prev)}
             aria-label="Toggle sidebar"
           >
@@ -254,45 +254,49 @@ export function AppShell() {
           </button>
         </div>
 
-        <div className="p-3 space-y-1.5">
+        <div className="space-y-1.5 p-3">
           {items.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               className={({ isActive }) => `group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-200 ${
                 isActive
-                  ? 'text-white bg-blue-500/25 border border-blue-300/35 shadow-[0_0_0_1px_rgba(59,130,246,0.2),0_8px_20px_rgba(37,99,235,0.25)]'
-                  : 'text-slate-200 hover:bg-white/10 border border-transparent'
+                  ? 'border border-[#A0EBCF]/30 bg-[#014871]/35 text-white shadow-[0_0_0_1px_rgba(160,235,207,0.12),0_8px_20px_rgba(1,72,113,0.3)]'
+                  : 'border border-transparent text-slate-300 hover:bg-white/[0.05]'
               }`}
             >
-              <span className="text-blue-200 relative">
-                {item.icon}
-                {item.to === '/notifications' && unreadCount > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 min-w-[1rem] h-4 px-1 rounded-full bg-red-500 text-[10px] font-semibold text-white grid place-items-center">
-                    {unreadCount > 99 ? '99+' : unreadCount}
+              {({ isActive }) => (
+                <>
+                  <span className={`relative ${isActive ? 'text-[#A0EBCF]' : 'text-slate-400'}`}>
+                    {item.icon}
+                    {item.to === '/notifications' && unreadCount > 0 && (
+                      <span className="absolute -right-1.5 -top-1.5 grid h-4 min-w-[1rem] place-items-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </span>
+                    )}
                   </span>
-                )}
-              </span>
-              {!isCollapsed && <span className="flex-1">{item.label}</span>}
-              {!isCollapsed && item.to === '/notifications' && unreadCount > 0 && (
-                <span className="text-xs rounded-full bg-red-500/80 px-1.5 py-0.5 text-white">{unreadCount > 99 ? '99+' : unreadCount}</span>
+                  {!isCollapsed && <span className="flex-1">{item.label}</span>}
+                  {!isCollapsed && item.to === '/notifications' && unreadCount > 0 && (
+                    <span className="rounded-full bg-red-500/80 px-1.5 py-0.5 text-xs text-white">{unreadCount > 99 ? '99+' : unreadCount}</span>
+                  )}
+                </>
               )}
             </NavLink>
           ))}
         </div>
 
         <div className="mt-auto p-3">
-          <button onClick={logout} className="w-full rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-slate-200 hover:bg-white/10 transition-all duration-200">
+          <button onClick={logout} className="w-full rounded-lg border border-[#2A2E35] bg-white/[0.03] px-3 py-2 text-sm text-slate-200 transition-all duration-200 hover:bg-white/[0.07]">
             {isCollapsed ? '↩' : 'Logout'}
           </button>
         </div>
       </aside>
 
-      <div className="relative flex-1 min-w-0 p-2 md:p-4 md:pl-0">
-        <header className="h-14 md:h-16 rounded-card border border-white/15 bg-white/10 backdrop-blur-xl px-3 md:px-6 flex items-center gap-3 md:gap-4">
+      <div className="relative min-w-0 flex-1 p-2 md:p-4 md:pl-0">
+        <header className="flex h-14 items-center gap-3 rounded-card border border-[#2A2E35] bg-[#1A1D21]/90 px-3 backdrop-blur-xl md:h-16 md:gap-4 md:px-6">
           <button
             type="button"
-            className="md:hidden rounded-input border border-white/20 p-2 text-slate-100"
+            className="rounded-input border border-[#2A2E35] p-2 text-slate-100 md:hidden"
             onClick={() => setMobileNavOpen(true)}
             aria-label="Open navigation menu"
           >
@@ -300,9 +304,9 @@ export function AppShell() {
               <path d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <p className="text-sm md:text-base font-semibold text-slate-100 min-w-fit truncate">{pageTitle}</p>
+          <p className="min-w-fit truncate text-sm font-semibold text-slate-100 md:text-base">{pageTitle}</p>
 
-          <div className="flex-1 max-w-xl hidden sm:block">
+          <div className="hidden max-w-xl flex-1 sm:block">
             <div className="relative">
               <input
                 value={search}
@@ -310,7 +314,7 @@ export function AppShell() {
                 placeholder="Search users, roles..."
                 className="ui-input py-2 pl-9"
               />
-              <svg viewBox="0 0 24 24" className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <svg viewBox="0 0 24 24" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <circle cx="11" cy="11" r="7" />
                 <path d="m21 21-4.3-4.3" />
               </svg>
@@ -321,7 +325,7 @@ export function AppShell() {
             <button
               type="button"
               onClick={() => navigate('/notifications')}
-              className="relative rounded-lg border border-white/20 bg-white/5 p-2 text-slate-100 hover:bg-white/15 transition-all duration-200"
+              className="relative rounded-lg border border-[#2A2E35] bg-white/[0.03] p-2 text-slate-100 transition-all duration-200 hover:bg-white/[0.08]"
               aria-label="Notifications"
             >
               <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -329,7 +333,7 @@ export function AppShell() {
                 <path d="M9 17a3 3 0 0 0 6 0" />
               </svg>
               {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[1rem] h-4 px-1 rounded-full bg-red-500 text-[10px] font-semibold text-white grid place-items-center">
+                <span className="absolute -right-1 -top-1 grid h-4 min-w-[1rem] place-items-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
                   {unreadCount > 99 ? '99+' : unreadCount}
                 </span>
               )}
@@ -338,19 +342,22 @@ export function AppShell() {
 
           <div className="relative">
             <button
-              className="flex items-center gap-2 rounded-lg border border-white/20 bg-white/5 px-2 py-1.5 hover:bg-white/15 transition-all duration-200"
+              className="flex items-center gap-2 rounded-lg border border-[#2A2E35] bg-white/[0.03] px-2 py-1.5 transition-all duration-200 hover:bg-white/[0.08]"
               onClick={() => setShowProfile((prev) => !prev)}
             >
-              <span className="grid h-8 w-8 place-items-center rounded-full bg-blue-200/20 text-blue-100 text-xs font-semibold">
+              <span
+                className="grid h-8 w-8 place-items-center rounded-full text-xs font-semibold text-white"
+                style={{ background: 'linear-gradient(145deg, #014871, #A0EBCF)' }}
+              >
                 {initials}
               </span>
-              <span className="hidden md:block text-sm text-slate-100">{user?.name || user?.username || 'Admin'}</span>
+              <span className="hidden text-sm text-slate-100 md:block">{user?.name || user?.username || 'Admin'}</span>
             </button>
 
             {showProfile && (
-              <div className="absolute right-0 top-11 w-52 rounded-lg border border-white/20 bg-slate-900/70 p-2 backdrop-blur-xl shadow-sm z-20">
-                <p className="px-2 py-1 text-xs text-slate-300">Signed in as {user?.role}</p>
-                <button onClick={logout} className="mt-1 w-full rounded-md px-2 py-2 text-left text-sm text-slate-100 hover:bg-white/10">
+              <div className="absolute right-0 top-11 z-20 w-52 rounded-lg border border-[#2A2E35] bg-[#1A1D21]/95 p-2 shadow-lg backdrop-blur-xl">
+                <p className="px-2 py-1 text-xs text-slate-400">Signed in as {user?.role}</p>
+                <button onClick={logout} className="mt-1 w-full rounded-md px-2 py-2 text-left text-sm text-slate-100 hover:bg-white/[0.06]">
                   Logout
                 </button>
               </div>
@@ -358,22 +365,22 @@ export function AppShell() {
           </div>
         </header>
 
-        <main className="p-3 md:p-6 pb-24 md:pb-6">
+        <main className="p-3 pb-24 md:p-6 md:pb-6">
           <Outlet context={{ globalSearch: search }} />
         </main>
 
-        <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-white/15 bg-slate-900/80 backdrop-blur-xl px-2 pb-safe">
+        <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-[#2A2E35] bg-[#0D0F12]/90 px-2 pb-safe backdrop-blur-xl md:hidden">
           <div className="flex items-stretch justify-around">
             {mobileNavItems.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
-                className={({ isActive }) => `relative flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[10px] ${isActive ? 'text-brand-300' : 'text-slate-400'}`}
+                className={({ isActive }) => `relative flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[10px] ${isActive ? 'text-brand-200' : 'text-slate-500'}`}
               >
                 <span className="relative">{item.icon}</span>
                 <span>{item.label}</span>
                 {item.to === '/notifications' && unreadCount > 0 && (
-                  <span className="absolute top-1 right-[calc(50%-1.25rem)] min-w-[0.9rem] h-3.5 px-0.5 rounded-full bg-red-500 text-[9px] font-bold text-white grid place-items-center">
+                  <span className="absolute right-[calc(50%-1.25rem)] top-1 grid h-3.5 min-w-[0.9rem] place-items-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold text-white">
                     {unreadCount > 9 ? '9+' : unreadCount}
                   </span>
                 )}
@@ -382,7 +389,7 @@ export function AppShell() {
             <button
               type="button"
               onClick={() => setMobileNavOpen(true)}
-              className="flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[10px] text-slate-400"
+              className="flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[10px] text-slate-500"
             >
               <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 6h16M4 12h10M4 18h16" /></svg>
               <span>More</span>
@@ -390,25 +397,25 @@ export function AppShell() {
           </div>
         </nav>
 
-        <div className={`md:hidden fixed inset-0 z-40 ${mobileNavOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}>
-          <div className={`absolute inset-0 bg-slate-950/60 transition-opacity ${mobileNavOpen ? 'opacity-100' : 'opacity-0'}`} onClick={() => setMobileNavOpen(false)} />
-          <aside className={`absolute left-0 top-0 h-full w-[min(20rem,85vw)] border-r border-white/15 bg-slate-900/95 backdrop-blur-2xl transition-transform ${mobileNavOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-            <div className="flex items-center justify-between border-b border-white/10 px-4 h-14">
+        <div className={`fixed inset-0 z-40 md:hidden ${mobileNavOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}>
+          <div className={`absolute inset-0 bg-black/60 transition-opacity ${mobileNavOpen ? 'opacity-100' : 'opacity-0'}`} onClick={() => setMobileNavOpen(false)} />
+          <aside className={`absolute left-0 top-0 h-full w-[min(20rem,85vw)] border-r border-[#2A2E35] bg-[#1A1D21]/98 backdrop-blur-2xl transition-transform ${mobileNavOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+            <div className="flex h-14 items-center justify-between border-b border-[#2A2E35] px-4">
               <p className="font-semibold text-white">Hadir.ai</p>
               <button type="button" onClick={() => setMobileNavOpen(false)} className="p-2 text-slate-400" aria-label="Close menu">✕</button>
             </div>
-            <div className="p-3 space-y-1 overflow-y-auto max-h-[calc(100%-3.5rem)]">
+            <div className="max-h-[calc(100%-3.5rem)] space-y-1 overflow-y-auto p-3">
               {items.map((item) => (
                 <NavLink
                   key={item.to}
                   to={item.to}
-                  className={({ isActive }) => `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm ${isActive ? 'bg-brand-500/20 text-white' : 'text-slate-300'}`}
+                  className={({ isActive }) => `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm ${isActive ? 'bg-[#014871]/35 text-white' : 'text-slate-300'}`}
                 >
                   {item.icon}
                   {item.label}
                 </NavLink>
               ))}
-              <button onClick={logout} className="mt-4 w-full rounded-input border border-white/20 px-3 py-2.5 text-sm text-slate-200">Logout</button>
+              <button onClick={logout} className="mt-4 w-full rounded-input border border-[#2A2E35] px-3 py-2.5 text-sm text-slate-200">Logout</button>
             </div>
           </aside>
         </div>

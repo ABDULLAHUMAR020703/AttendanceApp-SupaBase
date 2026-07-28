@@ -1,14 +1,14 @@
 export function AppLoader({ label = 'Loading workspace…' }) {
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
-      <div className="absolute inset-0 bg-[linear-gradient(135deg,#0F172A,#1E3A8A,#3B82F6)]" />
-      <div className="absolute -left-40 -top-24 h-[28rem] w-[28rem] rounded-full bg-blue-400/20 blur-3xl animate-float-slow" />
-      <div className="relative text-center px-6 animate-fade-in">
-        <div className="mx-auto mb-5 h-12 w-12 rounded-2xl border border-white/20 bg-white/10 backdrop-blur-xl grid place-items-center shadow-glass">
-          <span className="h-6 w-6 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0D0F12]">
+      <div className="absolute -left-40 -top-24 h-[28rem] w-[28rem] rounded-full bg-[#014871]/30 blur-3xl animate-float-slow" />
+      <div className="absolute -right-32 bottom-0 h-[24rem] w-[24rem] rounded-full bg-[#A0EBCF]/15 blur-3xl animate-float-slower" />
+      <div className="relative animate-fade-in px-6 text-center">
+        <div className="mx-auto mb-5 grid h-12 w-12 place-items-center rounded-2xl border border-[#2A2E35] bg-[#1A1D21] shadow-glass backdrop-blur-xl">
+          <span className="h-6 w-6 animate-spin rounded-full border-2 border-[#A0EBCF]/25 border-t-[#A0EBCF]" />
         </div>
         <p className="text-sm font-medium text-white">{label}</p>
-        <p className="mt-1 text-xs text-slate-300">Hadir.ai Admin</p>
+        <p className="mt-1 text-xs text-slate-400">Hadir.ai Admin</p>
       </div>
     </div>
   );

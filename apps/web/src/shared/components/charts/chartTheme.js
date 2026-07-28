@@ -1,16 +1,16 @@
 export const CHART_COLORS = {
-  primary: '#3B82F6',
-  primarySoft: 'rgba(59, 130, 246, 0.15)',
-  secondary: '#10B981',
-  secondarySoft: 'rgba(16, 185, 129, 0.15)',
+  primary: '#014871',
+  primarySoft: 'rgba(1, 72, 113, 0.18)',
+  secondary: '#A0EBCF',
+  secondarySoft: 'rgba(160, 235, 207, 0.18)',
   tertiary: '#F59E0B',
-  quaternary: '#8B5CF6',
+  quaternary: '#5BA8C8',
   muted: '#94A3B8',
   grid: 'rgba(255, 255, 255, 0.08)',
   axis: '#64748B',
   tick: '#CBD5E1',
-  tooltipBg: 'rgba(15, 23, 42, 0.97)',
-  tooltipBorder: 'rgba(255, 255, 255, 0.16)',
+  tooltipBg: 'rgba(13, 15, 18, 0.97)',
+  tooltipBorder: 'rgba(42, 46, 53, 0.9)',
 };
 
 export const CHART_HEIGHT = 300;

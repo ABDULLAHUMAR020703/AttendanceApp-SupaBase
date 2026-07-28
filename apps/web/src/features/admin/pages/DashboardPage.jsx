@@ -258,9 +258,9 @@ export function DashboardPage() {
             )}
             {canViewUsers && (
             <KPI
-              label="Active Users Today"
+              label="Active Users"
               value={stats?.activeUsers ?? 0}
-              trend={`${stats?.activeUsers ?? 0} currently active`}
+              trend={`${stats?.activeUsers ?? 0} active accounts`}
               hint="View active users →"
               onClick={() => navigate('/users', { state: { statusFilter: 'active' } })}
               icon={<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M21 12a9 9 0 1 1-9-9" /><path d="M21 3v9h-9" /></svg>}
