@@ -10,10 +10,8 @@ import {
   TextInput,
   FlatList,
   RefreshControl,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
-import { getKeyboardAvoidingBehavior, formScrollViewProps } from '../shared/components/KeyboardAwareScreen';
+import { KeyboardAwareModal } from '../shared/components/KeyboardAwareScreen';
 import { Ionicons } from '@expo/vector-icons';
 import {
   getCalendarEvents,
@@ -803,12 +801,7 @@ export default function CalendarScreen({ navigation, route }) {
         animationType="slide"
         onRequestClose={() => setShowEventModal(false)}
       >
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={getKeyboardAvoidingBehavior({ inModal: true })}
-          keyboardVerticalOffset={0}
-        >
-          <View
+        <View
             style={{
               flex: 1,
               justifyContent: tablet ? 'center' : 'flex-end',
@@ -822,18 +815,16 @@ export default function CalendarScreen({ navigation, route }) {
                 borderTopRightRadius: 24,
                 borderBottomLeftRadius: tablet ? 24 : 0,
                 borderBottomRightRadius: tablet ? 24 : 0,
-                padding: 24,
                 maxHeight: tablet ? '85%' : '80%',
                 width: '100%',
                 maxWidth: tablet ? 700 : undefined,
                 alignSelf: 'center',
+                overflow: 'hidden',
               }}
             >
-              <ScrollView 
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-                automaticallyAdjustKeyboardInsets={true}
-                keyboardDismissMode="on-drag"
+              <KeyboardAwareModal
+                contentContainerStyle={{ padding: 24 }}
+                extraScrollHeight={40}
               >
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                 <Text
@@ -1168,7 +1159,6 @@ export default function CalendarScreen({ navigation, route }) {
                         style={{ maxHeight: 150 }}
                         nestedScrollEnabled
                         keyboardShouldPersistTaps="handled"
-                        automaticallyAdjustKeyboardInsets={true}
                         keyboardDismissMode="on-drag"
                       >
                         {getFilteredEmployees().length > 0 ? (
@@ -1277,10 +1267,9 @@ export default function CalendarScreen({ navigation, route }) {
                   </Text>
                 </TouchableOpacity>
               </View>
-              </ScrollView>
+              </KeyboardAwareModal>
             </View>
           </View>
-        </KeyboardAvoidingView>
       </Modal>
 
       {/* Leave Details Modal (Admin only) */}

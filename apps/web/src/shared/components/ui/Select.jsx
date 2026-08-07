@@ -1,14 +1,39 @@
 import { cn } from '../../lib/cn';
+import { Field, fieldId } from './Field';
 
-export function Select({ label, error, className = '', id, children, ...props }) {
-  const selectId = id || label?.toLowerCase?.().replace(/\s+/g, '-');
+const SIZES = {
+  sm: 'ui-input-sm',
+  md: '',
+  lg: 'ui-input-lg',
+};
+
+export function Select({
+  label,
+  error,
+  hint,
+  size = 'md',
+  optional,
+  className = '',
+  id,
+  children,
+  required,
+  ...props
+}) {
+  const selectId = fieldId(id, label);
+  const describedBy = error ? `${selectId}-error` : hint ? `${selectId}-hint` : undefined;
+
   return (
-    <label className="block" htmlFor={selectId}>
-      {label && <span className="ui-label">{label}</span>}
-      <select id={selectId} className={cn('ui-select', error && 'border-red-400/50', className)} {...props}>
+    <Field id={selectId} label={label} required={required} optional={optional} error={error} hint={hint}>
+      <select
+        id={selectId}
+        required={required}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={describedBy}
+        className={cn('ui-select', SIZES[size], error && 'ui-input-invalid', className)}
+        {...props}
+      >
         {children}
       </select>
-      {error && <p className="mt-1 text-xs text-red-300" role="alert">{error}</p>}
-    </label>
+    </Field>
   );
 }

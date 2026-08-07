@@ -9,10 +9,8 @@ import {
   FlatList,
   RefreshControl,
   Modal,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
-import { getKeyboardAvoidingBehavior, formScrollViewProps } from '../shared/components/KeyboardAwareScreen';
+import { KeyboardAwareModal } from '../shared/components/KeyboardAwareScreen';
 import { Ionicons } from '@expo/vector-icons';
 import {
   createTicket,
@@ -488,12 +486,7 @@ export default function TicketScreen({ navigation, route }) {
         animationType="slide"
         onRequestClose={() => setShowCreateModal(false)}
       >
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={getKeyboardAvoidingBehavior({ inModal: true })}
-          keyboardVerticalOffset={0}
-        >
-          <View
+        <View
             style={{
               flex: 1,
               justifyContent: tablet ? 'center' : 'flex-end',
@@ -507,17 +500,16 @@ export default function TicketScreen({ navigation, route }) {
                 borderTopRightRadius: 24,
                 borderBottomLeftRadius: tablet ? 24 : 0,
                 borderBottomRightRadius: tablet ? 24 : 0,
-                padding: responsivePadding(24),
                 maxHeight: tablet ? '85%' : '90%',
                 width: '100%',
                 maxWidth: tablet ? 700 : undefined,
                 alignSelf: 'center',
+                overflow: 'hidden',
               }}
             >
-              <ScrollView 
-                {...formScrollViewProps}
-                showsVerticalScrollIndicator={false} 
-                contentContainerStyle={{ paddingBottom: spacing['2xl'] }}
+              <KeyboardAwareModal
+                contentContainerStyle={{ padding: responsivePadding(24) }}
+                extraScrollHeight={40}
               >
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.base }}>
                 <Text
@@ -718,10 +710,9 @@ export default function TicketScreen({ navigation, route }) {
                   </Text>
                 </TouchableOpacity>
               </View>
-              </ScrollView>
+              </KeyboardAwareModal>
             </View>
           </View>
-        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

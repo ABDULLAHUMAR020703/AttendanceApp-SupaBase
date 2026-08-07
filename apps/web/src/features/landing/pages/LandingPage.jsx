@@ -1,39 +1,592 @@
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, useInView, useScroll, useSpring, useTransform } from 'framer-motion';
+import {
+  ArrowRight,
+  BadgeCheck,
+  BellRing,
+  BrainCircuit,
+  CalendarClock,
+  Check,
+  ChevronRight,
+  Clock3,
+  DatabaseZap,
+  Fingerprint,
+  Gauge,
+  Globe2,
+  KeyRound,
+  Layers3,
+  LockKeyhole,
+  MapPin,
+  Radar,
+  ShieldCheck,
+  UserCheck,
+  Users,
+} from 'lucide-react';
 import { useAuthStore } from '../../auth/store/authStore';
+import { HalftoneAura } from '../../../shared/components/HalftoneAura';
 import { LandingNav } from '../components/LandingNav';
-import { LandingHero } from '../components/LandingHero';
-import { WhyHadirSection } from '../components/WhyHadirSection';
-import { ApproachSection } from '../components/ApproachSection';
-import { FaqSection } from '../components/FaqSection';
-import { FinalCta } from '../components/FinalCta';
-import { LandingFooter } from '../components/LandingFooter';
 
-/**
- * Hadir.ai marketing landing — Functional-inspired layout + brand gradient.
- *
- * Auth integration point:
- *   onSignInClick → navigate('/login') or '/dashboard' if already signed in
- */
+const spring = { type: 'spring', stiffness: 260, damping: 24, mass: 0.8 };
+const fadeUp = {
+  hidden: { opacity: 0, y: 24 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.62, ease: [0.16, 1, 0.3, 1] } },
+};
+
+const OVERVIEW_METRICS = [
+  ['Active Employees', '1,284+'],
+  ['Present Today', '94%'],
+  ['Late Arrivals', '18'],
+  ['Leave Requests', '42'],
+  ['Workforce Health Score', '88%'],
+];
+
+const FEATURES = [
+  ['AI Attendance', BrainCircuit, 'Recognizes attendance patterns, flags exceptions, and recommends next actions.', 'lg:col-span-2'],
+  ['Geo Fencing', MapPin, 'Location-aware check-ins with site confidence and policy context.', ''],
+  ['Shift Planning', CalendarClock, 'Create flexible schedules with automatic exception handling.', ''],
+  ['Payroll Sync', DatabaseZap, 'Clean attendance data prepared for payroll and downstream systems.', 'lg:col-span-2'],
+  ['Leave Management', Layers3, 'Balances, approvals, staffing impact, and calendars in one workflow.', ''],
+  ['Biometric Integration', Fingerprint, 'Connect face, fingerprint, and device signals with audit trails.', ''],
+  ['Live Monitoring', Radar, 'Real-time presence, alerts, and operational health across every site.', ''],
+  ['Compliance Reports', BadgeCheck, 'Policy-ready reports for reviews, audits, and leadership updates.', ''],
+];
+
+const INTEGRATION_LOGOS = [
+  { src: '/assets/slack1_3.webp', alt: 'Slack' },
+  { src: '/assets/teams1_3.png', alt: 'Microsoft Teams' },
+  { src: '/assets/workspace1_3.png', alt: 'Google Workspace' },
+  { src: '/assets/outlook1_3.jpg', alt: 'Outlook' },
+  { src: '/assets/quickbooks1_3.jpg', alt: 'QuickBooks' },
+  { src: '/assets/discord1_3.avif', alt: 'Discord' },
+];
+const SECURITY = [
+  ['Encryption', 'Enterprise-grade AES-256 data protection at rest and in transit across all attendance records.', '/assets/security-buyer-bg1.png'],
+  ['Role Permissions', 'Granular access control keeping managers focused on their teams while securing sensitive personnel data.', '/assets/security-buyer-bg2.png'],
+  ['Audit Logs', 'Traceable activity histories for every check-in, leave approval, and manual override across your enterprise.', '/assets/security-buyer-bg3.png'],
+  ['Compliance Monitoring', 'Operational rules kept visible, reviewable, and aligned with local labor regulations automatically.', '/assets/security-buyer-bg4.png'],
+];
+
+function PrimaryButton({ children, href = '#contact', onClick }) {
+  // Filled teal starts at #00838F: white text on #0097A7 only measures 3.5:1.
+  const className = 'group inline-flex items-center justify-center gap-2 rounded-[15px] bg-[#00838F] px-5 py-3 text-[15px] font-semibold text-white shadow-[0_12px_28px_rgba(0,131,143,0.24)] transition duration-200 ease-out hover:-translate-y-0.5 hover:bg-[#006978] hover:shadow-[0_18px_40px_rgba(0,105,120,0.32)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0097A7]/45 focus-visible:ring-offset-4 active:scale-[0.98] active:bg-[#005A66]';
+  if (onClick) return <button type="button" onClick={onClick} className={className}>{children}</button>;
+  return <a href={href} className={className}>{children}</a>;
+}
+
+function SecondaryButton({ children, href = '#product' }) {
+  return (
+    <a href={href} className="inline-flex items-center justify-center gap-2 rounded-[15px] border border-[#E2F3F5] bg-white/78 px-5 py-3 text-[15px] font-semibold text-[#0F172A] shadow-[0_8px_22px_rgba(15,23,42,0.04)] backdrop-blur-xl transition duration-200 ease-out hover:-translate-y-0.5 hover:border-[#0097A7]/50 hover:bg-white hover:text-[#00838F] hover:shadow-[0_14px_30px_rgba(15,23,42,0.07)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0097A7]/35 focus-visible:ring-offset-4">
+      {children}
+    </a>
+  );
+}
+
+function SlotNumber({ value }) {
+  const ref = useRef(null);
+  const inView = useInView(ref, { once: true, margin: '-80px' });
+  const characters = String(value).split('');
+
+  return (
+    <span ref={ref} className="inline-flex items-baseline overflow-hidden leading-none">
+      {characters.map((char, index) => {
+        if (!/\d/.test(char)) {
+          return <span key={`${char}-${index}`} className="leading-none">{char}</span>;
+        }
+
+        const digit = Number(char);
+        return (
+          <span key={`${char}-${index}`} className="relative inline-block h-[1em] overflow-hidden leading-none">
+            <motion.span
+              className="flex flex-col leading-none"
+              initial={{ y: '0em' }}
+              animate={{ y: inView ? `-${digit}em` : '0em' }}
+              transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1], delay: index * 0.05 }}
+            >
+              {Array.from({ length: 10 }, (_, number) => (
+                <span key={number} className="block h-[1em] leading-none">{number}</span>
+              ))}
+            </motion.span>
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+function DuotoneIcon({ icon: Icon, dark = false }) {
+  return (
+    <span className={`relative grid h-12 w-12 place-items-center rounded-[16px] border shadow-[0_8px_20px_rgba(15,23,42,0.04)] ${dark ? 'border-white/10 bg-white/8 text-[#E6F7F9]' : 'border-[#0097A7]/25 bg-[#E6F7F9] text-[#00838F]'}`}>
+      <span className="absolute inset-1 rounded-[0.9rem] bg-gradient-to-br from-white/65 to-transparent opacity-60" />
+      <Icon className="relative h-5 w-5" strokeWidth={1.9} />
+    </span>
+  );
+}
+
+function ActivityPill({ children, className = '' }) {
+  return <span className={`inline-flex items-center gap-2 rounded-full border border-[#E2F3F5] bg-white/84 px-3 py-1.5 text-sm font-medium text-[#475569] shadow-[0_8px_22px_rgba(15,23,42,0.045)] backdrop-blur-xl ${className}`}>{children}</span>;
+}
+
+function StatusBadge({ children, tone = 'teal' }) {
+  const tones = {
+    emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200/80',
+    amber: 'bg-amber-50 text-amber-700 border-amber-200/80',
+    teal: 'bg-[#E6F7F9] text-[#00838F] border-[#0097A7]/20',
+  };
+  return <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${tones[tone] || tones.teal}`}>{children}</span>;
+}
+
+function DashboardMockup({ dark = false, compact = false }) {
+  // The dark variant sits on #006978 so its white text stays above the 4.5:1 floor.
+  const surface = dark ? 'border-white/10 bg-white/10 text-white shadow-[0_28px_80px_rgba(0,105,120,0.24)]' : 'border-[#E2F3F5] bg-white/86 text-[#0F172A] shadow-[0_28px_80px_rgba(15,23,42,0.10)]';
+  const activity = [
+    ['Ayesha Khan', 'Lahore HQ', '09:12', 'Checked in', 'emerald'],
+    ['Hamza Tariq', 'Karachi Branch', '09:24', 'Shift overlap', 'amber'],
+    ['Zainab Ahmed', 'Payroll Queue', '10:05', 'Sync ready', 'teal'],
+  ];
+  return (
+    <motion.div className="relative" animate={{ y: [0, -5, 0] }} transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }} whileHover={{ y: -8 }}>
+      <div className="absolute -inset-6 rounded-[2.25rem] bg-[#0097A7]/14 blur-3xl" />
+      <div className={`relative overflow-hidden rounded-[18px] border backdrop-blur-2xl ${surface}`}>
+        <div className={`flex items-center justify-between border-b px-4 py-3 ${dark ? 'border-white/10 bg-white/8' : 'border-[#E2F3F5] bg-white/74'}`}>
+          <div className="flex items-center gap-2" aria-hidden="true"><span className="h-3 w-3 rounded-full bg-[#FF5F57]" /><span className="h-3 w-3 rounded-full bg-[#FFBD2E]" /><span className="h-3 w-3 rounded-full bg-[#28C840]" /></div>
+          <p className={`text-xs font-semibold ${dark ? 'text-white/70' : 'text-[#475569]'}`}>Live Attendance Command Center</p>
+          <span className={`hidden h-2 w-14 rounded-full sm:block ${dark ? 'bg-white/15' : 'bg-[#E2F3F5]'}`} />
+        </div>
+        <div className={`grid gap-4 p-4 sm:p-5 ${dark ? 'bg-[#006978]/50' : 'bg-[#F8FDFC]/80'}`}>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {[
+              ['Total Present', '1,204', UserCheck, 'emerald'],
+              ['Absent', '18', Users, 'amber'],
+              ['Late', '42', Clock3, 'teal'],
+            ].map(([label, value, Icon, tone]) => (
+              <motion.div key={label} className={`rounded-[16px] border p-4 ${dark ? 'border-white/10 bg-white/8' : 'border-[#E2F3F5] bg-white/78'}`} whileHover={{ y: -4 }} transition={spring}>
+                <div className="flex items-center justify-between gap-2">
+                  <Icon className="h-4 w-4 text-[#0097A7]" />
+                  <StatusBadge tone={tone}>{label}</StatusBadge>
+                </div>
+                <p className="mt-4 text-2xl font-bold tracking-tight">{value}</p>
+              </motion.div>
+            ))}
+          </div>
+          <div className={`grid gap-4 ${compact ? '' : 'md:grid-cols-[1.05fr_0.95fr]'}`}>
+            <div className={`rounded-[16px] border p-4 ${dark ? 'border-white/10 bg-white/8' : 'border-[#E2F3F5] bg-white'}`}>
+              <div className="mb-4 flex items-center justify-between">
+                <p className="text-sm font-semibold">Employee Presence Heatmap</p>
+                <StatusBadge tone="emerald">Live</StatusBadge>
+              </div>
+              <div className="grid grid-cols-7 gap-2">
+                {Array.from({ length: 28 }).map((_, i) => <span key={i} className="h-8 rounded-lg" style={{ backgroundColor: `rgba(0,151,167,${0.10 + ((i * 7) % 36) / 100})` }} />)}
+              </div>
+            </div>
+            <div className={`space-y-3 rounded-[16px] border p-4 ${dark ? 'border-white/10 bg-white/8' : 'border-[#E2F3F5] bg-white'}`}>
+              <div className="flex items-center justify-between"><p className="text-sm font-semibold">Live Activity Feed</p><StatusBadge>AI routed</StatusBadge></div>
+              {activity.map(([name, location, time, status, tone]) => (
+                <div key={`${name}-${status}`} className={`flex items-center gap-3 rounded-[14px] p-3 ${dark ? 'bg-white/8' : 'bg-[#F8FDFC]'}`}>
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#0097A7] shadow-[0_0_0_4px_rgba(0,151,167,0.16)]" />
+                  <div className="min-w-0 flex-1">
+                    <p className={`truncate text-xs font-semibold ${dark ? 'text-white/86' : 'text-[#0F172A]'}`}>{name}</p>
+                    <p className={`truncate text-[11px] ${dark ? 'text-white/55' : 'text-[#475569]'}`}>{location} · {time}</p>
+                  </div>
+                  <StatusBadge tone={tone}>{status}</StatusBadge>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function ScrollProgressBar() {
+  const { scrollYProgress } = useScroll();
+  const scaleX = useSpring(scrollYProgress, { stiffness: 120, damping: 24, mass: 0.35 });
+  const backgroundColor = useTransform(scrollYProgress, [0, 1], ['#0097A7', '#005A66']);
+
+  return (
+    <motion.div
+      className="fixed left-0 right-0 top-0 z-50 h-[7px] origin-left shadow-[0_0_20px_rgba(0,151,167,0.38)]"
+      style={{ scaleX, backgroundColor }}
+      aria-hidden="true"
+    />
+  );
+}
+
+function Hero({ onLaunch }) {
+  return (
+    <section id="top" aria-label="Hero" data-section="Hero" className="relative min-h-[72vh] overflow-hidden px-4 pb-16 pt-28 sm:px-6 sm:pb-20 sm:pt-32 lg:px-8">
+      <HalftoneAura />
+      <div className="relative z-10 mx-auto flex max-w-[980px] flex-col items-center text-center">
+        <motion.div variants={fadeUp} initial="hidden" animate="show">
+          <h1 className="text-[60px] font-bold leading-[0.98] tracking-[-0.02em] text-[#0F172A] sm:text-[68px] lg:text-[72px]">Automated <span className="text-[#0097A7]">workforce intelligence</span> for enterprise teams.</h1>
+          <p className="mx-auto mt-6 max-w-2xl text-base leading-[1.6] text-[#475569] sm:text-lg">Automate check-ins, enforce geofencing rules, track leave, and sync payroll without manual attendance cleanup.</p>
+          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <PrimaryButton onClick={onLaunch}>Book Demo <ArrowRight className="h-4 w-4" /></PrimaryButton>
+            <SecondaryButton href="#product">Explore Platform <ChevronRight className="h-4 w-4" /></SecondaryButton>
+          </div>
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+function AttendanceOverview() {
+  const sectionRef = useRef(null);
+  const { scrollYProgress } = useScroll({ target: sectionRef, offset: ['start end', 'center center'] });
+  const metricsX = useTransform(scrollYProgress, [0, 1], [-100, 0]);
+  const metricsOpacity = useTransform(scrollYProgress, [0, 0.65], [0.35, 1]);
+
+  return (
+    <section ref={sectionRef} id="product" aria-label="Attendance Overview" data-section="Attendance Overview" className="relative overflow-hidden px-4 pb-28 pt-20 sm:px-6 lg:px-8">
+      <HalftoneAura />
+      <div className="relative z-10 mx-auto max-w-[1400px]">
+        <motion.div className="max-w-3xl" variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true, amount: 0.35 }}>
+          <p className="text-sm font-medium uppercase tracking-[0.20em] text-[#005A66]">Attendance Overview</p>
+          <h2 className="mt-4 text-4xl font-bold tracking-tight text-[#0F172A] sm:text-5xl">Live operations, summarized into decisions.</h2>
+        </motion.div>
+        <motion.div className="mt-16 grid grid-cols-2 gap-8 md:grid-cols-5" style={{ x: metricsX, opacity: metricsOpacity }}>
+          {OVERVIEW_METRICS.map(([label, value], index) => (
+            <motion.div
+              key={label}
+              className="pt-0"
+              initial={{ opacity: 0, y: 18 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.35 }}
+              transition={{ duration: 0.55, delay: index * 0.06, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <div className="mb-4 h-[2px] w-full bg-[#0097A7]/60" />
+              <p className="text-4xl font-bold leading-none tracking-tight text-[#0F172A] md:text-5xl">
+                <SlotNumber value={value} />
+              </p>
+              <p className="mt-2 text-sm font-medium leading-6 text-[#475569]">{label}</p>
+            </motion.div>
+          ))}
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+function AnalyticsShowcaseMockup() {
+  const analyticsRows = [
+    ['Ayesha K.', 'EMP001', 'P', 'A', 'P', 'P', 'P', 'L'],
+    ['Hamza T.', 'EMP002', 'P', 'P', 'P', 'A', 'P', 'P'],
+    ['Zainab A.', 'EMP003', 'P', 'P', 'P', 'P', 'P', 'P'],
+    ['Usman R.', 'EMP004', 'P', 'P', 'L', 'P', 'P', 'A'],
+    ['Sara L.', 'EMP005', 'P', 'A', 'P', 'P', 'P', 'P'],
+    ['Bilal M.', 'EMP006', 'P', 'P', 'P', 'P', 'L', 'P'],
+  ];
+  const exportRows = [
+    ['Ayesha Khan', 'Engineering', 'Lahore HQ', 'Present', '09:02 AM', '06:21 PM'],
+    ['Hamza Tariq', 'Operations', 'Karachi', 'Late', '09:31 AM', '06:15 PM'],
+    ['Zainab Ahmed', 'Payroll', 'Lahore HQ', 'Leave', '-', '-'],
+    ['Usman Raza', 'Engineering', 'Islamabad', 'Present', '09:25 AM', '06:30 PM'],
+  ];
+  const profileEvents = [
+    ['Checked in at 10:04am', 'green'],
+    ['Checked out at 05:25pm', 'green'],
+    ['Checked in late at 10:15am', 'red'],
+    ['Checked out at 06:01pm', 'green'],
+  ];
+
+  return (
+    <motion.div className="relative min-h-[660px] lg:min-h-[700px]" animate={{ y: [0, -5, 0] }} transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}>
+      <div className="absolute -inset-8 rounded-[2.5rem] bg-white/10 blur-3xl" />
+
+      <svg className="pointer-events-none absolute inset-0 z-30 hidden h-full w-full overflow-visible lg:block" viewBox="0 0 760 700" fill="none" aria-hidden="true">
+        <path d="M510 86C474 94 454 112 444 142" stroke="white" strokeWidth="2.3" strokeLinecap="round" />
+        <path d="M438 130l5 16 13-11" stroke="white" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M710 268C736 304 734 346 704 386" stroke="white" strokeWidth="2.3" strokeLinecap="round" />
+        <path d="M717 376l-15 12-1-18" stroke="white" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M264 548C264 590 290 616 334 616" stroke="white" strokeWidth="2.3" strokeLinecap="round" />
+        <path d="M322 606l14 10-15 8" stroke="white" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+
+      <div className="pointer-events-none absolute right-[4%] top-2 z-30 hidden w-[320px] text-white lg:block">
+        <div className="text-center">
+          <p className="text-base font-extrabold tracking-tight text-white">Attendance Analytics</p>
+          <p className="mx-auto mt-1 max-w-[260px] text-sm font-medium leading-5 text-white/86">Track presence, absences, late arrivals, and trends.</p>
+        </div>
+        <div className="relative mt-8 h-24">
+          <div className="absolute right-1 top-3 h-20 w-44 rounded-2xl border border-white/50 bg-white/55 shadow-[0_18px_50px_rgba(0,105,120,0.18)] blur-[1.5px]" />
+          <div className="absolute right-6 top-7 text-sm font-extrabold text-[#00838F] blur-[0.4px]">Individual Profile</div>
+          <div className="absolute left-0 top-0 flex items-center gap-2 rounded-2xl border border-white/55 bg-white/95 p-2 shadow-[0_18px_44px_rgba(0,105,120,0.18)] backdrop-blur-xl">
+            {['Profiles', 'Present', 'Late', 'All'].map((tab) => (
+              <span key={tab} className={`rounded-lg px-3 py-1.5 text-[11px] font-extrabold ${tab === 'Late' ? 'bg-[#00838F] text-white shadow-[0_8px_18px_rgba(0,105,120,0.22)]' : 'border border-[#E2F3F5] bg-white text-[#475569]'}`}>{tab}</span>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="pointer-events-none absolute right-[-3%] top-[34%] z-30 hidden max-w-[220px] text-sm leading-5 text-white lg:block">
+        <p className="font-extrabold text-[#E6F7F9]">Individual Profile Attendance Report</p>
+        <p className="mt-1 text-white/82">AI-powered insights and recommendations.</p>
+      </div>
+      <div className="pointer-events-none absolute bottom-0 left-[32%] z-30 hidden max-w-[330px] text-sm leading-5 text-white lg:block">
+        <p className="font-extrabold text-[#E6F7F9]">Download Profile, List, and Full Report</p>
+        <p className="mt-1 text-white/82">Export data in Excel / CSV for payroll and compliance.</p>
+      </div>
+
+      <motion.div
+        className="absolute left-[8%] top-[110px] z-10 w-[72%] origin-center overflow-hidden rounded-[22px] border border-white/70 bg-white/94 shadow-[0_34px_90px_rgba(0,105,120,0.30)] backdrop-blur-2xl lg:left-[6%] lg:w-[70%]"
+        initial={{ opacity: 0, y: 24, rotateX: 8, rotateZ: 1.5 }}
+        whileInView={{ opacity: 1, y: 0, rotateX: 0, rotateZ: 1.2 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+      >
+        <div className="flex items-center justify-between border-b border-[#E2F3F5] bg-gradient-to-b from-white to-[#F8FDFC] px-5 py-4">
+          <div className="flex items-center gap-2">
+            <span className="grid h-7 w-7 place-items-center rounded-lg bg-[#E6F7F9] text-[11px] font-black text-[#00838F]">A</span>
+            <p className="text-xs font-extrabold text-[#475569]">Analytics Breakdown</p>
+          </div>
+          <span className="rounded-full bg-[#E6F7F9] px-3 py-1 text-[10px] font-bold text-[#00838F]">Live filters</span>
+        </div>
+        <div className="p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-[#475569]">75 records</p>
+            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700">Synced</span>
+          </div>
+          <div className="overflow-hidden rounded-xl border border-[#E2F3F5] bg-white">
+            <div className="grid grid-cols-[1.4fr_0.9fr_repeat(6,0.55fr)] bg-[#006978] px-3 py-2 text-[9px] font-bold text-white"><span>Name</span><span>Emp No.</span><span>07</span><span>08</span><span>09</span><span>10</span><span>11</span><span>12</span></div>
+            {analyticsRows.map((row) => <div key={row[1]} className="grid grid-cols-[1.4fr_0.9fr_repeat(6,0.55fr)] border-t border-[#E2F3F5] px-3 py-2 text-[10px] font-semibold text-[#475569]">{row.map((cell, i) => <span key={`${row[1]}-${i}`} className={cell === 'A' ? 'text-rose-500' : cell === 'L' ? 'text-amber-600' : ''}>{cell}</span>)}</div>)}
+          </div>
+        </div>
+      </motion.div>
+
+      <motion.div
+        className="absolute bottom-[120px] left-0 z-20 w-[66%] overflow-hidden rounded-[20px] border border-white/75 bg-white shadow-[0_32px_90px_rgba(0,105,120,0.34)] lg:w-[64%]"
+        initial={{ opacity: 0, x: -28, y: 32, rotateZ: -1.5 }}
+        whileInView={{ opacity: 1, x: 0, y: 0, rotateZ: -0.6 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.72, delay: 0.12, ease: [0.16, 1, 0.3, 1] }}
+      >
+        <div className="flex items-center justify-between border-b border-[#E2F3F5] bg-[#F8FDFC] px-5 py-3">
+          <div className="flex items-center gap-2"><span className="grid h-7 w-7 place-items-center rounded-md bg-emerald-500 text-xs font-black text-white">S</span><p className="text-xs font-bold text-[#475569]">Export_Present_Data.xlsx</p></div>
+          <span className="rounded-full bg-[#E6F7F9] px-3 py-1 text-[10px] font-bold text-[#00838F]">100%</span>
+        </div>
+        <div className="p-4">
+          <div className="grid grid-cols-6 rounded-t-lg bg-[#F8FDFC] px-3 py-2 text-[9px] font-bold uppercase text-[#475569]"><span>Name</span><span>Dept</span><span>Location</span><span>Status</span><span>In</span><span>Out</span></div>
+          {exportRows.map((row) => <div key={row[0]} className="grid grid-cols-6 border-x border-b border-[#E2F3F5] px-3 py-2 text-[9px] font-semibold text-[#475569]">{row.map((cell, i) => <span key={`${row[0]}-${i}`} className={`truncate ${cell === 'Present' ? 'rounded bg-emerald-50 px-1 text-emerald-700' : cell === 'Late' ? 'rounded bg-amber-50 px-1 text-amber-700' : cell === 'Absent' ? 'rounded bg-rose-50 px-1 text-rose-700' : ''}`}>{cell}</span>)}</div>)}
+        </div>
+      </motion.div>
+
+      <motion.div
+        className="absolute bottom-[132px] right-0 z-30 w-[32%] min-w-[230px] rounded-[22px] border border-white/80 bg-white p-5 shadow-[0_36px_95px_rgba(0,105,120,0.36)]"
+        initial={{ opacity: 0, x: 34, y: 18, rotateZ: 2 }}
+        whileInView={{ opacity: 1, x: 0, y: 0, rotateZ: 1.6 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.7, delay: 0.22, ease: [0.16, 1, 0.3, 1] }}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-extrabold text-[#00838F]">Individual Profile</p>
+            <h3 className="mt-1 text-xl font-extrabold tracking-tight text-[#0F172A]">Attendance Report</h3>
+          </div>
+          <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700">Ready</span>
+        </div>
+        <div className="mt-4 flex gap-2">
+          {['Today', '7 Days', '30 Days'].map((tab) => <span key={tab} className={`rounded-md px-2.5 py-1 text-[10px] font-bold ${tab === 'Today' ? 'bg-[#00838F] text-white' : 'bg-[#E6F7F9] text-[#475569]'}`}>{tab}</span>)}
+        </div>
+        <p className="mt-4 text-[10px] font-semibold leading-4 text-[#475569]">Predicted absent records: 12 based on AI behavioral analysis.</p>
+        <div className="mt-4 space-y-3">
+          {profileEvents.map(([event, tone]) => <div key={event} className="flex gap-3 text-[10px] font-semibold leading-4 text-[#475569]"><span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${tone === 'green' ? 'bg-emerald-500' : 'bg-rose-500'}`} /><span>{event}<br /><span className="text-[#94A3B8]">Confidence: 97% High</span></span></div>)}
+        </div>
+        <div className="mt-5 grid grid-cols-3 gap-2">
+          {['Print', 'PDF', 'Excel'].map((item) => <button key={item} type="button" className="rounded-lg border border-[#E2F3F5] bg-white px-2 py-2 text-[10px] font-bold text-[#475569]">{item}</button>)}
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function ProductShowcase() {
+  const stories = [
+    ['Detailed Attendance Analytics & Reports', 'Export attendance logs, track daily and monthly breakdowns, and generate profile-level reports that help HR and operations teams close payroll with confidence.'],
+  ];
+  // Every stop on this band stays at #00838F or darker so the white copy clears AA.
+  return (
+    <section id="solutions" aria-label="Product Showcase" data-section="Product Showcase" className="relative overflow-hidden bg-[#006978] px-4 py-24 text-white sm:px-6 lg:px-8">
+      <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_28%_48%,rgba(0,105,120,0.40),transparent_34%),linear-gradient(120deg,#006978_0%,#00838F_48%,#005A66_100%)]" />
+        <motion.div className="absolute -left-[10%] -top-[24%] h-[72%] w-[52%] opacity-70 bg-[radial-gradient(circle,rgba(255,255,255,0.78)_1.55px,transparent_1.85px)] bg-[size:13px_13px] [mask-image:linear-gradient(135deg,#000_0%,#000_46%,transparent_82%)]" animate={{ x: [0, 10, 0], y: [0, -6, 0] }} transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }} />
+        <motion.div className="absolute -bottom-[32%] right-[-10%] h-[78%] w-[66%] opacity-58 bg-[radial-gradient(circle,rgba(255,255,255,0.70)_1.55px,transparent_1.85px)] bg-[size:13px_13px] [mask-image:linear-gradient(315deg,#000_0%,#000_48%,transparent_84%)]" animate={{ x: [0, -12, 0], y: [0, 8, 0] }} transition={{ duration: 20, repeat: Infinity, ease: 'easeInOut' }} />
+        <div className="absolute left-[20%] top-[24%] h-72 w-72 rounded-full bg-[#0097A7]/24 blur-[70px]" />
+        <div className="absolute bottom-8 right-[28%] h-56 w-56 rounded-full bg-white/10 blur-[80px]" />
+      </div>
+      <div className="relative z-10 mx-auto max-w-[1400px] space-y-24">
+        {stories.map(([title, copy], index) => (
+          <div key={title} className="grid gap-12 lg:grid-cols-[0.88fr_1.12fr] lg:items-center">
+            <motion.div className={index % 2 ? 'lg:order-2' : ''} variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true, amount: 0.25 }}>
+              <p className="text-sm font-semibold uppercase tracking-[0.20em] text-white/78">Product Showcase</p>
+              <h2 className="mt-4 max-w-xl text-4xl font-bold tracking-[-0.02em] text-white sm:text-5xl">{title}</h2>
+              <p className="mt-5 max-w-2xl text-lg leading-8 text-white/78">{copy}</p>
+              <div className="mt-9 grid max-w-xl gap-3">
+                {['Export attendance logs', 'Profile-level reports', 'Monthly breakdowns', 'Payroll-ready summaries'].map((item) => (
+                  <span key={item} className="group inline-flex h-11 items-center gap-3 rounded-[14px] border border-white/28 bg-white/16 px-4 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(0,105,120,0.16)] backdrop-blur-xl transition-all duration-200 hover:-translate-y-0.5 hover:border-white/45 hover:bg-white/24 hover:shadow-[0_16px_34px_rgba(0,105,120,0.22)]">
+                    <span className="grid h-5 w-5 shrink-0 place-items-center rounded-[7px] bg-white/20 transition group-hover:bg-white/28"><Check className="h-3.5 w-3.5 text-white" /></span> {item}
+                  </span>
+                ))}
+              </div>
+            </motion.div>
+            <AnalyticsShowcaseMockup />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+
+function Integrations() {
+  const marqueeItems = [...INTEGRATION_LOGOS, ...INTEGRATION_LOGOS, ...INTEGRATION_LOGOS];
+
+  return (
+    <section id="company" aria-label="Integration Logo Ticker" data-section="Integration Logo Ticker" className="relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] w-screen max-w-none overflow-hidden bg-white p-0 pb-10 pt-4">
+      <style>{`@keyframes hadir-logo-marquee { from { transform: translateX(0); } to { transform: translateX(-33.333%); } }`}</style>
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_0%,rgba(0,151,167,0.10),transparent_28%),radial-gradient(circle_at_84%_100%,rgba(0,151,167,0.08),transparent_30%)]" aria-hidden="true" />
+      <div className="pointer-events-none absolute inset-0 opacity-[0.18] bg-[radial-gradient(circle,rgba(0,151,167,0.34)_1px,transparent_1.3px)] bg-[size:18px_18px] [mask-image:linear-gradient(to_bottom,transparent_0%,#000_24%,#000_72%,transparent_100%)]" aria-hidden="true" />
+      <div className="relative z-10 mx-auto mb-4 max-w-7xl px-4 text-center sm:px-6 lg:px-8">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#005A66]">Integrates seamlessly with your existing enterprise stack</p>
+      </div>
+      <div className="relative z-10 m-0 w-full max-w-none overflow-hidden p-0">
+        <div className="flex w-max items-center gap-3 py-2 [animation:hadir-logo-marquee_38s_linear_infinite] hover:[animation-play-state:paused] md:gap-4">
+          {marqueeItems.map((logo, index) => (
+            <span key={`${logo.src}-${index}`} className="flex h-36 w-[58vw] shrink-0 items-center justify-center p-2 sm:w-[40vw] md:h-40 md:w-[30vw] md:p-3 lg:w-[24vw] xl:w-[23vw]">
+              <img
+                src={logo.src}
+                alt={logo.alt}
+                className="h-full w-full object-contain transition-transform duration-300 hover:scale-105"
+                loading="lazy"
+              />
+            </span>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SecurityWave({ src }) {
+  return (
+    <div className="relative z-10 -mt-10 h-56 w-full overflow-hidden rounded-b-3xl">
+      <img
+        src={src}
+        alt=""
+        className="h-full w-full object-cover object-bottom opacity-95 [mask-image:linear-gradient(to_bottom,transparent_0%,rgba(0,0,0,0.12)_12%,rgba(0,0,0,0.72)_32%,#000_54%)] transition-all duration-[520ms] ease-[cubic-bezier(0.4,0,0.2,1)] group-hover:scale-[1.08] group-hover:opacity-100 group-hover:mix-blend-multiply group-hover:saturate-[1.65] group-hover:contrast-125"
+        loading="lazy"
+        aria-hidden="true"
+      />
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#0097A7]/20 to-[#006978]/34 opacity-0 mix-blend-overlay transition-opacity duration-[520ms] ease-[cubic-bezier(0.4,0,0.2,1)] group-hover:opacity-100" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_22%_18%,rgba(255,255,255,0.24),transparent_26%),radial-gradient(circle_at_78%_78%,rgba(255,255,255,0.20),transparent_28%),linear-gradient(to_bottom,transparent_0%,rgba(255,255,255,0.05)_42%,rgba(255,255,255,0.16)_100%)] opacity-0 transition-opacity duration-[520ms] group-hover:opacity-100" />
+    </div>
+  );
+}
+
+function Security() {
+  return (
+    <section id="security" aria-label="Enterprise Security" data-section="Enterprise Security" className="bg-gradient-to-b from-[#E6F7F9]/60 via-white to-[#F8FDFC] px-6 py-20">
+      <div className="mx-auto max-w-[1400px]">
+        <div>
+          <h2 className="max-w-2xl font-display text-3xl font-bold tracking-tight text-[#0F172A] md:text-4xl">Built for buyers who ask hard questions.</h2>
+        </div>
+
+        <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {SECURITY.map(([title, copy, image], index) => (
+            <motion.article
+              key={title}
+              className="group relative flex h-[420px] flex-col overflow-hidden rounded-[1.5rem] border border-[#E2F3F5] bg-white shadow-[0_10px_30px_rgba(0,0,0,0.05)] transition-all duration-[420ms] ease-[cubic-bezier(0.4,0,0.2,1)] hover:-translate-y-1.5 hover:border-[#0097A7]/50 hover:bg-[#00838F] hover:shadow-[0_26px_64px_rgba(0,151,167,0.30)]"
+              initial={{ opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.25 }}
+              transition={{ duration: 0.55, delay: index * 0.06, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#00838F] via-[#00838F] to-[#006978] opacity-0 transition-opacity duration-[420ms] ease-[cubic-bezier(0.4,0,0.2,1)] group-hover:opacity-100" />
+              <div className="relative z-10 flex flex-1 flex-col p-8">
+                <h3 className="mb-3 font-display text-2xl font-bold leading-tight text-[#0F172A] transition-colors duration-[400ms] group-hover:text-white">{title}</h3>
+                <p className="mb-8 font-sans text-sm font-normal leading-relaxed text-[#475569] transition-colors duration-[400ms] group-hover:text-white">{copy}</p>
+                <a href="#contact" className="mt-auto inline-flex items-center gap-1 text-[0.85rem] font-bold uppercase tracking-[0.05em] text-[#0F172A] transition-colors duration-[400ms] group-hover:text-white">
+                  LEARN MORE <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1" />
+                </a>
+              </div>
+              <SecurityWave src={image} />
+            </motion.article>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FinalCTA({ onLaunch }) {
+  return (
+    <section id="contact" aria-label="Request Demo CTA" data-section="Request Demo CTA" className="relative overflow-hidden px-4 py-32 sm:px-6 lg:px-8">
+      <HalftoneAura />
+      <div className="relative z-10 mx-auto max-w-4xl rounded-[18px] border border-[#E2F3F5] bg-white/88 p-8 text-center shadow-[0_1px_1px_rgba(15,23,42,0.04),0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur-2xl sm:p-12">
+        <p className="text-sm font-medium uppercase tracking-[0.20em] text-[#005A66]">Request Demo</p>
+        <h2 className="mx-auto mt-4 max-w-2xl text-4xl font-extrabold tracking-[-0.04em] text-[#0F172A] sm:text-6xl">See attendance automation operating live.</h2>
+        <p className="mx-auto mt-5 max-w-xl text-lg leading-8 text-[#475569]">Explore how AI attendance, geofencing, analytics, integrations, and enterprise controls work together.</p>
+        <div className="mt-8"><PrimaryButton onClick={onLaunch}>Book Demo <ArrowRight className="h-4 w-4" /></PrimaryButton></div>
+      </div>
+    </section>
+  );
+}
+
+function Footer() {
+  const columns = [
+    ['Product', 'AI Attendance', 'Dashboard', 'Automation', 'Analytics'],
+    ['Solutions', 'Enterprise HR', 'Operations', 'Hybrid Teams', 'Compliance'],
+    ['Resources', 'Guides', 'API Docs', 'Help Center', 'Security'],
+    ['Company', 'About', 'Contact', 'Careers', 'Partners'],
+    ['Legal', 'Privacy', 'Terms', 'DPA', 'Status'],
+  ];
+  return (
+    <footer className="border-t border-white/10 bg-black px-4 py-20 text-white/55 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[1400px]">
+        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-5">
+          {columns.map(([title, ...links]) => (
+            <div key={title}>
+              <h3 className="text-sm font-bold text-white">{title}</h3>
+              <div className="mt-4 space-y-3">
+                {links.map((link) => (
+                  <a
+                    key={link}
+                    href="#top"
+                    className="block text-sm text-white/55 transition hover:text-[#02EFF0]"
+                  >
+                    {link}
+                  </a>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-12 flex flex-col gap-4 border-t border-white/10 pt-6 text-sm text-white/45 sm:flex-row sm:items-center sm:justify-between">
+          <p className="font-bold text-white">Hadir.ai</p>
+          <p>© 2026 Hadir.ai. All rights reserved.</p>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
 export function LandingPage() {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
-
-  // ── Expose auth redirect at the top level for easy integration ───────────
-  const onSignInClick = () => {
-    navigate(user ? '/dashboard' : '/login');
-  };
-
+  const onSignInClick = () => navigate(user ? '/dashboard' : '/login');
+  const onCreateAccountClick = () => navigate(user ? '/dashboard' : '/onboard');
   return (
-    <div className="landing-page min-h-screen bg-[#F8FBFC] text-[#111827] antialiased">
-      <LandingNav onSignInClick={onSignInClick} />
+    <div className="landing-page min-h-screen scroll-smooth bg-[#F8FDFC] text-[#0F172A] antialiased [font-family:'Plus_Jakarta_Sans',Inter,system-ui,sans-serif]">
+      <ScrollProgressBar />
+      <LandingNav onSignInClick={onSignInClick} onCreateAccountClick={onCreateAccountClick} />
       <main>
-        <LandingHero onSignInClick={onSignInClick} />
-        <WhyHadirSection />
-        <ApproachSection />
-        <FaqSection />
-        <FinalCta onSignInClick={onSignInClick} />
+        <Hero onLaunch={onSignInClick} />
+        <Integrations />
+        <AttendanceOverview />
+        <ProductShowcase />
+        <Security />
+        <FinalCTA onLaunch={onSignInClick} />
       </main>
-      <LandingFooter />
+      <Footer />
     </div>
   );
 }

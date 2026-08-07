@@ -4,59 +4,75 @@
 import { API_GATEWAY_URL, API_TIMEOUT } from '../../../core/config/api';
 import * as FileSystem from 'expo-file-system';
 import * as FileSystemLegacy from 'expo-file-system/legacy';
-import { Linking, Platform } from 'react-native';
+import { Linking, Platform, Share } from 'react-native';
+
+/** Match web admin report timeouts (PDF build + email can exceed default API_TIMEOUT). */
+const REPORT_TIMEOUT_MS = 120000;
+
+function buildAuthHeaders(user) {
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+
+  if (!user) return headers;
+
+  // Prefer uid (Supabase Auth ID) — matches users.uid used by reporting-service
+  if (user.uid) {
+    headers['x-user-id'] = String(user.uid);
+  } else if (user.id) {
+    headers['x-user-id'] = String(user.id);
+  }
+
+  if (user.email) {
+    headers['x-user-email'] = user.email;
+  }
+
+  return headers;
+}
+
+function uint8ArrayToBase64(bytes) {
+  let binary = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  }
+  if (typeof globalThis.btoa !== 'function') {
+    throw new Error('Unable to encode PDF for storage on this device.');
+  }
+  return globalThis.btoa(binary);
+}
 
 /**
- * Generate a report
- * @param {string} range - Report range: 'weekly', 'monthly', 'yearly', 'all', or 'custom'
- * @param {string} from - Start date (ISO format) - optional, required for custom
- * @param {string} to - End date (ISO format) - optional, required for custom
- * @param {Object} user - User object with email and id
- * @returns {Promise<Object>} API response
+ * Generate a report PDF and email it to configured recipients.
+ * Uses POST /api/reports/generate-and-email (same as web admin).
+ *
+ * @param {string} range - 'weekly' | 'monthly' | 'yearly' | 'all' | 'custom'
+ * @param {string|null} from - Start date (YYYY-MM-DD) for custom
+ * @param {string|null} to - End date (YYYY-MM-DD) for custom
+ * @param {Object} user - Auth user (uid/email/role)
+ * @returns {Promise<Object>} API response including reportId and emailStatus
  */
 export async function generateReport(range, from = null, to = null, user = null) {
   try {
-    // Validate API Gateway URL
     if (!API_GATEWAY_URL || API_GATEWAY_URL.includes('localhost') || API_GATEWAY_URL.includes('undefined')) {
       throw new Error('API Gateway is not configured. Please check your app configuration.');
     }
 
-    const headers = {
-      'Content-Type': 'application/json',
-    };
+    const headers = buildAuthHeaders(user);
 
-    // Add authentication headers if user is available
-    // Backend expects x-user-id or x-user-email to verify super_admin role
-    if (user) {
-      // Prefer uid (Supabase Auth ID) as it matches the database uid column
-      // This is more reliable than the 'id' field which might have different formats
-      if (user.uid) {
-        headers['x-user-id'] = String(user.uid);
-      } else if (user.id) {
-        headers['x-user-id'] = String(user.id);
-      }
-      
-      // Always send email - backend will prioritize email lookup for better reliability
-      if (user.email) {
-        headers['x-user-email'] = user.email;
-      }
-      
-      if (__DEV__) {
-        console.log('[ReportService] Sending user headers:', {
-          'x-user-id': headers['x-user-id'],
-          'x-user-email': headers['x-user-email'],
-          userRole: user.role,
-          userUid: user.uid,
-          userId: user.id,
-        });
-      }
-    } else {
-      if (__DEV__) {
+    if (__DEV__) {
+      console.log('[ReportService] Sending user headers:', {
+        'x-user-id': headers['x-user-id'],
+        'x-user-email': headers['x-user-email'],
+        userRole: user?.role,
+      });
+      if (!user) {
         console.warn('[ReportService] No user object provided - report generation may fail');
       }
     }
 
-    const url = `${API_GATEWAY_URL}/api/reports/generate`;
+    // Web admin uses /generate-and-email. /generate is PDF-only (sendEmail: false).
+    const url = `${API_GATEWAY_URL}/api/reports/generate-and-email`;
     if (__DEV__) {
       console.log('[ReportService] Requesting report generation:', {
         url,
@@ -64,33 +80,35 @@ export async function generateReport(range, from = null, to = null, user = null)
         from,
         to,
         hasUser: !!user,
+        timeoutMs: REPORT_TIMEOUT_MS,
       });
     }
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
+    const timeoutId = setTimeout(() => controller.abort(), REPORT_TIMEOUT_MS);
 
-    const response = await fetch(`${API_GATEWAY_URL}/api/reports/generate`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        range,
-        from,
-        to,
-      }),
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
+    let response;
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          range,
+          from,
+          to,
+        }),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!response.ok) {
-      // Try to parse error response
       let errorMessage = 'Failed to generate report';
       try {
         const errorData = await response.json();
         errorMessage = errorData.message || errorData.error || errorMessage;
-        
-        // Provide more specific error messages
+
         if (response.status === 401 || response.status === 403) {
           errorMessage = 'Permission denied. Only super admins can generate reports.';
         } else if (response.status === 503) {
@@ -99,13 +117,12 @@ export async function generateReport(range, from = null, to = null, user = null)
           errorMessage = errorData.message || 'Invalid request. Please check your date range.';
         }
       } catch (parseError) {
-        // If response is not JSON, use status text
         errorMessage = response.statusText || `Server error (${response.status})`;
         if (__DEV__) {
           console.warn('[ReportService] Could not parse error response:', parseError);
         }
       }
-      
+
       if (__DEV__) {
         console.error('[ReportService] API error:', {
           status: response.status,
@@ -113,154 +130,210 @@ export async function generateReport(range, from = null, to = null, user = null)
           message: errorMessage,
         });
       }
-      
+
       throw new Error(errorMessage);
     }
 
     const data = await response.json();
-    
+
     if (__DEV__) {
-      console.log('[ReportService] Report generation started successfully:', data);
+      console.log('[ReportService] Report generation completed:', {
+        reportId: data.reportId,
+        emailStatus: data.emailStatus,
+        message: data.message,
+      });
     }
-    
+
+    if (!data.success && data.success !== undefined) {
+      throw new Error(data.message || data.error || 'Failed to generate report');
+    }
+
     return data;
   } catch (error) {
     console.error('[ReportService] Error generating report:', error);
-    
-    // Handle specific error types
+
     if (error.name === 'AbortError') {
-      throw new Error('Request timeout. The server took too long to respond. Please try again.');
+      throw new Error(
+        'Request timeout. Report generation can take up to a couple of minutes. Please try again.'
+      );
     }
-    
-    // Handle network errors (fetch fails before response)
-    if (error.message?.includes('Network request failed') || 
-        error.message?.includes('Failed to fetch') ||
-        error.message?.includes('NetworkError') ||
-        error.message?.includes('TypeError')) {
+
+    if (
+      error.message?.includes('Network request failed') ||
+      error.message?.includes('Failed to fetch') ||
+      error.message?.includes('NetworkError') ||
+      error.message?.includes('TypeError')
+    ) {
       throw new Error('Network error. Please check your internet connection and try again.');
     }
-    
-    // If error already has a message (from our error handling above), use it
+
     if (error.message && error.message !== 'Failed to generate report') {
       throw error;
     }
-    
-    // Generic fallback
-    throw new Error(error.message || 'Failed to generate report. Please check your connection and try again.');
+
+    throw new Error(
+      error.message || 'Failed to generate report. Please check your connection and try again.'
+    );
   }
 }
 
 /**
- * Download a generated report
- * @param {string} reportId - Report ID from generate response
- * @param {Object} user - User object for authentication
- * @returns {Promise<{success: boolean, fileUri?: string, error?: string}>} Download result
+ * Download a generated report PDF and verify it is a valid PDF.
+ * @param {string} reportId
+ * @param {Object} user
+ * @returns {Promise<{success: boolean, fileUri?: string}>}
  */
 export async function downloadReport(reportId, user = null) {
   try {
-    // Validate API Gateway URL
     if (!API_GATEWAY_URL || API_GATEWAY_URL.includes('localhost') || API_GATEWAY_URL.includes('undefined')) {
       throw new Error('API Gateway is not configured. Please check your app configuration.');
     }
 
-    const headers = {};
-
-    // Add authentication headers if user is available
-    if (user) {
-      if (user.uid) {
-        headers['x-user-id'] = String(user.uid);
-      } else if (user.id) {
-        headers['x-user-id'] = String(user.id);
-      }
-      if (user.email) {
-        headers['x-user-email'] = user.email;
-      }
+    if (!reportId) {
+      throw new Error('No report ID available. Please generate a report first.');
     }
 
+    const headers = buildAuthHeaders(user);
+    // GET download does not need JSON content-type
+    delete headers['Content-Type'];
+
     const url = `${API_GATEWAY_URL}/api/reports/download/${reportId}`;
-    
+
     if (__DEV__) {
       console.log('[ReportService] Downloading report:', { url, reportId });
     }
 
-    // Download file to local storage
-    // Use legacy API's documentDirectory (same pattern as export.js)
     const documentDir = FileSystemLegacy.documentDirectory || FileSystem.documentDirectory;
     if (!documentDir) {
-      throw new Error('Document directory is not available. Please ensure expo-file-system is properly configured.');
+      throw new Error(
+        'Document directory is not available. Please ensure expo-file-system is properly configured.'
+      );
     }
-    const fileUri = documentDir + `report-${reportId}.pdf`;
-    
-    if (__DEV__) {
-      console.log('[ReportService] Downloading to:', fileUri);
+    const fileUri = `${documentDir}report-${reportId}.pdf`;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REPORT_TIMEOUT_MS);
+
+    let response;
+    try {
+      response = await fetch(url, {
+        method: 'GET',
+        headers,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
     }
-    
-    // Use legacy API for downloadAsync (deprecated in v54, but still functional)
-    const downloadResult = await FileSystemLegacy.downloadAsync(url, fileUri, {
-      headers,
+
+    const contentType = response.headers.get('content-type') || '';
+
+    if (!response.ok) {
+      let errorMessage = `Download failed with status ${response.status}`;
+      if (contentType.includes('application/json')) {
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        } catch (_) {
+          /* keep status message */
+        }
+      }
+      if (response.status === 404) {
+        errorMessage =
+          'Report not found or has expired. Reports are retained for 7 days.';
+      } else if (response.status === 401 || response.status === 403) {
+        errorMessage = 'Permission denied. Unable to download this report.';
+      }
+      throw new Error(errorMessage);
+    }
+
+    if (contentType.includes('application/json')) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || errorData.error || 'Unable to download report');
+    }
+
+    const buffer = await response.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+
+    if (bytes.length < 100) {
+      throw new Error('Downloaded file is empty or corrupted.');
+    }
+
+    const magic = String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]);
+    if (magic !== '%PDF') {
+      throw new Error('Downloaded file is not a valid PDF.');
+    }
+
+    const base64 = uint8ArrayToBase64(bytes);
+    await FileSystemLegacy.writeAsStringAsync(fileUri, base64, {
+      encoding: FileSystemLegacy.EncodingType.Base64,
     });
 
-    if (downloadResult.status !== 200) {
-      throw new Error(`Download failed with status ${downloadResult.status}`);
-    }
-
     if (__DEV__) {
-      console.log('[ReportService] Report downloaded successfully:', fileUri);
+      console.log('[ReportService] Report downloaded successfully:', {
+        fileUri,
+        bytes: bytes.length,
+      });
     }
 
     return {
       success: true,
-      fileUri: downloadResult.uri,
+      fileUri,
     };
   } catch (error) {
     console.error('[ReportService] Error downloading report:', error);
-    
-    // Handle specific error types
+
+    if (error.name === 'AbortError') {
+      throw new Error('Download timed out. Please try again.');
+    }
+
     if (error.message?.includes('404') || error.message?.includes('not found')) {
       throw new Error('Report not found or has expired. Reports are retained for 7 days.');
     }
-    
+
     if (error.message?.includes('Network') || error.message?.includes('fetch')) {
       throw new Error('Network error. Please check your internet connection and try again.');
     }
-    
+
     throw new Error(error.message || 'Failed to download report. Please try again.');
   }
 }
 
 /**
- * Open a downloaded report file
- * @param {string} fileUri - Local file URI
- * @returns {Promise<{success: boolean, error?: string}>} Open result
+ * Open / share a downloaded report PDF using the system share sheet.
+ * @param {string} fileUri
  */
 export async function openReport(fileUri) {
   try {
-    // For Android, use content URI
+    let shareUri = fileUri;
     if (Platform.OS === 'android') {
-      // Use legacy API for getContentUriAsync
-      const contentUri = await FileSystemLegacy.getContentUriAsync(fileUri);
-      const canOpen = await Linking.canOpenURL(contentUri);
-      
-      if (canOpen) {
-        await Linking.openURL(contentUri);
-        return { success: true };
-      } else {
-        throw new Error('No app available to open PDF files');
+      shareUri = await FileSystemLegacy.getContentUriAsync(fileUri);
+    }
+
+    try {
+      await Share.share({
+        url: shareUri,
+        title: 'Attendance Report',
+        message: Platform.OS === 'android' ? 'Attendance Report PDF' : undefined,
+      });
+      return { success: true };
+    } catch (shareError) {
+      // Fallback: try opening via Linking
+      if (__DEV__) {
+        console.warn('[ReportService] Share failed, trying Linking:', shareError?.message);
       }
-    } else {
-      // For iOS, use file URI directly
-      const canOpen = await Linking.canOpenURL(fileUri);
-      
+      const canOpen = await Linking.canOpenURL(shareUri);
       if (canOpen) {
-        await Linking.openURL(fileUri);
+        await Linking.openURL(shareUri);
         return { success: true };
-      } else {
-        throw new Error('No app available to open PDF files');
       }
+      throw shareError;
     }
   } catch (error) {
     console.error('[ReportService] Error opening report:', error);
-    throw new Error(error.message || 'Failed to open report. The file has been saved to your device.');
+    throw new Error(
+      error.message || 'Failed to open report. The file has been saved to your device.'
+    );
   }
 }
 
+export { REPORT_TIMEOUT_MS, API_TIMEOUT };

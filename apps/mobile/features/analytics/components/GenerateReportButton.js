@@ -11,12 +11,9 @@ import {
   Alert,
   ActivityIndicator,
   StyleSheet,
-  ScrollView,
   TextInput,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
-import { getKeyboardAvoidingBehavior, formScrollViewProps } from '../../../shared/components/KeyboardAwareScreen';
+import { KeyboardAwareModal } from '../../../shared/components/KeyboardAwareScreen';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../core/contexts/ThemeContext';
 import { useAuth } from '../../../core/contexts/AuthContext';
@@ -62,25 +59,42 @@ export default function GenerateReportButton({ style }) {
         user
       );
 
-      // Store reportId for download
       if (result.reportId) {
         setLastReportId(result.reportId);
       }
 
-      Alert.alert(
-        'Report Generation Started',
-        'Your report is being generated and will be sent to your email shortly. You can also download it once it\'s ready.',
-        [{ 
-          text: 'OK', 
+      const emailStatus = result.emailStatus;
+      let title = 'Report Generated';
+      let message =
+        result.message ||
+        'Your report was generated successfully. You can download it below.';
+
+      if (emailStatus === 'sent') {
+        title = 'Report Generated & Emailed';
+        message =
+          'Your PDF report was generated and sent to the configured recipient emails. You can also download it below.';
+      } else if (emailStatus === 'failed') {
+        title = 'Report Generated';
+        message =
+          (result.message ||
+            'Your PDF was generated, but email delivery failed.') +
+          ' You can still download the report below.';
+      } else if (emailStatus === 'skipped') {
+        title = 'Report Generated';
+        message =
+          'Your PDF was generated, but no recipient emails are configured. You can download the report below.';
+      }
+
+      Alert.alert(title, message, [
+        {
+          text: 'OK',
           onPress: () => {
-            // Don't close modal - keep it open to show download button
-            // Reset form after successful generation
             setSelectedRange('monthly');
             setCustomFrom('');
             setCustomTo('');
-          }
-        }]
-      );
+          },
+        },
+      ]);
     } catch (error) {
       Alert.alert(
         'Error',
@@ -100,45 +114,39 @@ export default function GenerateReportButton({ style }) {
 
     setIsDownloading(true);
     try {
-      Alert.alert(
-        'Downloading Report',
-        'Please wait while we download your report...',
-        [],
-        { cancelable: false }
-      );
-
       const result = await downloadReport(lastReportId, user);
-      
+
       if (result.success && result.fileUri) {
-        // Offer to share/open the file
         Alert.alert(
           'Download Complete',
-          'Report downloaded successfully. Would you like to open it?',
+          'Report downloaded successfully. Would you like to open or share it?',
           [
             {
               text: 'Cancel',
               style: 'cancel',
             },
-              {
-                text: 'Open',
-                onPress: async () => {
-                  try {
-                    await openReport(result.fileUri);
-                  } catch (openError) {
-                    Alert.alert(
-                      'Error',
-                      openError.message || 'Failed to open report. The file has been saved to your device.'
-                    );
-                  }
-                },
+            {
+              text: 'Open',
+              onPress: async () => {
+                try {
+                  await openReport(result.fileUri);
+                } catch (openError) {
+                  Alert.alert(
+                    'Error',
+                    openError.message ||
+                      'Failed to open report. The file has been saved to your device.'
+                  );
+                }
               },
+            },
           ]
         );
       }
     } catch (error) {
       Alert.alert(
         'Download Failed',
-        error.message || 'Failed to download report. The report may have expired (reports expire after 30 minutes).',
+        error.message ||
+          'Failed to download report. The report may have expired (reports are retained for 7 days).',
         [{ text: 'OK' }]
       );
     } finally {
@@ -180,19 +188,21 @@ export default function GenerateReportButton({ style }) {
           }
         }}
       >
-        <KeyboardAvoidingView
-          behavior={getKeyboardAvoidingBehavior({ inModal: true })}
-          style={{ flex: 1 }}
-        >
         <View style={styles.modalOverlay}>
           <View
             style={[
               styles.modalContent,
               {
                 backgroundColor: colors.surface,
+                overflow: 'hidden',
               },
             ]}
           >
+            <KeyboardAwareModal
+              contentContainerStyle={styles.modalBodyContent}
+              extraScrollHeight={40}
+              scrollViewProps={{ style: styles.modalBody }}
+            >
             <View style={styles.modalHeader}>
               <Text
                 style={[
@@ -219,15 +229,6 @@ export default function GenerateReportButton({ style }) {
                 <Ionicons name="close" size={iconSize.lg} color={colors.text} />
               </TouchableOpacity>
             </View>
-
-            <ScrollView 
-              style={styles.modalBody}
-              contentContainerStyle={styles.modalBodyContent}
-              showsVerticalScrollIndicator={true}
-              keyboardShouldPersistTaps="handled"
-              automaticallyAdjustKeyboardInsets={true}
-              keyboardDismissMode="on-drag"
-            >
               <Text
                 style={[
                   styles.label,
@@ -403,10 +404,9 @@ export default function GenerateReportButton({ style }) {
                   </TouchableOpacity>
                 )}
               </View>
-            </ScrollView>
+            </KeyboardAwareModal>
           </View>
         </View>
-        </KeyboardAvoidingView>
       </Modal>
     </>
   );

@@ -723,7 +723,9 @@ export const createLeaveRequest = async (employeeId, leaveType, startDate, endDa
             screen: 'HRDashboard', // Use HR Dashboard for leave management
             params: {
               initialTab: 'leaves', // Open leaves tab
-              openLeaveRequests: true
+              openLeaveRequests: true,
+              leaveRequestId: requestId,
+              requestId,
             }
           }
         };

@@ -118,8 +118,7 @@ export default function ReportsScreen({ route, navigation }) {
         <View style={[styles.infoCard, { backgroundColor: colors.surface }]}>
           <Ionicons name="information-circle-outline" size={iconSize.md} color={colors.primary} />
           <Text style={[styles.infoText, { color: colors.textSecondary, fontSize: responsiveFont(12) }]}>
-            Reports are generated asynchronously and will be sent to your email address when ready.
-            Monthly reports are automatically generated on the 1st of every month.
+            Reports are generated as PDF files and emailed to configured recipients (super admins and any additional schedule recipients). You can also download the PDF after generation. Monthly reports are automatically generated on the 1st of every month when auto-send is enabled.
           </Text>
         </View>
       </ScrollView>

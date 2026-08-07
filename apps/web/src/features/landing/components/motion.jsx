@@ -140,13 +140,13 @@ export function StaggerItem({ children, className = '' }) {
 }
 
 /**
- * Dark feature card — hover lift + mint border glow.
+ * Feature card — hover lift + teal border glow.
  * whileHover={{ y: -4, scale: 1.01 }}
  */
 export function DarkMotionCard({ children, className = '' }) {
   const reduce = useReducedMotion();
   const base =
-    'rounded-[1.35rem] border border-[#2A2E35] bg-[#1A1D21] will-change-transform';
+    'rounded-[1.35rem] border border-[#E2F3F5] bg-white will-change-transform';
 
   if (reduce) {
     return <div className={`${base} ${className}`}>{children}</div>;
@@ -159,8 +159,8 @@ export function DarkMotionCard({ children, className = '' }) {
       whileHover={{
         y: -4,
         scale: 1.01,
-        borderColor: 'rgba(160, 235, 207, 0.3)',
-        boxShadow: '0 20px 50px rgba(0,0,0,0.35), 0 0 0 1px rgba(160,235,207,0.12)',
+        borderColor: 'rgba(0, 151, 167, 0.5)',
+        boxShadow: '0 20px 50px rgba(0,105,120,0.10), 0 0 0 1px rgba(0,151,167,0.12)',
       }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
     >

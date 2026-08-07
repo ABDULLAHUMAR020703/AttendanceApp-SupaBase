@@ -1,13 +1,15 @@
 export const BRAND = {
-  teal: '#014871',
-  mint: '#A0EBCF',
-  lightBg: '#F8F9FA',
-  lightBgAlt: '#F4F5F6',
-  ink: '#111827',
-  muted: '#6B7280',
-  darkBg: '#0D0F12',
-  darkCard: '#1A1D21',
-  darkBorder: '#2A2E35',
+  teal: '#0097A7',
+  // tealText is the smallest-safe teal: #0097A7 only reaches 3.5:1 on white.
+  tealText: '#00838F',
+  tealDeep: '#006978',
+  tealDeepest: '#005A66',
+  canvas: '#F8FDFC',
+  surface: '#FFFFFF',
+  hairline: '#E2F3F5',
+  tint: '#E6F7F9',
+  ink: '#0F172A',
+  muted: '#475569',
 };
 
 export const NAV_LINKS = [

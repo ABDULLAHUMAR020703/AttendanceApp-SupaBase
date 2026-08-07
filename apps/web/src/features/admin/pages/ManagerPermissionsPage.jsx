@@ -5,7 +5,11 @@ import {
   defaultManagerPermissions,
   managerPermissionGroups,
 } from '../permissions';
+import { History, SearchX } from 'lucide-react';
 import { GlassCard } from '../../../shared/components/GlassCard';
+import { GlassTable, TableCell, TableIdentity, TableRow } from '../../../shared/components/GlassTable';
+import { EmptyStateBody } from '../../../shared/components/ui/EmptyState';
+import { SkeletonFeed } from '../../../shared/components/ui/Skeleton';
 
 export function ManagerPermissionsPage() {
   const [managers, setManagers] = useState([]);
@@ -113,12 +117,29 @@ export function ManagerPermissionsPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search users..."
-            className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-300 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-300/30"
+            className="ui-input w-full"
           />
           <div className="mt-4 space-y-2">
-            {loading && <p className="text-sm text-slate-200">Loading users...</p>}
+            {loading && <SkeletonFeed count={5} />}
             {!loading && filteredManagers.length === 0 && (
-              <p className="text-sm text-slate-200">No users found.</p>
+              <EmptyStateBody
+                size="sm"
+                icon={SearchX}
+                title="No users match"
+                description={
+                  search
+                    ? 'Try a shorter search term, or clear it to see every manager and admin.'
+                    : 'Promote someone to manager and they will show up here for permission tuning.'
+                }
+                action={
+                  search ? (
+                    <button type="button" onClick={() => setSearch('')} className="ui-btn-secondary ui-btn-sm">
+                      Clear search
+                    </button>
+                  ) : null
+                }
+                className="py-8"
+              />
             )}
             {filteredManagers.map((manager) => {
               const active = manager.uid === selectedUid;
@@ -127,14 +148,14 @@ export function ManagerPermissionsPage() {
                   key={manager.uid}
                   type="button"
                   onClick={() => setSelectedUid(manager.uid)}
-                  className={`w-full rounded-lg border px-3 py-3 text-left transition-all ${
+                  className={`w-full rounded-lg border px-3 py-3 text-left transition-colors duration-fast ease-premium ${
                     active
-                      ? 'border-blue-300/60 bg-blue-500/25 text-white'
-                      : 'border-white/10 bg-white/10 text-slate-100 hover:bg-white/15'
+                      ? 'border-accent-600/40 bg-accent-50 text-accent-900'
+                      : 'border-hairline bg-white text-ink hover:border-hairline-strong hover:bg-surface-subtle'
                   }`}
                 >
                   <span className="block text-sm font-semibold">{manager.name || manager.username}</span>
-                  <span className="block text-xs text-slate-300">
+                  <span className={`block text-xs ${active ? 'text-accent-800' : 'text-ink-muted'}`}>
                     {manager.department || 'No department'} / {(manager.permissions || []).length} permissions
                   </span>
                 </button>
@@ -156,17 +177,17 @@ export function ManagerPermissionsPage() {
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={() => setPermissionSet(new Set(allManagerPermissions))} className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-slate-100 hover:bg-white/20">
+                  <button type="button" onClick={() => setPermissionSet(new Set(allManagerPermissions))} className="ui-btn-secondary ui-btn-sm">
                     Select All
                   </button>
-                  <button type="button" onClick={() => setPermissionSet(new Set())} className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-slate-100 hover:bg-white/20">
+                  <button type="button" onClick={() => setPermissionSet(new Set())} className="ui-btn-secondary ui-btn-sm">
                     Deselect All
                   </button>
-                  <button type="button" onClick={() => setPermissionSet(new Set(defaultManagerPermissions))} className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-slate-100 hover:bg-white/20">
+                  <button type="button" onClick={() => setPermissionSet(new Set(defaultManagerPermissions))} className="ui-btn-secondary ui-btn-sm">
                     Reset to Default
                   </button>
-                  <button type="button" onClick={save} disabled={saving} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
-                    {saving ? 'Saving...' : 'Save Permissions'}
+                  <button type="button" onClick={save} disabled={saving} className="ui-btn-primary ui-btn-sm">
+                    {saving ? 'Saving…' : 'Save Permissions'}
                   </button>
                 </div>
               </div>
@@ -201,38 +222,40 @@ export function ManagerPermissionsPage() {
       <GlassCard className="p-5">
         <div className="flex items-center justify-between">
           <p className="text-lg font-semibold text-white">Audit History</p>
-          <button type="button" onClick={loadData} className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-slate-100 hover:bg-white/20">
+          <button type="button" onClick={loadData} className="ui-btn-secondary ui-btn-sm">
             Refresh
           </button>
         </div>
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-white/10 text-left text-slate-300">
-                <th className="py-2 pr-3">Action</th>
-                <th className="py-2 pr-3">Actor</th>
-                <th className="py-2 pr-3">Target</th>
-                <th className="py-2 pr-3">Time</th>
-              </tr>
-            </thead>
-            <tbody>
-              {auditLogs.map((log) => (
-                <tr key={log.id} className="border-b border-white/5 text-slate-100">
-                  <td className="py-2 pr-3">{log.action}</td>
-                  <td className="py-2 pr-3">{log.actor?.name || log.actor?.username || 'Unknown User'}</td>
-                  <td className="py-2 pr-3">{log.target?.name || log.target?.username || 'Unknown User'}</td>
-                  <td className="py-2 pr-3">{new Date(log.timestamp).toLocaleString()}</td>
-                </tr>
-              ))}
-              {auditLogs.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="py-6 text-center text-slate-300">
-                    No audit entries yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+        <div className="mt-4">
+          <GlassTable
+            emptyIcon={History}
+            emptyTitle="No audit entries yet"
+            emptyMessage="Permission changes are recorded here with the actor and the affected user."
+            columns={[
+              { key: 'action', label: 'Action' },
+              { key: 'actor', label: 'Actor' },
+              { key: 'target', label: 'Target' },
+              { key: 'time', label: 'Time', className: 'w-44' },
+            ]}
+          >
+            {auditLogs.map((log) => (
+              <TableRow key={log.id}>
+                <TableCell className="font-medium">{log.action}</TableCell>
+                <TableCell>
+                  <TableIdentity name={log.actor?.name || log.actor?.username || 'Unknown user'} />
+                </TableCell>
+                <TableCell>
+                  <TableIdentity
+                    name={log.target?.name || log.target?.username || 'Unknown user'}
+                    tone="neutral"
+                  />
+                </TableCell>
+                <TableCell className="whitespace-nowrap text-caption text-ink-muted">
+                  {new Date(log.timestamp).toLocaleString()}
+                </TableCell>
+              </TableRow>
+            ))}
+          </GlassTable>
         </div>
       </GlassCard>
     </div>

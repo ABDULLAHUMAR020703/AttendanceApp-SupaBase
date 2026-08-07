@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { CalendarOff } from 'lucide-react';
 import { adminService } from '../services/adminService';
 import { GlassCard } from '../../../shared/components/GlassCard';
 import { PermissionGate, usePermission } from '../../../shared/components/PermissionGate';
@@ -9,9 +11,11 @@ import {
   formatLeaveTypeLabel,
 } from '../utils/leaveDisplay';
 import { useSilentPoll } from '../../../shared/hooks/useSilentPoll';
-import { Alert, Button, EmptyState, PageHeader } from '../../../shared/components/ui';
+import { Alert, Button, EmptyState, PageHeader, StatusBadge } from '../../../shared/components/ui';
+import { SkeletonCardList } from '../../../shared/components/ui/Skeleton';
 
 export function LeavesPage() {
+  const navigate = useNavigate();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -51,27 +55,29 @@ export function LeavesPage() {
       <PageHeader title="Leaves" subtitle="Review and process employee leave requests" onRefresh={load} refreshing={loading} />
       {error && <Alert type="error">{error}</Alert>}
       <div className="space-y-2">
-        {loading &&
-          Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-16 rounded-card border border-white/15 skeleton" />
-          ))}
+        {loading && <SkeletonCardList count={5} />}
         {!loading && rows.length === 0 && (
           <EmptyState
+            icon={CalendarOff}
             title="No leave requests"
-            description="When employees submit leave requests, they will appear here for review."
-            icon={<svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /></svg>}
+            description="When employees submit leave requests, they land here for review with their approval chain attached."
+            actionLabel="Configure approval steps"
+            onAction={() => navigate('/approvals')}
           />
         )}
         {!loading &&
           rows.map((r) => (
-            <GlassCard key={r.id} className="p-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+            <GlassCard key={r.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
-                <p className="text-slate-100 font-medium truncate">{formatEmployeeDisplay(r)}</p>
-                <p className="text-sm text-slate-300 mt-0.5">
-                  {formatLeaveTypeLabel(r.leave_type)} · {formatLeaveStatus(r.status)}
-                  {r.current_step > 1 ? ` · Step ${r.current_step}` : ''}
-                  {r.employee_department ? ` · ${r.employee_department}` : ''}
-                </p>
+                <p className="truncate text-body-tight font-medium text-ink">{formatEmployeeDisplay(r)}</p>
+                <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                  <StatusBadge status={r.status} label={formatLeaveStatus(r.status)} />
+                  <span className="text-caption text-ink-muted">
+                    {formatLeaveTypeLabel(r.leave_type)}
+                    {r.current_step > 1 ? ` · Step ${r.current_step}` : ''}
+                    {r.employee_department ? ` · ${r.employee_department}` : ''}
+                  </span>
+                </div>
               </div>
               {r.status === 'pending' && (canApprove || canReject) && (
                 <div className="flex gap-2 shrink-0">

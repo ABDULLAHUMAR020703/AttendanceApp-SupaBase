@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
+import { LucideProvider } from 'lucide-react';
 import { useAuthStore } from '../../features/auth/store/authStore';
 import { canAccessFeature, isSuperAdmin } from '../../features/admin/permissions';
 import { AccessDenied } from '../../shared/components/PermissionGate';
@@ -35,6 +36,17 @@ function Unauthorized() {
   return <AccessDenied />;
 }
 
+/**
+ * House glyph weight for the portal. Lucide's 2px default reads heavy next to the
+ * system font at 14-16px; SF Symbols sit nearer 1.75 at those sizes, and a single
+ * weight everywhere is what makes an icon set look drawn as one family. Individual
+ * icons can still pass `strokeWidth` to take emphasis, which is how the selected
+ * sidebar row gains weight. The landing page is outside this and keeps its own voice.
+ */
+function PortalIcons({ children }) {
+  return <LucideProvider strokeWidth={1.75}>{children}</LucideProvider>;
+}
+
 function PermissionRoute({ feature, superAdminOnly = false, children }) {
   const { user } = useAuthStore();
   if (superAdminOnly && !isSuperAdmin(user)) return <AccessDenied />;
@@ -53,7 +65,7 @@ export function AppRouter() {
       <Route path="/onboard" element={<CompanyOnboardingPage />} />
       <Route path="/unauthorized" element={<Unauthorized />} />
       {/* Pathless layout: keeps /users, /attendance, etc. while freeing / for marketing */}
-      <Route element={<Protected><AppShell /></Protected>}>
+      <Route element={<Protected><PortalIcons><AppShell /></PortalIcons></Protected>}>
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="users" element={<PermissionRoute feature="users"><UsersPage /></PermissionRoute>} />
         <Route path="departments" element={<PermissionRoute feature="departments"><DepartmentsPage /></PermissionRoute>} />

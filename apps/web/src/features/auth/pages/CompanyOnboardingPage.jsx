@@ -1,21 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiUrl, IS_API_GATEWAY_CONFIGURED } from '../../../core/config/api';
+import { HalftoneAura } from '../../../shared/components/HalftoneAura';
+import { Input } from '../../../shared/components/ui/Input';
+import { PasswordInput } from '../../../shared/components/PasswordInput';
+import { Field } from '../../../shared/components/ui/Field';
+import { Button } from '../../../shared/components/ui/Button';
+import { Alert } from '../../../shared/components/ui/Alert';
 
 const LOGO_PATH = '/logo.jpeg';
 
-const fieldClass =
-  'w-full rounded-xl border border-black/[0.08] bg-white/80 px-3 py-2.5 text-[#111827] placeholder:text-[#9CA3AF] outline-none transition focus:border-[#014871]/40 focus:ring-2 focus:ring-[#A0EBCF]/40';
-
-function HadirMark({ className = 'h-5 w-5' }) {
-  return (
-    <svg viewBox="0 0 20 20" fill="currentColor" className={className} aria-hidden>
-      <rect x="2" y="11" width="3.5" height="7" rx="1" />
-      <rect x="8.25" y="6" width="3.5" height="12" rx="1" />
-      <rect x="14.5" y="2" width="3.5" height="16" rx="1" />
-    </svg>
-  );
-}
 
 export function CompanyOnboardingPage() {
   const [logoSrc, setLogoSrc] = useState(LOGO_PATH);
@@ -105,154 +99,138 @@ export function CompanyOnboardingPage() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#F8FBFC]">
-      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-        <div className="absolute -top-24 left-1/4 h-[28rem] w-[28rem] rounded-full bg-gradient-to-br from-[#D0E8F8] to-[#A6D5FA] opacity-70 blur-[120px]" />
-        <div className="absolute right-1/5 top-1/3 h-[24rem] w-[24rem] rounded-full bg-[#A0EBCF] opacity-55 blur-[130px]" />
-        <div className="absolute bottom-10 left-1/2 h-[18rem] w-[28rem] -translate-x-1/2 rounded-full bg-[#014871] opacity-[0.12] blur-[150px]" />
-      </div>
+    <div className="relative min-h-screen overflow-hidden bg-page">
+      <HalftoneAura />
 
       <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-10">
         <div className="w-full max-w-md animate-fade-up">
-          <Link
-            to="/"
-            className="mb-6 flex items-center justify-center gap-2 text-[#111827]"
-          >
-            <HadirMark className="h-[18px] w-[18px]" />
-            <span className="text-[15px] font-semibold tracking-tight">Hadir.ai</span>
+          <Link to="/" className="mb-6 flex items-center justify-center gap-2 text-ink">
+            <img
+              src={LOGO_PATH}
+              alt="Hadir.ai logo"
+              className="h-8 w-8 rounded-2xl object-cover shadow-hair"
+            />
+            <span className="text-subheading font-semibold tracking-[-0.02em]">Hadir.ai</span>
           </Link>
 
           {!logoFailed && (
             <div className="mb-5 flex justify-center">
               <img
                 src={logoSrc}
-                alt="Logo"
-                className="h-14 w-14 rounded-2xl border border-white/80 object-cover shadow-[0_12px_30px_rgba(1,72,113,0.12)]"
+                alt=""
+                className="h-14 w-14 rounded-2xl border border-white object-cover shadow-raise"
                 onError={() => {
                   setLogoFailed(true);
                   setLogoSrc('/logo.jpeg');
                 }}
+                aria-hidden
               />
             </div>
           )}
 
           {success ? (
-            <div className="space-y-3 rounded-[1.35rem] border border-emerald-200/60 bg-white/80 p-6 shadow-[0_20px_50px_-10px_rgba(1,72,113,0.12)] backdrop-blur-xl">
-              <h1 className="text-2xl font-semibold text-[#111827]">Company ready</h1>
-              <p className="text-sm text-[#4B5563]">
-                {success.company?.name} is set up. Sign in as <strong>{success.user?.username}</strong>{' '}
-                using the password you chose.
+            <div className="space-y-3 rounded-3xl border border-hairline bg-white p-8 shadow-pop">
+              <h1 className="text-title font-semibold text-ink">Company ready</h1>
+              <p className="text-label text-ink-muted">
+                {success.company?.name} is set up. Sign in as{' '}
+                <strong className="font-semibold text-ink">{success.user?.username}</strong> using the
+                password you chose.
               </p>
-              <Link
-                to="/login"
-                className="mt-2 inline-flex rounded-full bg-[#0D0F12] px-5 py-3 text-sm font-semibold text-white transition hover:bg-black"
-              >
+              <Link to="/login" className="ui-btn-primary mt-2 inline-flex">
                 Go to sign in
               </Link>
             </div>
           ) : (
             <form
-              className="space-y-4 rounded-[1.35rem] border border-white/80 bg-white/75 p-6 shadow-[0_20px_50px_-10px_rgba(1,72,113,0.12)] backdrop-blur-xl md:p-7"
+              className="space-y-5 rounded-3xl border border-hairline bg-white p-8 shadow-pop"
               onSubmit={onSubmit}
             >
               <div className="space-y-1">
-                <h1 className="text-2xl font-semibold tracking-tight text-[#111827]">Create company</h1>
-                <p className="text-sm text-[#6B7280]">
+                <h1 className="text-title font-semibold text-ink">Create company</h1>
+                <p className="text-label text-ink-muted">
                   Register a new tenant with a Management department and super admin.
                 </p>
               </div>
 
-              {statusLoading && <p className="text-sm text-[#6B7280]">Checking onboarding…</p>}
-              {statusError && <p className="text-sm text-red-600">{statusError}</p>}
+              {statusLoading && <p className="text-label text-ink-muted">Checking onboarding…</p>}
+              {statusError && <Alert type="error">{statusError}</Alert>}
               {!statusLoading && !requiresKey && (
-                <p className="rounded-lg border border-[#A0EBCF]/50 bg-[#F0FAF7] px-3 py-2 text-xs text-[#014871]">
+                <Alert type="info">
                   First company: no server key required. For additional companies, configure{' '}
-                  <code className="font-medium">COMPANY_ONBOARDING_SECRET</code> and enter it below.
-                </p>
+                  <code className="font-semibold">COMPANY_ONBOARDING_SECRET</code> and enter it below.
+                </Alert>
               )}
               {!statusLoading && requiresKey && (
-                <label className="block space-y-1">
-                  <span className="text-xs font-medium text-[#6B7280]">Onboarding key</span>
-                  <input
-                    className={fieldClass}
-                    placeholder="Server secret from COMPANY_ONBOARDING_SECRET"
-                    value={onboardingKey}
-                    onChange={(e) => setOnboardingKey(e.target.value)}
-                    autoComplete="off"
-                  />
-                </label>
+                <Input
+                  label="Onboarding key"
+                  placeholder="Server secret from COMPANY_ONBOARDING_SECRET"
+                  value={onboardingKey}
+                  onChange={(e) => setOnboardingKey(e.target.value)}
+                  autoComplete="off"
+                />
               )}
 
-              <label className="block space-y-1">
-                <span className="text-xs font-medium text-[#6B7280]">Company name</span>
-                <input
-                  required
-                  className={fieldClass}
-                  placeholder="Acme Inc."
-                  value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
-                />
-              </label>
+              <Input
+                label="Company name"
+                required
+                placeholder="Acme Inc."
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+              />
 
-              <label className="block space-y-1">
-                <span className="text-xs font-medium text-[#6B7280]">Super admin full name</span>
-                <input
-                  required
-                  className={fieldClass}
-                  placeholder="Jane Doe"
-                  value={superAdminName}
-                  onChange={(e) => setSuperAdminName(e.target.value)}
-                />
-              </label>
+              <Input
+                label="Super admin full name"
+                required
+                placeholder="Jane Doe"
+                value={superAdminName}
+                onChange={(e) => setSuperAdminName(e.target.value)}
+              />
 
-              <label className="block space-y-1">
-                <span className="text-xs font-medium text-[#6B7280]">Username</span>
-                <input
-                  required
-                  autoCapitalize="none"
-                  className={fieldClass}
-                  placeholder="jane.admin"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                />
-              </label>
+              <Input
+                label="Username"
+                required
+                autoCapitalize="none"
+                placeholder="jane.admin"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+              />
 
-              <label className="block space-y-1">
-                <span className="text-xs font-medium text-[#6B7280]">Email</span>
-                <input
-                  required
-                  type="email"
-                  className={fieldClass}
-                  placeholder="jane@company.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </label>
+              <Input
+                label="Email"
+                required
+                type="email"
+                placeholder="jane@company.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
 
-              <label className="block space-y-1">
-                <span className="text-xs font-medium text-[#6B7280]">Password (min 8 characters)</span>
-                <input
+              <Field id="onboard-password" label="Password" hint="At least 8 characters.">
+                <PasswordInput
+                  id="onboard-password"
                   required
-                  type="password"
                   minLength={8}
-                  className={fieldClass}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
-              </label>
+              </Field>
 
-              {formError && <p className="text-sm text-red-600">{formError}</p>}
+              {formError && <Alert type="error">{formError}</Alert>}
 
-              <button
+              <Button
                 type="submit"
-                disabled={submitting || statusLoading}
-                className="w-full rounded-full bg-[#0D0F12] p-3 font-semibold text-white transition hover:bg-black active:scale-[0.99] disabled:opacity-60"
+                size="lg"
+                loading={submitting}
+                disabled={statusLoading}
+                className="w-full"
               >
-                {submitting ? 'Creating…' : 'Create company & super admin'}
-              </button>
+                Create company &amp; super admin
+              </Button>
 
-              <p className="text-center text-sm text-[#6B7280]">
-                <Link to="/login" className="font-medium text-[#014871] hover:underline">
+              <p className="text-center text-label text-ink-muted">
+                <Link
+                  to="/login"
+                  className="font-semibold text-accent-800 transition-colors duration-fast hover:text-accent-900 hover:underline"
+                >
                   Back to sign in
                 </Link>
               </p>

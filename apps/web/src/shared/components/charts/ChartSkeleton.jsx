@@ -1,10 +1,10 @@
 export function ChartSkeleton({ height = 280, variant = 'chart' }) {
   if (variant === 'kpi') {
     return (
-      <div className="rounded-2xl border border-white/15 bg-white/10 p-4" aria-hidden="true">
+      <div className="rounded-2xl border border-hairline bg-white p-4" aria-hidden="true">
         <div className="flex items-center justify-between">
           <div className="h-3 w-24 rounded skeleton" />
-          <div className="h-8 w-8 rounded-lg skeleton" />
+          <div className="h-8 w-8 rounded-xl skeleton" />
         </div>
         <div className="mt-4 h-8 w-16 rounded skeleton" />
         <div className="mt-3 h-3 w-32 rounded skeleton" />
@@ -19,7 +19,7 @@ export function ChartSkeleton({ height = 280, variant = 'chart' }) {
         <div className="h-3 w-56 rounded skeleton" />
       </div>
       <div
-        className="rounded-lg border border-white/10 bg-slate-950/30 p-4"
+        className="rounded-2xl border border-hairline bg-white p-4"
         style={{ minHeight: height }}
       >
         <div className="flex h-full flex-col justify-end gap-3" style={{ minHeight: height - 32 }}>

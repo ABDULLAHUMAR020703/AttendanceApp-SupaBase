@@ -1,18 +1,31 @@
 import { cn } from '../../lib/cn';
+import { Field, fieldId } from './Field';
 
-export function Textarea({ label, error, hint, className = '', id, rows = 4, ...props }) {
-  const textareaId = id || label?.toLowerCase?.().replace(/\s+/g, '-');
+export function Textarea({
+  label,
+  error,
+  hint,
+  optional,
+  className = '',
+  id,
+  rows = 4,
+  required,
+  ...props
+}) {
+  const textareaId = fieldId(id, label);
+  const describedBy = error ? `${textareaId}-error` : hint ? `${textareaId}-hint` : undefined;
+
   return (
-    <label className="block" htmlFor={textareaId}>
-      {label && <span className="ui-label">{label}</span>}
+    <Field id={textareaId} label={label} required={required} optional={optional} error={error} hint={hint}>
       <textarea
         id={textareaId}
         rows={rows}
-        className={cn('ui-input resize-y min-h-[6rem]', error && 'border-red-400/50 focus:ring-red-400/30', className)}
+        required={required}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={describedBy}
+        className={cn('ui-textarea', error && 'ui-input-invalid', className)}
         {...props}
       />
-      {error && <p className="mt-1 text-xs text-red-300" role="alert">{error}</p>}
-      {hint && !error && <p className="mt-1 text-xs text-slate-400">{hint}</p>}
-    </label>
+    </Field>
   );
 }

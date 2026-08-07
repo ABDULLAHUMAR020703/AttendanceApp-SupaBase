@@ -27,11 +27,15 @@ export function getKeyboardAvoidingBehavior({ inModal = false } = {}) {
 export const keyboardAvoidingBehavior =
   Platform.OS === 'ios' ? 'padding' : undefined;
 
-/** Shared ScrollView props so focused TextInputs stay reachable. */
+/** Shared ScrollView props so focused TextInputs stay reachable.
+ * Note: do NOT enable automaticallyAdjustKeyboardInsets here when used inside
+ * KeyboardAwareScreen — that wrapper already pads + scrolls into view.
+ * Enabling both causes double layout shifts (screen jump).
+ */
 export const formScrollViewProps = {
   keyboardShouldPersistTaps: 'handled',
   keyboardDismissMode: Platform.OS === 'ios' ? 'interactive' : 'on-drag',
-  automaticallyAdjustKeyboardInsets: true,
+  automaticallyAdjustKeyboardInsets: false,
 };
 
 const EXTRA_GAP = 28;
@@ -186,11 +190,10 @@ export function KeyboardAwareScreen({
     []
   );
 
-  // Keep submit buttons reachable: keyboard height + safe area + cushion
-  const bottomPad =
-    extraScrollHeight +
-    (keyboardBottom > 0 ? Math.max(keyboardBottom * 0.15, 12) : 0) +
-    (inModal ? insets.bottom : 0);
+  // Keep submit buttons reachable with a stable cushion.
+  // Do NOT add live keyboard height here — KeyboardAvoidingView already
+  // resizes the viewport; dynamic padding + KAV causes jump/flicker.
+  const bottomPad = extraScrollHeight + (inModal ? insets.bottom : 0);
 
   const inner = scroll ? (
     <ScrollView

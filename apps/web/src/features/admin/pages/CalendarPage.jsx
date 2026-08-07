@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
+import { CalendarPlus } from 'lucide-react';
 import { GlassCard } from '../../../shared/components/GlassCard';
 import { PermissionGate } from '../../../shared/components/PermissionGate';
 import { adminService } from '../services/adminService';
 import { PERMISSIONS } from '../permissions';
 import { useSilentPoll, useSessionState } from '../../../shared/hooks/useSilentPoll';
+import { EmptyStateBody } from '../../../shared/components/ui/EmptyState';
+import { SkeletonFeed } from '../../../shared/components/ui/Skeleton';
+import { formatStatusLabel } from '../../../shared/components/ui/Badge';
 
 const EVENT_TYPES = [
   { value: 'meeting', label: 'Meeting' },
@@ -127,9 +131,9 @@ export function CalendarPage() {
         </div>
         <div className="flex gap-2">
           <PermissionGate permission={PERMISSIONS.CREATE_EVENTS}>
-            <button type="button" onClick={startCreate} className="rounded-lg bg-indigo-600 px-3 py-2 text-sm text-white">Create Event</button>
+            <button type="button" onClick={startCreate} className="ui-btn-primary ui-btn-sm">Create Event</button>
           </PermissionGate>
-          <button type="button" onClick={() => load()} className="text-xs text-blue-200 underline self-center">Refresh</button>
+          <button type="button" onClick={() => load()} className="ui-btn-secondary ui-btn-sm self-center">Refresh</button>
         </div>
       </div>
 
@@ -141,21 +145,21 @@ export function CalendarPage() {
           <GlassCard className="p-5">
             <form onSubmit={handleSubmit} className="space-y-3">
               <h2 className="text-sm font-medium text-white">{mode === 'edit' ? 'Edit Event' : 'Create Event'}</h2>
-              <input required placeholder="Title" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-slate-100" />
-              <textarea rows={2} placeholder="Description" value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} className="w-full rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-slate-100" />
+              <input required placeholder="Title" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} className="ui-input" />
+              <textarea rows={2} placeholder="Description" value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} className="ui-textarea" />
               <div className="grid gap-3 sm:grid-cols-3">
-                <input required type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} className="rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-slate-100" />
-                <input type="time" value={form.time} onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))} className="rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-slate-100" />
-                <select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))} className="rounded border border-white/20 bg-white/10 px-3 py-2 text-sm text-slate-100">
-                  {EVENT_TYPES.map((t) => <option key={t.value} value={t.value} className="bg-slate-800">{t.label}</option>)}
+                <input required type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} className="ui-input" />
+                <input type="time" value={form.time} onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))} className="ui-input" />
+                <select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))} className="ui-select">
+                  {EVENT_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
               </div>
               <div className="flex gap-2">
-                <button type="submit" disabled={busy} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white disabled:opacity-50">{mode === 'edit' ? 'Save' : 'Create'}</button>
-                <button type="button" onClick={() => setMode('list')} className="rounded-lg border border-white/20 px-4 py-2 text-sm text-slate-200">Cancel</button>
+                <button type="submit" disabled={busy} className="ui-btn-primary ui-btn-sm">{mode === 'edit' ? 'Save' : 'Create'}</button>
+                <button type="button" onClick={() => setMode('list')} className="ui-btn-secondary ui-btn-sm">Cancel</button>
                 {mode === 'edit' && (
                   <PermissionGate permission={PERMISSIONS.DELETE_EVENTS}>
-                    <button type="button" onClick={handleDelete} disabled={busy} className="rounded-lg border border-red-300/30 bg-red-500/15 px-4 py-2 text-sm text-red-100">Delete</button>
+                    <button type="button" onClick={handleDelete} disabled={busy} className="ui-btn-danger-soft ui-btn-sm">Delete</button>
                   </PermissionGate>
                 )}
               </div>
@@ -164,20 +168,32 @@ export function CalendarPage() {
         </PermissionGate>
       )}
 
-      <GlassCard className="p-4 space-y-2">
+      <GlassCard className="space-y-2 p-4">
         {loading ? (
-          <div className="h-24 skeleton rounded-lg" />
+          <SkeletonFeed count={4} />
         ) : events.length === 0 ? (
-          <p className="text-sm text-slate-400">No events scheduled.</p>
+          <EmptyStateBody
+            size="sm"
+            icon={CalendarPlus}
+            title="No events scheduled"
+            description="Holidays, company-wide events and shift notes you add here are visible to every employee."
+            className="py-8"
+          />
         ) : (
           events.map((ev) => (
-            <div key={ev.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/5 px-4 py-3">
-              <div>
-                <p className="text-slate-100 font-medium">{ev.title}</p>
-                <p className="text-xs text-slate-400">{ev.date}{ev.time ? ` · ${ev.time}` : ''} · {ev.type}</p>
+            <div
+              key={ev.id}
+              className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-hairline bg-surface-subtle px-4 py-3 transition-colors duration-200 ease-premium hover:border-accent-200 hover:bg-accent-50"
+            >
+              <div className="min-w-0">
+                <p className="truncate text-body-tight font-medium text-ink">{ev.title}</p>
+                <p className="mt-0.5 text-caption text-ink-muted">
+                  {ev.date}
+                  {ev.time ? ` · ${ev.time}` : ''} · {formatStatusLabel(ev.type)}
+                </p>
               </div>
               <PermissionGate permission={PERMISSIONS.EDIT_EVENTS}>
-                <button type="button" onClick={() => startEdit(ev)} className="text-xs text-blue-200 underline">Edit</button>
+                <button type="button" onClick={() => startEdit(ev)} className="ui-btn-secondary ui-btn-sm">Edit</button>
               </PermissionGate>
             </div>
           ))

@@ -22,27 +22,27 @@ export function LandingHero({ onSignInClick }) {
   return (
     <section
       id="top"
-      className="landing-hero relative min-h-[100svh] overflow-hidden bg-[#F8FBFC] px-4 pb-20 pt-28 sm:px-6 sm:pb-28 sm:pt-32 lg:px-8"
+      className="landing-hero relative min-h-[100svh] overflow-hidden bg-[#F8FDFC] px-4 pb-20 pt-28 sm:px-6 sm:pb-28 sm:pt-32 lg:px-8"
     >
       <HeroMeshBackground />
 
       <div className="relative z-10 mx-auto flex max-w-3xl flex-col items-center text-center">
         <HeroIntro delay={0.08}>
-          <p className="landing-brand mb-5 text-[15px] font-semibold tracking-[-0.02em] text-[#014871]">
+          <p className="landing-brand mb-5 text-[15px] font-bold tracking-[-0.02em] text-black">
             Hadir.ai
           </p>
         </HeroIntro>
 
         <HeroIntro delay={0.12}>
-          <h1 className="landing-display text-[2.5rem] font-bold leading-[1.05] tracking-[-0.035em] text-[#111827] sm:text-[3.25rem] lg:text-[3.75rem]">
+          <h1 className="landing-display text-[2.5rem] font-bold leading-[1.05] tracking-[-0.035em] text-[#0F172A] sm:text-[3.25rem] lg:text-[3.75rem]">
             Attendance done right.
             <br />
-            Wellbeing done better.
+            <span className="text-[#0097A7]">Wellbeing</span> done better.
           </h1>
         </HeroIntro>
 
         <HeroIntro delay={0.22}>
-          <p className="landing-text mx-auto mt-6 max-w-[34rem] text-[1.05rem] font-normal leading-[1.65] text-[#5C6570] sm:text-[1.125rem]">
+          <p className="landing-text mx-auto mt-6 max-w-[34rem] text-[1.05rem] font-normal leading-[1.65] text-[#475569] sm:text-[1.125rem]">
             Automated check-ins, leave tracking, and workforce operations — built to stay out of
             the way and keep teams healthy.
           </p>
@@ -54,12 +54,12 @@ export function LandingHero({ onSignInClick }) {
             className={[
               'landing-glass-field mx-auto flex w-full max-w-xl items-center gap-1.5 rounded-full p-1.5 transition-[box-shadow,border-color] duration-300',
               focused
-                ? 'border border-[#A0EBCF]/70 shadow-[0_0_0_4px_rgba(160,235,207,0.18),0_16px_48px_rgba(1,72,113,0.1)]'
-                : 'border border-white/70 shadow-[0_14px_44px_rgba(1,72,113,0.08),inset_0_1px_0_rgba(255,255,255,0.85)]',
+                ? 'border border-[#0097A7]/70 shadow-[0_0_0_4px_rgba(0,151,167,0.18),0_16px_48px_rgba(0,105,120,0.1)]'
+                : 'border border-white/70 shadow-[0_14px_44px_rgba(0,105,120,0.08),inset_0_1px_0_rgba(255,255,255,0.85)]',
             ].join(' ')}
           >
             <div className="flex min-w-0 flex-1 items-center gap-2.5 pl-4">
-              <Mail className="h-[15px] w-[15px] shrink-0 text-[#8B95A1]" strokeWidth={1.75} />
+              <Mail className="h-[15px] w-[15px] shrink-0 text-[#94A3B8]" strokeWidth={1.75} />
               <input
                 type="email"
                 value={email}
@@ -67,7 +67,7 @@ export function LandingHero({ onSignInClick }) {
                 onFocus={() => setFocused(true)}
                 onBlur={() => setFocused(false)}
                 placeholder="Enter your work email"
-                className="landing-text w-full min-w-0 border-0 bg-transparent py-3 text-[15px] text-[#111827] outline-none placeholder:text-[#9AA3AE]"
+                className="landing-text w-full min-w-0 border-0 bg-transparent py-3 text-[15px] text-[#0F172A] outline-none placeholder:text-[#94A3B8]"
                 aria-label="Work email"
               />
             </div>

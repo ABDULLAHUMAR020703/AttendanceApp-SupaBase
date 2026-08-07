@@ -1,25 +1,41 @@
+import { AlertTriangle, CheckCircle2, Info, X, XCircle } from 'lucide-react';
 import { cn } from '../../lib/cn';
 
 const STYLES = {
-  success: 'border-emerald-300/25 bg-emerald-500/15 text-emerald-100',
-  error: 'border-red-300/25 bg-red-500/15 text-red-100',
-  warning: 'border-amber-300/25 bg-amber-500/15 text-amber-100',
-  info: 'border-brand-300/25 bg-brand-500/15 text-brand-100',
+  success: 'border-success-border bg-success-surface text-success-ink',
+  error: 'border-danger-border bg-danger-surface text-danger-ink',
+  warning: 'border-warning-border bg-warning-surface text-warning-ink',
+  info: 'border-accent-200 bg-accent-50 text-accent-800',
+};
+
+const ICONS = {
+  success: CheckCircle2,
+  error: XCircle,
+  warning: AlertTriangle,
+  info: Info,
 };
 
 export function Alert({ type = 'info', title, children, onDismiss, className = '' }) {
+  const Icon = ICONS[type] || Info;
+
   return (
     <div
-      role="status"
-      className={cn('rounded-card border px-4 py-3 text-sm flex items-start justify-between gap-3', STYLES[type], className)}
+      role={type === 'error' ? 'alert' : 'status'}
+      className={cn('flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm', STYLES[type], className)}
     >
-      <div>
-        {title && <p className="font-medium mb-0.5">{title}</p>}
-        <div>{children}</div>
+      <Icon className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
+      <div className="min-w-0 flex-1">
+        {title && <p className="font-semibold">{title}</p>}
+        <div className={cn('leading-relaxed', title && 'mt-0.5 opacity-90')}>{children}</div>
       </div>
       {onDismiss && (
-        <button type="button" onClick={onDismiss} className="text-xs underline opacity-80 hover:opacity-100 shrink-0">
-          Dismiss
+        <button
+          type="button"
+          onClick={onDismiss}
+          aria-label="Dismiss"
+          className="-mr-1 -mt-1 shrink-0 rounded-lg p-1.5 opacity-70 transition-opacity hover:opacity-100"
+        >
+          <X className="h-4 w-4" aria-hidden />
         </button>
       )}
     </div>

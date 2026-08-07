@@ -1,127 +1,136 @@
-import { useEffect, useState } from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Menu, X } from 'lucide-react';
-import { NAV_LINKS } from '../landingContent';
+import { useEffect, useId, useState } from 'react';
+import { ArrowRight, Menu, X } from 'lucide-react';
 
-function HadirMark({ className = 'h-5 w-5' }) {
+const LOGO_PATH = '/logo.jpeg';
+
+const NAV_ITEMS = [
+  { href: '#product', label: 'Product' },
+  { href: '#solutions', label: 'Solutions' },
+  { href: '#company', label: 'Integrations' },
+  { href: '#security', label: 'Security' },
+  { href: '#contact', label: 'Contact' },
+];
+
+function HadirMark() {
   return (
-    <svg viewBox="0 0 20 20" fill="currentColor" className={className} aria-hidden>
-      <rect x="2" y="11" width="3.5" height="7" rx="1" />
-      <rect x="8.25" y="6" width="3.5" height="12" rx="1" />
-      <rect x="14.5" y="2" width="3.5" height="16" rx="1" />
-    </svg>
+    <span className="flex items-center gap-2.5">
+      <img
+        src={LOGO_PATH}
+        alt="Hadir.ai logo"
+        className="h-8 w-8 rounded-[15px] object-cover shadow-[0_8px_20px_rgba(15,23,42,0.10)]"
+      />
+      <span className="text-[15px] font-extrabold tracking-[-0.02em] text-black">Hadir.ai</span>
+    </span>
   );
 }
 
-/**
- * Floating glass navbar — Apple HIG materials, translucent teal CTA.
- * @param {{ onSignInClick: () => void }} props
- */
-export function LandingNav({ onSignInClick }) {
-  const [open, setOpen] = useState(false);
+export function LandingNav({ onSignInClick, onCreateAccountClick }) {
+  const mobileMenuId = useId();
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const reduce = useReducedMotion();
+  const [hiddenPastHero, setHiddenPastHero] = useState(false);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 50);
+    const onScroll = () => {
+      const hero = document.getElementById('top');
+      const hidePoint = hero ? Math.max(120, hero.offsetTop + hero.offsetHeight - 96) : window.innerHeight * 0.65;
+      setScrolled(window.scrollY > 24);
+      setHiddenPastHero(window.scrollY > hidePoint);
+      if (window.scrollY > hidePoint) setMobileOpen(false);
+    };
+
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+    window.addEventListener('resize', onScroll);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    };
   }, []);
 
-  return (
-    <motion.div
-      className="pointer-events-none fixed inset-x-0 top-0 z-50 px-3 pt-4 sm:px-5 sm:pt-5 lg:px-8"
-      initial={reduce ? false : { opacity: 0, y: -16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-    >
-      <motion.div
-        className={[
-          'landing-nav-shell pointer-events-auto mx-auto flex max-w-4xl items-center justify-between gap-4 rounded-[22px]',
-          'py-2 pl-4 pr-2 sm:pl-5 sm:pr-2',
-          scrolled ? 'landing-nav-shell--scrolled' : '',
-        ].join(' ')}
-        transition={{ duration: 0.2 }}
-      >
-        <a
-          href="#top"
-          className="landing-display flex shrink-0 items-center gap-2 text-[#111827]"
-          aria-label="Hadir.ai home"
-        >
-          <HadirMark className="h-[18px] w-[18px]" />
-          <span className="text-[15px] font-semibold tracking-[-0.02em]">Hadir.ai</span>
-        </a>
+  const closeMobile = () => setMobileOpen(false);
 
-        <div className="flex items-center gap-1 sm:gap-2">
-          <nav className="hidden items-center gap-0.5 md:flex" aria-label="Primary">
-            {NAV_LINKS.map((l) => (
+  return (
+    <header className={`fixed inset-x-0 top-0 z-50 transition-transform duration-300 ease-out ${hiddenPastHero ? '-translate-y-full' : 'translate-y-0'}`}>
+      <div
+        className={[
+          'w-full border-b border-[#E2F3F5] bg-[#F8FDFC]/80 backdrop-blur-md transition-all duration-200 ease-out',
+          scrolled ? 'shadow-[0_10px_30px_rgba(0,105,120,0.07)]' : 'shadow-none',
+        ].join(' ')}
+      >
+        <div className="mx-auto flex h-[72px] max-w-[1400px] items-center justify-between gap-8 px-4 sm:px-6 lg:px-8">
+          <a href="#top" aria-label="Hadir.ai home" onClick={closeMobile} className="rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0097A7] focus-visible:ring-offset-2">
+            <HadirMark />
+          </a>
+
+          <nav className="hidden items-center gap-9 lg:flex" aria-label="Primary navigation">
+            {NAV_ITEMS.map((item) => (
               <a
-                key={l.href}
-                href={l.href}
-                className="landing-text rounded-full px-3 py-2 text-[13px] font-medium text-[#111827]/75 transition-colors hover:bg-black/[0.03] hover:text-[#111827]"
+                key={item.href}
+                href={item.href}
+                className="group relative text-[15px] font-medium tracking-[-0.01em] text-slate-700 transition duration-200 ease-out hover:text-[#00838F] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0097A7]/50 focus-visible:ring-offset-4"
               >
-                {l.label}
+                {item.label}
+                <span className="absolute -bottom-1 left-0 h-px w-full origin-left scale-x-0 bg-[#0097A7] transition-transform duration-200 group-hover:scale-x-100" />
               </a>
             ))}
           </nav>
 
-          <motion.button
-            type="button"
-            onClick={onSignInClick}
-            className="landing-cta-waitlist hidden rounded-full px-4 py-2.5 text-[13px] font-semibold tracking-[-0.01em] text-[#014871] sm:inline-flex"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            Join Waitlist
-          </motion.button>
+          <div className="hidden items-center gap-4 lg:flex">
+            <button
+              type="button"
+              onClick={onSignInClick}
+              className="text-[15px] font-semibold tracking-[-0.01em] text-slate-700 transition duration-200 hover:text-[#00838F]"
+            >
+              Sign In
+            </button>
+            {/* Filled teal only reaches AA against white text at #00838F or darker. */}
+            <button
+              type="button"
+              onClick={onCreateAccountClick}
+              className="inline-flex items-center justify-center gap-2 rounded-[15px] bg-[#00838F] px-4 py-2.5 text-[15px] font-semibold text-white shadow-[0_10px_24px_rgba(0,131,143,0.22)] transition duration-200 ease-out hover:-translate-y-0.5 hover:bg-[#006978] hover:shadow-[0_16px_34px_rgba(0,105,120,0.30)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0097A7]/45 focus-visible:ring-offset-4 active:scale-[0.98] active:bg-[#005A66]"
+            >
+              Create Free Account
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
 
           <button
             type="button"
-            className="inline-flex rounded-full p-2 text-[#111827] hover:bg-black/[0.04] md:hidden"
-            onClick={() => setOpen((v) => !v)}
-            aria-expanded={open}
-            aria-label={open ? 'Close menu' : 'Open menu'}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl text-[#0F172A] transition hover:bg-[#E6F7F9] lg:hidden"
+            aria-controls={mobileMenuId}
+            aria-expanded={mobileOpen}
+            aria-label={mobileOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            onClick={() => setMobileOpen((value) => !value)}
           >
-            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
         </div>
-      </motion.div>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            className="landing-nav-shell pointer-events-auto mx-auto mt-2 max-w-4xl overflow-hidden rounded-3xl p-3 md:hidden"
-            initial={{ opacity: 0, y: -8, height: 0 }}
-            animate={{ opacity: 1, y: 0, height: 'auto' }}
-            exit={{ opacity: 0, y: -8, height: 0 }}
-            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <div className="flex flex-col gap-0.5">
-              {NAV_LINKS.map((l) => (
+        {mobileOpen && (
+          <div id={mobileMenuId} className="border-t border-[#E2F3F5] px-3 pb-3 pt-2 lg:hidden">
+            <nav className="flex flex-col gap-1" aria-label="Mobile navigation">
+              {NAV_ITEMS.map((item) => (
                 <a
-                  key={l.href}
-                  href={l.href}
-                  className="landing-text rounded-2xl px-3 py-2.5 text-sm font-medium text-[#111827] hover:bg-black/[0.04]"
-                  onClick={() => setOpen(false)}
+                  key={item.href}
+                  href={item.href}
+                  className="rounded-2xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-[#E6F7F9] hover:text-[#00838F]"
+                  onClick={closeMobile}
                 >
-                  {l.label}
+                  {item.label}
                 </a>
               ))}
-              <button
-                type="button"
-                onClick={() => {
-                  setOpen(false);
-                  onSignInClick();
-                }}
-                className="landing-cta-waitlist mt-2 rounded-full px-4 py-2.5 text-sm font-semibold text-[#014871]"
-              >
-                Join Waitlist
+              <button type="button" onClick={onSignInClick} className="mt-1 rounded-2xl border border-[#E2F3F5] bg-white px-4 py-3 text-sm font-semibold text-[#0F172A]">
+                Sign In
               </button>
-            </div>
-          </motion.div>
+              <button type="button" onClick={() => { closeMobile(); onCreateAccountClick?.(); }} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#00838F] px-4 py-3 text-sm font-semibold text-white hover:bg-[#006978] active:bg-[#005A66]">
+                Create Free Account
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </nav>
+          </div>
         )}
-      </AnimatePresence>
-    </motion.div>
+      </div>
+    </header>
   );
 }

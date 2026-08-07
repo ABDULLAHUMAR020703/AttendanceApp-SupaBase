@@ -9,14 +9,9 @@ import {
   Modal,
   FlatList,
   RefreshControl,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import {
-  getKeyboardAvoidingBehavior,
-  formScrollViewProps,
-} from '../shared/components/KeyboardAwareScreen';
+import { KeyboardAwareModal } from '../shared/components/KeyboardAwareScreen';
 import { 
   getEmployeeLeaveBalance,
   calculateRemainingLeaves,
@@ -471,17 +466,11 @@ export default function LeaveRequestScreen({ navigation, route }) {
           resetForm();
         }}
       >
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={getKeyboardAvoidingBehavior({ inModal: true })}
-          keyboardVerticalOffset={0}
-        >
         <View className="flex-1" style={{ justifyContent: tablet ? 'center' : 'flex-end', backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
-          <View className="rounded-t-3xl p-6" style={{ backgroundColor: colors.surface, maxHeight: tablet ? '85%' : '90%', width: '100%', maxWidth: tablet ? 700 : undefined, alignSelf: 'center', borderBottomLeftRadius: tablet ? 24 : 0, borderBottomRightRadius: tablet ? 24 : 0 }}>
-              <ScrollView 
-                {...formScrollViewProps}
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingBottom: 24 }}
+          <View className="rounded-t-3xl" style={{ backgroundColor: colors.surface, maxHeight: tablet ? '85%' : '90%', width: '100%', maxWidth: tablet ? 700 : undefined, alignSelf: 'center', borderBottomLeftRadius: tablet ? 24 : 0, borderBottomRightRadius: tablet ? 24 : 0, overflow: 'hidden' }}>
+              <KeyboardAwareModal
+                contentContainerStyle={{ padding: 24 }}
+                extraScrollHeight={40}
               >
               <View className="flex-row items-center justify-between mb-4">
                 <Text className="text-xl font-bold" style={{ color: colors.text }}>
@@ -917,10 +906,9 @@ export default function LeaveRequestScreen({ navigation, route }) {
                   </Text>
                 </TouchableOpacity>
               </View>
-            </ScrollView>
+              </KeyboardAwareModal>
           </View>
         </View>
-        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

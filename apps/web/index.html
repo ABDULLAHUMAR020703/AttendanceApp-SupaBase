@@ -6,9 +6,14 @@
     <title>Hadir.ai — Workforce & Operations Intelligence</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <!--
+      Plus Jakarta Sans is the whole type system, marketing and portal alike, so it is
+      the only face fetched. Inter stays in the CSS font stack as a local fallback for
+      machines that have it, but there is nothing left rendering in it to download for.
+    -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   </head>
-  <body class="bg-[#0D0F12]">
+  <body class="bg-page text-ink antialiased">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

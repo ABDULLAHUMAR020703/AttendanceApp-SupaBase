@@ -2,88 +2,54 @@
 @tailwind components;
 @tailwind utilities;
 
-.landing-page {
-  font-family:
-    -apple-system,
-    BlinkMacSystemFont,
-    'SF Pro Text',
-    'SF Pro Display',
-    'Segoe UI',
-    system-ui,
-    sans-serif;
-  font-feature-settings: 'kern' 1, 'liga' 1;
-  letter-spacing: -0.011em;
-}
-
-.landing-display {
-  font-family:
-    -apple-system,
-    BlinkMacSystemFont,
-    'SF Pro Display',
-    'SF Pro Text',
-    'Segoe UI',
-    system-ui,
-    sans-serif;
-}
-
-.landing-text {
-  font-family:
-    -apple-system,
-    BlinkMacSystemFont,
-    'SF Pro Text',
-    'Segoe UI',
-    system-ui,
-    sans-serif;
-}
-
+.landing-page,
+.landing-display,
+.landing-text,
 .landing-brand {
-  font-family:
-    -apple-system,
-    BlinkMacSystemFont,
-    'SF Pro Display',
-    'SF Pro Text',
-    system-ui,
-    sans-serif;
+  font-family: 'Plus Jakarta Sans', Inter, sans-serif;
+  font-feature-settings: 'kern' 1, 'liga' 1;
 }
 
 .landing-page h1,
 .landing-page h2,
 .landing-page h3 {
+  font-family: 'Plus Jakarta Sans', sans-serif;
   letter-spacing: -0.03em;
 }
 
-/* Glass nav shell */
+/* Glass nav shell. The tint is the ice-white canvas, so the frosted bar reads as the
+   page seen through glass rather than as a fourth off-white. */
 .landing-nav-shell {
-  background: rgba(248, 251, 252, 0.72);
+  background: rgba(248, 253, 252, 0.8);
   backdrop-filter: saturate(180%) blur(20px);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(226, 243, 245, 0.9);
   box-shadow:
-    0 8px 32px rgba(17, 24, 39, 0.06),
+    0 8px 32px rgba(0, 90, 102, 0.06),
     0 1px 0 rgba(255, 255, 255, 0.8) inset;
 }
 
 .landing-nav-shell--scrolled {
-  background: rgba(248, 251, 252, 0.86);
+  background: rgba(248, 253, 252, 0.9);
   box-shadow:
-    0 10px 36px rgba(17, 24, 39, 0.08),
+    0 10px 36px rgba(0, 90, 102, 0.09),
     0 1px 0 rgba(255, 255, 255, 0.85) inset;
 }
 
-/* Join Waitlist — translucent teal material */
+/* Join Waitlist — translucent teal material, the quiet half of the CTA pair. */
 .landing-cta-waitlist {
-  background: linear-gradient(180deg, rgba(160, 235, 207, 0.55) 0%, rgba(166, 213, 250, 0.42) 100%);
-  border: 1px solid rgba(160, 235, 207, 0.65);
+  background: linear-gradient(180deg, rgba(0, 151, 167, 0.14) 0%, rgba(0, 131, 143, 0.1) 100%);
+  border: 1px solid rgba(0, 151, 167, 0.3);
   box-shadow:
-    0 4px 14px rgba(1, 72, 113, 0.08),
+    0 4px 14px rgba(0, 90, 102, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.55);
   transition: box-shadow 200ms ease, background 200ms ease;
 }
 
 .landing-cta-waitlist:hover {
-  background: linear-gradient(180deg, rgba(160, 235, 207, 0.7) 0%, rgba(166, 213, 250, 0.55) 100%);
+  background: linear-gradient(180deg, rgba(0, 151, 167, 0.2) 0%, rgba(0, 131, 143, 0.16) 100%);
   box-shadow:
-    0 6px 18px rgba(1, 72, 113, 0.12),
+    0 6px 18px rgba(0, 90, 102, 0.12),
     inset 0 1px 0 rgba(255, 255, 255, 0.65);
 }
 
@@ -109,7 +75,7 @@
     rgba(255, 255, 255, 0.55) 0%,
     transparent 42%,
     transparent 58%,
-    rgba(160, 235, 207, 0.12) 100%
+    rgba(0, 151, 167, 0.12) 100%
   );
   opacity: 0.9;
 }
@@ -124,15 +90,19 @@
   z-index: 1;
 }
 
-/* Launch Portal — milled glass/metal teal */
+/*
+ * Launch Portal — milled glass over brand teal. The gradient stays inside accent
+ * 700-900 so the white label keeps at least 4.6:1 over every band of it; the old
+ * version ramped through a navy that belonged to no other surface in the product.
+ */
 .landing-cta-primary {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, transparent 42%),
-    linear-gradient(145deg, #0a6a8f 0%, #014871 48%, #026a5e 100%);
+    linear-gradient(145deg, #00838f 0%, #006978 52%, #005a66 100%);
   border: 1px solid rgba(255, 255, 255, 0.28);
   box-shadow:
-    0 8px 22px rgba(1, 72, 113, 0.28),
-    0 0 0 1px rgba(1, 72, 113, 0.2),
+    0 8px 22px rgba(0, 90, 102, 0.28),
+    0 0 0 1px rgba(0, 105, 120, 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.35),
     inset 0 -1px 0 rgba(0, 0, 0, 0.12);
   transition: box-shadow 220ms ease, filter 220ms ease;
@@ -140,9 +110,9 @@
 
 .landing-cta-primary:hover {
   box-shadow:
-    0 10px 28px rgba(1, 72, 113, 0.34),
-    0 0 0 1px rgba(160, 235, 207, 0.35),
-    0 0 24px rgba(160, 235, 207, 0.35),
+    0 10px 28px rgba(0, 90, 102, 0.34),
+    0 0 0 1px rgba(0, 151, 167, 0.4),
+    0 0 24px rgba(0, 151, 167, 0.35),
     inset 0 1px 0 rgba(255, 255, 255, 0.45),
     inset 0 -1px 0 rgba(0, 0, 0, 0.1);
   filter: saturate(1.05);
@@ -159,26 +129,139 @@
   -webkit-backdrop-filter: saturate(180%) blur(24px);
   border: 1px solid rgba(255, 255, 255, 0.9);
   box-shadow:
-    0 28px 60px -18px rgba(1, 72, 113, 0.18),
-    0 12px 28px rgba(166, 213, 250, 0.2),
+    0 28px 60px -18px rgba(0, 90, 102, 0.18),
+    0 12px 28px rgba(0, 151, 167, 0.14),
     inset 0 1px 0 rgba(255, 255, 255, 0.95);
 }
 
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
 :root {
-  --color-bg-start: #0d0f12;
-  --color-bg-mid: #121417;
-  --color-bg-end: #014871;
-  --color-text: #e8eef2;
-  --color-text-muted: #9ca3af;
-  --color-surface: rgba(255, 255, 255, 0.06);
-  --color-surface-border: #2a2e35;
-  --color-primary: #014871;
-  --color-accent: #a0ebcf;
-  --color-success: #10b981;
+  /* Surface ladder. See tailwind.config.js `surface` for how the layers stack. */
+  /*
+   * Ice-white canvas. This single value is also the active nav tab and both of its
+   * inverse curve pieces: the tab is a cutout of the page, so "make the tab #F8FDFC"
+   * and "make the canvas #F8FDFC" are the same instruction. Setting the tab alone is
+   * what put two different whites side by side at the rail edge before.
+   */
+  --page: #f8fdfc;
+  --paper: #ffffff;
+  --surface-subtle: #f6fafc;
+  --surface-muted: #edf4f7;
+  --surface-sunken: #e3edf2;
+
+  /* Border ladder: soft for dividers inside tinted panels, strong for structure.
+     Each step is the brand hue at very low saturation, so an edge reads as light
+     catching the card rather than as a grey line drawn around it. */
+  --hairline-soft: #eef8f9;
+  --hairline: #e2f3f5;
+  --hairline-strong: #cbe6ea;
+
+  /* Type. See tailwind.config.js `ink` for the measured contrast of each step. */
+  --ink: #1b2430;
+  --ink-muted: #55657b;
+  --ink-faint: #94a3b8;
+
+  /* Brand teal ramp. Mirrors tailwind.config.js `accent`, which documents the three
+     tiers in full — 400 is tier 3 (light, fills only), 600 the identity tone, 800
+     tier 1 (deep). 700/800 are the two steps that may carry white text. */
+  --accent-50: #f2fcfd;
+  --accent-100: #e6f7f9;
+  --accent-200: #c7eff5;
+  --accent-300: #8fe3ee;
+  --accent-400: #4dd0e1;
+  --accent-500: #18c9d8;
+  --accent-600: #0097a7;
+  --accent-700: #00838f;
+  --accent-800: #006978;
+  --accent-900: #005a66;
+
+  /*
+   * Logo lime — the electric dot on the Hadir.ai mark. Live presence only:
+   * on-site dots, checked-in rings, notification counts. Not a CTA fill.
+   */
+  --lime: #84cc16;
+  --lime-soft: #f7fee7;
+  --lime-muted: #d9f99d;
+  --lime-ink: #3f6212;
+  --lime-bright: #97e02c;
+
+  /*
+   * Named views onto the ramp above, for the places that express rank rather than
+   * brand: an ordered bar chart, a leaderboard, a three-step legend. Aliases rather
+   * than new values, so there is still exactly one definition of each teal.
+   */
+  --tier-1: var(--accent-800);
+  --tier-2: var(--accent-600);
+  --tier-3: var(--accent-400);
+  /* Every track, well and empty bar these tiers fill. Ice-teal, never grey. */
+  --tier-track: var(--accent-100);
+
+  /*
+   * Semantic triads: a surface to sit on, a border to define it, an ink that reads
+   * on both. `--*-solid` is reserved for dots, bars and fills that carry no text.
+   * Success solid is the logo lime so "present / on-site" matches the mark.
+   */
+  --success-surface: #f7fee7;
+  --success-border: #d9f99d;
+  --success-ink: #3f6212;
+  --success-solid: #84cc16;
+
+  --warning-surface: #fef7ea;
+  --warning-border: #f3dfb4;
+  --warning-ink: #b45309;
+  --warning-solid: #f59e0b;
+
+  --danger-surface: #fdf2f2;
+  --danger-border: #f3cfcf;
+  --danger-ink: #b91c1c;
+  --danger-solid: #ef4444;
+
+  /* Info reuses the brand teal rather than adding a fourth hue. */
+  --info-surface: #f2fcfd;
+  --info-border: #c7eff5;
+  --info-ink: #006978;
+
+  --radius-card: 1.125rem;
+  --radius-input: 0.75rem;
+
+  /*
+   * Motion scale. Everything interactive lands in 180-220ms on an ease-out curve:
+   * fast enough to feel instant, long enough to read as motion rather than a jump.
+   * `fast` is for state changes under the cursor, `base` for popovers and reveals,
+   * `slow` for larger surfaces entering (panels, page sections).
+   */
+  --motion-fast: 180ms;
+  --motion: 200ms;
+  --motion-slow: 220ms;
+  /* Same curve as the `ease-premium` / `ease-out` Tailwind classes. */
+  --ease-out: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* Legacy aliases kept so older screens keep resolving. */
+  --color-bg-start: #f8fcfd;
+  --color-bg-mid: #ffffff;
+  --color-bg-end: #f2fcfd;
+  --color-text: #1b2430;
+  --color-text-muted: #55657b;
+  --color-surface: #ffffff;
+  --color-surface-border: #e2f3f5;
+  --color-primary: #0097a7;
+  --color-accent: #0097a7;
+  --color-success: #84cc16;
   --color-error: #ef4444;
   --color-warning: #f59e0b;
-  --radius-card: 1rem;
-  --radius-input: 0.625rem;
 }
 
 @layer base {
@@ -188,18 +271,63 @@
 
   body {
     margin: 0;
-    font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
     font-size: 16px;
     line-height: 1.5;
-    background: #0d0f12;
-    color: var(--color-text);
+    background: var(--page);
+    color: var(--ink);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     min-height: 100vh;
   }
 
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    color: var(--ink);
+    letter-spacing: -0.025em;
+  }
+
+  h1, .font-display {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+
+  p, span, label, input, textarea, select, button, a, table {
+    font-family: 'Plus Jakarta Sans', Inter, sans-serif;
+  }
+
+  /*
+   * One typeface for the whole product, marketing and portal alike: Plus Jakarta Sans,
+   * inherited from body. The portal used to opt into the system UI stack here, which
+   * meant the landing page and the app it led into were set in different faces and the
+   * same 14px label had two different widths across the boundary. What the portal
+   * keeps is the OpenType tuning — kerning, ligatures and contextual alternates on.
+   */
+  .app-admin-surface {
+    font-feature-settings: 'kern' 1, 'liga' 1, 'calt' 1;
+  }
+
+  /*
+   * Numerals stay proportional in prose — tabular figures are wider and read as
+   * gappy inside sentences. Tabular is opted into where columns of digits must
+   * line up: metrics, table cells, timestamps, deltas.
+   */
+  .app-admin-surface {
+    font-variant-numeric: proportional-nums;
+  }
+
+  /* Headings are set to balance so two-line titles break evenly, not 6-words/1-word. */
+  .app-admin-surface h1,
+  .app-admin-surface h2,
+  .app-admin-surface h3 {
+    text-wrap: balance;
+  }
+
+  input, textarea, select, button {
+    font: inherit;
+  }
+
   *:focus-visible {
-    outline: 2px solid rgba(160, 235, 207, 0.45);
+    outline: 2px solid rgba(0, 151, 167, 0.5);
     outline-offset: 2px;
   }
 
@@ -213,66 +341,768 @@
 }
 
 @layer components {
+  /* ---------------------------------------------------------------- layout */
   .page-container {
     @apply space-y-section animate-fade-up;
   }
 
+  /*
+   * Landing canvas, held still for the portal: ice-white (#F8FDFC) with the same
+   * teal wash as the hero (soft mid band + corner glows). No animated mesh —
+   * that fights data tables — but the palette and shape match the marketing page.
+   *
+   * `background-attachment: fixed` keeps the active nav cutout sampling the same
+   * viewport pixels as the page, so the rail seam stays invisible.
+   */
+  .page-wash {
+    background-color: #f8fdfc;
+    background-image:
+      radial-gradient(circle at 20% 16%, rgba(230, 247, 249, 0.55), transparent 28%),
+      radial-gradient(circle at 78% 24%, rgba(0, 151, 167, 0.12), transparent 32%),
+      radial-gradient(62rem 38rem at 12% -8%, rgba(0, 151, 167, 0.08), transparent 62%),
+      radial-gradient(48rem 34rem at 104% 108%, rgba(0, 131, 143, 0.07), transparent 60%),
+      linear-gradient(180deg, #f8fdfc 0%, #e6f7f9 48%, #f8fdfc 100%);
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+  }
+
+  /*
+   * Navigation rail material, shared by the docked sidebar and the mobile drawer.
+   * One flat colour for the entire rail — header, list and footer all inherit it, so
+   * there is no second shade anywhere down its height. Flat rather than a gradient
+   * because the inverse-curve corner pieces have to paint the exact rail colour where
+   * they meet the tab, and any vertical variation would show as a seam at every curve.
+   *
+   * The rail is the brand identity tone, accent-600, so the first surface a user sees
+   * is the brand colour itself. White ink on it measures 3.5:1 — short of the 4.5:1
+   * AA minimum, which is why labels are set semibold rather than medium. Moving this
+   * one value to accent-700 (#00838F, 4.6:1) is the whole fix if the rail ever has to
+   * pass AA. Ink is set once on the container and inherited, so nothing inside can
+   * quietly fall back to the dark body colour.
+   */
+  .nav-surface {
+    --nav-rail: var(--accent-600);
+    background-color: var(--nav-rail);
+    color: #ffffff;
+  }
+
+  /*
+   * The house focus ring is cyan and vanishes on a cyan rail, so it rings in white
+   * here — and it rings *inward*.
+   *
+   * The global ring sits 2px outside the element. The rail clips its overflow (that is
+   * what hides the labels at 64px), so an outward white ring on the first row, the
+   * brand block or the logout button was cut off by the rail's own boundary and what
+   * survived was a white line running along the top or left edge of the sidebar. It
+   * looked like a layout gap, but it was the focus ring of whatever had just been
+   * clicked. Inside the rail the ring is drawn within the row, where nothing clips it.
+   */
+  .nav-surface :focus-visible {
+    outline-color: rgba(255, 255, 255, 0.9);
+    outline-offset: -2px;
+  }
+
+  /*
+   * Inverse outer curve for the active tab. The tab and each corner piece are flat
+   * ice-white (`bg-[#F8FDFC]` in markup) — the same fill as the page canvas — so the
+   * cutout merges into the dashboard with no shade seam. A rail-coloured ::before
+   * rounds away one corner to form the notch.
+   *
+   * Flat rather than `.page-wash`: the sidebar is `position: fixed`, and fixed
+   * backgrounds inside a fixed ancestor can re-anchor to that ancestor, sampling a
+   * different tint than the page and drawing a vertical line at the rail edge.
+   */
+  .nav-cut {
+    position: absolute;
+    right: 0;
+    height: 16px;
+    width: 16px;
+    pointer-events: none;
+  }
+
+  .nav-cut::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-color: var(--nav-rail);
+  }
+
+  .nav-cut-top {
+    top: -16px;
+  }
+
+  .nav-cut-top::before {
+    border-bottom-right-radius: 16px;
+  }
+
+  .nav-cut-bottom {
+    bottom: -16px;
+  }
+
+  .nav-cut-bottom::before {
+    border-top-right-radius: 16px;
+  }
+
+  /*
+   * Folder-tab KPI surface.
+   *
+   * The silhouette is two rectangles sharing one fill variable: a tab across the left
+   * 45%, and the body beneath it starting 16px lower. They overlap, so the throat
+   * between them is one continuous surface with no seam to hide.
+   *
+   * Not clip-path: a polygon cannot round the corners this shape needs, and path()
+   * takes absolute pixel coordinates, so every radius would distort as the card
+   * resizes across the responsive grid. Two rectangles stay exact at any width.
+   *
+   * Not a border either — a border on each piece draws a line straight through the
+   * join, which is what produced the corner artefacts last time. The 1px edge is four
+   * offset drop-shadows on the shape layer, which trace the *union* of the rectangles,
+   * i.e. the real folder outline: the tab's right edge is drawn where it stands above
+   * the body and stops where it enters it. Fill, edge and elevation are all driven by
+   * three variables set once on the card, so the hover repaint is one state change
+   * rather than a dozen colour utilities that can drift apart.
+   */
+  /*
+   * KPI folder tabs — light white / cyan-tinted surfaces that continue the
+   * sidebar brand (#0097A7) without competing with it. Dark navy is text only.
+   */
+  .kpi-folder {
+    --kpi-fill: #ffffff;
+    --kpi-edge: #cbe6ea;
+    --kpi-lift: 0 8px 24px -8px rgba(0, 151, 167, 0.1);
+  }
+
+  .kpi-folder:hover,
+  .kpi-folder:focus-visible {
+    --kpi-edge: #0097a7;
+    --kpi-lift: 0 12px 28px -8px rgba(0, 151, 167, 0.18);
+  }
+
+  .kpi-folder-surface {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    filter: drop-shadow(1px 0 0 var(--kpi-edge)) drop-shadow(-1px 0 0 var(--kpi-edge))
+      drop-shadow(0 1px 0 var(--kpi-edge)) drop-shadow(0 -1px 0 var(--kpi-edge))
+      drop-shadow(var(--kpi-lift));
+    transition: filter 200ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  .kpi-folder-surface::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 45%;
+    height: 32px;
+    border-radius: 14px 14px 0 0;
+    background: linear-gradient(180deg, #ffffff 0%, #f2fcfd 100%);
+    transition: background 200ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  .kpi-folder-surface::after {
+    content: '';
+    position: absolute;
+    inset: 16px 0 0;
+    border-radius: 0 20px 20px 20px;
+    background: linear-gradient(165deg, #ffffff 0%, #f7fcfd 100%);
+    transition: background 200ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  .kpi-folder--lead .kpi-folder-surface::before,
+  .kpi-folder--lead .kpi-folder-surface::after {
+    background: linear-gradient(165deg, #ffffff 0%, #e6f7f9 100%);
+  }
+
+  .kpi-folder--lead .kpi-folder-surface {
+    filter: drop-shadow(1px 0 0 #8fe3ee) drop-shadow(-1px 0 0 #8fe3ee)
+      drop-shadow(0 1px 0 #8fe3ee) drop-shadow(0 -1px 0 #8fe3ee)
+      drop-shadow(0 8px 24px -8px rgba(0, 151, 167, 0.14));
+  }
+
+  .kpi-folder--lead:hover .kpi-folder-surface,
+  .kpi-folder--lead:focus-visible .kpi-folder-surface {
+    filter: drop-shadow(1px 0 0 #0097a7) drop-shadow(-1px 0 0 #0097a7)
+      drop-shadow(0 1px 0 #0097a7) drop-shadow(0 -1px 0 #0097a7)
+      drop-shadow(0 12px 28px -8px rgba(0, 151, 167, 0.2));
+  }
+
+  /* --------------------------------------------------------- type hierarchy
+   *
+   * Seven tiers, and each one is separated from its neighbours by size AND
+   * weight, so the hierarchy survives with colour removed entirely:
+   *
+   *   tier          size  weight     role
+   *   display       34    600        marketing-weight moment, used sparingly
+   *   page-title    26/30 600        one per screen, the "you are here"
+   *   section-title 20    600        splits a page into named regions
+   *   card-title    16    600        names a single card or panel
+   *   type-body     14    400/500    the readable default
+   *   type-label    13    500        names a field or control
+   *   type-caption  12    500        metadata, timestamps, helper copy
+   *   type-overline 11    600 caps   category above a title
+   *
+   * Weight only ever steps 400 -> 500 -> 600. There is no 700+ tier: heavy
+   * weights at small sizes muddy the letterforms and flatten the hierarchy.
+   */
+  .type-display {
+    @apply text-display font-semibold text-ink;
+  }
+
   .page-title {
-    @apply text-2xl font-semibold tracking-tight text-white;
+    @apply text-title font-semibold text-ink sm:text-title-lg;
   }
 
   .page-subtitle {
-    @apply mt-1 text-sm text-slate-400;
+    @apply mt-2 max-w-2xl text-body font-normal text-ink-muted;
   }
 
-  .ui-input {
-    @apply w-full rounded-input border border-charcoal-line bg-white/[0.04] px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 transition-colors duration-200;
-    @apply focus:border-brand-200/50 focus:bg-white/[0.07] focus:outline-none focus:ring-2 focus:ring-brand-200/20;
+  .section-title {
+    @apply text-heading font-semibold text-ink;
   }
 
-  .ui-select {
-    @apply ui-input glass-select cursor-pointer;
+  .card-title {
+    @apply text-subheading font-semibold text-ink;
   }
 
+  /* Sits under a card-title to qualify it, never to repeat it. */
+  .card-subtitle {
+    @apply mt-0.5 text-label font-normal text-ink-muted;
+  }
+
+  .card-eyebrow {
+    @apply mb-1 block text-micro font-semibold uppercase tracking-[0.08em] text-accent-700;
+  }
+
+  .type-body {
+    @apply text-body font-normal text-ink;
+  }
+
+  /* Emphasis inside body copy comes from weight, not from a second colour. */
+  .type-body-strong {
+    @apply text-body font-semibold text-ink;
+  }
+
+  .type-label {
+    @apply text-label font-medium text-ink;
+  }
+
+  .type-caption {
+    @apply text-caption font-medium text-ink-muted;
+  }
+
+  .type-overline {
+    @apply text-micro font-semibold uppercase tracking-[0.07em] text-ink-muted;
+  }
+
+  /* Digits that sit in columns or get compared need to be tabular. */
+  .type-numeric {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Metric readout: the number is the focal point, so it runs tight and heavy. */
+  .stat-value {
+    @apply text-metric font-semibold text-ink;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stat-value-sm {
+    @apply text-metric-sm font-semibold text-ink;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /*
+   * Sentence case, not uppercase: a KPI label is read as a phrase, and all-caps
+   * costs legibility at 12px while adding visual noise next to the number.
+   */
+  .stat-label {
+    @apply text-caption font-medium text-ink-muted;
+  }
+
+  /*
+   * Labels sit above the control at 13px medium: close enough to own the field,
+   * quiet enough that the value the user typed stays the loudest thing in the row.
+   */
   .ui-label {
-    @apply mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400;
+    @apply mb-1.5 flex items-center gap-1 text-label font-medium text-ink;
   }
 
+  .ui-label-optional {
+    @apply text-caption font-normal text-ink-faint;
+  }
+
+  .ui-hint {
+    @apply mt-1.5 text-caption font-normal text-ink-muted;
+  }
+
+  /* Errors are icon-led so they aren't mistaken for helper text at a glance. */
+  .ui-error {
+    @apply mt-1.5 flex items-start gap-1.5 text-caption font-medium text-danger-ink;
+  }
+
+  .ui-error > svg {
+    @apply mt-px h-3.5 w-3.5 shrink-0;
+  }
+
+  /* Vertical rhythm for stacked fields and for grouped sections inside a form. */
+  .ui-form {
+    @apply space-y-5;
+  }
+
+  .ui-form-section {
+    @apply space-y-4 border-t border-hairline pt-5 first:border-t-0 first:pt-0;
+  }
+
+  .ui-form-section-title {
+    @apply text-subheading font-semibold text-ink;
+  }
+
+  /* -------------------------------------------------------------- surfaces */
+  /* Layer 1: white content sitting on the tinted canvas. 18px radius — premium SaaS, not bubble UI. */
+  .ui-card {
+    @apply rounded-[18px] border border-hairline bg-surface shadow-hair;
+  }
+
+  /* Dashboard command header status chips — quiet, not loud. */
+  .dash-status-pill {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-hairline bg-white/80 px-2.5 py-1 text-micro font-medium text-ink-muted;
+  }
+
+  .dash-status-pill-dot {
+    @apply h-1.5 w-1.5 shrink-0 rounded-full bg-accent-600;
+  }
+
+  /*
+   * Only cards that actually lead somewhere answer the cursor. The teal edge is the
+   * affordance, so putting it on every `.ui-card` would promise a click that most of
+   * them don't honour.
+   */
+  .ui-card-interactive {
+    @apply transition-all duration-200 ease-premium hover:-translate-y-0.5 hover:border-accent-600/40 hover:shadow-raise;
+  }
+
+  /*
+   * Progress track. The fill is whichever tier the caller passes; the well is always
+   * ice-teal, so a bar at 4% still reads as a bar in a channel rather than as a mark
+   * floating on grey.
+   */
+  .ui-track {
+    @apply w-full overflow-hidden rounded-full bg-accent-100;
+  }
+
+  .ui-track-fill {
+    @apply h-full rounded-full transition-[width] duration-700 ease-out;
+  }
+
+  /*
+   * Inset surface: the second layer inside a white card. A 3% cyan tint plus a
+   * hairline is enough to separate nested content without borders or gradients.
+   */
+  .ui-inset {
+    @apply rounded-xl border border-hairline bg-surface-subtle;
+  }
+
+  .ui-inset-interactive {
+    @apply ui-inset transition-all duration-200 ease-premium;
+    @apply hover:-translate-y-px hover:border-accent-200 hover:bg-white hover:shadow-hair;
+  }
+
+  /* Segmented control: tinted track, white thumb, Apple-style. */
+  .ui-segment {
+    @apply inline-flex w-fit items-center gap-0.5 rounded-xl border border-hairline bg-surface-muted p-1;
+  }
+
+  /* Selection is carried by weight first, then surface — legible without colour. */
+  .ui-segment-item {
+    @apply rounded-lg px-3 py-1 text-caption font-medium text-ink-muted transition-all duration-200 ease-premium;
+    @apply hover:text-ink;
+  }
+
+  .ui-segment-item-active {
+    @apply bg-white font-semibold text-accent-800 shadow-[0_1px_2px_rgba(13,45,58,0.10)] hover:text-accent-800;
+  }
+
+  .ui-divider {
+    @apply border-t border-hairline;
+  }
+
+  /* --------------------------------------------------------------- buttons */
+  /*
+   * One geometry for every button: 40px tall, 12px radius, 8px gap, semibold 14px
+   * label — the same 40px as a default input so controls line up in a toolbar.
+   *
+   * Hover moves surface, border and shadow only. A button that slides upward on
+   * hover reads as a card; Apple and Linear both hold the box still and answer the
+   * press instead, which is why the lift moved to `active`.
+   *
+   * Never `@apply text-white` in a filled variant below. @apply also copies rules that
+   * use the utility *as a selector*, substituting the applying class, so the compat
+   * layer's `.app-admin-surface .admin-main .text-white { color: #1B2430 }` got re-
+   * emitted as `.admin-main .ui-btn-primary` — three classes deep, so it outranked the
+   * variant's own colour and every filled button inside a page rendered dark ink on a
+   * dark fill. A plain `color` declaration is not subject to that substitution.
+   */
   .ui-btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-input px-4 py-2.5 text-sm font-medium transition-all duration-200;
-    @apply disabled:cursor-not-allowed disabled:opacity-50;
+    @apply relative inline-flex select-none items-center justify-center gap-2 whitespace-nowrap;
+    @apply h-10 rounded-xl px-4 text-body-tight font-semibold;
+    @apply transition-[background-color,border-color,box-shadow,color,transform] duration-fast ease-premium;
+    @apply active:scale-[0.98];
+    @apply disabled:cursor-not-allowed disabled:shadow-none disabled:active:scale-100;
   }
 
+  /* Glyphs hold 16px and never shrink, so a long label wraps before an icon warps. */
+  .ui-btn > svg {
+    @apply h-4 w-4 shrink-0;
+  }
+
+  /*
+   * Filled brand teal with a white label, one step down the ramp from the identity
+   * colour: white is 4.6:1 on accent-700 (#00838F) but only 3.5:1 on accent-600
+   * (#0097A7), and a filled primary action is the one control whose label must never
+   * be marginal. Hover darkens to accent-800 (6.4:1) rather than brightening — the
+   * same direction danger and success take, so all three filled variants behave
+   * alike and the label gets clearer under the cursor instead of dimmer.
+   */
   .ui-btn-primary {
-    @apply ui-btn bg-brand-500 text-white shadow-glow hover:bg-brand-600 active:scale-[0.98];
+    @apply ui-btn bg-accent-700 shadow-[0_1px_2px_rgba(0,90,102,0.16)];
+    @apply hover:bg-accent-800 hover:shadow-[0_2px_10px_rgba(0,131,143,0.30)];
+    @apply active:bg-accent-900;
+    @apply disabled:bg-surface-muted disabled:text-[#8493A6];
+    /* Plain declaration, never `@apply text-white` — see the note above .ui-btn. */
+    color: #ffffff;
   }
 
+  /*
+   * Secondary stays neutral. It is the toolbar workhorse — filters, exports, cancel —
+   * and there are several of them per screen; giving them all a teal label and border
+   * would read as a row of competing primaries and as a row of links.
+   */
   .ui-btn-secondary {
-    @apply ui-btn border border-charcoal-line bg-white/[0.04] text-slate-100 hover:bg-white/[0.08] active:scale-[0.98];
+    @apply ui-btn border border-hairline bg-white text-ink shadow-hair;
+    @apply hover:border-hairline-strong hover:bg-surface-subtle hover:shadow-[0_1px_3px_rgba(13,45,58,0.08)];
+    @apply disabled:border-hairline disabled:bg-surface-subtle disabled:text-[#8493A6];
+  }
+
+  /*
+   * The branded alternative to primary: a full-strength tier-2 outline on white that
+   * fills with the soft tint on hover. The border is 600 at full opacity rather than
+   * 30% — at 30% on white it read as a grey hairline, which made the branded button
+   * indistinguishable from the neutral secondary next to it.
+   */
+  .ui-btn-outline {
+    @apply ui-btn border border-accent-600 bg-white text-accent-800;
+    @apply hover:bg-accent-100 hover:text-accent-900;
+    @apply disabled:border-hairline disabled:bg-transparent disabled:text-[#8493A6];
   }
 
   .ui-btn-ghost {
-    @apply ui-btn text-slate-200 hover:bg-white/[0.06];
+    @apply ui-btn text-ink-muted;
+    @apply hover:bg-accent-50 hover:text-accent-800;
+    @apply disabled:bg-transparent disabled:text-[#8493A6];
   }
 
   .ui-btn-danger {
-    @apply ui-btn bg-red-600/90 text-white hover:bg-red-500 active:scale-[0.98];
+    @apply ui-btn bg-[#DC2626] shadow-[0_1px_2px_rgba(127,29,29,0.16)];
+    @apply hover:bg-[#B91C1C] hover:shadow-[0_2px_10px_rgba(220,38,38,0.26)];
+    @apply disabled:bg-surface-muted disabled:text-[#8493A6];
+    color: #ffffff;
   }
 
   .ui-btn-success {
-    @apply ui-btn bg-emerald-600 text-white hover:bg-emerald-500 active:scale-[0.98];
+    @apply ui-btn bg-[#16A34A] shadow-[0_1px_2px_rgba(5,90,45,0.16)];
+    @apply hover:bg-[#15803D] hover:shadow-[0_2px_10px_rgba(22,163,74,0.26)];
+    @apply disabled:bg-surface-muted disabled:text-[#8493A6];
+    color: #ffffff;
+  }
+
+  /*
+   * Soft destructive: HIG treats delete as a red *label*, not a red slab, unless it
+   * is the confirmed final step. Inline and in-panel deletes use this; confirmation
+   * dialogs use the filled danger button.
+   */
+  .ui-btn-danger-soft {
+    @apply ui-btn border border-danger-border bg-danger-surface text-danger-ink;
+    @apply hover:border-[#E7B4B4] hover:bg-[#FBE8E8];
+    @apply disabled:border-hairline disabled:bg-surface-subtle disabled:text-[#8493A6];
   }
 
   .ui-btn-sm {
-    @apply px-3 py-1.5 text-xs;
+    @apply h-8 gap-1.5 rounded-[10px] px-3 text-label;
   }
 
+  .ui-btn-sm > svg {
+    @apply h-3.5 w-3.5;
+  }
+
+  .ui-btn-lg {
+    @apply h-11 gap-2.5 px-5 text-subheading;
+  }
+
+  /* Loading holds the button's identity and width: the label stays in place and the
+     spinner is centred over it, so nothing reflows when a submit starts. */
+  .ui-btn-loading {
+    @apply cursor-progress;
+  }
+
+  .ui-icon-btn {
+    @apply inline-flex h-10 w-10 items-center justify-center rounded-xl text-ink-muted;
+    @apply transition-[background-color,color,transform] duration-fast ease-premium;
+    @apply hover:bg-accent-50 hover:text-accent-800 active:scale-95;
+    @apply disabled:cursor-not-allowed disabled:bg-transparent disabled:text-[#8493A6];
+  }
+
+  .ui-icon-btn-sm {
+    @apply h-8 w-8 rounded-[10px];
+  }
+
+  /* ---------------------------------------------------------------- inputs */
+  /*
+   * 40px control height, 12px radius, 14px value text. Hover darkens the hairline
+   * neutrally and focus is the only place teal appears — a teal hover previews the
+   * focus state and makes the form feel twitchy under the cursor. The focus border is
+   * the identity tone at full strength with a soft halo behind it, which is legible
+   * as a state change without the halo bleeding into the neighbouring field.
+   */
+  .ui-input {
+    @apply h-10 w-full rounded-xl border border-hairline bg-white px-3.5 py-0 text-body-tight text-ink;
+    @apply placeholder:text-ink-faint;
+    @apply transition-[border-color,box-shadow,background-color] duration-fast;
+    @apply hover:border-hairline-strong;
+    @apply focus:border-accent-600 focus:outline-none focus:ring-4 focus:ring-accent-600/20;
+    @apply focus-visible:outline-none;
+    @apply disabled:cursor-not-allowed disabled:border-hairline disabled:bg-surface-subtle disabled:text-ink-muted;
+  }
+
+  .ui-input-sm {
+    @apply h-8 rounded-[10px] px-3 text-label;
+  }
+
+  .ui-input-lg {
+    @apply h-11 text-subheading;
+  }
+
+  /* Invalid carries a tinted fill as well as a border, so it survives a screenshot. */
+  .ui-input-invalid {
+    @apply border-danger-border bg-[#FEF8F8];
+    @apply hover:border-danger-border;
+    @apply focus:border-danger-solid focus:ring-danger-solid/15;
+  }
+
+  /* Room for a 16px leading glyph at 14px inset. */
+  .ui-input-icon {
+    @apply pl-10;
+  }
+
+  .ui-textarea {
+    @apply ui-input h-auto min-h-[6.5rem] resize-y py-2.5 leading-relaxed;
+  }
+
+  /*
+   * Native select arrows differ per platform, so the chevron is drawn here and the
+   * control keeps the same silhouette as a text field.
+   */
+  .ui-select {
+    @apply ui-input cursor-pointer appearance-none pr-9;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2355657B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.7rem center;
+    background-size: 1rem 1rem;
+  }
+
+  /*
+   * `.ui-select` re-applies the full `.ui-input` block, so it would otherwise
+   * out-order the size modifiers. The compounds restate height and type.
+   */
+  .ui-select.ui-input-sm {
+    @apply h-8 rounded-[10px] px-3 pr-8 text-label;
+    background-position: right 0.5rem center;
+    background-size: 0.875rem 0.875rem;
+  }
+
+  .ui-select.ui-input-lg {
+    @apply h-11 text-subheading;
+  }
+
+  /* Field adornments: the affix button never grows the control's height. */
+  .ui-field-affix {
+    @apply absolute right-1.5 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-lg text-ink-muted;
+    @apply transition-colors duration-fast hover:bg-accent-50 hover:text-accent-800;
+  }
+
+  .ui-checkbox {
+    @apply h-4 w-4 shrink-0 cursor-pointer rounded border-hairline-strong text-accent-600;
+    accent-color: #0097a7;
+  }
+
+  /* ---------------------------------------------------------------- tables */
+  .ui-table-shell {
+    @apply overflow-hidden rounded-[18px] border border-hairline bg-surface shadow-hair;
+  }
+
+  /*
+   * Layer 2 for column headers. A tinted head is what separates chrome from data
+   * without a heavy rule under it — the previous near-white tint was invisible.
+   */
+  .ui-table-head {
+    @apply bg-surface-muted;
+  }
+
+  /*
+   * Sticky heads lose collapsed borders while scrolling, so the seam is painted per
+   * cell instead. The soft drop below it only appears once rows slide under.
+   */
+  .ui-table-head th {
+    box-shadow:
+      inset 0 -1px 0 0 var(--hairline),
+      0 4px 8px -6px rgba(13, 45, 58, 0.14);
+  }
+
+  /* Column headers stay set as overlines: caps read as chrome, not as data. */
+  .ui-th {
+    @apply h-10 px-4 py-0 text-micro font-semibold uppercase tracking-[0.07em] text-ink-muted;
+  }
+
+  /*
+   * 52px rows keep long lists scannable. The last row drops its divider so it never
+   * doubles up with the shell border, and the selected state carries a cyan inset
+   * rail so it still reads while the row is also hovered.
+   */
   .ui-table-row {
-    @apply border-b border-white/10 transition-colors hover:bg-white/[0.04];
+    @apply h-[52px] border-b border-hairline-soft transition-colors duration-fast hover:bg-accent-50;
+  }
+
+  .ui-table-row:last-child {
+    @apply border-b-0;
+  }
+
+  .ui-table-row-selected {
+    @apply bg-accent-50 shadow-[inset_2px_0_0_0_#0097A7] hover:bg-accent-100/70;
   }
 
   .ui-table-cell {
-    @apply p-3 align-middle text-sm text-slate-200;
+    @apply px-4 py-3 align-middle text-body-tight text-ink;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* The whole header cell is the sort target, not just the label text. */
+  .ui-th-sortable {
+    @apply -mx-2 inline-flex h-10 items-center gap-1.5 rounded-md px-2 text-inherit transition-colors;
+    @apply hover:bg-white/70 hover:text-accent-800;
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-600/40;
+  }
+
+  /* Row action trigger: invisible until the row is hovered or the menu has focus. */
+  .ui-row-action {
+    @apply grid h-8 w-8 place-items-center rounded-lg text-ink-muted transition-all duration-fast;
+    @apply hover:bg-white hover:text-accent-800 hover:shadow-hair;
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-600/40;
+  }
+
+  /* Portalled to escape the table's clipped overflow, so positioning is fixed. */
+  .ui-row-menu {
+    @apply ui-menu fixed z-50;
+  }
+
+  /*
+   * Opt-in marker for filter bars, table toolbars and action rows. The tint is what
+   * separates the controls above a table from the data inside it.
+   */
+  .ui-toolbar {
+    @apply border-hairline bg-surface-subtle;
+  }
+
+  /* Pager controls share one 32px square footprint so numbers and chevrons align. */
+  .ui-pager-btn {
+    @apply inline-flex h-8 min-w-[2rem] items-center justify-center rounded-lg px-2 text-label font-medium tabular-nums text-ink-muted transition-colors;
+    @apply hover:bg-accent-50 hover:text-accent-800 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-ink-muted;
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-600/40;
+  }
+
+  .ui-pager-current {
+    @apply inline-flex h-8 min-w-[2rem] items-center justify-center rounded-lg bg-accent-100 px-2 text-label font-semibold tabular-nums text-accent-800;
+  }
+
+  /* --------------------------------------------------------------- badges */
+  /*
+   * Status chips: fixed 22px height so a column of them sits on one baseline
+   * whether or not a dot is present. Soft tint plus a darker ink label, never a
+   * saturated fill — a table of twenty saturated pills reads as an alarm.
+   * 11px semibold with light tracking survives the tint at small sizes.
+   */
+  .ui-badge {
+    @apply inline-flex h-[22px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2 text-micro font-semibold tracking-[0.01em];
+  }
+
+  /* Roomier chip for standalone use (headers, filter summaries) rather than rows. */
+  .ui-badge-lg {
+    @apply h-6 gap-2 px-2.5 text-caption;
+  }
+
+  .ui-badge-neutral {
+    @apply border-hairline bg-surface-muted text-ink-muted;
+  }
+
+  /* Soft tag pill: the tint fill carries tier-1 ink, which is 6.4:1 on it. */
+  .ui-badge-accent {
+    @apply border-accent-200 bg-accent-100 text-accent-800;
+  }
+
+  .ui-badge-success {
+    @apply border-success-border bg-success-surface text-success-ink;
+  }
+
+  .ui-badge-warning {
+    @apply border-warning-border bg-warning-surface text-warning-ink;
+  }
+
+  .ui-badge-danger {
+    @apply border-danger-border bg-danger-surface text-danger-ink;
+  }
+
+  /* ---------------------------------------------------------------- menus */
+  /*
+   * One popover system for header menus, row actions and any future dropdown:
+   * 8px radius on items inside a 12px panel, 4px inner padding so the hovered
+   * item's tint reads as a contained row rather than a full-bleed band.
+   */
+  .ui-menu {
+    @apply overflow-hidden rounded-xl border border-hairline bg-white p-1 shadow-pop;
+    animation: menuIn var(--motion-fast) var(--ease-out);
+  }
+
+  .ui-menu-item {
+    @apply flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-label font-medium text-ink;
+    @apply transition-colors duration-fast;
+    @apply hover:bg-accent-50 hover:text-accent-800;
+    /* Focus, not focus-visible: arrow keys move real focus between items, and the
+     * tint is the menu cursor. A click focuses too, but the menu closes on select. */
+    @apply focus:bg-accent-50 focus:text-accent-800 focus:outline-none;
+    @apply disabled:cursor-not-allowed disabled:text-ink-faint disabled:hover:bg-transparent;
+  }
+
+  /* Keyboard cursor: arrow keys move this, so it must read as strongly as hover. */
+  .ui-menu-item-active {
+    @apply bg-accent-50 text-accent-800;
+  }
+
+  .ui-menu-item-danger {
+    @apply text-danger-ink hover:bg-danger-surface hover:text-danger-ink focus:bg-danger-surface focus:text-danger-ink;
+  }
+
+  .ui-menu-item-danger.ui-menu-item-active {
+    @apply bg-danger-surface text-danger-ink;
+  }
+
+  .ui-menu-item > svg {
+    @apply h-4 w-4 shrink-0;
+  }
+
+  .ui-menu-label {
+    @apply px-2.5 pb-1 pt-1.5 text-micro font-semibold uppercase tracking-[0.07em] text-ink-faint;
+  }
+
+  .ui-menu-separator {
+    @apply my-1 h-px bg-hairline-soft;
   }
 }
 
@@ -297,35 +1127,98 @@
   100% { background-position: calc(300px + 100%) 0; }
 }
 
-.animate-fade-up { animation: fadeUp 280ms ease-out; }
-.animate-fade-in { animation: fadeIn 300ms ease-out; }
+@keyframes scaleIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Menus travel a shorter distance than panels so they feel attached to the trigger. */
+@keyframes menuIn {
+  from { opacity: 0; transform: translateY(-4px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(16px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.animate-fade-up { animation: fadeUp 220ms cubic-bezier(0.32, 0.72, 0, 1); }
+.animate-fade-in { animation: fadeIn 200ms ease-out; }
+.animate-scale-in { animation: scaleIn 220ms cubic-bezier(0.32, 0.72, 0, 1); }
+.animate-slide-in-right { animation: slideInRight 220ms cubic-bezier(0.32, 0.72, 0, 1); }
 .animate-float-slow { animation: floatSlow 9s ease-in-out infinite; }
 .animate-float-slower { animation: floatSlow 12s ease-in-out infinite; }
 
+/* Card hover lift, shared by every interactive surface. */
+.hover-lift {
+  transition: transform var(--motion) var(--ease-out), box-shadow var(--motion) var(--ease-out),
+    border-color var(--motion) var(--ease-out);
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(27, 36, 48, 0.07);
+}
+
+/*
+ * Icon rotation for disclosure triggers. Animating the glyph rather than the
+ * control is the Linear/HIG trade: the container holds still, its contents answer.
+ */
+.icon-rotate {
+  transition: transform var(--motion) var(--ease-out);
+}
+
+.icon-rotate-open {
+  transform: rotate(180deg);
+}
+
+/*
+ * Respect the OS setting. Everything here is decoration on top of a working page,
+ * so it all collapses to an instant state change rather than being re-tuned.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .hover-lift:hover {
+    transform: none;
+  }
+}
+
+/*
+ * The shimmer is a slow, low-contrast sweep: the point is to signal "loading", not
+ * to pulse for attention. A faster or higher-contrast band turns a table of ten
+ * placeholder rows into a strobe.
+ */
 .skeleton {
-  background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.10) 37%, rgba(255,255,255,0.04) 63%);
-  background-size: 400px 100%;
-  animation: shimmer 1.4s ease infinite;
+  background: linear-gradient(90deg, var(--surface-muted) 20%, var(--surface-subtle) 42%, var(--surface-muted) 68%);
+  background-size: 480px 100%;
+  animation: shimmer 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   border-radius: var(--radius-input);
 }
 
 select option {
-  color: #0f172a;
-  background-color: #f1f5f9;
+  color: var(--ink);
+  background-color: #ffffff;
 }
 
 select option:checked,
 select option:hover {
-  color: #ffffff;
-  background-color: #014871;
+  color: var(--accent-900);
+  background-color: var(--accent-100);
 }
-
-.glass-select { color-scheme: dark; }
 
 .chart-content { min-height: 300px; }
 
 .chart-panel:focus-within .chart-surface {
-  outline: 2px solid rgba(160, 235, 207, 0.35);
+  outline: 2px solid rgba(0, 151, 167, 0.4);
   outline-offset: 2px;
 }
 
@@ -340,4 +1233,412 @@ select option:hover {
     background: #ffffff !important;
   }
   .chart-surface svg { max-width: 100% !important; }
+}
+
+
+/* Light-theme compatibility for older admin screens that still use dark utility classes directly. */
+.app-admin-surface .skeleton {
+  background: linear-gradient(90deg, var(--surface-muted), var(--surface-subtle), var(--surface-muted));
+  background-size: 200% 100%;
+}
+
+.app-admin-surface .chart-panel,
+.app-admin-surface .chart-surface {
+  color: #1B2430;
+}
+
+.app-admin-surface .glass-select,
+.app-admin-surface select {
+  color-scheme: light;
+}
+
+.app-admin-surface .glass-select option,
+.app-admin-surface select option {
+  color: #1B2430;
+  background: #FFFFFF;
+}
+
+.app-admin-surface select option:checked,
+.app-admin-surface select option:hover {
+  color: #005A66;
+  background-color: #C7EFF5;
+}
+
+.app-admin-surface .admin-main .text-white,
+.app-admin-surface .admin-main .text-slate-100 {
+  color: #1B2430;
+}
+
+/* `text-slate-200` is almost always a page subtitle on these screens. */
+.app-admin-surface .admin-main .text-slate-200 {
+  color: var(--ink-muted);
+}
+
+/*
+ * Page titles: legacy screens set their own `text-xl`/`text-2xl`, so the shell
+ * normalises every page heading onto the type scale instead.
+ */
+.app-admin-surface .admin-main h1 {
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+}
+
+@media (min-width: 1024px) {
+  .app-admin-surface .admin-main h1 {
+    font-size: 36px;
+  }
+}
+
+/* Headings that live inside a card are section titles, whatever the tag. */
+.app-admin-surface .admin-main .ui-card h1 {
+  font-size: 20px;
+  letter-spacing: -0.015em;
+}
+
+/*
+ * Opt back into real white wherever the surface underneath is intentionally dark or
+ * a solid brand fill. The rule above exists because legacy screens asked for white
+ * text on dark glass that no longer exists — but it cannot be allowed to reach a teal
+ * button, which is how a filled primary ended up with near-black ink on it. Any new
+ * teal fill that carries a label belongs in this list, or on `[data-on-dark]`.
+ */
+.app-admin-surface .admin-main .bg-slate-900.text-white,
+.app-admin-surface .admin-main .bg-slate-900 .text-white,
+.app-admin-surface .admin-main [data-on-dark].text-white,
+.app-admin-surface .admin-main [data-on-dark] .text-white,
+.app-admin-surface .admin-main .bg-accent-600.text-white,
+.app-admin-surface .admin-main .bg-accent-600 .text-white,
+.app-admin-surface .admin-main .bg-accent-700.text-white,
+.app-admin-surface .admin-main .bg-accent-700 .text-white,
+.app-admin-surface .admin-main .bg-accent-800.text-white,
+.app-admin-surface .admin-main .bg-accent-800 .text-white,
+.app-admin-surface .admin-main .bg-accent-900.text-white,
+.app-admin-surface .admin-main .bg-accent-900 .text-white {
+  color: #FFFFFF;
+}
+
+.app-admin-surface .admin-main .text-slate-300,
+.app-admin-surface .admin-main .text-slate-400,
+.app-admin-surface .admin-main .text-slate-500 {
+  color: var(--ink-muted);
+}
+
+.app-admin-surface .admin-main .border-white\/10,
+.app-admin-surface .admin-main .border-white\/15,
+.app-admin-surface .admin-main .border-white\/20 {
+  border-color: var(--hairline);
+}
+
+.app-admin-surface .admin-main .bg-white\/5,
+.app-admin-surface .admin-main .bg-white\/10,
+.app-admin-surface .admin-main .bg-slate-950\/30,
+.app-admin-surface .admin-main .bg-slate-800\/80,
+.app-admin-surface .admin-main .bg-slate-900\/85,
+.app-admin-surface .admin-main .bg-slate-900\/90 {
+  background-color: rgba(255, 255, 255, 0.88);
+}
+
+/*
+ * Legacy screens set `bg-slate-800` on their <option> elements, from when the selects
+ * were dark glass. The class has no opacity suffix, so none of the translucent rules
+ * above catch it, and the browser paints a near-black row with near-black text inside
+ * an otherwise white dropdown. Options are chrome the theme owns, not content, so the
+ * element is targeted directly rather than chasing the class through every page.
+ */
+.app-admin-surface .admin-main option {
+  background-color: #ffffff;
+  color: var(--ink);
+}
+
+.app-admin-surface .admin-main .bg-indigo-600,
+.app-admin-surface .admin-main .bg-blue-600,
+.app-admin-surface .admin-main .bg-blue-700 {
+  background-color: #00838F;
+  color: #FFFFFF;
+}
+
+.app-admin-surface .admin-main .hover\:bg-indigo-700:hover,
+.app-admin-surface .admin-main .hover\:bg-blue-700:hover {
+  background-color: #006978;
+  color: #FFFFFF;
+}
+
+.app-admin-surface .admin-main .hover\:bg-white\/20:hover,
+.app-admin-surface .admin-main .hover\:bg-white\/10:hover {
+  background-color: #E6F7F9;
+}
+
+.app-admin-surface .admin-main button.bg-indigo-600,
+.app-admin-surface .admin-main button.bg-blue-600,
+.app-admin-surface .admin-main button.bg-blue-700 {
+  color: #FFFFFF;
+  border-radius: 14px;
+  box-shadow: 0 2px 8px rgba(0, 131, 143, 0.22);
+  transition: transform 200ms cubic-bezier(0.32, 0.72, 0, 1), box-shadow 200ms ease, background-color 200ms ease;
+}
+
+.app-admin-surface .admin-main button.bg-indigo-600:hover:not(:disabled),
+.app-admin-surface .admin-main button.bg-blue-600:hover:not(:disabled),
+.app-admin-surface .admin-main button.bg-blue-700:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(0, 131, 143, 0.26);
+}
+
+/*
+ * Pale accent text (the `-100`/`-200`/`-300` shades meant for dark backgrounds)
+ * is unreadable on the light canvas. Remap each accent family to its readable
+ * equivalent. Substring matching covers every alpha and hover variant.
+ */
+.app-admin-surface .admin-main [class*="text-blue-1"],
+.app-admin-surface .admin-main [class*="text-blue-2"],
+.app-admin-surface .admin-main [class*="text-blue-3"],
+.app-admin-surface .admin-main [class*="text-indigo-1"],
+.app-admin-surface .admin-main [class*="text-indigo-2"],
+.app-admin-surface .admin-main [class*="text-sky-1"],
+.app-admin-surface .admin-main [class*="text-sky-2"],
+.app-admin-surface .admin-main [class*="text-cyan-1"],
+.app-admin-surface .admin-main [class*="text-cyan-2"],
+.app-admin-surface .admin-main [class*="text-brand-1"],
+.app-admin-surface .admin-main [class*="text-brand-2"] {
+  color: #00838F;
+}
+
+.app-admin-surface .admin-main [class*="text-green-1"],
+.app-admin-surface .admin-main [class*="text-green-2"],
+.app-admin-surface .admin-main [class*="text-green-3"],
+.app-admin-surface .admin-main [class*="text-emerald-1"],
+.app-admin-surface .admin-main [class*="text-emerald-2"],
+.app-admin-surface .admin-main [class*="text-emerald-3"] {
+  color: #047857;
+}
+
+.app-admin-surface .admin-main [class*="text-red-1"],
+.app-admin-surface .admin-main [class*="text-red-2"],
+.app-admin-surface .admin-main [class*="text-red-3"],
+.app-admin-surface .admin-main [class*="text-rose-1"],
+.app-admin-surface .admin-main [class*="text-rose-2"] {
+  color: #b91c1c;
+}
+
+.app-admin-surface .admin-main [class*="text-amber-1"],
+.app-admin-surface .admin-main [class*="text-amber-2"],
+.app-admin-surface .admin-main [class*="text-amber-3"],
+.app-admin-surface .admin-main [class*="text-yellow-1"],
+.app-admin-surface .admin-main [class*="text-yellow-2"] {
+  color: #b45309;
+}
+
+.app-admin-surface .admin-main [class*="text-purple-1"],
+.app-admin-surface .admin-main [class*="text-purple-2"],
+.app-admin-surface .admin-main [class*="text-violet-1"],
+.app-admin-surface .admin-main [class*="text-violet-2"] {
+  color: #6d28d9;
+}
+
+/* Translucent accent fills become soft opaque tints of the same family. */
+.app-admin-surface .admin-main [class*="bg-blue-400/"],
+.app-admin-surface .admin-main [class*="bg-blue-500/"],
+.app-admin-surface .admin-main [class*="bg-blue-600/"],
+.app-admin-surface .admin-main [class*="bg-indigo-500/"],
+.app-admin-surface .admin-main [class*="bg-sky-500/"],
+.app-admin-surface .admin-main [class*="bg-cyan-500/"],
+.app-admin-surface .admin-main [class*="bg-brand-500/"] {
+  background-color: #E6F7F9;
+}
+
+.app-admin-surface .admin-main [class*="bg-green-400/"],
+.app-admin-surface .admin-main [class*="bg-green-500/"],
+.app-admin-surface .admin-main [class*="bg-emerald-400/"],
+.app-admin-surface .admin-main [class*="bg-emerald-500/"] {
+  background-color: #ecfdf5;
+}
+
+.app-admin-surface .admin-main [class*="bg-red-400/"],
+.app-admin-surface .admin-main [class*="bg-red-500/"] {
+  background-color: #fef2f2;
+}
+
+.app-admin-surface .admin-main [class*="bg-amber-400/"],
+.app-admin-surface .admin-main [class*="bg-amber-500/"],
+.app-admin-surface .admin-main [class*="bg-yellow-500/"] {
+  background-color: #fffbeb;
+}
+
+.app-admin-surface .admin-main [class*="bg-purple-500/"],
+.app-admin-surface .admin-main [class*="bg-violet-500/"] {
+  background-color: #f5f3ff;
+}
+
+.app-admin-surface .admin-main [class*="bg-slate-200/"],
+.app-admin-surface .admin-main [class*="bg-slate-400/"],
+.app-admin-surface .admin-main [class*="bg-slate-500/"] {
+  background-color: var(--surface-muted);
+}
+
+/* Accent borders drop to hairlines that read on white cards. */
+.app-admin-surface .admin-main [class*="border-blue-3"],
+.app-admin-surface .admin-main [class*="border-blue-4"],
+.app-admin-surface .admin-main [class*="border-indigo-4"],
+.app-admin-surface .admin-main [class*="border-sky-4"],
+.app-admin-surface .admin-main [class*="border-cyan-4"],
+.app-admin-surface .admin-main [class*="border-brand-4"] {
+  border-color: #C7EFF5;
+}
+
+.app-admin-surface .admin-main [class*="border-green-3"],
+.app-admin-surface .admin-main [class*="border-green-4"],
+.app-admin-surface .admin-main [class*="border-emerald-3"],
+.app-admin-surface .admin-main [class*="border-emerald-4"] {
+  border-color: #a7f3d0;
+}
+
+.app-admin-surface .admin-main [class*="border-red-2"],
+.app-admin-surface .admin-main [class*="border-red-3"],
+.app-admin-surface .admin-main [class*="border-red-4"] {
+  border-color: #fecaca;
+}
+
+.app-admin-surface .admin-main [class*="border-amber-3"],
+.app-admin-surface .admin-main [class*="border-amber-4"],
+.app-admin-surface .admin-main [class*="border-slate-3"],
+.app-admin-surface .admin-main [class*="border-slate-4"] {
+  border-color: var(--hairline);
+}
+
+/*
+ * Disabled controls on legacy screens: opacity alone made accent-on-tint text
+ * vanish, so use an explicit muted surface at full opacity instead.
+ *
+ * Buttons that own a disabled style are excluded, and so is anything mid-request —
+ * a loading primary button has to keep its cyan fill rather than flashing grey.
+ */
+.app-admin-surface
+  .admin-main
+  button:disabled:not([class*='ui-btn']):not([class*='ui-icon-btn']):not([class*='ui-pager']):not([role='menuitem']):not([aria-busy='true']),
+.app-admin-surface
+  .admin-main
+  button[disabled]:not([class*='ui-btn']):not([class*='ui-icon-btn']):not([class*='ui-pager']):not([role='menuitem']):not([aria-busy='true']) {
+  opacity: 1;
+  background-color: var(--surface-muted);
+  border-color: var(--hairline);
+  color: #8493A6;
+  box-shadow: none;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/*
+ * Native inputs on legacy screens still carry dark field styling, and set their
+ * own radius/border. Normalise them onto the standard control shape so every
+ * field in the product has the same silhouette, hover and focus behaviour.
+ */
+.app-admin-surface .admin-main input:not([type='checkbox']):not([type='radio']),
+.app-admin-surface .admin-main textarea,
+.app-admin-surface .admin-main select {
+  color: #1B2430;
+}
+
+.app-admin-surface .admin-main input:not([type='checkbox']):not([type='radio']):not(.ui-input),
+.app-admin-surface .admin-main textarea:not(.ui-input),
+.app-admin-surface .admin-main select:not(.ui-select) {
+  border-radius: 0.75rem;
+  border-color: var(--hairline);
+  background-color: #FFFFFF;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+/* Legacy selects get the same drawn chevron, so one page never mixes the custom
+   arrow with the platform's own. */
+.app-admin-surface .admin-main select:not(.ui-select) {
+  appearance: none;
+  padding-right: 2.25rem;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2355657B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  background-size: 1rem 1rem;
+}
+
+/* Hover darkens the hairline; cyan is reserved for focus. */
+.app-admin-surface .admin-main input:not([type='checkbox']):not([type='radio']):not(.ui-input):hover,
+.app-admin-surface .admin-main textarea:not(.ui-input):hover,
+.app-admin-surface .admin-main select:not(.ui-select):hover {
+  border-color: var(--hairline-strong);
+}
+
+.app-admin-surface .admin-main input:not([type='checkbox']):not([type='radio']):not(.ui-input):focus,
+.app-admin-surface .admin-main textarea:not(.ui-input):focus,
+.app-admin-surface .admin-main select:not(.ui-select):focus {
+  border-color: #0097A7;
+  box-shadow: 0 0 0 4px rgba(0, 151, 167, 0.2);
+  outline: none;
+}
+
+/* Placeholders clear 3:1 so the prompt is legible without competing with a value. */
+.app-admin-surface .admin-main input::placeholder,
+.app-admin-surface .admin-main textarea::placeholder {
+  color: #8493A6;
+}
+
+.app-admin-surface .admin-main input[type='checkbox'],
+.app-admin-surface .admin-main input[type='radio'] {
+  accent-color: #0097A7;
+  width: 1rem;
+  height: 1rem;
+}
+
+/*
+ * Data surfaces (tables, toolbars, menus, pagination) carry a 2-5% cyan tint so
+ * they read as part of the Hadir palette. Selectors sit here rather than in the
+ * component layer because they have to outrank the utility classes the legacy
+ * screens still set inline.
+ */
+.app-admin-surface .admin-main thead,
+.app-admin-surface .admin-main thead th {
+  background-color: var(--surface-subtle);
+}
+
+.app-admin-surface .admin-main thead tr[class*="border-"],
+.app-admin-surface .admin-main tbody tr[class*="border-"] {
+  border-color: var(--hairline);
+}
+
+.app-admin-surface .admin-main tbody tr[class*="hover:bg-"]:hover {
+  background-color: #F6FDFE;
+}
+
+/* Filter bars and table action rows: tinted surface instead of pure white. */
+.app-admin-surface .admin-main .ui-toolbar {
+  background-color: var(--surface-subtle);
+  border-color: var(--hairline);
+}
+
+.app-admin-surface .admin-main .ui-toolbar input,
+.app-admin-surface .admin-main .ui-toolbar select,
+.app-admin-surface .admin-main .ui-toolbar textarea {
+  border-color: var(--hairline);
+}
+
+/* Dropdown lists match the same tinted surface, keeping the cyan selected row. */
+.app-admin-surface .glass-select option,
+.app-admin-surface select option {
+  background: #FFFFFF;
+}
+
+.app-admin-surface .admin-main button.ui-pager-btn:disabled {
+  background-color: transparent;
+  border-color: transparent;
+  color: #94A3B8;
+}
+
+/*
+ * Sticky table headers: the shell clips at a 18px radius, so the header keeps a
+ * hairline instead of its own shadow while scrolled.
+ */
+.app-admin-surface .admin-main .ui-table-shell thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  box-shadow: inset 0 -1px 0 var(--hairline);
 }

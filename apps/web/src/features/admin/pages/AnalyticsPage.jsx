@@ -8,6 +8,7 @@ import {
   DateRangeSelector,
 } from '../../../shared/components/charts';
 import { useAnalyticsMetrics } from '../../../shared/components/charts/useAnalyticsMetrics';
+import { Skeleton, SkeletonGroup } from '../../../shared/components/ui/Skeleton';
 import { adminService } from '../services/adminService';
 import {
   formatRangeLabel,
@@ -250,7 +251,7 @@ export function AnalyticsPage() {
           onClick={load}
           disabled={loading}
           aria-busy={loading}
-          className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-xs text-slate-100 transition-all duration-200 hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300/50 disabled:opacity-50"
+          className="ui-btn-secondary ui-btn-sm"
         >
           {loading ? 'Loading…' : 'Refresh'}
         </button>
@@ -348,12 +349,16 @@ export function AnalyticsPage() {
         <p className="mb-4 text-xs text-slate-400">
           Account and structure metrics alongside your filtered attendance period
         </p>
+        {/* Two columns per row, matching the label/value pairs that replace them. */}
         {loading && (
-          <ul className="space-y-3" aria-hidden="true">
+          <SkeletonGroup label="Loading insights" className="space-y-3">
             {Array.from({ length: 4 }).map((_, i) => (
-              <li key={i} className="h-4 w-3/4 rounded skeleton" />
+              <div key={i} className="flex items-center justify-between gap-4 border-b border-hairline-soft pb-2.5 last:border-0">
+                <Skeleton className="h-3.5 w-40 max-w-[55%]" />
+                <Skeleton className="h-3.5 w-12" />
+              </div>
             ))}
-          </ul>
+          </SkeletonGroup>
         )}
         {!loading && insightRows.length > 0 && (
           <ul className="space-y-3 text-sm text-slate-200">

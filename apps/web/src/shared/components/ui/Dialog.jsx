@@ -1,30 +1,66 @@
-import { useEffect } from 'react';
-import { Button } from './Button';
+import { useEffect, useRef } from 'react';
+import { X } from 'lucide-react';
 
-export function Dialog({ open, onClose, title, children, footer, size = 'md' }) {
+const WIDTHS = {
+  sm: 'max-w-sm',
+  md: 'max-w-lg',
+  lg: 'max-w-2xl',
+  xl: 'max-w-4xl',
+};
+
+/**
+ * Centred modal: blurred backdrop, 24px radius, scale-in entry, scrollable body
+ * with the action row pinned below it. Focus moves into the panel on open and
+ * Escape closes.
+ */
+export function Dialog({ open, onClose, title, description, children, footer, size = 'md' }) {
+  const panelRef = useRef(null);
+
   useEffect(() => {
     if (!open) return undefined;
-    const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose?.();
+    };
     window.addEventListener('keydown', onKey);
+    panelRef.current?.focus();
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
   if (!open) return null;
 
-  const width = size === 'lg' ? 'max-w-2xl' : size === 'sm' ? 'max-w-sm' : 'max-w-lg';
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
-      <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm animate-fade-in" onClick={onClose} />
-      <div className={`relative w-full ${width} rounded-card border border-white/20 bg-slate-900/90 backdrop-blur-2xl shadow-glass-lg animate-fade-up`}>
-        <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
-          <h2 id="dialog-title" className="text-base font-semibold text-white">{title}</h2>
-          <button type="button" onClick={onClose} className="rounded-input p-1.5 text-slate-400 hover:bg-white/10 hover:text-white" aria-label="Close dialog">
-            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18M6 6l12 12" /></svg>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="dialog-title"
+    >
+      <div className="absolute inset-0 bg-[#0B2530]/35 backdrop-blur-md animate-fade-in" onClick={onClose} />
+
+      <div
+        ref={panelRef}
+        tabIndex={-1}
+        className={`relative flex max-h-[86vh] w-full flex-col overflow-hidden rounded-3xl border border-hairline bg-white shadow-overlay outline-none animate-scale-in ${WIDTHS[size] || WIDTHS.md}`}
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-hairline px-6 py-5">
+          <div className="min-w-0">
+            <h2 id="dialog-title" className="text-[17px] font-semibold tracking-[-0.01em] text-ink">
+              {title}
+            </h2>
+            {description && <p className="mt-1 text-sm leading-relaxed text-ink-muted">{description}</p>}
+          </div>
+          <button type="button" onClick={onClose} className="ui-icon-btn -mr-1.5 -mt-1" aria-label="Close dialog">
+            <X className="h-5 w-5" aria-hidden />
           </button>
         </div>
-        <div className="px-5 py-4 max-h-[70vh] overflow-y-auto">{children}</div>
-        {footer && <div className="flex justify-end gap-2 border-t border-white/10 px-5 py-4">{footer}</div>}
+
+        <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
+
+        {footer && (
+          <div className="flex flex-wrap justify-end gap-2 border-t border-hairline bg-surface-subtle px-6 py-4">
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Laptop } from 'lucide-react';
 import { GlassCard } from '../../../shared/components/GlassCard';
 import { PermissionGate } from '../../../shared/components/PermissionGate';
 import { adminService } from '../services/adminService';
 import { PERMISSIONS } from '../permissions';
 import { useSilentPoll } from '../../../shared/hooks/useSilentPoll';
+import { Alert, Badge, EmptyState, PageHeader, StatusBadge, formatStatusLabel } from '../../../shared/components/ui';
+import { SkeletonCardList } from '../../../shared/components/ui/Skeleton';
 
 const WORK_MODE_LABELS = {
   in_office: 'In Office',
@@ -14,24 +18,18 @@ const WORK_MODE_LABELS = {
 function ApprovalProgress({ progress }) {
   if (!progress?.length) return null;
   return (
-    <div className="flex flex-wrap gap-1 mt-2">
+    <div className="mt-2 flex flex-wrap gap-1.5">
       {progress.map((p) => (
-        <span
-          key={p.id}
-          className={`text-xs rounded-full px-2 py-0.5 border ${
-            p.action === 'approved' ? 'border-green-400/40 bg-green-500/20 text-green-100'
-              : p.action === 'rejected' ? 'border-red-400/40 bg-red-500/20 text-red-100'
-                : 'border-amber-400/30 bg-amber-500/15 text-amber-100'
-          }`}
-        >
-          {p.step_label || `Step ${p.step_order}`}: {p.action}
-        </span>
+        <Badge key={p.id} status={p.action} dot>
+          {p.step_label || `Step ${p.step_order}`}: {formatStatusLabel(p.action)}
+        </Badge>
       ))}
     </div>
   );
 }
 
 export function WorkModeRequestsPage() {
+  const navigate = useNavigate();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -67,34 +65,43 @@ export function WorkModeRequestsPage() {
 
   return (
     <div className="space-y-5 animate-fade-up">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-white">Work Mode Requests</h1>
-          <p className="text-sm text-slate-300 mt-1">Review remote and hybrid work change requests.</p>
-        </div>
-        <button type="button" onClick={load} className="text-xs text-blue-200 underline">Refresh</button>
-      </div>
+      <PageHeader
+        title="Work mode requests"
+        subtitle="Review remote and hybrid work change requests."
+        onRefresh={() => load()}
+      />
 
-      {error && <GlassCard className="p-4 text-sm text-red-100">{error}</GlassCard>}
+      {error && <Alert variant="error">{error}</Alert>}
 
       {loading ? (
-        <div className="h-32 skeleton rounded-xl" />
+        <SkeletonCardList count={3} />
       ) : rows.length === 0 ? (
-        <GlassCard className="p-6 text-center text-slate-400 text-sm">No work mode requests.</GlassCard>
+        <EmptyState
+          icon={Laptop}
+          title="No work mode requests"
+          description="When someone asks to switch between office, hybrid and remote, the request lands here for approval."
+          actionLabel="Review approval steps"
+          onAction={() => navigate('/approvals')}
+        />
       ) : (
         <div className="space-y-3">
           {rows.map((r) => (
             <GlassCard key={r.id} className="p-4 space-y-2">
               <div className="flex flex-wrap justify-between gap-2">
-                <div>
-                  <p className="text-slate-100 font-medium">{r.employee?.name || r.employee_uid}</p>
-                  <p className="text-sm text-slate-300">
+                <div className="min-w-0">
+                  <p className="text-body-tight font-semibold text-ink">{r.employee?.name || r.employee_uid}</p>
+                  <p className="mt-0.5 text-label text-ink-muted">
                     {WORK_MODE_LABELS[r.current_work_mode] || r.current_work_mode}
                     {' → '}
-                    <span className="text-white">{WORK_MODE_LABELS[r.requested_work_mode] || r.requested_work_mode}</span>
+                    <span className="font-semibold text-ink">
+                      {WORK_MODE_LABELS[r.requested_work_mode] || r.requested_work_mode}
+                    </span>
                   </p>
-                  {r.reason && <p className="text-xs text-slate-400 mt-1">{r.reason}</p>}
-                  <p className="text-xs text-slate-500 mt-1 capitalize">Status: {r.status} · Step {r.current_step || 1}</p>
+                  {r.reason && <p className="mt-1 text-caption text-ink-muted">{r.reason}</p>}
+                  <div className="mt-2 flex items-center gap-2">
+                    <StatusBadge status={r.status} />
+                    <span className="text-caption text-ink-muted">Step {r.current_step || 1}</span>
+                  </div>
                 </div>
                 {r.status === 'pending' && (
                   <div className="flex flex-col gap-2 min-w-[200px]">
@@ -102,14 +109,14 @@ export function WorkModeRequestsPage() {
                       placeholder="Admin notes (optional)"
                       value={notes[r.id] || ''}
                       onChange={(e) => setNotes((n) => ({ ...n, [r.id]: e.target.value }))}
-                      className="rounded border border-white/20 bg-white/10 px-2 py-1 text-xs text-slate-100"
+                      className="ui-input ui-input-sm"
                     />
                     <div className="flex gap-2">
                       <PermissionGate permission={PERMISSIONS.APPROVE_WORK_MODE}>
-                        <button type="button" onClick={() => process(r.id, 'approved')} className="flex-1 rounded bg-green-700/80 px-2 py-1 text-xs text-white">Approve</button>
+                        <button type="button" onClick={() => process(r.id, 'approved')} className="ui-btn-success ui-btn-sm flex-1">Approve</button>
                       </PermissionGate>
                       <PermissionGate permission={PERMISSIONS.REJECT_WORK_MODE}>
-                        <button type="button" onClick={() => process(r.id, 'rejected')} className="flex-1 rounded bg-red-700/80 px-2 py-1 text-xs text-white">Reject</button>
+                        <button type="button" onClick={() => process(r.id, 'rejected')} className="ui-btn-danger-soft ui-btn-sm flex-1">Reject</button>
                       </PermissionGate>
                     </div>
                   </div>

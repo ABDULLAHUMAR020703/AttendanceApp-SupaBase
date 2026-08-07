@@ -12,7 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../core/contexts/AuthContext';
 import { getAttendanceRecords } from '../utils/storage';
-import { getAllLeaveRequests, getPendingLeaveRequests, processLeaveRequest } from '../utils/leaveManagement';
+import { getAllLeaveRequests, getPendingLeaveRequests, processLeaveRequest, getLeaveRequestById } from '../utils/leaveManagement';
 import {
   getAllTickets,
   getTicketsByStatus,
@@ -29,14 +29,22 @@ import {
   getTicketById,
 } from '../utils/ticketManagement';
 import { getManageableEmployees, canManageEmployee } from '../utils/employees';
-import { generateAttendanceReport, generateLeaveReport, shareCSVFile } from '../utils/export';
+import { generateAttendanceReport, generateLeaveReport, shareReportFile } from '../utils/export';
 import { ROUTES } from '../shared/constants/routes';
 import { spacing, fontSize, responsivePadding, responsiveFont, iconSize, isTablet } from '../shared/utils/responsive';
 import { isHRAdmin } from '../shared/constants/roles';
 import { useStaleWhileRevalidate } from '../shared/hooks/useStaleWhileRevalidate';
 
 export default function HRDashboard({ navigation, route }) {
-  const { user: routeUser, initialTab, openLeaveRequests, ticketId } = route.params || {};
+  const {
+    user: routeUser,
+    initialTab,
+    openLeaveRequests,
+    ticketId,
+    leaveRequestId: leaveRequestIdParam,
+    requestId: requestIdParam,
+  } = route.params || {};
+  const focusedLeaveRequestId = leaveRequestIdParam || requestIdParam || null;
   const { user: authUser } = useAuth();
   const { colors } = useTheme();
   const tablet = isTablet();
@@ -68,8 +76,14 @@ export default function HRDashboard({ navigation, route }) {
     return null;
   }
   // Set initial tab from route params if provided (for notification navigation)
-  const [activeTab, setActiveTab] = useState(initialTab || 'overview'); // overview, attendance, leaves, tickets
+  const [activeTab, setActiveTab] = useState(
+    focusedLeaveRequestId || openLeaveRequests ? 'leaves' : initialTab || 'overview'
+  ); // overview, attendance, leaves, tickets
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [highlightedLeaveId, setHighlightedLeaveId] = useState(
+    focusedLeaveRequestId ? String(focusedLeaveRequestId) : null
+  );
+  const leaveListRef = React.useRef(null);
   
   // Overview stats
   const [stats, setStats] = useState({
@@ -158,7 +172,7 @@ export default function HRDashboard({ navigation, route }) {
   }, [activeTab, ticketFilter, refreshOnFocus]);
   
   // Handle navigation params (e.g., from notifications)
-  // IMPORTANT: This only changes the active tab - it does NOT trigger any actions
+  // IMPORTANT: This only changes the active tab / focus target - it does NOT trigger approve/reject
   useEffect(() => {
     if (initialTab) {
       setActiveTab(initialTab);
@@ -166,20 +180,66 @@ export default function HRDashboard({ navigation, route }) {
         console.log('[HRDashboard] Navigation param: initialTab =', initialTab);
       }
     }
-    if (openLeaveRequests) {
+    if (openLeaveRequests || focusedLeaveRequestId) {
       setActiveTab('leaves');
       if (__DEV__) {
-        console.log('[HRDashboard] Navigation param: openLeaveRequests = true, switching to leaves tab');
+        console.log('[HRDashboard] Opening leaves tab from notification');
       }
+    }
+    if (focusedLeaveRequestId) {
+      setHighlightedLeaveId(String(focusedLeaveRequestId));
     }
     if (ticketId) {
       setActiveTab('tickets');
       if (__DEV__) {
         console.log('[HRDashboard] Navigation param: ticketId =', ticketId, ', switching to tickets tab');
       }
-      // Optionally, you could highlight the specific ticket here
     }
-  }, [initialTab, openLeaveRequests, ticketId]);
+  }, [initialTab, openLeaveRequests, ticketId, focusedLeaveRequestId]);
+
+  // Resolve the specific leave from a notification tap (never use the notification row id).
+  useEffect(() => {
+    let cancelled = false;
+    const targetId = focusedLeaveRequestId ? String(focusedLeaveRequestId) : null;
+    if (!targetId) return undefined;
+
+    (async () => {
+      try {
+        const request = await getLeaveRequestById(targetId);
+        if (cancelled) return;
+        if (!request) {
+          Alert.alert(
+            'Leave request unavailable',
+            'This leave request could not be loaded. It may have been removed, or you may not have access.'
+          );
+          return;
+        }
+        setHighlightedLeaveId(String(request.id));
+        setLeaveRequests((prev) => {
+          const exists = prev.some((row) => String(row.id) === String(request.id));
+          if (exists) {
+            return prev.map((row) =>
+              String(row.id) === String(request.id) ? { ...row, ...request } : row
+            );
+          }
+          return [request, ...prev];
+        });
+        setPendingLeaves((prev) => {
+          if (request.status !== 'pending') return prev;
+          const exists = prev.some((row) => String(row.id) === String(request.id));
+          return exists ? prev : [request, ...prev];
+        });
+      } catch (error) {
+        if (__DEV__) {
+          console.warn('[HRDashboard] Failed to load leave from notification:', error?.message);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [focusedLeaveRequestId]);
 
   const loadOverviewStats = async () => {
     try {
@@ -263,11 +323,18 @@ export default function HRDashboard({ navigation, route }) {
 
   const handleGenerateAttendanceReport = async () => {
     try {
-      Alert.alert('Generating Report', 'Please wait while we generate the attendance report...');
+      Alert.alert('Generating Report', 'Please wait while we generate the attendance PDF...');
       const result = await generateAttendanceReport(user?.companyId);
-      
+
       if (result.success) {
-        await shareCSVFile(result.fileUri, result.fileName);
+        const shareResult = await shareReportFile(result.fileUri, result.fileName);
+        if (shareResult.error && shareResult.error !== 'Share cancelled') {
+          Alert.alert(
+            'PDF Ready',
+            'The attendance PDF was generated, but sharing failed. You can try again from the report actions.',
+            [{ text: 'OK' }]
+          );
+        }
       } else {
         Alert.alert('Error', result.error || 'Failed to generate attendance report');
       }
@@ -279,11 +346,18 @@ export default function HRDashboard({ navigation, route }) {
 
   const handleGenerateLeaveReport = async () => {
     try {
-      Alert.alert('Generating Report', 'Please wait while we generate the leave report...');
+      Alert.alert('Generating Report', 'Please wait while we generate the leave PDF...');
       const result = await generateLeaveReport(user?.companyId);
-      
+
       if (result.success) {
-        await shareCSVFile(result.fileUri, result.fileName);
+        const shareResult = await shareReportFile(result.fileUri, result.fileName);
+        if (shareResult.error && shareResult.error !== 'Share cancelled') {
+          Alert.alert(
+            'PDF Ready',
+            'The leave PDF was generated, but sharing failed. You can try again from the report actions.',
+            [{ text: 'OK' }]
+          );
+        }
       } else {
         Alert.alert('Error', result.error || 'Failed to generate leave report');
       }
@@ -320,9 +394,18 @@ export default function HRDashboard({ navigation, route }) {
       Alert.alert('Error', 'Invalid action. Please try again.');
       return;
     }
+
+    const targetId = requestId != null ? String(requestId) : '';
+    if (!targetId) {
+      Alert.alert('Error', 'Leave request not found');
+      return;
+    }
     
-    // Find the request
-    const request = leaveRequests.find(req => req.id === requestId);
+    // Find the request in loaded state; fall back to a direct fetch if the list is stale
+    let request = leaveRequests.find((req) => String(req.id) === targetId);
+    if (!request) {
+      request = await getLeaveRequestById(targetId);
+    }
     if (!request) {
       Alert.alert('Error', 'Leave request not found');
       return;
@@ -365,7 +448,7 @@ export default function HRDashboard({ navigation, route }) {
           onPress: async () => {
             try {
               const result = await processLeaveRequest(
-                requestId,
+                targetId,
                 status,
                 user.username,
                 status === 'approved' ? 'Leave request approved' : 'Leave request rejected'
@@ -684,7 +767,7 @@ export default function HRDashboard({ navigation, route }) {
                   Generate Attendance Report
                 </Text>
                 <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
-                  Export attendance data
+                  Export attendance PDF (share via WhatsApp)
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={iconSize.md} color={colors.textSecondary} />
@@ -723,7 +806,7 @@ export default function HRDashboard({ navigation, route }) {
                   Generate Leave Report
                 </Text>
                 <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
-                  Export leave data
+                  Export leave PDF (share via WhatsApp)
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={iconSize.md} color={colors.textSecondary} />
@@ -826,9 +909,12 @@ export default function HRDashboard({ navigation, route }) {
       </View>
       {leaveRequests.length > 0 ? (
         <FlatList
+          ref={leaveListRef}
           data={leaveRequests}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
+          keyExtractor={(item) => String(item.id)}
+          renderItem={({ item }) => {
+            const isFocused = highlightedLeaveId && String(item.id) === String(highlightedLeaveId);
+            return (
             <View
               style={{
                 backgroundColor: colors.surface,
@@ -836,6 +922,8 @@ export default function HRDashboard({ navigation, route }) {
                 padding: responsivePadding(16),
                 marginHorizontal: responsivePadding(16),
                 marginBottom: spacing.md,
+                borderWidth: isFocused ? 2 : 0,
+                borderColor: isFocused ? colors.primary : 'transparent',
               }}
             >
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.xs }}>
@@ -922,7 +1010,8 @@ export default function HRDashboard({ navigation, route }) {
                 </Text>
               )}
             </View>
-          )}
+            );
+          }}
           refreshControl={
             <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
           }

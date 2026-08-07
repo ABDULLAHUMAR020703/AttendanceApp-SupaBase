@@ -1,14 +1,60 @@
-export function AppLoader({ label = 'Loading workspace…' }) {
+import { Skeleton } from './Skeleton';
+
+/**
+ * Boot state for the whole app. Rather than a centred spinner on an empty page,
+ * this lays out the chrome that is about to appear — nav rail, header, page title,
+ * KPI strip, cards — so the arrival of the real shell is a fill-in rather than a
+ * complete repaint.
+ */
+export function AppLoader({ label = 'Loading workspace' }) {
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0D0F12]">
-      <div className="absolute -left-40 -top-24 h-[28rem] w-[28rem] rounded-full bg-[#014871]/30 blur-3xl animate-float-slow" />
-      <div className="absolute -right-32 bottom-0 h-[24rem] w-[24rem] rounded-full bg-[#A0EBCF]/15 blur-3xl animate-float-slower" />
-      <div className="relative animate-fade-in px-6 text-center">
-        <div className="mx-auto mb-5 grid h-12 w-12 place-items-center rounded-2xl border border-[#2A2E35] bg-[#1A1D21] shadow-glass backdrop-blur-xl">
-          <span className="h-6 w-6 animate-spin rounded-full border-2 border-[#A0EBCF]/25 border-t-[#A0EBCF]" />
+    <div className="page-wash flex h-screen w-full overflow-hidden" role="status" aria-busy="true" aria-live="polite">
+      <span className="sr-only">{label}</span>
+
+      {/* Collapsed nav rail: same 64px footprint the real sidebar occupies at rest. */}
+      <div className="hidden w-16 shrink-0 flex-col items-center gap-2 border-r border-hairline bg-surface-subtle py-4 md:flex">
+        <Skeleton className="h-9 w-9" rounded="rounded-xl" />
+        <div className="mt-4 flex flex-col gap-2.5">
+          {Array.from({ length: 7 }).map((_, i) => (
+            <Skeleton key={i} className="h-8 w-8" rounded="rounded-lg" />
+          ))}
         </div>
-        <p className="text-sm font-medium text-white">{label}</p>
-        <p className="mt-1 text-xs text-slate-400">Hadir.ai Admin</p>
+      </div>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* 56px header, matching TopBar's height so nothing shifts vertically. */}
+        <div className="flex h-14 shrink-0 items-center gap-4 border-b border-hairline bg-white/85 px-4 md:px-6">
+          <Skeleton className="h-3.5 w-32" />
+          <div className="ml-auto flex items-center gap-2">
+            <Skeleton className="h-8 w-52 max-w-[30vw]" rounded="rounded-lg" />
+            <Skeleton className="h-8 w-8" rounded="rounded-lg" />
+            <Skeleton className="h-8 w-8" rounded="rounded-full" />
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-hidden p-4 md:p-6">
+          <div className="mx-auto w-full max-w-[1400px] space-y-6">
+            <div className="space-y-2.5">
+              <Skeleton className="h-7 w-64 max-w-[60%]" />
+              <Skeleton className="h-3.5 w-96 max-w-[80%]" />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="ui-card space-y-4 p-5">
+                  <Skeleton className="h-3 w-24" />
+                  <Skeleton className="h-8 w-16" />
+                  <Skeleton className="h-3 w-32" />
+                </div>
+              ))}
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-3">
+              <div className="ui-card h-64 p-6 lg:col-span-2" />
+              <div className="ui-card h-64 p-6" />
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

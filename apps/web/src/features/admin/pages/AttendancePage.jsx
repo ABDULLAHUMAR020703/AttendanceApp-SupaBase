@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { CalendarClock } from 'lucide-react';
 import { adminService } from '../services/adminService';
 import { GlassCard } from '../../../shared/components/GlassCard';
+import { Alert } from '../../../shared/components/ui/Alert';
+import { Badge, formatStatusLabel } from '../../../shared/components/ui/Badge';
+import { EmptyState } from '../../../shared/components/ui/EmptyState';
+import { SkeletonCardList } from '../../../shared/components/ui/Skeleton';
 import { PermissionGate, useAnyPermission } from '../../../shared/components/PermissionGate';
 import { PERMISSIONS } from '../permissions';
 import { useSilentPoll } from '../../../shared/hooks/useSilentPoll';
@@ -42,20 +47,10 @@ function downloadAttendanceCsv(rows) {
 
 function AlertBanner({ type = 'info', message, onDismiss }) {
   if (!message) return null;
-  const styles = {
-    success: 'border-green-300/25 bg-green-500/15 text-green-100',
-    error: 'border-red-300/25 bg-red-500/15 text-red-100',
-    info: 'border-blue-300/25 bg-blue-500/15 text-blue-100',
-  };
   return (
-    <GlassCard className={`p-4 text-sm flex items-start justify-between gap-3 ${styles[type] || styles.info}`} role="status">
-      <span>{message}</span>
-      {onDismiss && (
-        <button type="button" onClick={onDismiss} className="text-xs underline opacity-80 hover:opacity-100">
-          Dismiss
-        </button>
-      )}
-    </GlassCard>
+    <Alert type={type} onDismiss={onDismiss}>
+      {message}
+    </Alert>
   );
 }
 
@@ -191,7 +186,7 @@ export function AttendancePage() {
               type="button"
               onClick={() => setShowManual(true)}
               disabled={actionLoading}
-              className="rounded-lg bg-indigo-600 px-3 py-2 text-xs text-white hover:bg-indigo-700 transition-all duration-200 disabled:opacity-50"
+              className="ui-btn-primary ui-btn-sm"
             >
               Manual Correction
             </button>
@@ -201,7 +196,7 @@ export function AttendancePage() {
               type="button"
               onClick={handleExport}
               disabled={actionLoading || loading}
-              className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-xs text-slate-100 hover:bg-white/20 transition-all duration-200 disabled:opacity-50"
+              className="ui-btn-secondary ui-btn-sm"
             >
               {actionLoading ? 'Exporting…' : 'Export Attendance'}
             </button>
@@ -211,7 +206,7 @@ export function AttendancePage() {
               type="button"
               onClick={loadAttendance}
               disabled={loading}
-              className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-xs text-slate-100 hover:bg-white/20 transition-all duration-200 disabled:opacity-50"
+              className="ui-btn-secondary ui-btn-sm"
             >
               {loading ? 'Refreshing…' : 'Refresh'}
             </button>
@@ -222,7 +217,7 @@ export function AttendancePage() {
       <AlertBanner {...(notice || {})} onDismiss={() => setNotice(null)} />
 
       <PermissionGate anyOf={[PERMISSIONS.VIEW_ATTENDANCE, PERMISSIONS.MANUAL_ATTENDANCE]}>
-        {error && <GlassCard className="p-4 text-sm text-red-100" role="alert">{error}</GlassCard>}
+        {error && <Alert type="error">{error}</Alert>}
 
         {showManual && (
           <GlassCard className="p-5 space-y-4">
@@ -242,7 +237,7 @@ export function AttendancePage() {
                   id="manual-user"
                   value={manualForm.username}
                   onChange={(e) => setManualForm((f) => ({ ...f, username: e.target.value }))}
-                  className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-slate-100"
+                  className="ui-select"
                   required
                 >
                   <option value="" className="bg-slate-800">Select employee</option>
@@ -259,7 +254,7 @@ export function AttendancePage() {
                   id="manual-type"
                   value={manualForm.type}
                   onChange={(e) => setManualForm((f) => ({ ...f, type: e.target.value }))}
-                  className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-slate-100"
+                  className="ui-select"
                 >
                   <option value="checkin" className="bg-slate-800">Check-in</option>
                   <option value="checkout" className="bg-slate-800">Check-out</option>
@@ -272,7 +267,7 @@ export function AttendancePage() {
                   type="datetime-local"
                   value={manualForm.timestamp}
                   onChange={(e) => setManualForm((f) => ({ ...f, timestamp: e.target.value }))}
-                  className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-slate-100"
+                  className="ui-input"
                   required
                 />
               </div>
@@ -284,21 +279,21 @@ export function AttendancePage() {
                   value={manualForm.locationNote}
                   onChange={(e) => setManualForm((f) => ({ ...f, locationNote: e.target.value }))}
                   placeholder="e.g. Office HQ — corrected by manager"
-                  className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-slate-100"
+                  className="ui-input"
                 />
               </div>
               <div className="md:col-span-2 flex gap-2">
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700 disabled:opacity-50"
+                  className="ui-btn-primary"
                 >
                   {actionLoading ? 'Saving…' : 'Save correction'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowManual(false)}
-                  className="rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm text-slate-100 hover:bg-white/20"
+                  className="ui-btn-secondary ui-btn-sm"
                 >
                   Cancel
                 </button>
@@ -308,24 +303,29 @@ export function AttendancePage() {
         )}
 
         <div className="space-y-2">
-          {loading &&
-            Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-14 rounded-xl border border-white/15 bg-white/10 skeleton" />
-            ))}
+          {loading && <SkeletonCardList count={5} />}
           {!loading && sortedRows.length === 0 && (
-            <GlassCard className="p-4 text-sm text-slate-300">No attendance records found.</GlassCard>
+            <EmptyState
+              icon={CalendarClock}
+              title="No attendance records yet"
+              description="Check-ins and check-outs appear here as your team clocks in. If an event was missed, log a manual correction."
+              actionLabel="Refresh records"
+              onAction={() => loadAttendance()}
+            />
           )}
           {!loading &&
             sortedRows.slice(0, 100).map((r) => (
-              <GlassCard key={r.id} className="p-3 text-slate-100">
+              <GlassCard key={r.id} className="p-3">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-sm font-medium">
-                      {r.employee_name || r.username || 'Unknown user'}
-                      <span className="ml-2 text-xs uppercase text-slate-400">{r.type || 'event'}</span>
-                      {r.is_manual && <span className="ml-2 rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] text-amber-100">Manual</span>}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-400">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-body-tight font-medium text-ink">
+                        {r.employee_name || r.username || 'Unknown user'}
+                      </p>
+                      <Badge tone="neutral">{formatStatusLabel(r.type) || 'Event'}</Badge>
+                      {r.is_manual && <Badge tone="warning">Manual</Badge>}
+                    </div>
+                    <p className="mt-1 text-caption text-ink-muted">
                       {r.timestamp ? new Date(r.timestamp).toLocaleString() : 'Unknown time'}
                       {r.location?.address ? ` · ${r.location.address}` : ''}
                     </p>
@@ -335,7 +335,7 @@ export function AttendancePage() {
                       type="button"
                       onClick={() => handleDelete(r)}
                       disabled={actionLoading}
-                      className="self-start text-xs text-red-300 hover:text-red-200 underline disabled:opacity-50"
+                      className="ui-btn-danger-soft ui-btn-sm self-start"
                     >
                       Delete
                     </button>

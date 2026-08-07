@@ -98,7 +98,7 @@ export function DepartmentsPage() {
 
       <div className="mb-4 flex flex-col md:flex-row gap-2">
         <input
-          className="rounded-lg border border-white/20 bg-white/10 p-2.5 md:w-72 text-sm text-slate-100 placeholder:text-slate-300"
+          className="ui-input md:w-72"
           placeholder="Search departments"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -107,13 +107,13 @@ export function DepartmentsPage() {
           <>
             <input
               ref={createInputRef}
-              className="rounded-lg border border-white/20 bg-white/10 p-2.5 md:w-72 text-sm text-slate-100 placeholder:text-slate-300"
+              className="ui-input md:w-72"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="New department"
             />
             <PermissionGate permission={PERMISSIONS.MANAGE_DEPARTMENTS}>
-              <button className="rounded-lg bg-blue-600 text-white px-3 py-2 text-sm hover:bg-blue-700 transition-all duration-200 active:scale-[0.99]" onClick={onCreateDepartment}>
+              <button className="ui-btn-primary" onClick={onCreateDepartment}>
                 Create
               </button>
             </PermissionGate>
@@ -146,15 +146,15 @@ export function DepartmentsPage() {
                   <PermissionGate permission={PERMISSIONS.MANAGE_DEPARTMENTS}>
                   <div className="flex flex-col md:flex-row gap-2">
                     <input
-                      className="rounded-lg border border-white/20 bg-white/10 p-2.5 md:w-72 text-sm text-slate-100 placeholder:text-slate-300"
+                      className="ui-input md:w-72"
                       placeholder="Rename department"
                       value={renameState.id === d.id ? renameState.value : ''}
                       onChange={(e) => setRenameState({ id: d.id, value: e.target.value })}
                     />
-                    <button className="rounded-lg bg-blue-600 text-white px-3 py-2 text-sm hover:bg-blue-700 transition-all duration-200 active:scale-[0.99]" onClick={() => onRenameDepartment(d.id)}>
+                    <button className="ui-btn-secondary" onClick={() => onRenameDepartment(d.id)}>
                       Rename
                     </button>
-                    <button className="rounded-lg border border-red-200/40 bg-red-500/15 text-red-100 px-3 py-2 text-sm hover:bg-red-500/25 transition-all duration-200 active:scale-[0.99]" onClick={() => onDeleteDepartment(d.id)}>
+                    <button className="ui-btn-danger-soft" onClick={() => onDeleteDepartment(d.id)}>
                       Delete
                     </button>
                   </div>

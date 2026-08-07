@@ -19,17 +19,17 @@ export function DateRangeSelector({
   }, {});
 
   return (
-    <div className="space-y-4">
+    <div className="ui-toolbar space-y-4 rounded-2xl border border-hairline bg-white p-4 shadow-[0_12px_32px_rgba(27,36,48,0.06)]">
       <div>
-        <h2 className="text-sm font-medium text-white">Date range</h2>
-        <p className="mt-1 text-xs text-slate-400">
+        <h2 className="text-sm font-semibold text-[#1B2430]">Date range</h2>
+        <p className="mt-1 text-xs text-ink-muted">
           All attendance charts and KPI cards update for the selected period.
         </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <div className="flex flex-col gap-1">
-          <label htmlFor={`${idPrefix}-range`} className="text-xs text-slate-300">
+          <label htmlFor={`${idPrefix}-range`} className="text-xs font-semibold text-ink-muted">
             Period
           </label>
           <select
@@ -37,7 +37,7 @@ export function DateRangeSelector({
             value={preset}
             onChange={(e) => onPresetChange(e.target.value)}
             aria-describedby={`${idPrefix}-range-hint`}
-            className="glass-select rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300/50"
+            className="ui-select"
           >
             {Object.entries(groupedPresets).map(([group, options]) => (
               <optgroup key={group} label={group}>
@@ -54,7 +54,7 @@ export function DateRangeSelector({
         {preset === 'custom' && (
           <>
             <div className="flex flex-col gap-1">
-              <label htmlFor={`${idPrefix}-from`} className="text-xs text-slate-300">
+              <label htmlFor={`${idPrefix}-from`} className="text-xs font-semibold text-ink-muted">
                 From
               </label>
               <input
@@ -62,11 +62,11 @@ export function DateRangeSelector({
                 type="date"
                 value={customFrom}
                 onChange={(e) => onCustomFromChange(e.target.value)}
-                className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300/50"
+                className="ui-input"
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label htmlFor={`${idPrefix}-to`} className="text-xs text-slate-300">
+              <label htmlFor={`${idPrefix}-to`} className="text-xs font-semibold text-ink-muted">
                 To
               </label>
               <input
@@ -74,22 +74,22 @@ export function DateRangeSelector({
                 type="date"
                 value={customTo}
                 onChange={(e) => onCustomToChange(e.target.value)}
-                className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300/50"
+                className="ui-input"
               />
             </div>
           </>
         )}
       </div>
 
-      <div id={`${idPrefix}-range-hint`} className="text-xs text-slate-400">
+      <div id={`${idPrefix}-range-hint`} className="text-xs text-ink-muted">
         {selectedRange && !rangeInvalid && (
           <span>
             Showing data for{' '}
-            <span className="text-slate-200">{formatRangeLabel(selectedRange.start, selectedRange.end)}</span>
+            <span className="font-semibold text-[#1B2430]">{formatRangeLabel(selectedRange.start, selectedRange.end)}</span>
           </span>
         )}
         {rangeInvalid && (
-          <span className="text-amber-200">
+          <span className="font-medium text-warning-ink">
             Select a valid start and end date to update charts and KPIs.
           </span>
         )}

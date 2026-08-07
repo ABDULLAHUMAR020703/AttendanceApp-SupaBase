@@ -8,10 +8,8 @@ import {
   Modal,
   FlatList,
   TextInput,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
-import { getKeyboardAvoidingBehavior, formScrollViewProps } from '../shared/components/KeyboardAwareScreen';
+import { KeyboardAwareModal } from '../shared/components/KeyboardAwareScreen';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { 
@@ -444,19 +442,11 @@ export default function ManualAttendanceScreen({ navigation }) {
         animationType="slide"
         onRequestClose={() => setShowAddModal(false)}
       >
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={getKeyboardAvoidingBehavior({ inModal: true })}
-          keyboardVerticalOffset={0}
-        >
-          <View style={{ flex: 1, justifyContent: tablet ? 'center' : 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
-            <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, borderBottomLeftRadius: tablet ? 20 : 0, borderBottomRightRadius: tablet ? 20 : 0, maxHeight: tablet ? '85%' : '90%', width: '100%', maxWidth: tablet ? 700 : undefined, alignSelf: 'center', padding: responsivePadding(20) }}>
-              <ScrollView 
-                showsVerticalScrollIndicator={false} 
-                contentContainerStyle={{ paddingBottom: spacing['2xl'] }}
-                keyboardShouldPersistTaps="handled"
-                automaticallyAdjustKeyboardInsets={true}
-                keyboardDismissMode="on-drag"
+        <View style={{ flex: 1, justifyContent: tablet ? 'center' : 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+            <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, borderBottomLeftRadius: tablet ? 20 : 0, borderBottomRightRadius: tablet ? 20 : 0, maxHeight: tablet ? '85%' : '90%', width: '100%', maxWidth: tablet ? 700 : undefined, alignSelf: 'center', overflow: 'hidden' }}>
+              <KeyboardAwareModal
+                contentContainerStyle={{ padding: responsivePadding(20) }}
+                extraScrollHeight={40}
               >
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg }}>
                 <Text style={{ fontSize: responsiveFont(20), fontWeight: 'bold', color: colors.text }}>
@@ -477,8 +467,6 @@ export default function ManualAttendanceScreen({ navigation }) {
                   nestedScrollEnabled={true}
                   showsVerticalScrollIndicator={true}
                   keyboardShouldPersistTaps="handled"
-                  automaticallyAdjustKeyboardInsets={true}
-                  keyboardDismissMode="on-drag"
                 >
                   {employees.length === 0 ? (
                     <View style={{ padding: spacing.md, alignItems: 'center' }}>
@@ -629,10 +617,9 @@ export default function ManualAttendanceScreen({ navigation }) {
                   </Text>
                 </TouchableOpacity>
               </View>
-              </ScrollView>
+              </KeyboardAwareModal>
             </View>
           </View>
-        </KeyboardAvoidingView>
       </Modal>
 
       {/* Edit Modal */}
@@ -642,19 +629,11 @@ export default function ManualAttendanceScreen({ navigation }) {
         animationType="slide"
         onRequestClose={() => setShowEditModal(false)}
       >
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={getKeyboardAvoidingBehavior({ inModal: true })}
-          keyboardVerticalOffset={0}
-        >
-          <View style={{ flex: 1, justifyContent: tablet ? 'center' : 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
-            <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, borderBottomLeftRadius: tablet ? 20 : 0, borderBottomRightRadius: tablet ? 20 : 0, maxHeight: tablet ? '85%' : '90%', width: '100%', maxWidth: tablet ? 700 : undefined, alignSelf: 'center', padding: responsivePadding(20) }}>
-              <ScrollView 
-                showsVerticalScrollIndicator={false} 
-                contentContainerStyle={{ paddingBottom: spacing['2xl'] }}
-                keyboardShouldPersistTaps="handled"
-                automaticallyAdjustKeyboardInsets={true}
-                keyboardDismissMode="on-drag"
+        <View style={{ flex: 1, justifyContent: tablet ? 'center' : 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+            <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, borderBottomLeftRadius: tablet ? 20 : 0, borderBottomRightRadius: tablet ? 20 : 0, maxHeight: tablet ? '85%' : '90%', width: '100%', maxWidth: tablet ? 700 : undefined, alignSelf: 'center', overflow: 'hidden' }}>
+              <KeyboardAwareModal
+                contentContainerStyle={{ padding: responsivePadding(20) }}
+                extraScrollHeight={40}
               >
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg }}>
                 <Text style={{ fontSize: responsiveFont(20), fontWeight: 'bold', color: colors.text }}>
@@ -815,10 +794,9 @@ export default function ManualAttendanceScreen({ navigation }) {
                   </Text>
                 </TouchableOpacity>
               </View>
-              </ScrollView>
+              </KeyboardAwareModal>
             </View>
           </View>
-        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

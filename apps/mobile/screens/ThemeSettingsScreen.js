@@ -9,10 +9,8 @@ import {
   Alert,
   ActivityIndicator,
   Modal,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
-import { getKeyboardAvoidingBehavior, formScrollViewProps } from '../shared/components/KeyboardAwareScreen';
+import { KeyboardAwareModal } from '../shared/components/KeyboardAwareScreen';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../core/contexts/AuthContext';
@@ -539,7 +537,6 @@ export default function ThemeSettingsScreen({ navigation, route }) {
           setShowPasswordModal(false);
         }}
       >
-        <KeyboardAvoidingView behavior={getKeyboardAvoidingBehavior({ inModal: true })} style={{ flex: 1 }}>
         <View
           style={{
             flex: 1,
@@ -552,15 +549,13 @@ export default function ThemeSettingsScreen({ navigation, route }) {
               backgroundColor: colors.surface,
               borderTopLeftRadius: 24,
               borderTopRightRadius: 24,
-              padding: 24,
               maxHeight: '90%',
+              overflow: 'hidden',
             }}
           >
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              automaticallyAdjustKeyboardInsets={true}
-              keyboardDismissMode="on-drag"
+            <KeyboardAwareModal
+              contentContainerStyle={{ padding: 24 }}
+              extraScrollHeight={40}
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
                 <Text
@@ -785,10 +780,9 @@ export default function ThemeSettingsScreen({ navigation, route }) {
                   )}
                 </TouchableOpacity>
               </View>
-            </ScrollView>
+            </KeyboardAwareModal>
           </View>
         </View>
-        </KeyboardAvoidingView>
       </Modal>
     </ScrollView>
   );

@@ -1,14 +1,15 @@
 import { cn } from '../lib/cn';
 
-export function GlassCard({ children, className = '', hover = true }) {
+/**
+ * The standard surface: white, 20px radius, hairline border, near-invisible
+ * resting shadow that lifts on hover.
+ *
+ * Remaining props land on the element, so a card can also be a click target
+ * without a wrapper element swallowing the handler.
+ */
+export function GlassCard({ children, className = '', hover = true, ...props }) {
   return (
-    <div
-      className={cn(
-        'rounded-card border border-[#2A2E35] bg-[#1A1D21]/80 backdrop-blur-xl shadow-glass',
-        hover && 'transition-all duration-200 hover:-translate-y-0.5 hover:border-[#A0EBCF]/25 hover:shadow-glow',
-        className
-      )}
-    >
+    <div className={cn('ui-card', hover && 'ui-card-interactive', className)} {...props}>
       {children}
     </div>
   );

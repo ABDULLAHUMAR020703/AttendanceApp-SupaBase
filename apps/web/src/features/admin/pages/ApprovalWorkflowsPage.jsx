@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
+import { ListChecks } from 'lucide-react';
 import { GlassCard } from '../../../shared/components/GlassCard';
 import { adminService } from '../services/adminService';
+import { EmptyStateBody } from '../../../shared/components/ui/EmptyState';
+import { SkeletonCardList } from '../../../shared/components/ui/Skeleton';
 
 const REQUEST_TYPE_LABELS = {
   annual_leave: 'Annual Leave',
@@ -103,16 +106,17 @@ export function ApprovalWorkflowsPage() {
         <p className="text-sm text-slate-300 mt-1">Configure multi-level approval chains per request type. Drag steps to reorder.</p>
       </div>
 
-      <GlassCard className="p-4 flex flex-wrap gap-2">
+      <GlassCard className="ui-toolbar p-4 flex flex-wrap gap-2">
         {Object.entries(REQUEST_TYPE_LABELS).map(([type, label]) => (
           <button
             key={type}
             type="button"
             onClick={() => setSelectedType(type)}
-            className={`rounded-lg px-3 py-2 text-sm border transition-all ${
+            aria-pressed={selectedType === type}
+            className={`rounded-xl border px-3 py-2 text-sm transition-colors duration-200 ${
               selectedType === type
-                ? 'border-blue-300/40 bg-blue-500/25 text-blue-100'
-                : 'border-white/15 bg-white/5 text-slate-300 hover:bg-white/10'
+                ? 'border-accent-200 bg-accent-100 font-semibold text-accent-800'
+                : 'border-hairline bg-white text-ink-muted hover:border-accent-200 hover:bg-accent-50 hover:text-accent-800'
             }`}
           >
             {label}
@@ -129,13 +133,24 @@ export function ApprovalWorkflowsPage() {
       <GlassCard className="p-5 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-medium text-white">{REQUEST_TYPE_LABELS[selectedType]} chain</h2>
-          <button type="button" onClick={addStep} className="text-sm text-blue-200 hover:text-blue-100 underline">+ Add step</button>
+          <button type="button" onClick={addStep} className="ui-btn-secondary ui-btn-sm">+ Add step</button>
         </div>
 
         {loading ? (
-          <div className="h-24 skeleton rounded-xl" />
+          <SkeletonCardList count={3} />
         ) : steps.length === 0 ? (
-          <p className="text-sm text-slate-400">No steps configured. Add steps or save to load defaults.</p>
+          <EmptyStateBody
+            size="sm"
+            icon={ListChecks}
+            title="No approval steps yet"
+            description="Add the approvers this request type has to pass through, in order. Saving with none loads the defaults."
+            action={
+              <button type="button" onClick={addStep} className="ui-btn-secondary ui-btn-sm">
+                Add first step
+              </button>
+            }
+            className="py-8"
+          />
         ) : (
           <ul className="space-y-2">
             {steps.map((step, index) => (
@@ -145,25 +160,25 @@ export function ApprovalWorkflowsPage() {
                 onDragStart={() => setDragIndex(index)}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={() => { moveStep(dragIndex, index); setDragIndex(null); }}
-                className="flex flex-wrap items-center gap-3 rounded-lg border border-white/15 bg-white/5 px-4 py-3 cursor-grab active:cursor-grabbing"
+                className="flex cursor-grab flex-wrap items-center gap-3 rounded-xl border border-hairline bg-accent-50 px-4 py-3 active:cursor-grabbing"
               >
-                <span className="text-xs text-slate-400 w-8">#{index + 1}</span>
+                <span className="w-8 text-xs font-semibold text-ink-muted">#{index + 1}</span>
                 <input
                   value={step.step_label}
                   onChange={(e) => setSteps((prev) => prev.map((s, i) => i === index ? { ...s, step_label: e.target.value } : s))}
-                  className="flex-1 min-w-[120px] rounded border border-white/20 bg-white/10 px-2 py-1.5 text-sm text-slate-100"
+                  className="ui-input min-w-[120px] flex-1"
                   placeholder="Step label"
                 />
                 <select
                   value={step.approver_role}
                   onChange={(e) => setSteps((prev) => prev.map((s, i) => i === index ? { ...s, approver_role: e.target.value } : s))}
-                  className="rounded border border-white/20 bg-white/10 px-2 py-1.5 text-sm text-slate-100"
+                  className="ui-select w-auto"
                 >
                   {Object.entries(APPROVER_ROLE_LABELS).map(([value, label]) => (
-                    <option key={value} value={value} className="bg-slate-800">{label}</option>
+                    <option key={value} value={value}>{label}</option>
                   ))}
                 </select>
-                <button type="button" onClick={() => removeStep(index)} className="text-xs text-red-300 hover:text-red-200">Remove</button>
+                <button type="button" onClick={() => removeStep(index)} className="text-xs font-semibold text-red-600 hover:text-red-700">Remove</button>
               </li>
             ))}
           </ul>
@@ -173,7 +188,7 @@ export function ApprovalWorkflowsPage() {
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="rounded-lg border border-blue-300/30 bg-blue-500/20 px-4 py-2 text-sm font-medium text-blue-100 hover:bg-blue-500/35 disabled:opacity-50"
+          className="ui-btn-primary ui-btn-sm"
         >
           {saving ? 'Saving…' : 'Save workflow'}
         </button>

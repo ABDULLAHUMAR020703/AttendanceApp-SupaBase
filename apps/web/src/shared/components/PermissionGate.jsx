@@ -1,36 +1,32 @@
-import { useAuthStore } from '../../features/auth/store/authStore';
 import { hasAnyPermission, hasPermission } from '../../features/admin/permissions';
+import { useAuthStore } from '../../features/auth/store/authStore';
 import { GlassCard } from './GlassCard';
 
-export function AccessDenied() {
+export function AccessDenied({ className = '' }) {
   return (
-    <div className="min-h-[50vh] grid place-items-center">
-      <GlassCard className="max-w-md p-6 text-center">
-        <h1 className="text-xl font-semibold text-white">Access Denied</h1>
-        <p className="mt-2 text-sm text-slate-200">
-          You do not have permission to access this feature.
-        </p>
-      </GlassCard>
-    </div>
+    <GlassCard className={`max-w-md p-6 text-center ${className}`}>
+      <h1 className="text-xl font-semibold text-ink">Access Denied</h1>
+      <p className="mt-2 text-sm text-ink-muted">
+        You do not have permission to view this section. Contact your administrator if you believe this is incorrect.
+      </p>
+    </GlassCard>
   );
 }
 
 export function usePermission(permission) {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
+  if (!permission) return true;
   return hasPermission(user, permission);
 }
 
 export function useAnyPermission(permissions = []) {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
+  if (!permissions?.length) return true;
   return hasAnyPermission(user, permissions);
 }
 
-export function PermissionGate({ permission, anyOf, children, fallback = null }) {
-  const { user } = useAuthStore();
-  const allowed = permission
-    ? hasPermission(user, permission)
-    : hasAnyPermission(user, anyOf || []);
-
-  if (!allowed) return fallback;
+export function PermissionGate({ permission, anyOf, fallback = null, children }) {
+  const canAccess = anyOf?.length ? useAnyPermission(anyOf) : usePermission(permission);
+  if (!canAccess) return fallback || <AccessDenied />;
   return children;
 }

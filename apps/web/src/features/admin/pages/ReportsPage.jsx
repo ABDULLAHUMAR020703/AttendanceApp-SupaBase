@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Download, Eye, FileText, Send, Trash2, X } from 'lucide-react';
 import { GlassCard } from '../../../shared/components/GlassCard';
-import { GlassTable } from '../../../shared/components/GlassTable';
+import { GlassTable, TableActions, TableCell, TableRow } from '../../../shared/components/GlassTable';
+import { Button } from '../../../shared/components/ui/Button';
+import { StatusBadge } from '../../../shared/components/ui/Badge';
+import { EmptyStateBody } from '../../../shared/components/ui/EmptyState';
+import { SkeletonFeed, SkeletonForm } from '../../../shared/components/ui/Skeleton';
 import { PermissionGate } from '../../../shared/components/PermissionGate';
 import { adminService } from '../services/adminService';
 import { PERMISSIONS } from '../permissions';
@@ -52,21 +57,6 @@ function formatFileSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function StatusBadge({ status }) {
-  const styles = {
-    completed: 'bg-green-500/20 text-green-100 border-green-300/30',
-    sent: 'bg-green-500/20 text-green-100 border-green-300/30',
-    not_sent: 'bg-slate-500/20 text-slate-200 border-slate-300/20',
-    failed: 'bg-red-500/20 text-red-100 border-red-300/30',
-    skipped: 'bg-amber-500/20 text-amber-100 border-amber-300/30',
-  };
-  const cls = styles[status] || styles.not_sent;
-  return (
-    <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs capitalize ${cls}`}>
-      {(status || 'unknown').replace(/_/g, ' ')}
-    </span>
-  );
-}
 
 function Spinner() {
   return (
@@ -346,7 +336,7 @@ export function ReportsPage() {
               <select
                 value={reportRange}
                 onChange={(e) => setReportRange(e.target.value)}
-                className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-300/40"
+                className="ui-select"
               >
                 {RANGE_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value} className="bg-slate-800">{opt.label}</option>
@@ -359,47 +349,36 @@ export function ReportsPage() {
                 <div className="flex flex-col gap-1">
                   <label className="text-xs text-slate-300">From</label>
                   <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)}
-                    className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-slate-100" />
+                    className="ui-input" />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-xs text-slate-300">To</label>
                   <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)}
-                    className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-slate-100" />
+                    className="ui-input" />
                 </div>
               </>
             )}
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <button onClick={handleGeneratePdf} disabled={busy}
-              className="flex items-center gap-2 rounded-lg border border-blue-300/30 bg-blue-500/20 px-4 py-2 text-sm font-medium text-blue-100 hover:bg-blue-500/35 disabled:opacity-50 transition-all">
-              {generating ? <Spinner /> : (
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                  <polyline points="14 2 14 8 20 8" />
-                </svg>
-              )}
-              {generating ? 'Generating…' : 'Generate PDF'}
-            </button>
+            <Button onClick={handleGeneratePdf} disabled={busy} loading={generating}>
+              <FileText strokeWidth={2} aria-hidden />
+              Generate PDF
+            </Button>
 
-            <button onClick={handleGenerateAndEmail} disabled={busy}
-              className="flex items-center gap-2 rounded-lg border border-emerald-300/30 bg-emerald-500/20 px-4 py-2 text-sm font-medium text-emerald-100 hover:bg-emerald-500/35 disabled:opacity-50 transition-all">
-              {emailing ? <Spinner /> : (
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
-                  <path d="M22 2 11 13" /><path d="m22 2-7 20-4-9-9-4 20-7z" />
-                </svg>
-              )}
-              {emailing ? 'Processing…' : 'Generate & Email Report'}
-            </button>
+            <Button variant="secondary" onClick={handleGenerateAndEmail} disabled={busy} loading={emailing}>
+              <Send strokeWidth={2} aria-hidden />
+              Generate &amp; Email Report
+            </Button>
 
             {latestReport && (
               <>
                 <button onClick={() => handlePreview(latestReport.reportId)} disabled={!!rowAction}
-                  className="flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm text-slate-200 hover:bg-white/15 disabled:opacity-50 transition-all">
+                  className="ui-btn-secondary ui-btn-sm">
                   Preview Report
                 </button>
                 <button onClick={() => handleDownload(latestReport)} disabled={!!rowAction}
-                  className="flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm text-slate-200 hover:bg-white/15 disabled:opacity-50 transition-all">
+                  className="ui-btn-secondary ui-btn-sm">
                   Download Latest
                 </button>
               </>
@@ -422,7 +401,7 @@ export function ReportsPage() {
           </div>
 
           {scheduleLoading ? (
-            <div className="h-24 rounded-xl skeleton" />
+            <SkeletonForm fields={3} />
           ) : (
             <div className="space-y-5">
               <div className="flex flex-wrap items-center gap-4">
@@ -432,7 +411,7 @@ export function ReportsPage() {
                     role="switch"
                     aria-checked={autoSend}
                     onClick={() => setAutoSend((v) => !v)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${autoSend ? 'bg-blue-500' : 'bg-white/20'}`}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-fast ease-premium ${autoSend ? 'bg-accent-600' : 'bg-surface-sunken'}`}
                   >
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${autoSend ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
@@ -446,7 +425,7 @@ export function ReportsPage() {
                   <select
                     value={frequency}
                     onChange={(e) => setFrequency(e.target.value)}
-                    className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-slate-100"
+                    className="ui-select w-full"
                   >
                     {FREQUENCY_OPTIONS.map((f) => (
                       <option key={f.value} value={f.value} className="bg-slate-800">{f.label}</option>
@@ -460,7 +439,7 @@ export function ReportsPage() {
                     <select
                       value={scheduleDay}
                       onChange={(e) => setScheduleDay(Number(e.target.value))}
-                      className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-slate-100"
+                      className="ui-select w-full"
                     >
                       {DAY_OPTIONS.map((d) => (
                         <option key={d} value={d} className="bg-slate-800">{ordinal(d)}</option>
@@ -483,12 +462,12 @@ export function ReportsPage() {
                     onChange={(e) => { setNewRecipientEmail(e.target.value); setRecipientError(''); }}
                     onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addRecipientEmail(); } }}
                     placeholder="name@company.com"
-                    className="flex-1 min-w-0 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
+                    className="ui-input flex-1 min-w-0"
                   />
                   <button
                     type="button"
                     onClick={addRecipientEmail}
-                    className="shrink-0 rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm text-slate-200 hover:bg-white/15"
+                    className="ui-btn-secondary ui-btn-sm shrink-0"
                   >
                     Add email
                   </button>
@@ -497,18 +476,18 @@ export function ReportsPage() {
 
                 <div className="flex flex-wrap gap-2">
                   {customRecipients.length === 0 ? (
-                    <p className="text-xs text-slate-400">No additional recipients. Add emails above and save.</p>
+                    <p className="text-caption text-ink-muted">No additional recipients. Add emails above and save.</p>
                   ) : (
                     customRecipients.map((email) => (
-                      <span key={email} className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs text-slate-200">
+                      <span key={email} className="ui-badge ui-badge-lg ui-badge-neutral pr-1">
                         {email}
                         <button
                           type="button"
                           onClick={() => removeRecipientEmail(email)}
-                          className="text-slate-400 hover:text-red-300"
+                          className="grid h-4 w-4 place-items-center rounded-full text-ink-muted transition-colors duration-fast hover:bg-danger-surface hover:text-danger-ink"
                           aria-label={`Remove ${email}`}
                         >
-                          ×
+                          <X className="h-3 w-3" strokeWidth={2.5} aria-hidden />
                         </button>
                       </span>
                     ))
@@ -524,14 +503,9 @@ export function ReportsPage() {
               </div>
 
               <div className="flex flex-wrap gap-3">
-                <button
-                  onClick={handleSaveSchedule}
-                  disabled={scheduleSaving}
-                  className="flex items-center gap-2 rounded-lg border border-blue-300/30 bg-blue-500/20 px-4 py-2 text-sm font-medium text-blue-100 hover:bg-blue-500/35 disabled:opacity-50 transition-all"
-                >
-                  {scheduleSaving ? <Spinner /> : null}
-                  {scheduleSaving ? 'Saving…' : 'Save Schedule'}
-                </button>
+                <Button onClick={handleSaveSchedule} loading={scheduleSaving}>
+                  Save Schedule
+                </Button>
               </div>
             </div>
           )}
@@ -578,28 +552,38 @@ export function ReportsPage() {
               <p className="text-xs text-slate-300 mt-1">Recent scheduled and manual email deliveries.</p>
             </div>
             <button onClick={loadDeliveryLogs} disabled={deliveryLogsLoading}
-              className="text-xs text-blue-200 hover:text-blue-100 underline disabled:opacity-50">
+              className="ui-btn-secondary ui-btn-sm">
               Refresh
             </button>
           </div>
 
           {deliveryLogsLoading ? (
-            <div className="h-20 rounded-xl skeleton" />
+            <SkeletonFeed count={3} />
           ) : deliveryLogs.length === 0 ? (
-            <p className="text-sm text-slate-400 py-4 text-center">No delivery logs yet.</p>
+            <EmptyStateBody
+              size="sm"
+              icon={Send}
+              title="No deliveries yet"
+              description="Once a report is emailed — on schedule or on demand — every attempt is logged here with its recipients."
+              className="py-8"
+            />
           ) : (
-            <div className="space-y-2 max-h-64 overflow-y-auto">
+            <div className="max-h-64 space-y-2 overflow-y-auto">
               {deliveryLogs.map((log) => (
-                <div key={log.id} className="rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-xs">
+                <div key={log.id} className="rounded-xl border border-hairline bg-surface-subtle px-4 py-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <StatusBadge status={log.status} />
-                    <span className="text-slate-400">{formatDateTime(log.created_at)}</span>
+                    <span className="text-caption text-ink-muted">{formatDateTime(log.created_at)}</span>
                   </div>
-                  {log.report_period && <p className="text-slate-300 mt-1">{log.report_period}</p>}
+                  {log.report_period && <p className="mt-1.5 text-caption text-ink">{log.report_period}</p>}
                   {log.recipients?.length > 0 && (
-                    <p className="text-slate-400 mt-1 break-words">To: {Array.isArray(log.recipients) ? log.recipients.join(', ') : log.recipients}</p>
+                    <p className="mt-1 break-words text-caption text-ink-muted">
+                      To: {Array.isArray(log.recipients) ? log.recipients.join(', ') : log.recipients}
+                    </p>
                   )}
-                  {log.error_message && <p className="text-red-300 mt-1">{log.error_message}</p>}
+                  {log.error_message && (
+                    <p className="mt-1.5 text-caption font-medium text-danger-ink">{log.error_message}</p>
+                  )}
                 </div>
               ))}
             </div>
@@ -614,53 +598,62 @@ export function ReportsPage() {
               <p className="text-xs text-slate-300 mt-1">Previously generated reports for your company.</p>
             </div>
             <button onClick={loadHistory} disabled={historyLoading}
-              className="text-xs text-blue-200 hover:text-blue-100 underline disabled:opacity-50">
+              className="ui-btn-secondary ui-btn-sm">
               Refresh
             </button>
           </div>
 
-          {historyLoading ? (
-            <div className="h-32 rounded-xl skeleton" />
-          ) : history.length === 0 ? (
-            <p className="text-sm text-slate-400 py-6 text-center">No reports generated yet.</p>
-          ) : (
-            <GlassTable columns={[
-              { key: 'id', label: 'Report ID' },
-              { key: 'company', label: 'Company' },
-              { key: 'by', label: 'Generated By' },
-              { key: 'at', label: 'Generated At' },
+          <GlassTable
+            loading={historyLoading}
+            skeletonRows={4}
+            emptyIcon={FileText}
+            emptyTitle="No reports yet"
+            emptyMessage="Generated reports will appear here with their delivery status."
+            columns={[
+              { key: 'id', label: 'Report', className: 'w-40' },
+              { key: 'by', label: 'Generated by' },
+              { key: 'at', label: 'Generated at' },
               { key: 'type', label: 'Type' },
               { key: 'status', label: 'Status' },
               { key: 'size', label: 'PDF' },
               { key: 'email', label: 'Email' },
-              { key: 'actions', label: 'Actions' },
-            ]}>
-              {history.map((r) => (
-                <tr key={r.reportId} className="border-b border-white/5 hover:bg-white/5">
-                  <td className="p-3 font-mono text-xs text-slate-300">{r.reportId.slice(0, 8)}…</td>
-                  <td className="p-3">{r.companyName}</td>
-                  <td className="p-3 text-slate-300">{r.generatedBy}</td>
-                  <td className="p-3 text-slate-300 text-xs">{formatDateTime(r.generatedAt)}</td>
-                  <td className="p-3 capitalize">{r.reportType}</td>
-                  <td className="p-3"><StatusBadge status={r.generationStatus} /></td>
-                  <td className="p-3 text-slate-300">{formatFileSize(r.fileSize)}</td>
-                  <td className="p-3"><StatusBadge status={r.emailStatus} /></td>
-                  <td className="p-3">
-                    <div className="flex flex-wrap gap-2">
-                      <button onClick={() => handlePreview(r.reportId)} disabled={rowAction === r.reportId}
-                        className="text-xs text-blue-200 hover:text-blue-100 underline disabled:opacity-50">View</button>
-                      <button onClick={() => handleDownload(r)} disabled={rowAction === r.reportId}
-                        className="text-xs text-blue-200 hover:text-blue-100 underline disabled:opacity-50">Download</button>
-                      <button onClick={() => handleResend(r.reportId)} disabled={rowAction === r.reportId}
-                        className="text-xs text-emerald-200 hover:text-emerald-100 underline disabled:opacity-50">Resend</button>
-                      <button onClick={() => handleDelete(r.reportId)} disabled={rowAction === r.reportId}
-                        className="text-xs text-red-300 hover:text-red-200 underline disabled:opacity-50">Delete</button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </GlassTable>
-          )}
+              { key: 'actions', label: <span className="sr-only">Actions</span>, className: 'w-16' },
+            ]}
+          >
+            {history.map((r) => (
+              <TableRow key={r.reportId}>
+                <TableCell>
+                  <span className="font-mono text-caption text-ink-muted">{r.reportId.slice(0, 8)}…</span>
+                  <span className="block truncate text-caption text-ink-faint">{r.companyName}</span>
+                </TableCell>
+                <TableCell className="text-ink-muted">{r.generatedBy}</TableCell>
+                <TableCell className="whitespace-nowrap text-caption text-ink-muted">
+                  {formatDateTime(r.generatedAt)}
+                </TableCell>
+                <TableCell className="capitalize">{r.reportType}</TableCell>
+                <TableCell><StatusBadge status={r.generationStatus} /></TableCell>
+                <TableCell className="text-ink-muted">{formatFileSize(r.fileSize)}</TableCell>
+                <TableCell><StatusBadge status={r.emailStatus} /></TableCell>
+                <TableCell>
+                  <TableActions
+                    label={`Actions for report ${r.reportId.slice(0, 8)}`}
+                    items={[
+                      { label: 'View', icon: Eye, disabled: rowAction === r.reportId, onClick: () => handlePreview(r.reportId) },
+                      { label: 'Download', icon: Download, disabled: rowAction === r.reportId, onClick: () => handleDownload(r) },
+                      { label: 'Resend email', icon: Send, disabled: rowAction === r.reportId, onClick: () => handleResend(r.reportId) },
+                      {
+                        label: 'Delete',
+                        icon: Trash2,
+                        tone: 'danger',
+                        disabled: rowAction === r.reportId,
+                        onClick: () => handleDelete(r.reportId),
+                      },
+                    ]}
+                  />
+                </TableCell>
+              </TableRow>
+            ))}
+          </GlassTable>
         </GlassCard>
       </PermissionGate>
     </div>

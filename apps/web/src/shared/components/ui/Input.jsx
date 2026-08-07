@@ -1,13 +1,62 @@
 import { cn } from '../../lib/cn';
+import { Field, fieldId } from './Field';
 
-export function Input({ label, error, hint, className = '', id, ...props }) {
-  const inputId = id || label?.toLowerCase?.().replace(/\s+/g, '-');
+const SIZES = {
+  sm: 'ui-input-sm',
+  md: '',
+  lg: 'ui-input-lg',
+};
+
+/**
+ * Labelled text field. `icon` renders a leading 16px glyph inside the control;
+ * `trailing` slots an adornment (unit, toggle) on the right.
+ */
+export function Input({
+  label,
+  error,
+  hint,
+  icon,
+  trailing,
+  size = 'md',
+  optional,
+  className = '',
+  id,
+  required,
+  ...props
+}) {
+  const inputId = fieldId(id, label);
+  const describedBy = error ? `${inputId}-error` : hint ? `${inputId}-hint` : undefined;
+
   return (
-    <label className="block" htmlFor={inputId}>
-      {label && <span className="ui-label">{label}</span>}
-      <input id={inputId} className={cn('ui-input', error && 'border-red-400/50 focus:ring-red-400/30', className)} {...props} />
-      {error && <p className="mt-1 text-xs text-red-300" role="alert">{error}</p>}
-      {hint && !error && <p className="mt-1 text-xs text-slate-400">{hint}</p>}
-    </label>
+    <Field id={inputId} label={label} required={required} optional={optional} error={error} hint={hint}>
+      <div className="relative">
+        {icon && (
+          <span
+            className="pointer-events-none absolute left-3.5 top-1/2 grid h-4 w-4 -translate-y-1/2 place-items-center text-ink-faint"
+            aria-hidden
+          >
+            {icon}
+          </span>
+        )}
+        <input
+          id={inputId}
+          required={required}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={describedBy}
+          className={cn(
+            'ui-input',
+            SIZES[size],
+            icon && 'ui-input-icon',
+            trailing && 'pr-11',
+            error && 'ui-input-invalid',
+            className
+          )}
+          {...props}
+        />
+        {trailing && (
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-caption text-ink-muted">{trailing}</span>
+        )}
+      </div>
+    </Field>
   );
 }

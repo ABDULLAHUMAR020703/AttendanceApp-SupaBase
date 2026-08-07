@@ -66,7 +66,7 @@ export const DepartmentBarChart = memo(function DepartmentBarChart({
         />
         <Tooltip
           content={<DepartmentTooltipContent />}
-          cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+          cursor={{ fill: 'rgba(199, 239, 245, 0.35)' }}
           wrapperStyle={CHART_TOOLTIP_STYLE}
         />
         <Legend
@@ -77,7 +77,7 @@ export const DepartmentBarChart = memo(function DepartmentBarChart({
           dataKey="total"
           name="total"
           fill={CHART_COLORS.primary}
-          radius={[4, 4, 0, 0]}
+          radius={[6, 6, 0, 0]}
           animationDuration={CHART_ANIMATION.duration}
           animationEasing={CHART_ANIMATION.easing}
           onClick={handleBarClick}
@@ -87,7 +87,7 @@ export const DepartmentBarChart = memo(function DepartmentBarChart({
           dataKey="active"
           name="active"
           fill={CHART_COLORS.secondary}
-          radius={[4, 4, 0, 0]}
+          radius={[6, 6, 0, 0]}
           animationDuration={CHART_ANIMATION.duration}
           animationEasing={CHART_ANIMATION.easing}
           onClick={handleBarClick}

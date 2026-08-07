@@ -13,6 +13,29 @@
 import { ROUTES } from '../shared/constants/routes';
 
 /**
+ * Resolve the leave request UUID from a notification payload.
+ * Leave creates store it as `requestId`; tolerate alternate keys from older payloads.
+ * Never treat the notification row id as the leave request id.
+ */
+export const extractLeaveRequestId = (notificationData = {}) => {
+  if (!notificationData || typeof notificationData !== 'object') return null;
+  const candidates = [
+    notificationData.requestId,
+    notificationData.leaveRequestId,
+    notificationData.leave_request_id,
+    notificationData.request_id,
+    notificationData.navigation?.params?.leaveRequestId,
+    notificationData.navigation?.params?.requestId,
+  ];
+  for (const value of candidates) {
+    if (value == null || value === '') continue;
+    const id = String(value).trim();
+    if (id) return id;
+  }
+  return null;
+};
+
+/**
  * Role-based route mapping
  * Maps notification types to screens based on user role
  */
@@ -78,11 +101,30 @@ const ROLE_ROUTE_MAP = {
  * @returns {Object|null} { screen, params } or null if no route
  */
 export const getNotificationRoute = (notificationType, userRole, notificationData = {}) => {
+  const leaveRequestId = extractLeaveRequestId(notificationData);
+
   // First, check if notification has explicit navigation data
   if (notificationData?.navigation) {
     const { screen, params } = notificationData.navigation;
     if (screen) {
-      return { screen, params: params || {} };
+      const mergedParams = { ...(params || {}) };
+      // Always preserve the leave request id — payload.requestId was previously dropped here.
+      if (
+        leaveRequestId &&
+        (notificationType === 'leave_request' ||
+          mergedParams.initialTab === 'leaves' ||
+          mergedParams.openLeaveRequests)
+      ) {
+        mergedParams.leaveRequestId = leaveRequestId;
+        mergedParams.requestId = leaveRequestId;
+        mergedParams.initialTab = mergedParams.initialTab || 'leaves';
+        mergedParams.openLeaveRequests = true;
+      }
+      const normalizedScreen =
+        screen === 'HRDashboard' || screen === ROUTES.HR_DASHBOARD
+          ? ROUTES.HR_DASHBOARD
+          : screen;
+      return { screen: normalizedScreen, params: mergedParams };
     }
   }
   
@@ -103,32 +145,24 @@ export const getNotificationRoute = (notificationType, userRole, notificationDat
     return null;
   }
   
-  // Build params based on notification type and data
-  const params = buildRouteParams(notificationType, notificationData, userRole);
+  const params = buildRouteParams(notificationType, notificationData, userRole, leaveRequestId);
   
   return { screen: targetScreen, params };
 };
 
 /**
  * Build route parameters based on notification type
- * @param {string} notificationType - Type of notification
- * @param {Object} notificationData - Notification data
- * @param {string} userRole - User's role
- * @returns {Object} Route parameters
  */
-const buildRouteParams = (notificationType, notificationData, userRole) => {
+const buildRouteParams = (notificationType, notificationData, userRole, leaveRequestId = null) => {
   const baseParams = {};
   
-  // Add user to params if available
   if (notificationData.user) {
     baseParams.user = notificationData.user;
   }
   
-  // Type-specific params
   switch (notificationType) {
     case 'ticket_created':
     case 'ticket_assigned':
-      // For HR Dashboard, open tickets tab and optionally highlight specific ticket
       if (userRole === 'manager' || userRole === 'super_admin') {
         baseParams.initialTab = 'tickets';
         if (notificationData.ticketId) {
@@ -142,24 +176,27 @@ const buildRouteParams = (notificationType, notificationData, userRole) => {
       if (notificationData.ticketId) {
         baseParams.ticketId = notificationData.ticketId;
       }
-      // For HR Dashboard, open tickets tab
       if (userRole === 'manager' || userRole === 'super_admin') {
         baseParams.initialTab = 'tickets';
       }
       break;
       
     case 'leave_request':
-      // For HR Dashboard, open leave requests tab
       if (userRole === 'manager' || userRole === 'super_admin') {
         baseParams.initialTab = 'leaves';
         baseParams.openLeaveRequests = true;
+        if (leaveRequestId) {
+          baseParams.leaveRequestId = leaveRequestId;
+          baseParams.requestId = leaveRequestId;
+        }
       }
       break;
       
     case 'leave_approved':
     case 'leave_rejected':
-      // For employees, just navigate to leave request screen
-      // User is already in context
+      if (leaveRequestId) {
+        baseParams.leaveRequestId = leaveRequestId;
+      }
       break;
       
     default:
@@ -216,7 +253,9 @@ export const handleNotificationNavigation = async (
     console.log(`[NotificationNav] Handling notification:`, {
       type: notificationType,
       role: userRole,
-      hasNavData: !!notificationData.navigation
+      hasNavData: !!notificationData.navigation,
+      leaveRequestId: extractLeaveRequestId(notificationData),
+      notificationRowId: notification.id,
     });
   }
   

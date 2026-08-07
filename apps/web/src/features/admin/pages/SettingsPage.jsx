@@ -3,6 +3,7 @@ import { GlassCard } from '../../../shared/components/GlassCard';
 import { PermissionGate } from '../../../shared/components/PermissionGate';
 import { adminService } from '../services/adminService';
 import { PERMISSIONS } from '../permissions';
+import { SkeletonForm } from '../../../shared/components/ui/Skeleton';
 
 const SECTIONS = [
   { id: 'company', label: 'Company' },
@@ -21,11 +22,11 @@ function SectionFields({ section, values, onChange }) {
   if (!values) return null;
   const field = (key, label, type = 'text') => (
     <label key={key} className="flex flex-col gap-1 text-sm">
-      <span className="text-slate-400 text-xs">{label}</span>
+      <span className="text-xs font-medium text-ink-muted">{label}</span>
       {type === 'checkbox' ? (
         <input type="checkbox" checked={!!values[key]} onChange={(e) => onChange(key, e.target.checked)} className="h-4 w-4" />
       ) : (
-        <input type={type} value={values[key] ?? ''} onChange={(e) => onChange(key, type === 'number' ? Number(e.target.value) : e.target.value)} className="rounded border border-white/20 bg-white/10 px-3 py-2 text-slate-100" />
+        <input type={type} value={values[key] ?? ''} onChange={(e) => onChange(key, type === 'number' ? Number(e.target.value) : e.target.value)} className="ui-input" />
       )}
     </label>
   );
@@ -174,7 +175,12 @@ export function SettingsPage() {
                 key={s.id}
                 type="button"
                 onClick={() => setActive(s.id)}
-                className={`w-full text-left rounded-lg px-3 py-2 text-sm ${active === s.id ? 'bg-blue-500/20 text-blue-100' : 'text-slate-300 hover:bg-white/10'}`}
+                aria-current={active === s.id ? 'true' : undefined}
+                className={`w-full rounded-xl px-3 py-2 text-left text-sm transition-colors duration-200 ${
+                  active === s.id
+                    ? 'bg-accent-100 font-semibold text-accent-800'
+                    : 'text-ink-muted hover:bg-accent-50 hover:text-accent-800'
+                }`}
               >
                 {s.label}
               </button>
@@ -184,13 +190,13 @@ export function SettingsPage() {
           <GlassCard className="p-5 lg:col-span-3 space-y-4">
             <h2 className="text-base font-medium text-white capitalize">{active} settings</h2>
             {loading ? (
-              <div className="h-32 skeleton rounded-lg" />
+              <SkeletonForm fields={4} />
             ) : (
               <>
                 <SectionFields section={active} values={draft} onChange={onFieldChange} />
                 <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={save} disabled={saving} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white disabled:opacity-50">Save</button>
-                  <button type="button" onClick={resetSection} disabled={saving} className="rounded-lg border border-white/20 px-4 py-2 text-sm text-slate-200">Reset</button>
+                  <button type="button" onClick={save} disabled={saving} className="ui-btn-primary ui-btn-sm">Save</button>
+                  <button type="button" onClick={resetSection} disabled={saving} className="ui-btn-secondary ui-btn-sm">Reset</button>
                 </div>
               </>
             )}

@@ -10,10 +10,8 @@ import {
   RefreshControl,
   Modal,
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
-import { getKeyboardAvoidingBehavior, formScrollViewProps } from '../shared/components/KeyboardAwareScreen';
+import { KeyboardAwareModal, formScrollViewProps } from '../shared/components/KeyboardAwareScreen';
 import { Ionicons } from '@expo/vector-icons';
 import {
   getTicketById,
@@ -713,9 +711,7 @@ function TicketManagementDetail({ navigation, user, initialTicket, onBack }) {
       ) : null}
       <ScrollView
         style={{ flex: 1 }}
-        keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets={true}
-        keyboardDismissMode="on-drag"
+        {...formScrollViewProps}
         refreshControl={
           <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
         }
@@ -1057,14 +1053,11 @@ function TicketManagementDetail({ navigation, user, initialTicket, onBack }) {
         animationType="slide"
         onRequestClose={() => setShowResponseModal(false)}
       >
-        <KeyboardAvoidingView behavior={getKeyboardAvoidingBehavior({ inModal: true })} style={{ flex: 1 }}>
         <View style={{ flex: 1, justifyContent: tablet ? 'center' : 'flex-end', backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
-          <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderBottomLeftRadius: tablet ? 24 : 0, borderBottomRightRadius: tablet ? 24 : 0, padding: 24, width: '100%', maxWidth: tablet ? 700 : undefined, alignSelf: 'center', maxHeight: '90%' }}>
-            <ScrollView
-              keyboardShouldPersistTaps="handled"
-              automaticallyAdjustKeyboardInsets={true}
-              keyboardDismissMode="on-drag"
-              showsVerticalScrollIndicator={false}
+          <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderBottomLeftRadius: tablet ? 24 : 0, borderBottomRightRadius: tablet ? 24 : 0, width: '100%', maxWidth: tablet ? 700 : undefined, alignSelf: 'center', maxHeight: '90%', overflow: 'hidden' }}>
+            <KeyboardAwareModal
+              contentContainerStyle={{ padding: 24 }}
+              extraScrollHeight={40}
             >
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
               <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text }}>Add Response</Text>
@@ -1107,10 +1100,9 @@ function TicketManagementDetail({ navigation, user, initialTicket, onBack }) {
                 </Text>
               </TouchableOpacity>
             </View>
-            </ScrollView>
+            </KeyboardAwareModal>
           </View>
         </View>
-        </KeyboardAvoidingView>
       </Modal>
 
       {/* Status Modal */}

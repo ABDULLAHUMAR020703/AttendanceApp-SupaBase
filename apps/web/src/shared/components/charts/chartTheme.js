@@ -1,17 +1,46 @@
+/*
+ * Series colours are four steps of the brand ramp rather than four hues: on a single
+ * chart the reader distinguishes them by value, and a second hue would imply a
+ * semantic the data doesn't carry. Ordered light-to-dark, matching accent 600-900.
+ *
+ * These keys name a *series slot*, not a rank. For ordered data — a leaderboard, a
+ * department bar list, a top-three — use CHART_RANKS below, which runs deep-to-light
+ * so the leading value is the heaviest mark on the page.
+ */
 export const CHART_COLORS = {
-  primary: '#014871',
-  primarySoft: 'rgba(1, 72, 113, 0.18)',
-  secondary: '#A0EBCF',
-  secondarySoft: 'rgba(160, 235, 207, 0.18)',
-  tertiary: '#F59E0B',
-  quaternary: '#5BA8C8',
-  muted: '#94A3B8',
-  grid: 'rgba(255, 255, 255, 0.08)',
-  axis: '#64748B',
-  tick: '#CBD5E1',
-  tooltipBg: 'rgba(13, 15, 18, 0.97)',
-  tooltipBorder: 'rgba(42, 46, 53, 0.9)',
+  primary: '#0097A7',
+  primarySoft: 'rgba(0, 151, 167, 0.22)',
+  secondary: '#00838F',
+  secondarySoft: 'rgba(0, 131, 143, 0.18)',
+  tertiary: '#006978',
+  quaternary: '#005A66',
+  muted: '#C7EFF5',
+  /* Chart chrome tracks the surface and border ladders in index.css. */
+  grid: 'rgba(27, 36, 48, 0.055)',
+  axis: '#E2F3F5',
+  /* Ice-teal well, matching `.ui-track` — the grey it used to be made a short bar
+     read as a defect rather than as a low value. */
+  track: '#E6F7F9',
+  tick: '#55657B',
+  tooltipBg: '#FFFFFF',
+  tooltipBorder: '#E2F3F5',
 };
+
+/*
+ * Rank ladder: tier 1 deep, tier 2 brand, tier 3 light. Weight falls with rank, so
+ * position in an ordered list is legible without reading a single number.
+ *
+ * Ranks past third share one pale tint on purpose — a fourth and fifth distinct step
+ * would be a difference the reader has to decode rather than see, and the list order
+ * already carries it. `rankColor` clamps, so a 20-row list stays on the system.
+ */
+export const CHART_RANKS = ['#006978', '#0097A7', '#4DD0E1'];
+export const CHART_RANK_REST = '#A9E4EC';
+
+export const rankColor = (index) => CHART_RANKS[index] || CHART_RANK_REST;
+
+/* Plus Jakarta Sans is the only family the app loads; SVG text has to be told. */
+const CHART_FONT = "'Plus Jakarta Sans', system-ui, sans-serif";
 
 export const CHART_HEIGHT = 300;
 
@@ -23,7 +52,12 @@ export const CHART_MARGINS = {
 
 export const CHART_AXIS = {
   stroke: CHART_COLORS.axis,
-  tick: { fill: CHART_COLORS.tick, fontSize: 11, fontFamily: 'Inter, system-ui, sans-serif' },
+  tick: {
+    fill: CHART_COLORS.tick,
+    fontSize: 11,
+    fontWeight: 500,
+    fontFamily: CHART_FONT,
+  },
 };
 
 export const CHART_GRID = {
@@ -40,17 +74,17 @@ export const CHART_ANIMATION = {
 export const CHART_TOOLTIP_STYLE = {
   backgroundColor: CHART_COLORS.tooltipBg,
   border: `1px solid ${CHART_COLORS.tooltipBorder}`,
-  borderRadius: '10px',
-  color: '#F8FAFC',
+  borderRadius: '14px',
+  color: '#1B2430',
   fontSize: '12px',
-  boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
+  boxShadow: '0 12px 32px rgba(27,36,48,0.10)',
   padding: '10px 12px',
 };
 
 export const CHART_LEGEND_STYLE = {
   color: CHART_COLORS.tick,
   fontSize: '12px',
-  fontFamily: 'Inter, system-ui, sans-serif',
+  fontFamily: CHART_FONT,
   paddingTop: '8px',
 };
 

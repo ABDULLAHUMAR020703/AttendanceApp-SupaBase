@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
+import { MapPin } from 'lucide-react';
 import { adminService } from '../services/adminService';
 import { GlassCard } from '../../../shared/components/GlassCard';
 import { PermissionGate } from '../../../shared/components/PermissionGate';
 import { PERMISSIONS } from '../permissions';
 import { useSilentPoll } from '../../../shared/hooks/useSilentPoll';
+import { EmptyState } from '../../../shared/components/ui/EmptyState';
+import { SkeletonCardList } from '../../../shared/components/ui/Skeleton';
 
 export function SitesPage() {
   const [sites, setSites] = useState([]);
@@ -93,7 +96,7 @@ export function SitesPage() {
         <button
           type="button"
           onClick={load}
-          className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-xs text-slate-100 hover:bg-white/20 transition-all duration-200"
+          className="ui-btn-secondary ui-btn-sm"
         >
           Refresh
         </button>
@@ -119,21 +122,27 @@ export function SitesPage() {
             ))}
           </select>
         </div>
-        <button className="rounded bg-indigo-600 px-3 py-2 mb-4 text-white" onClick={createSite}>
+        <button className="ui-btn-primary mb-4" onClick={createSite}>
           Create Site
         </button>
       </PermissionGate>
 
       <div className="space-y-2">
-        {loading &&
-          Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-14 rounded-xl border border-white/15 bg-white/10 skeleton" />
-          ))}
-        {!loading && sites.length === 0 && <GlassCard className="p-4 text-sm text-slate-300">No sites available.</GlassCard>}
+        {loading && <SkeletonCardList count={4} />}
+        {!loading && sites.length === 0 && (
+          <EmptyState
+            icon={MapPin}
+            title="No geofence sites yet"
+            description="Add a site with a centre point and radius, then assign employees so their mobile check-ins can be verified."
+          />
+        )}
         {!loading &&
           sites.map((s) => (
-            <GlassCard key={s.id} className="p-3 text-slate-100">
-              {s.name} ({s.latitude}, {s.longitude}) r={s.radius}
+            <GlassCard key={s.id} className="flex flex-wrap items-center justify-between gap-3 p-3.5">
+              <p className="text-body-tight font-medium text-ink">{s.name}</p>
+              <p className="type-numeric text-caption text-ink-muted">
+                {s.latitude}, {s.longitude} · {s.radius}m radius
+              </p>
             </GlassCard>
           ))}
       </div>
@@ -146,23 +155,23 @@ export function SitesPage() {
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             <select
-              className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-slate-100"
+              className="ui-select"
               value={assignEmployeeUid}
               onChange={(e) => {
                 setAssignEmployeeUid(e.target.value);
                 loadEmployeeAssignments(e.target.value);
               }}
             >
-              <option value="" className="bg-slate-800">Select employee</option>
+              <option value="">Select employee</option>
               {users.map((u) => (
-                <option key={u.uid} value={u.uid} className="bg-slate-800">{u.name || u.username} ({u.department})</option>
+                <option key={u.uid} value={u.uid}>{u.name || u.username} ({u.department})</option>
               ))}
             </select>
             <button
               type="button"
               disabled={!assignEmployeeUid || assignSaving}
               onClick={saveAssignments}
-              className="rounded-lg border border-blue-300/30 bg-blue-500/20 px-4 py-2 text-sm text-blue-100 disabled:opacity-50"
+              className="ui-btn-primary ui-btn-sm"
             >
               {assignSaving ? 'Saving…' : 'Save assignments'}
             </button>
@@ -170,7 +179,7 @@ export function SitesPage() {
           {assignEmployeeUid && (
             <div className="flex flex-wrap gap-2">
               {sites.map((s) => (
-                <label key={s.id} className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs cursor-pointer ${assignSiteIds.includes(s.id) ? 'border-blue-300/40 bg-blue-500/20 text-blue-100' : 'border-white/15 text-slate-300'}`}>
+                <label key={s.id} className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1 text-xs transition-colors duration-200 ${assignSiteIds.includes(s.id) ? 'border-accent-200 bg-accent-100 font-semibold text-accent-800' : 'border-hairline bg-white text-ink-muted hover:border-accent-200 hover:text-accent-800'}`}>
                   <input
                     type="checkbox"
                     className="sr-only"

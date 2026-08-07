@@ -9,12 +9,9 @@ import {
   TextInput,
   ScrollView,
   Keyboard,
-  TouchableWithoutFeedback,
-  KeyboardAvoidingView,
-  Platform,
   RefreshControl,
 } from 'react-native';
-import { getKeyboardAvoidingBehavior, formScrollViewProps } from '../shared/components/KeyboardAwareScreen';
+import { KeyboardAwareModal } from '../shared/components/KeyboardAwareScreen';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { 
@@ -1000,7 +997,20 @@ export default function EmployeeManagement({
     </Modal>
   );
 
-  const PendingRequestsModal = () => (
+  const totalPendingRequestCount = pendingRequests.length + pendingLeaveRequests.length;
+
+  const openRequestsModal = async () => {
+    setShowRequestsModal(true);
+    // Refresh both queues when opening so newly submitted leaves appear immediately.
+    await Promise.all([loadPendingRequests(), loadPendingLeaveRequests()]);
+  };
+
+  const PendingRequestsModal = () => {
+    const hasLeave = pendingLeaveRequests.length > 0;
+    const hasWorkMode = pendingRequests.length > 0;
+    const isEmpty = !hasLeave && !hasWorkMode;
+
+    return (
     <Modal
       visible={showRequestsModal}
       transparent
@@ -1008,33 +1018,60 @@ export default function EmployeeManagement({
       onRequestClose={() => setShowRequestsModal(false)}
     >
       <View className="flex-1 justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
-        <View className="rounded-xl p-6 mx-4 w-full max-w-md max-h-96" style={{ backgroundColor: colors.surface }}>
+        <View
+          className="rounded-xl p-6 mx-4 w-full max-w-md"
+          style={{ backgroundColor: colors.surface, maxHeight: '80%' }}
+        >
           <View className="flex-row items-center justify-between mb-4">
             <Text className="text-xl font-bold" style={{ color: colors.text }}>
-              Pending Work Mode Requests
+              Pending Requests
             </Text>
             <TouchableOpacity onPress={() => setShowRequestsModal(false)}>
               <Ionicons name="close" size={24} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
-          
-          {pendingRequests.length > 0 ? (
-            <FlatList
-              data={pendingRequests}
-              renderItem={renderPendingRequest}
-              keyExtractor={(item) => item.id}
-              showsVerticalScrollIndicator={false}
-            />
-          ) : (
+
+          {isEmpty ? (
             <View className="items-center py-8">
               <Ionicons name="checkmark-circle" size={48} color={colors.success} />
-              <Text className="mt-2" style={{ color: colors.textSecondary }}>No pending work mode requests</Text>
+              <Text className="mt-2" style={{ color: colors.textSecondary }}>
+                No pending leave or work mode requests
+              </Text>
             </View>
+          ) : (
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text className="text-sm font-semibold mb-2" style={{ color: colors.textSecondary }}>
+                Leave Requests ({pendingLeaveRequests.length})
+              </Text>
+              {hasLeave ? (
+                pendingLeaveRequests.map((item) => (
+                  <View key={`leave-${item.id}`}>{renderPendingLeaveRequest({ item })}</View>
+                ))
+              ) : (
+                <Text className="mb-4 text-sm" style={{ color: colors.textTertiary }}>
+                  No pending leave requests
+                </Text>
+              )}
+
+              <Text className="text-sm font-semibold mb-2 mt-2" style={{ color: colors.textSecondary }}>
+                Work Mode Requests ({pendingRequests.length})
+              </Text>
+              {hasWorkMode ? (
+                pendingRequests.map((item) => (
+                  <View key={`work-${item.id}`}>{renderPendingRequest({ item })}</View>
+                ))
+              ) : (
+                <Text className="mb-2 text-sm" style={{ color: colors.textTertiary }}>
+                  No pending work mode requests
+                </Text>
+              )}
+            </ScrollView>
           )}
         </View>
       </View>
     </Modal>
-  );
+    );
+  };
 
   const PendingLeaveRequestsModal = () => (
     <Modal
@@ -1123,12 +1160,12 @@ export default function EmployeeManagement({
                 minWidth: 120,
                 flexShrink: 1,
               }}
-              onPress={() => setShowRequestsModal(true)}
+              onPress={openRequestsModal}
             >
               <View className="flex-row items-center">
                 <Ionicons name="notifications" size={16} color="white" />
                 <Text className="text-white font-semibold ml-1" numberOfLines={1}>
-                  Requests ({pendingRequests.length})
+                  Requests ({totalPendingRequestCount})
                 </Text>
               </View>
             </TouchableOpacity>
@@ -1201,7 +1238,6 @@ export default function EmployeeManagement({
         keyExtractor={(item) => item.id}
         numColumns={employeeGridColumns}
         keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets={true}
         keyboardDismissMode="on-drag"
         ListHeaderComponent={employeeListHeader}
         ListEmptyComponent={
@@ -1395,15 +1431,12 @@ const LeaveSettingsModal = ({ visible, onClose, defaultSettings, onSave, onSetti
       animationType="slide"
       onRequestClose={handleBack}
     >
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={getKeyboardAvoidingBehavior({ inModal: true })}
-        keyboardVerticalOffset={0}
-      >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <View className="flex-1 justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
-            <TouchableWithoutFeedback onPress={() => {}}>
-              <View className="rounded-xl p-6 mx-4 w-full max-w-sm" style={{ backgroundColor: colors.surface }}>
+      <View className="flex-1 justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+        <View className="rounded-xl mx-4 w-full max-w-sm overflow-hidden" style={{ backgroundColor: colors.surface, maxHeight: '85%' }}>
+          <KeyboardAwareModal
+            contentContainerStyle={{ padding: 24 }}
+            extraScrollHeight={40}
+          >
               {/* Header with Back Button */}
               <View className="flex-row items-center justify-between mb-4">
                 <TouchableOpacity
@@ -1506,15 +1539,13 @@ const LeaveSettingsModal = ({ visible, onClose, defaultSettings, onSave, onSetti
                   disabled={isSaving}
                 >
                   <Text className="text-center font-medium text-white">
-                    {isSaving ? 'Savingâ€¦' : 'Save'}
+                    {isSaving ? 'Saving…' : 'Save'}
                   </Text>
                 </TouchableOpacity>
               </View>
-            </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </KeyboardAvoidingView>
+          </KeyboardAwareModal>
+        </View>
+      </View>
     </Modal>
   );
 };
@@ -1548,18 +1579,12 @@ const EmployeeLeaveModal = ({ visible, onClose, employeeData, leaveInputs, onInp
       animationType="slide"
       onRequestClose={handleBack}
     >
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={getKeyboardAvoidingBehavior({ inModal: true })}
-        keyboardVerticalOffset={0}
-      >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <View className="flex-1 justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
-            <TouchableWithoutFeedback onPress={() => {}}>
-              <View className="rounded-xl p-6 mx-4 w-full max-w-sm max-h-96" style={{ backgroundColor: colors.surface }}>
-                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"
-                automaticallyAdjustKeyboardInsets={true}
-                keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets={true} keyboardDismissMode="on-drag">
+      <View className="flex-1 justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+        <View className="rounded-xl mx-4 w-full max-w-sm overflow-hidden" style={{ backgroundColor: colors.surface, maxHeight: '85%' }}>
+          <KeyboardAwareModal
+            contentContainerStyle={{ padding: 24 }}
+            extraScrollHeight={40}
+          >
                 {/* Header with Back Button */}
                 <View className="flex-row items-center justify-between mb-2">
                   <TouchableOpacity
@@ -1699,12 +1724,9 @@ const EmployeeLeaveModal = ({ visible, onClose, employeeData, leaveInputs, onInp
                 <Text className="text-center font-medium text-white">Save</Text>
               </TouchableOpacity>
             </View>
-                </ScrollView>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </KeyboardAvoidingView>
+          </KeyboardAwareModal>
+        </View>
+      </View>
     </Modal>
   );
 };

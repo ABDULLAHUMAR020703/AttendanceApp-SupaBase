@@ -2,27 +2,24 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { adminService } from '../services/adminService';
 import { useAuthStore } from '../../auth/store/authStore';
-import { GlassCard } from '../../../shared/components/GlassCard';
-import { GlassTable } from '../../../shared/components/GlassTable';
+import { Pencil, Search, ShieldCheck, UserCheck, UserMinus, UserPlus, Users } from 'lucide-react';
+import {
+  GlassTable,
+  TableActions,
+  TableCell,
+  TableIdentity,
+  TablePagination,
+  TableRow,
+  TableSelectionBar,
+  TableToolbar,
+} from '../../../shared/components/GlassTable';
 import { SlideOverPanel } from '../../../shared/components/SlideOverPanel';
 import { PasswordInput } from '../../../shared/components/PasswordInput';
+import { Alert } from '../../../shared/components/ui/Alert';
+import { RoleBadge, StatusBadge } from '../../../shared/components/ui/Badge';
+import { Button } from '../../../shared/components/ui/Button';
+import { PageHeader } from '../../../shared/components/ui/PageHeader';
 import { hasPermission, PERMISSIONS } from '../permissions';
-
-function SkeletonRow() {
-  return (
-    <tr className="border-b border-white/10">
-      {Array.from({ length: 7 }).map((_, i) => (
-        <td key={i} className="p-3"><div className="h-4 skeleton w-full max-w-[6rem]" /></td>
-      ))}
-    </tr>
-  );
-}
-
-const roleStyles = {
-  super_admin: 'bg-brand-500/20 text-brand-100 border-brand-400/30',
-  manager: 'bg-indigo-500/20 text-indigo-100 border-indigo-400/30',
-  employee: 'bg-slate-500/20 text-slate-200 border-slate-400/25',
-};
 
 const EMPTY_CREATE_FORM = {
   username: '',
@@ -38,6 +35,15 @@ const EMPTY_CREATE_FORM = {
 
 const roleCanBeToggled = (targetRole) => targetRole === 'employee' || targetRole === 'manager';
 
+/** Column key -> comparable value. Keys mirror the table's column keys. */
+const SORT_VALUES = {
+  name: (row) => (row.name || row.username || '').toLowerCase(),
+  role: (row) => (row.role || '').toLowerCase(),
+  dept: (row) => (row.department || '').toLowerCase(),
+  status: (row) => (row.is_active ? 0 : 1),
+  last: (row) => (row.updated_at ? new Date(row.updated_at).getTime() : 0),
+};
+
 export function UsersPage() {
   const { user } = useAuthStore();
   const location = useLocation();
@@ -49,6 +55,10 @@ export function UsersPage() {
   const [roleFilter, setRoleFilter] = useState('all');
   const [departmentFilter, setDepartmentFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [sortKey, setSortKey] = useState('name');
+  const [sortDir, setSortDir] = useState('asc');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [activeUser, setActiveUser] = useState(null);
   const [error, setError] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
@@ -211,24 +221,60 @@ export function UsersPage() {
     });
   }, [rows, search, roleFilter, departmentFilter, statusFilter]);
 
+  const sortedRows = useMemo(() => {
+    const read = SORT_VALUES[sortKey];
+    if (!read) return filteredRows;
+    const direction = sortDir === 'asc' ? 1 : -1;
+    return [...filteredRows].sort((a, b) => {
+      const left = read(a);
+      const right = read(b);
+      if (left === right) return 0;
+      return left > right ? direction : -direction;
+    });
+  }, [filteredRows, sortKey, sortDir]);
+
+  /* Paging is applied after sorting so page 1 always holds the top of the sort. */
+  const pagedRows = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return sortedRows.slice(start, start + pageSize);
+  }, [sortedRows, page, pageSize]);
+
+  /* Narrowing the result set can strand the viewer on a page that no longer exists. */
+  useEffect(() => {
+    const pageCount = Math.max(Math.ceil(sortedRows.length / pageSize), 1);
+    if (page > pageCount) setPage(pageCount);
+  }, [sortedRows.length, pageSize, page]);
+
+  const requestSort = (key) => {
+    if (!SORT_VALUES[key]) return;
+    setSortDir((prev) => (sortKey === key ? (prev === 'asc' ? 'desc' : 'asc') : 'asc'));
+    setSortKey(key);
+    setPage(1);
+  };
+
   const departments = useMemo(() => {
     return ['all', ...Array.from(new Set(rows.map((r) => r.department).filter(Boolean))).sort()];
   }, [rows]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [search, roleFilter, departmentFilter, statusFilter]);
+
   const selectedCount = Object.values(selected).filter(Boolean).length;
-  const allVisibleSelected = filteredRows.length > 0 && filteredRows.every((r) => selected[r.uid]);
+  /* Select-all covers the rows on screen, not the whole filtered set. */
+  const allVisibleSelected = pagedRows.length > 0 && pagedRows.every((r) => selected[r.uid]);
 
   const toggleSelectAll = () => {
     if (allVisibleSelected) {
       setSelected((prev) => {
         const next = { ...prev };
-        for (const row of filteredRows) delete next[row.uid];
+        for (const row of pagedRows) delete next[row.uid];
         return next;
       });
       return;
     }
     const next = {};
-    for (const row of filteredRows) next[row.uid] = true;
+    for (const row of pagedRows) next[row.uid] = true;
     setSelected((prev) => ({ ...prev, ...next }));
   };
 
@@ -346,173 +392,201 @@ export function UsersPage() {
     }
   };
 
-  const initials = (value) =>
-    (value || 'U')
-      .split(' ')
-      .map((part) => part.charAt(0).toUpperCase())
-      .slice(0, 2)
-      .join('');
-
+  /* Absolute timestamps are noise in a list; relative age is what people scan for. */
   const asLastActive = (row) => {
-    if (!row.updated_at) return 'N/A';
-    return new Date(row.updated_at).toLocaleString();
+    if (!row.updated_at) return '—';
+    const then = new Date(row.updated_at).getTime();
+    const minutes = Math.round((Date.now() - then) / 60000);
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.round(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.round(hours / 24);
+    if (days < 30) return `${days}d ago`;
+    return new Date(then).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   return (
     <div className="space-y-5 animate-fade-up">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-white">User Management</h1>
-          <p className="mt-1 text-sm text-slate-200">Manage users, roles, and department assignments.</p>
-        </div>
-        {canCreate && (
-          <button
-            type="button"
-            onClick={openCreate}
-            className="self-start md:self-auto rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 active:scale-[0.99] transition-all duration-200 shadow"
-          >
-            + Create user
-          </button>
-        )}
-      </div>
+      <PageHeader
+        title="User Management"
+        subtitle="Manage users, roles, and department assignments."
+        actions={
+          canCreate && (
+            <Button onClick={openCreate}>
+              <UserPlus className="h-4 w-4" strokeWidth={2} aria-hidden />
+              Create user
+            </Button>
+          )
+        }
+      />
 
-      <GlassCard className="p-4">
-        <div className="flex flex-col xl:flex-row xl:items-center gap-3">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search users, roles..."
-            className="w-full xl:max-w-sm rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-300 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-300/30"
-          />
-          <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="glass-select rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-slate-100">
-            <option value="all">All roles</option>
-            <option value="super_admin">Super Admin</option>
-            <option value="manager">Manager</option>
-            <option value="employee">Employee</option>
-          </select>
-          <select value={departmentFilter} onChange={(e) => setDepartmentFilter(e.target.value)} className="glass-select rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-slate-100">
-            {departments.map((dep) => (
-              <option key={dep} value={dep}>{dep === 'all' ? 'All departments' : dep}</option>
-            ))}
-          </select>
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="glass-select rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-slate-100">
-            <option value="all">All status</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
-          <button
-            disabled={selectedCount === 0 || !canBulkDeactivate}
-            onClick={bulkDeactivate}
-            className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-slate-100 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-white/20 transition-all duration-200"
-          >
-            Disable selected ({selectedCount})
-          </button>
-        </div>
-      </GlassCard>
-      {error && <GlassCard className="p-4 text-sm text-red-100">{error}</GlassCard>}
-      {saveSuccess && <GlassCard className="p-4 text-sm text-emerald-100">{saveSuccess}</GlassCard>}
+      <TableToolbar
+        search={
+          <>
+            <Search
+              className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint"
+              strokeWidth={2}
+              aria-hidden
+            />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search users, roles..."
+              aria-label="Search users"
+              className="ui-input ui-input-icon"
+            />
+          </>
+        }
+        filters={
+          <>
+            <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} aria-label="Filter by role" className="ui-select w-auto">
+              <option value="all">All roles</option>
+              <option value="super_admin">Super Admin</option>
+              <option value="manager">Manager</option>
+              <option value="employee">Employee</option>
+            </select>
+            <select value={departmentFilter} onChange={(e) => setDepartmentFilter(e.target.value)} aria-label="Filter by department" className="ui-select w-auto">
+              {departments.map((dep) => (
+                <option key={dep} value={dep}>{dep === 'all' ? 'All departments' : dep}</option>
+              ))}
+            </select>
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Filter by status" className="ui-select w-auto">
+              <option value="all">All status</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </>
+        }
+        actions={
+          <p className="text-caption font-medium tabular-nums text-ink-muted">
+            {filteredRows.length} {filteredRows.length === 1 ? 'user' : 'users'}
+          </p>
+        }
+      />
+
+      {error && <Alert type="error">{error}</Alert>}
+      {saveSuccess && <Alert type="success">{saveSuccess}</Alert>}
+
+      <TableSelectionBar count={selectedCount} onClear={() => setSelected({})}>
+        <Button size="sm" variant="secondary" disabled={!canBulkDeactivate} onClick={bulkDeactivate}>
+          <UserMinus className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+          Disable
+        </Button>
+      </TableSelectionBar>
 
       <GlassTable
+        loading={loading}
+        skeletonRows={6}
+        maxHeight="min(68vh, 42rem)"
+        emptyIcon={Users}
+        emptyTitle="No users found"
+        emptyMessage="Try adjusting your search or filters to widen the results."
+        sortKey={sortKey}
+        sortDir={sortDir}
+        onSort={requestSort}
         columns={[
-          { key: 'check', label: <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAll} />, className: 'w-12' },
-          { key: 'name', label: 'Name' },
-          { key: 'role', label: 'Role' },
-          { key: 'dept', label: 'Department' },
-          { key: 'status', label: 'Status' },
-          { key: 'last', label: 'Last Active' },
-          { key: 'actions', label: 'Actions' },
+          {
+            key: 'check',
+            label: (
+              <input
+                type="checkbox"
+                checked={allVisibleSelected}
+                onChange={toggleSelectAll}
+                aria-label="Select all users on this page"
+                className="ui-checkbox"
+              />
+            ),
+            className: 'w-12',
+          },
+          { key: 'name', label: 'Name', sortable: true },
+          { key: 'role', label: 'Role', sortable: true },
+          { key: 'dept', label: 'Department', sortable: true },
+          { key: 'status', label: 'Status', sortable: true },
+          { key: 'last', label: 'Last active', sortable: true, className: 'w-32' },
+          { key: 'actions', label: <span className="sr-only">Actions</span>, className: 'w-16' },
         ]}
       >
-            {loading && (
-              <>
-                <SkeletonRow />
-                <SkeletonRow />
-                <SkeletonRow />
-                <SkeletonRow />
-              </>
-            )}
-
-            {!loading && filteredRows.length === 0 && (
-              <tr>
-                <td colSpan={7} className="p-10 text-center">
-                  <p className="text-white font-medium">No users found</p>
-                  <p className="mt-1 text-slate-300 text-sm">Try adjusting your search or filters.</p>
-                </td>
-              </tr>
-            )}
-
-            {!loading &&
-              filteredRows.map((u) => (
-                <tr key={u.uid} className="border-b border-white/10 hover:bg-white/10 transition-all duration-200">
-                  <td className="p-3">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(selected[u.uid])}
-                      onChange={() => setSelected((prev) => ({ ...prev, [u.uid]: !prev[u.uid] }))}
-                    />
-                  </td>
-                  <td className="p-3">
-                    <button type="button" className="flex items-center gap-3" onClick={() => openUserPanel(u)}>
-                      <span className="grid h-8 w-8 place-items-center rounded-full bg-brand-500/20 text-xs font-semibold text-brand-100">
-                        {initials(u.name || u.username)}
-                      </span>
-                      <span>
-                        <span className="block text-white font-medium">{u.name || u.username}</span>
-                        <span className="block text-xs text-slate-300">{u.email}</span>
-                      </span>
-                    </button>
-                  </td>
-                  <td className="p-3">
-                    <span className={`inline-flex items-center rounded-full border px-2 py-1 text-xs font-medium ${roleStyles[u.role] || roleStyles.employee}`}>
-                      {u.role}
-                    </span>
-                  </td>
-                  <td className="p-3 text-slate-100">{u.department || '-'}</td>
-                  <td className="p-3">
-                    <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${u.is_active ? 'bg-emerald-400/20 text-emerald-100' : 'bg-slate-200/20 text-slate-300'}`}>
-                      {u.is_active ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
-                  <td className="p-3 text-xs text-slate-300">{asLastActive(u)}</td>
-                  <td className="p-3">
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => openUserPanel(u)} className="rounded-md border border-white/20 bg-white/10 px-2 py-1 text-xs text-slate-100 hover:bg-white/20">
-                        {canEditProfiles ? 'Edit' : 'View'}
-                      </button>
-                      {((u.is_active && canDeactivate) || (!u.is_active && canActivate)) && (
-                        <button onClick={() => toggleActive(u)} className="rounded-md border border-white/20 bg-white/10 px-2 py-1 text-xs text-slate-100 hover:bg-white/20">
-                          {u.is_active ? 'Disable' : 'Enable'}
-                        </button>
-                      )}
-                      {canChangeRoles && roleCanBeToggled(u.role) && (
-                        <button
-                          type="button"
-                          onClick={() => changeRole(u)}
-                          className="rounded-md border border-white/20 bg-white/10 px-2 py-1 text-xs text-slate-100 hover:bg-white/20"
-                          title={u.role === 'employee' ? 'Promote to manager' : 'Set to employee'}
-                        >
-                          {u.role === 'employee' ? 'Make manager' : 'Make employee'}
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+        {pagedRows.map((u) => (
+          <TableRow key={u.uid} selected={Boolean(selected[u.uid])}>
+            <TableCell>
+              <input
+                type="checkbox"
+                checked={Boolean(selected[u.uid])}
+                onChange={() => setSelected((prev) => ({ ...prev, [u.uid]: !prev[u.uid] }))}
+                aria-label={`Select ${u.name || u.username}`}
+                className="ui-checkbox"
+              />
+            </TableCell>
+            <TableCell>
+              <TableIdentity
+                name={u.name || u.username}
+                secondary={u.email}
+                onClick={() => openUserPanel(u)}
+              />
+            </TableCell>
+            <TableCell>
+              <RoleBadge role={u.role} />
+            </TableCell>
+            <TableCell className="text-ink-muted">{u.department || '—'}</TableCell>
+            <TableCell>
+              <StatusBadge status={u.is_active ? 'active' : 'inactive'} />
+            </TableCell>
+            <TableCell className="whitespace-nowrap text-caption text-ink-muted">{asLastActive(u)}</TableCell>
+            <TableCell>
+              <TableActions
+                label={`Actions for ${u.name || u.username}`}
+                items={[
+                  {
+                    label: canEditProfiles ? 'Edit details' : 'View details',
+                    icon: Pencil,
+                    onClick: () => openUserPanel(u),
+                  },
+                  ((u.is_active && canDeactivate) || (!u.is_active && canActivate)) && {
+                    label: u.is_active ? 'Disable access' : 'Enable access',
+                    icon: u.is_active ? UserMinus : UserCheck,
+                    tone: u.is_active ? 'danger' : undefined,
+                    onClick: () => toggleActive(u),
+                  },
+                  canChangeRoles &&
+                    roleCanBeToggled(u.role) && {
+                      label: u.role === 'employee' ? 'Make manager' : 'Make employee',
+                      icon: ShieldCheck,
+                      onClick: () => changeRole(u),
+                    },
+                ]}
+              />
+            </TableCell>
+          </TableRow>
+        ))}
       </GlassTable>
+
+      {!loading && filteredRows.length > 0 && (
+        <TablePagination
+          page={page}
+          pageSize={pageSize}
+          total={sortedRows.length}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />
+      )}
 
       <SlideOverPanel open={createOpen} onClose={() => (createSubmitting ? null : setCreateOpen(false))}>
         <form className="h-full flex flex-col" onSubmit={submitCreate}>
-          <div className="p-5 border-b border-white/10 flex items-center justify-between">
+          <div className="p-5 border-b border-hairline flex items-center justify-between">
             <div>
-              <p className="text-lg font-semibold text-white">Create user</p>
-              <p className="text-xs text-slate-300">
+              <p className="text-[17px] font-semibold tracking-[-0.015em] text-ink">Create user</p>
+              <p className="mt-1 text-[13px] text-ink-muted">
                 New users are automatically assigned to your company.
               </p>
             </div>
             <button
               type="button"
               onClick={() => !createSubmitting && setCreateOpen(false)}
-              className="rounded-md border border-white/20 bg-white/10 px-2 py-1 text-sm text-slate-200 hover:bg-white/20"
+              className="ui-btn-ghost ui-btn-sm"
               disabled={createSubmitting}
             >
               Close
@@ -520,48 +594,44 @@ export function UsersPage() {
           </div>
 
           <div className="p-5 space-y-4 overflow-y-auto">
-            {createError && (
-              <div className="rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">
-                {createError}
-              </div>
-            )}
+            {createError && <Alert type="error">{createError}</Alert>}
 
             <label className="block space-y-1">
-              <span className="text-xs text-slate-300">Username *</span>
+              <span className="ui-label">Username *</span>
               <input
                 required
                 value={createForm.username}
                 onChange={(e) => setCreateForm((f) => ({ ...f, username: e.target.value }))}
                 autoCapitalize="off"
-                className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-400"
+                className="ui-input"
                 placeholder="jane.doe"
               />
             </label>
 
             <label className="block space-y-1">
-              <span className="text-xs text-slate-300">Full name</span>
+              <span className="ui-label">Full name</span>
               <input
                 value={createForm.name}
                 onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))}
-                className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-400"
+                className="ui-input"
                 placeholder="Jane Doe"
               />
             </label>
 
             <label className="block space-y-1">
-              <span className="text-xs text-slate-300">Email *</span>
+              <span className="ui-label">Email *</span>
               <input
                 required
                 type="email"
                 value={createForm.email}
                 onChange={(e) => setCreateForm((f) => ({ ...f, email: e.target.value }))}
-                className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-400"
+                className="ui-input"
                 placeholder="jane@company.com"
               />
             </label>
 
             <label className="block space-y-1">
-              <span className="text-xs text-slate-300">Temporary password * (min 8 chars)</span>
+              <span className="ui-label">Temporary password * (min 8 chars)</span>
               <PasswordInput
                 required
                 minLength={8}
@@ -569,18 +639,18 @@ export function UsersPage() {
                 onChange={(e) => setCreateForm((f) => ({ ...f, password: e.target.value }))}
                 placeholder="At least 8 characters"
               />
-              <span className="text-[10px] text-slate-400">
+              <span className="ui-hint block">
                 Stored in Supabase Auth. User signs in on mobile with this email + password.
               </span>
             </label>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <label className="block space-y-1">
-                <span className="text-xs text-slate-300">Role *</span>
+                <span className="ui-label">Role *</span>
                 <select
                   value={createForm.role}
                   onChange={(e) => setCreateForm((f) => ({ ...f, role: e.target.value }))}
-                  className="glass-select w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2.5 text-sm text-slate-100"
+                  className="ui-select"
                 >
                   <option value="employee">Employee</option>
                   {canChangeRoles && <option value="manager">Manager</option>}
@@ -588,15 +658,15 @@ export function UsersPage() {
               </label>
 
               <label className="block space-y-1">
-                <span className="text-xs text-slate-300">Department</span>
+                <span className="ui-label">Department</span>
                 <select
                   value={createForm.department}
                   onChange={(e) => setCreateForm((f) => ({ ...f, department: e.target.value }))}
-                  className="glass-select w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2.5 text-sm text-slate-100"
+                  className="ui-select"
                 >
-                  <option value="" className="bg-slate-100 text-slate-900">— None —</option>
+                  <option value="">— None —</option>
                   {tenantDepartments.map((d) => (
-                    <option key={d.id} value={d.name} className="bg-slate-100 text-slate-900">
+                    <option key={d.id} value={d.name}>
                       {d.name}
                     </option>
                   ))}
@@ -606,21 +676,21 @@ export function UsersPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <label className="block space-y-1">
-                <span className="text-xs text-slate-300">Position</span>
+                <span className="ui-label">Position</span>
                 <input
                   value={createForm.position}
                   onChange={(e) => setCreateForm((f) => ({ ...f, position: e.target.value }))}
-                  className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-400"
+                  className="ui-input"
                   placeholder="Software Engineer"
                 />
               </label>
 
               <label className="block space-y-1">
-                <span className="text-xs text-slate-300">Work mode</span>
+                <span className="ui-label">Work mode</span>
                 <select
                   value={createForm.workMode}
                   onChange={(e) => setCreateForm((f) => ({ ...f, workMode: e.target.value }))}
-                  className="glass-select w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2.5 text-sm text-slate-100"
+                  className="ui-select"
                 >
                   <option value="in_office">In office</option>
                   <option value="remote">Remote</option>
@@ -630,29 +700,29 @@ export function UsersPage() {
             </div>
 
             <label className="block space-y-1">
-              <span className="text-xs text-slate-300">Hire date</span>
+              <span className="ui-label">Hire date</span>
               <input
                 type="date"
                 value={createForm.hireDate}
                 onChange={(e) => setCreateForm((f) => ({ ...f, hireDate: e.target.value }))}
-                className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2.5 text-sm text-slate-100"
+                className="ui-input"
               />
             </label>
           </div>
 
-          <div className="mt-auto p-5 border-t border-white/10 flex justify-end gap-2">
+          <div className="mt-auto p-5 border-t border-hairline flex justify-end gap-2">
             <button
               type="button"
               onClick={() => setCreateOpen(false)}
               disabled={createSubmitting}
-              className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-slate-100 hover:bg-white/20"
+              className="ui-btn-secondary ui-btn-sm"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={createSubmitting}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60 active:scale-[0.99] transition-all duration-200"
+              className="ui-btn-primary"
             >
               {createSubmitting ? 'Creating…' : 'Create user'}
             </button>
@@ -663,131 +733,127 @@ export function UsersPage() {
       <SlideOverPanel open={Boolean(activeUser)} onClose={closePanel}>
           {activeUser && (
             <div className="h-full flex flex-col">
-              <div className="p-5 border-b border-white/10 flex items-center justify-between">
+              <div className="p-5 border-b border-hairline flex items-center justify-between">
                 <div>
-                  <p className="text-lg font-semibold text-white">{activeUser.name || activeUser.username}</p>
-                  <p className="text-xs text-slate-300">{activeUser.email}</p>
+                  <p className="text-[17px] font-semibold tracking-[-0.015em] text-ink">{activeUser.name || activeUser.username}</p>
+                  <p className="mt-1 text-[13px] text-ink-muted">{activeUser.email}</p>
                 </div>
-                <button onClick={closePanel} className="rounded-md border border-white/20 bg-white/10 px-2 py-1 text-sm text-slate-200 hover:bg-white/20">Close</button>
+                <button onClick={closePanel} className="ui-btn-ghost ui-btn-sm">Close</button>
               </div>
 
               <div className="p-5 space-y-5 overflow-y-auto">
-                {editError && (
-                  <div className="rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">
-                    {editError}
-                  </div>
-                )}
+                {editError && <Alert type="error">{editError}</Alert>}
 
                 <section>
-                  <p className="text-xs uppercase tracking-wide text-slate-300 mb-2">Profile</p>
+                  <p className="card-eyebrow mb-2 block">Profile</p>
                   {canEditProfiles && editForm ? (
-                    <div className="rounded-lg border border-white/10 bg-white/5 p-4 space-y-3 text-sm">
+                    <div className="rounded-xl border border-hairline bg-surface-subtle p-4 space-y-3 text-sm">
                       {editLoading ? (
-                        <p className="text-slate-300">Loading profile…</p>
+                        <p className="text-ink-muted">Loading profile…</p>
                       ) : (
                         <>
                           <label className="block space-y-1">
-                            <span className="text-xs text-slate-300">Full name</span>
+                            <span className="ui-label">Full name</span>
                             <input
                               value={editForm.name}
                               onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
-                              className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-slate-100"
+                              className="ui-input"
                               placeholder="Display name"
                             />
                           </label>
                           <label className="block space-y-1">
-                            <span className="text-xs text-slate-300">Username</span>
+                            <span className="ui-label">Username</span>
                             <input
                               value={editForm.username}
                               onChange={(e) => setEditForm((f) => ({ ...f, username: e.target.value }))}
-                              className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-slate-100"
+                              className="ui-input"
                             />
                           </label>
                           <label className="block space-y-1">
-                            <span className="text-xs text-slate-300">Email</span>
+                            <span className="ui-label">Email</span>
                             <input
                               type="email"
                               value={editForm.email}
                               onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
-                              className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-slate-100"
+                              className="ui-input"
                             />
                           </label>
                           {activeUser?.role === 'super_admin' && (
                             <label className="block space-y-1">
-                              <span className="text-xs text-slate-300">Report email <span className="text-slate-400">(optional — overrides login email for reports)</span></span>
+                              <span className="ui-label">Report email <span className="text-ink-muted">(optional — overrides login email for reports)</span></span>
                               <input
                                 type="email"
                                 value={editForm.report_email || ''}
                                 onChange={(e) => setEditForm((f) => ({ ...f, report_email: e.target.value }))}
                                 placeholder="reports@company.com"
-                                className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-slate-100 placeholder:text-slate-400"
+                                className="ui-input"
                               />
                             </label>
                           )}
                           <label className="block space-y-1">
-                            <span className="text-xs text-slate-300">Department</span>
+                            <span className="ui-label">Department</span>
                             <select
                               value={editForm.department}
                               onChange={(e) => setEditForm((f) => ({ ...f, department: e.target.value }))}
-                              className="glass-select w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-slate-100"
+                              className="ui-select"
                             >
-                              <option value="" className="bg-slate-100 text-slate-900">— None —</option>
+                              <option value="">— None —</option>
                               {tenantDepartments.map((d) => (
-                                <option key={d.id} value={d.name} className="bg-slate-100 text-slate-900">
+                                <option key={d.id} value={d.name}>
                                   {d.name}
                                 </option>
                               ))}
                             </select>
                           </label>
-                          <p className="text-xs text-slate-400">
+                          <p className="text-xs text-ink-muted">
                             Role: {activeUser.role} · Status: {activeUser.is_active ? 'Active' : 'Inactive'}
                           </p>
                         </>
                       )}
                     </div>
                   ) : (
-                    <div className="rounded-lg border border-white/10 bg-white/5 p-4 space-y-2 text-sm">
-                      <p><span className="text-slate-300">Name:</span> <span className="text-slate-100">{activeUser.name || '-'}</span></p>
-                      <p><span className="text-slate-300">Username:</span> <span className="text-slate-100">{activeUser.username}</span></p>
-                      <p><span className="text-slate-300">Role:</span> <span className="text-slate-100">{activeUser.role}</span></p>
-                      <p><span className="text-slate-300">Department:</span> <span className="text-slate-100">{activeUser.department || '-'}</span></p>
-                      <p><span className="text-slate-300">Status:</span> <span className="text-slate-100">{activeUser.is_active ? 'Active' : 'Inactive'}</span></p>
+                    <div className="rounded-xl border border-hairline bg-surface-subtle p-4 space-y-2 text-sm">
+                      <p><span className="text-ink-muted">Name:</span> <span className="text-ink">{activeUser.name || '-'}</span></p>
+                      <p><span className="text-ink-muted">Username:</span> <span className="text-ink">{activeUser.username}</span></p>
+                      <p><span className="text-ink-muted">Role:</span> <span className="text-ink">{activeUser.role}</span></p>
+                      <p><span className="text-ink-muted">Department:</span> <span className="text-ink">{activeUser.department || '-'}</span></p>
+                      <p><span className="text-ink-muted">Status:</span> <span className="text-ink">{activeUser.is_active ? 'Active' : 'Inactive'}</span></p>
                     </div>
                   )}
                 </section>
 
                 {canEditLeaveBalance && editForm && !editLoading && (
                   <section>
-                    <p className="text-xs uppercase tracking-wide text-slate-300 mb-2">Leave allocation</p>
-                    <div className="rounded-lg border border-white/10 bg-white/5 p-4 grid grid-cols-3 gap-3 text-sm">
+                    <p className="card-eyebrow mb-2 block">Leave allocation</p>
+                    <div className="rounded-xl border border-hairline bg-surface-subtle p-4 grid grid-cols-3 gap-3 text-sm">
                       <label className="block space-y-1">
-                        <span className="text-xs text-slate-300">Annual</span>
+                        <span className="ui-label">Annual</span>
                         <input
                           type="number"
                           min={0}
                           value={editForm.annual_leaves}
                           onChange={(e) => setEditForm((f) => ({ ...f, annual_leaves: e.target.value }))}
-                          className="w-full rounded-lg border border-white/20 bg-white/10 px-2 py-2 text-slate-100"
+                          className="ui-input"
                         />
                       </label>
                       <label className="block space-y-1">
-                        <span className="text-xs text-slate-300">Sick</span>
+                        <span className="ui-label">Sick</span>
                         <input
                           type="number"
                           min={0}
                           value={editForm.sick_leaves}
                           onChange={(e) => setEditForm((f) => ({ ...f, sick_leaves: e.target.value }))}
-                          className="w-full rounded-lg border border-white/20 bg-white/10 px-2 py-2 text-slate-100"
+                          className="ui-input"
                         />
                       </label>
                       <label className="block space-y-1">
-                        <span className="text-xs text-slate-300">Casual</span>
+                        <span className="ui-label">Casual</span>
                         <input
                           type="number"
                           min={0}
                           value={editForm.casual_leaves}
                           onChange={(e) => setEditForm((f) => ({ ...f, casual_leaves: e.target.value }))}
-                          className="w-full rounded-lg border border-white/20 bg-white/10 px-2 py-2 text-slate-100"
+                          className="ui-input"
                         />
                       </label>
                     </div>
@@ -795,20 +861,20 @@ export function UsersPage() {
                 )}
 
                 <section>
-                  <p className="text-xs uppercase tracking-wide text-slate-300 mb-2">Activity</p>
-                  <div className="rounded-lg border border-white/10 bg-white/5 p-4 text-sm text-slate-200">
+                  <p className="card-eyebrow mb-2 block">Activity</p>
+                  <div className="rounded-xl border border-hairline bg-surface-subtle p-4 text-sm text-ink-muted">
                     <p>Last updated: {asLastActive(activeUser)}</p>
                   </div>
                 </section>
               </div>
 
-              <div className="mt-auto p-5 border-t border-white/10 flex flex-wrap gap-2">
+              <div className="mt-auto p-5 border-t border-hairline flex flex-wrap gap-2">
                 {canEditProfiles && editForm && (
                   <button
                     type="button"
                     onClick={saveProfile}
                     disabled={editSaving || editLoading}
-                    className="rounded-lg bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-60 transition-all duration-200 active:scale-[0.99]"
+                    className="ui-btn-primary ui-btn-sm"
                   >
                     {editSaving ? 'Saving…' : 'Save profile'}
                   </button>
@@ -817,13 +883,13 @@ export function UsersPage() {
                   <button
                     type="button"
                     onClick={() => changeRole(activeUser)}
-                    className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-slate-100 hover:bg-white/20 transition-all duration-200 active:scale-[0.99]"
+                    className="ui-btn-secondary ui-btn-sm"
                   >
                     {activeUser.role === 'employee' ? 'Make manager' : 'Make employee'}
                   </button>
                 )}
                 {((activeUser.is_active && canDeactivate) || (!activeUser.is_active && canActivate)) && activeUser.role !== 'super_admin' && (
-                  <button onClick={() => toggleActive(activeUser)} className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-slate-100 hover:bg-white/20 transition-all duration-200 active:scale-[0.99]">
+                  <button onClick={() => toggleActive(activeUser)} className="ui-btn-secondary ui-btn-sm">
                     {activeUser.is_active ? 'Deactivate' : 'Activate'}
                   </button>
                 )}
