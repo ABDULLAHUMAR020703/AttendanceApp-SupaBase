@@ -3,18 +3,19 @@ import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YA
 import { CHART_COLORS } from './chartTheme';
 
 const AXIS_TICK = { fill: '#64748B', fontSize: 11, fontWeight: 500 };
+const SKY = '#70C9EF';
 
 function TrendTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="min-w-[10rem] rounded-xl border border-hairline bg-white p-3 shadow-[0_8px_24px_-8px_rgba(0,151,167,0.18)]">
-      <p className="text-[12px] font-semibold text-ink">{label}</p>
+    <div className="min-w-[10rem] rounded-xl border border-[#70C9EF]/40 bg-white p-3 shadow-[0_8px_24px_-8px_rgba(112,201,239,0.22)]">
+      <p className="text-[12px] font-semibold text-[#0F172A]">{label}</p>
       <div className="mt-2 space-y-1.5">
         {payload.map((entry) => (
-          <p key={entry.dataKey} className="flex items-center gap-2 text-caption text-ink-muted">
+          <p key={entry.dataKey} className="flex items-center gap-2 text-caption text-[#64748B]">
             <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: entry.stroke }} aria-hidden />
             <span className="flex-1">{entry.name}</span>
-            <span className="font-semibold tabular-nums text-ink">{entry.value}</span>
+            <span className="font-semibold tabular-nums text-[#0F172A]">{entry.value}</span>
           </p>
         ))}
       </div>
@@ -28,15 +29,15 @@ export const AttendanceTrendAreaChart = memo(function AttendanceTrendAreaChart({
       <AreaChart data={data} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
         <defs>
           <linearGradient id="trendCheckinsFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={CHART_COLORS.primary} stopOpacity={0.18} />
-            <stop offset="100%" stopColor={CHART_COLORS.primary} stopOpacity={0} />
+            <stop offset="0%" stopColor={SKY} stopOpacity={0.3} />
+            <stop offset="100%" stopColor={SKY} stopOpacity={0} />
           </linearGradient>
           <linearGradient id="trendHeadcountFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={CHART_COLORS.tertiary} stopOpacity={0.1} />
+            <stop offset="0%" stopColor={CHART_COLORS.tertiary} stopOpacity={0.08} />
             <stop offset="100%" stopColor={CHART_COLORS.tertiary} stopOpacity={0} />
           </linearGradient>
         </defs>
-        <CartesianGrid stroke="rgba(0, 151, 167, 0.06)" strokeDasharray="3 8" vertical={false} />
+        <CartesianGrid stroke="rgba(112, 201, 239, 0.18)" strokeDasharray="3 8" vertical={false} />
         <XAxis
           dataKey="label"
           tick={AXIS_TICK}
@@ -57,7 +58,7 @@ export const AttendanceTrendAreaChart = memo(function AttendanceTrendAreaChart({
         />
         <Tooltip
           content={<TrendTooltip />}
-          cursor={{ stroke: 'rgba(0, 151, 167, 0.28)', strokeWidth: 1, strokeDasharray: '4 4' }}
+          cursor={{ stroke: 'rgba(112, 201, 239, 0.45)', strokeWidth: 1, strokeDasharray: '4 4' }}
         />
         <Area
           type="monotone"
@@ -76,14 +77,14 @@ export const AttendanceTrendAreaChart = memo(function AttendanceTrendAreaChart({
           type="monotone"
           dataKey="checkins"
           name="Check-ins"
-          stroke={CHART_COLORS.primary}
-          strokeWidth={2}
+          stroke={SKY}
+          strokeWidth={2.5}
           fill="url(#trendCheckinsFill)"
           fillOpacity={1}
           dot={false}
           animationDuration={800}
           animationEasing="ease-out"
-          activeDot={{ r: 4, fill: CHART_COLORS.primary, stroke: '#ffffff', strokeWidth: 2 }}
+          activeDot={{ r: 4, fill: SKY, stroke: '#ffffff', strokeWidth: 2 }}
         />
       </AreaChart>
     </ResponsiveContainer>

@@ -4,19 +4,15 @@ import { NAV_FOOTER_ITEMS, NAV_SECTIONS, NOTIFICATIONS_ITEM } from './navConfig'
 import { CountBadge } from './ui/CountBadge';
 
 /*
- * Row geometry for a permanently expanded 256px rail. Left padding only — the
- * selected tab must reach the rail's right edge so its inverse curves meet the
- * page canvas. Icons and labels share one baseline via items-center + gap-3.
+ * Cyan rail with concave active cutout (white pill → main canvas).
+ * Palette: #00B2EE / white / soft sky — layout from the reference.
  */
 const ROW_BASE =
-  'group/row relative flex h-9 w-full items-center gap-3 rounded-l-full pl-2.5 pr-3 text-left text-label tracking-[-0.01em] transition-colors duration-200 ease-premium';
-/*
- * Active tab + curve pieces share .page-wash with the dashboard canvas so the
- * cutout merges into the landing-matched background with no shade seam.
- */
-const ROW_ACTIVE = 'page-wash z-10 font-semibold text-accent-900';
-const ROW_IDLE = 'font-semibold text-white hover:bg-white/20';
-const CUTOUT = 'nav-cut page-wash';
+  'group/row relative flex h-11 w-full items-center gap-3 pl-3.5 pr-4 text-left text-label tracking-[-0.01em] transition-colors duration-200 ease-premium';
+const ROW_ACTIVE =
+  'nav-item-active z-10 ml-3 mr-0 rounded-l-[20px] bg-white font-semibold text-[#00B2EE]';
+const ROW_IDLE =
+  'mx-3 rounded-xl font-semibold text-white/85 hover:bg-white/15 hover:text-white';
 
 function NavRow({ item, badge = 0 }) {
   const Icon = item.icon;
@@ -28,16 +24,10 @@ function NavRow({ item, badge = 0 }) {
     >
       {({ isActive }) => (
         <>
-          {isActive && (
-            <>
-              <b className={`${CUTOUT} nav-cut-top`} aria-hidden />
-              <b className={`${CUTOUT} nav-cut-bottom`} aria-hidden />
-            </>
-          )}
           <span className="relative grid h-5 w-5 shrink-0 place-items-center">
             <Icon
               className={`h-[18px] w-[18px] transition-colors duration-200 ease-premium ${
-                isActive ? 'text-accent-700' : 'text-white'
+                isActive ? 'text-[#00B2EE]' : 'text-white/85 group-hover/row:text-white'
               }`}
               strokeWidth={isActive ? 2 : 1.75}
             />
@@ -47,12 +37,9 @@ function NavRow({ item, badge = 0 }) {
             <CountBadge
               count={badge}
               max={99}
+              tone={isActive ? 'brand' : 'onBrand'}
               ring={false}
-              className={
-                isActive
-                  ? 'shrink-0 h-[1.125rem] ring-2 ring-white'
-                  : 'shrink-0 h-[1.125rem] ring-2 ring-[#0097A7]'
-              }
+              className="h-[1.125rem] shrink-0"
             />
           )}
         </>
@@ -63,8 +50,8 @@ function NavRow({ item, badge = 0 }) {
 
 function SectionLabel({ children }) {
   return (
-    <div className="relative flex h-6 items-center pl-2.5 pr-3">
-      <p className="truncate whitespace-nowrap text-micro font-bold uppercase tracking-[0.12em] text-white">
+    <div className="relative flex h-6 items-center px-6">
+      <p className="truncate whitespace-nowrap text-micro font-bold uppercase tracking-[0.12em] text-white/65">
         {children}
       </p>
     </div>
@@ -72,10 +59,6 @@ function SectionLabel({ children }) {
 }
 
 /**
- * In-flow left rail: flush to the viewport edge (no outer margin/padding/radius),
- * square corners, 256px wide. Lives in the AppShell flex row so the content column
- * sits beside it — no fixed positioning, no pl-64 offset.
- *
  * @param {{
  *   canSee: (item: object) => boolean,
  *   onLogout: () => void,
@@ -93,12 +76,11 @@ export function Sidebar({ canSee, onLogout, unreadCount = 0 }) {
 
   return (
     <aside
-      className="relative z-40 m-0 hidden h-full w-64 shrink-0 flex-col justify-between overflow-hidden rounded-none bg-[#0097A7] p-0 text-white md:flex"
-      style={{ '--nav-rail': '#0097A7' }}
+      className="nav-surface relative z-40 m-0 hidden h-full w-64 shrink-0 flex-col justify-between overflow-hidden rounded-l-3xl p-0 md:flex"
       aria-label="Sidebar"
     >
-      <div className="relative flex h-14 shrink-0 items-center gap-3 px-3">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[13px] bg-white shadow-[0_2px_8px_rgba(0,70,79,0.22)]">
+      <div className="relative flex h-16 shrink-0 items-center gap-3 px-5">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[13px] bg-white shadow-[0_2px_8px_rgba(15,23,42,0.14)]">
           <img src="/logo.jpeg" alt="Hadir.ai logo" className="h-6 w-6 rounded-[9px] object-cover" />
         </span>
         <span className="min-w-0">
@@ -112,7 +94,7 @@ export function Sidebar({ canSee, onLogout, unreadCount = 0 }) {
       </div>
 
       <nav
-        className="no-scrollbar relative min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain py-6 pb-8 pl-4"
+        className="no-scrollbar relative min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain py-4 pb-8"
         aria-label="Main navigation"
       >
         {sections.map((section, index) => (
@@ -128,7 +110,7 @@ export function Sidebar({ canSee, onLogout, unreadCount = 0 }) {
         ))}
       </nav>
 
-      <div className="relative z-20 shrink-0 space-y-1 bg-[#0097A7] py-3 pl-4">
+      <div className="relative z-20 shrink-0 space-y-1 border-t border-white/20 bg-transparent py-3">
         {footerItems.map((item) => (
           <NavRow key={item.to} item={item} />
         ))}
@@ -137,9 +119,9 @@ export function Sidebar({ canSee, onLogout, unreadCount = 0 }) {
           type="button"
           onClick={onLogout}
           title="Logout"
-          className="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left text-sm font-semibold text-white transition-all hover:bg-white/10"
+          className={`${ROW_BASE} ${ROW_IDLE} w-auto`}
         >
-          <LogOut className="h-5 w-5 shrink-0 text-white" strokeWidth={1.75} />
+          <LogOut className="h-5 w-5 shrink-0 text-white/85" strokeWidth={1.75} />
           <span>Logout</span>
         </button>
       </div>

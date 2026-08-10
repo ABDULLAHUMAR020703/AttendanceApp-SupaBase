@@ -77,7 +77,7 @@ export function GlassTable({
                       <button
                         type="button"
                         onClick={() => onSort(col.key)}
-                        className={cn('ui-th-sortable group/th', active && 'text-accent-800')}
+                        className={cn('ui-th-sortable group/th', active && 'text-accent-600')}
                       >
                         {col.label}
                         <Icon
@@ -162,7 +162,7 @@ const initialsOf = (value) =>
 export function TableIdentity({ name, secondary, onClick, tone = 'accent' }) {
   const Tag = onClick ? 'button' : 'div';
   const palette =
-    tone === 'neutral' ? 'bg-surface-muted text-ink-muted' : 'bg-accent-100 text-accent-800';
+    tone === 'neutral' ? 'bg-surface-muted text-ink-muted' : 'bg-[#E6F4FA] text-[#00BFFF]';
 
   return (
     <Tag
@@ -182,7 +182,7 @@ export function TableIdentity({ name, secondary, onClick, tone = 'accent' }) {
         <span
           className={cn(
             'block truncate text-body-tight font-medium text-ink transition-colors',
-            onClick && 'group-hover:text-accent-800'
+            onClick && 'group-hover:text-accent-600'
           )}
         >
           {name}
@@ -295,14 +295,14 @@ export function TableSelectionBar({ count, onClear, children }) {
 
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-[18px] border border-accent-200 bg-accent-50 px-3 py-2.5">
-      <span className="text-label font-semibold text-accent-800">
+      <span className="text-label font-semibold text-accent-600">
         {count} selected
       </span>
       <div className="flex flex-wrap items-center gap-2">{children}</div>
       <button
         type="button"
         onClick={onClear}
-        className="ml-auto inline-flex items-center gap-1 rounded-lg px-2 py-1 text-caption font-medium text-accent-800 transition-colors hover:bg-white/70"
+        className="ml-auto inline-flex items-center gap-1 rounded-lg px-2 py-1 text-caption font-medium text-accent-600 transition-colors hover:bg-white/70"
       >
         <X className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
         Clear

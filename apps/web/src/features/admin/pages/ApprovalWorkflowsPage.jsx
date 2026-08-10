@@ -115,8 +115,8 @@ export function ApprovalWorkflowsPage() {
             aria-pressed={selectedType === type}
             className={`rounded-xl border px-3 py-2 text-sm transition-colors duration-200 ${
               selectedType === type
-                ? 'border-accent-200 bg-accent-100 font-semibold text-accent-800'
-                : 'border-hairline bg-white text-ink-muted hover:border-accent-200 hover:bg-accent-50 hover:text-accent-800'
+                ? 'border-accent-200 bg-accent-100 font-semibold text-accent-600'
+                : 'border-hairline bg-white text-ink-muted hover:border-accent-200 hover:bg-[#E6F4FA] hover:text-accent-600'
             }`}
           >
             {label}

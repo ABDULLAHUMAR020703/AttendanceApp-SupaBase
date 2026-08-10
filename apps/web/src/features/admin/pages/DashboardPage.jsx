@@ -1,10 +1,10 @@
 import { Fragment, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import {
   AlertCircle,
   ArrowUpRight,
   Building2,
-  CalendarCheck,
   CalendarDays,
   Check,
   Clock,
@@ -18,7 +18,6 @@ import {
   TrendingUp,
   UserCog,
   Users,
-  Wifi,
   X,
 } from 'lucide-react';
 import { adminService } from '../services/adminService';
@@ -83,40 +82,37 @@ const CARD_TIERS = {
 const cardFooter = (tier) =>
   `${CARD_TIERS[tier].footer} flex items-center justify-between gap-4 border-t border-hairline text-caption font-medium text-ink-muted`;
 const FOCUS_RING =
-  'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-600/45 focus-visible:ring-offset-2';
+  'focus:outline-none focus-visible:ring-[3px] focus-visible:ring-[rgba(0,178,238,0.25)] focus-visible:ring-offset-2';
+/* Design tokens for this dashboard (Hadir cyan system). */
+const CYAN = '#00B2EE';
+const SKY = '#70C9EF';
+const SOFT_SKY = '#E6F4FA';
+const SLATE = '#0F172A';
+const MUTED = '#64748B';
+const ICE = '#F8FCFD';
+
 /* One button vocabulary for the whole dashboard: filled cyan leads, outline follows. */
 const BTN_BASE =
   'inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition-all duration-200 ease-premium active:translate-y-px';
-/* Same fill and white label as .ui-btn-primary, at this row's smaller geometry. */
-const BTN_PRIMARY = `${BTN_BASE} bg-accent-700 text-white shadow-[0_1px_3px_rgba(0,90,102,0.28)] hover:bg-accent-800 hover:shadow-[0_6px_16px_rgba(0,131,143,0.3)]`;
-const BTN_QUIET = `${BTN_BASE} border border-hairline bg-white text-ink-muted hover:border-accent-200 hover:bg-accent-50 hover:text-accent-800`;
+const BTN_PRIMARY = `${BTN_BASE} bg-[#00B2EE] text-white shadow-[0_1px_3px_rgba(0,178,238,0.28)] hover:-translate-y-px hover:bg-[#0090C4] hover:shadow-[0_6px_16px_rgba(0,144,196,0.3)]`;
+const BTN_QUIET = `${BTN_BASE} border border-[#70C9EF]/50 bg-white text-[#64748B] hover:border-[#70C9EF] hover:bg-[#E6F4FA] hover:text-[#00B2EE]`;
 const BTN_DANGER_QUIET = `${BTN_BASE} border border-hairline bg-white text-ink-muted hover:border-danger-border hover:bg-danger-surface hover:text-danger-ink`;
-/* In-row actions stay compact so the request itself keeps the visual weight. */
 const BTN_SM = 'px-2.5 py-1.5 text-caption';
-/*
- * Queue decisions use soft tinted fills rather than a filled primary: two equally
- * weighted, full-width targets that press in on tap, iOS-style.
- */
 const BTN_SOFT_BASE =
   'inline-flex w-full items-center justify-center gap-1.5 rounded-xl py-2 text-caption font-semibold transition-all duration-200 ease-premium active:scale-[0.98] disabled:cursor-not-allowed';
-/* Approve leads with brand cyan — not lime — so the queue matches the sidebar identity. */
-const BTN_SOFT_APPROVE = `${BTN_SOFT_BASE} bg-accent-600 text-white shadow-[0_1px_3px_rgba(0,90,102,0.22)] hover:bg-accent-700`;
-const BTN_SOFT_DANGER = `${BTN_SOFT_BASE} border border-hairline bg-white text-ink-muted hover:border-danger-border hover:bg-danger-surface hover:text-danger-ink`;
+const BTN_SOFT_APPROVE = `${BTN_SOFT_BASE} bg-[#00B2EE] text-white shadow-[0_1px_3px_rgba(0,178,238,0.22)] hover:-translate-y-px hover:bg-[#0090C4] hover:shadow-[0_8px_18px_rgba(0,178,238,0.28)]`;
+const BTN_SOFT_DANGER = `${BTN_SOFT_BASE} border border-[#FECACA] bg-white text-[#DC2626] hover:border-[#F87171] hover:bg-[#FEF2F2]`;
 const ICON_BTN =
-  'grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline bg-white text-ink-muted transition-all duration-200 hover:border-accent-200 hover:bg-accent-50 hover:text-accent-800';
+  'grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline bg-white text-ink-muted transition-all duration-200 hover:border-[#70C9EF] hover:bg-[#E6F4FA] hover:text-[#00B2EE]';
 const HEALTH_FILTERS = [
   { id: 'today', label: 'Today' },
   { id: 'week', label: 'This Week' },
   { id: 'month', label: 'This Month' },
 ];
-/*
- * Attendance split — cyan family only (sidebar brand #0097A7). No green.
- * Outer → ice cyan, mid → light→brand, inner → brand→deep teal.
- */
 const HEALTH_SEGMENTS = [
-  { key: 'onSite', label: 'On-site', color: '#0097A7', colorSoft: '#006978' },
-  { key: 'remote', label: 'Remote / hybrid', color: '#4DD0E1', colorSoft: '#0097A7' },
-  { key: 'absent', label: 'Not checked in', color: '#E6F7F9', colorSoft: '#C7EFF5' },
+  { key: 'onSite', label: 'On-site', color: CYAN, colorSoft: SKY },
+  { key: 'remote', label: 'Remote / hybrid', color: SKY, colorSoft: CYAN },
+  { key: 'absent', label: 'Not checked in', color: '#E0F6FC', colorSoft: '#C2ECF9' },
 ];
 
 const WORK_MODE_LABELS = {
@@ -125,39 +121,56 @@ const WORK_MODE_LABELS = {
   fully_remote: 'Fully remote',
 };
 
-/* Ordered bars use the shared rank ladder — see rankColor in chartTheme. */
-
 const REMOTE_MODES = new Set(['semi_remote', 'fully_remote', 'remote', 'hybrid']);
 
-/* Arrivals after 09:15 count as late, and the activity strip covers 06:00–20:00. */
 const LATE_AFTER_MINUTES = 9 * 60 + 15;
 const LATE_LABEL = '09:15';
 const ACTIVITY_WINDOW = { from: 6, to: 20 };
 
-/*
- * Check-ins-by-time matrix. Rows are two-hour bands, not single hours: the working
- * window is 14 hours long, and fourteen rows in the height this panel has would be
- * 8px each — a texture rather than a grid you can read a value off. Seven bands
- * against seven days also keeps the cells close to square.
- */
 const HEATMAP_BAND_HOURS = 2;
 const HEATMAP_DAYS = 7;
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
 /*
- * Five steps of one hue, because the only variable encoded is volume — a second hue
- * would imply a second dimension. Level 0 keeps the page tone plus a hairline so a
- * band nobody checked into still occupies a visible slot: on an attendance grid the
- * empty cells are half the finding. The legend dots for the two palest steps carry a
- * ring, since a 10px dot of #E6F7F9 on white is otherwise invisible.
+ * Heatmap density — ice → soft sky → sky → vivid→deep cyan.
  */
 const HEATMAP_LEVELS = [
-  { cell: 'bg-page border border-hairline', dot: 'bg-page ring-1 ring-hairline-strong' },
-  { cell: 'bg-accent-100', dot: 'bg-accent-100 ring-1 ring-accent-200' },
-  /* Tier 3 — the ramp's light step, so the mid band is a token and not a one-off. */
-  { cell: 'bg-accent-400', dot: 'bg-accent-400' },
-  { cell: 'bg-accent-600', dot: 'bg-accent-600' },
-  { cell: 'bg-accent-900', dot: 'bg-accent-900' },
+  {
+    gradient: `linear-gradient(135deg, ${ICE}, ${ICE})`,
+    border: `1px solid ${SOFT_SKY}`,
+    glow: '0 4px 12px rgba(0, 178, 238, 0.3)',
+    pulse: false,
+    label: '0',
+  },
+  {
+    gradient: `linear-gradient(135deg, ${SOFT_SKY}, ${SOFT_SKY})`,
+    border: '1px solid transparent',
+    glow: '0 4px 12px rgba(0, 178, 238, 0.3)',
+    pulse: false,
+    label: '1–2',
+  },
+  {
+    gradient: `linear-gradient(135deg, ${SKY}, ${SKY})`,
+    border: '1px solid transparent',
+    glow: '0 4px 12px rgba(0, 178, 238, 0.3)',
+    pulse: false,
+    label: '3–4',
+  },
+  {
+    gradient: `linear-gradient(135deg, ${CYAN}, #0088E8)`,
+    border: '1px solid transparent',
+    glow: '0 4px 12px rgba(0, 178, 238, 0.35)',
+    pulse: true,
+    label: '5+',
+  },
 ];
+
+const heatmapLevelOf = (count) => {
+  if (!count || count <= 0) return 0;
+  if (count <= 2) return 1;
+  if (count <= 4) return 2;
+  return 3;
+};
 
 /** 13 → "1pm". Hour labels are 12-hour because the axis is scanned, not computed. */
 const formatHourLabel = (hour) => {
@@ -337,7 +350,7 @@ function DeltaChip({ delta, suffix = '' }) {
 }
 
 /**
- * Layered concentric attendance viz — soft cyan gradients tied to sidebar #0097A7.
+ * Coverage donut — cyan→sky stroke, deep-slate center metric.
  */
 function LayeredAttendanceViz({
   onSite,
@@ -359,59 +372,32 @@ function LayeredAttendanceViz({
     setProgress(0);
     let frame;
     const started = performance.now();
-    const duration = 960;
+    const duration = 900;
     const step = (now) => {
       const t = Math.min(1, (now - started) / duration);
-      const eased = 1 - (1 - t) ** 3;
-      setProgress(eased);
+      setProgress(1 - (1 - t) ** 3);
       if (t < 1) frame = requestAnimationFrame(step);
     };
     frame = requestAnimationFrame(step);
     return () => cancelAnimationFrame(frame);
-  }, [onSite, remote, absent, headcount]);
+  }, [onSite, remote, absent, headcount, coverage]);
 
   const vb = 300;
   const cx = 150;
   const cy = 150;
-  const maxR = 118;
+  const radius = 104;
+  const stroke = 22;
+  const circumference = 2 * Math.PI * radius;
+  const coveredLen = circumference * (Math.min(100, Math.max(0, coverage)) / 100) * progress;
   const safeHead = Math.max(headcount, 1);
   const pct = (n) => Math.round((Math.max(0, n) / safeHead) * 100);
 
-  /* Staggered ease-out expand: outer → mid → inner */
-  const layerT = (delay, span = 0.58) =>
-    Math.max(0, Math.min(1, (progress - delay) / span));
-
-  const rOuter = maxR * layerT(0);
-  const rMid = maxR * Math.max(0.12, (onSite + remote) / safeHead) * layerT(0.1);
-  const rInner = maxR * Math.max(0.08, onSite / safeHead) * layerT(0.2);
-
-  const layers = [
-    {
-      key: 'absent',
-      r: rOuter,
-      fill: 'url(#attGradAbsent)',
-      tip: { title: 'Not checked in', detail: `${absent} employees · ${pct(absent)}%` },
-    },
-    {
-      key: 'remote',
-      r: rMid,
-      fill: 'url(#attGradRemote)',
-      tip: { title: 'Remote / hybrid', detail: `${remote} employees · ${pct(remote)}%` },
-    },
-    {
-      key: 'onSite',
-      r: rInner,
-      fill: 'url(#attGradOnSite)',
-      tip: { title: 'On-site', detail: `${onSite} employees · ${pct(onSite)}%` },
-    },
-  ];
-
-  const layerOpacity = (key) => {
-    if (!activeKey) return 1;
-    return activeKey === key ? 1 : 0.3;
+  const tips = {
+    onSite: { title: 'On-site', detail: `${onSite} employees · ${pct(onSite)}%` },
+    remote: { title: 'Remote / hybrid', detail: `${remote} employees · ${pct(remote)}%` },
+    absent: { title: 'Not checked in', detail: `${absent} employees · ${pct(absent)}%` },
   };
-
-  const activeTip = layers.find((layer) => layer.key === activeKey)?.tip;
+  const activeTip = activeKey ? tips[activeKey] : null;
 
   return (
     <div
@@ -421,77 +407,41 @@ function LayeredAttendanceViz({
       onMouseLeave={() => onHoverKey?.(null)}
     >
       <svg viewBox={`0 0 ${vb} ${vb}`} className="h-full w-full overflow-visible" aria-hidden>
-        <defs>
-          <radialGradient id="attGradAbsent" cx="42%" cy="38%" r="68%">
-            <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.95" />
-            <stop offset="45%" stopColor="#F2FCFD" stopOpacity="0.78" />
-            <stop offset="100%" stopColor="#E6F7F9" stopOpacity="0.52" />
-          </radialGradient>
-          <radialGradient id="attGradRemote" cx="40%" cy="36%" r="70%">
-            <stop offset="0%" stopColor="#E6F7F9" stopOpacity="0.95" />
-            <stop offset="38%" stopColor="#8FE3EE" stopOpacity="0.88" />
-            <stop offset="78%" stopColor="#0097A7" stopOpacity="0.74" />
-            <stop offset="100%" stopColor="#00838F" stopOpacity="0.58" />
-          </radialGradient>
-          <radialGradient id="attGradOnSite" cx="38%" cy="34%" r="72%">
-            <stop offset="0%" stopColor="#4DD0E1" stopOpacity="0.95" />
-            <stop offset="42%" stopColor="#0097A7" stopOpacity="0.96" />
-            <stop offset="100%" stopColor="#006978" stopOpacity="0.92" />
-          </radialGradient>
-          <radialGradient id="attCenterGlow" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#FFFFFF" stopOpacity="1" />
-            <stop offset="55%" stopColor="#F2FCFD" stopOpacity="0.96" />
-            <stop offset="100%" stopColor="#E6F7F9" stopOpacity="0" />
-          </radialGradient>
-        </defs>
-
-        <circle cx={cx} cy={cy} r={maxR + 8} fill="url(#attCenterGlow)" opacity={0.85 * progress} />
-
-        {layers.map((layer) => {
-          if (layer.r < 0.5) return null;
-          const boost = activeKey === layer.key;
-          return (
-            <circle
-              key={layer.key}
-              cx={cx}
-              cy={cy}
-              r={layer.r}
-              fill={layer.fill}
-              stroke={boost ? 'rgba(0, 151, 167, 0.38)' : 'rgba(255, 255, 255, 0.55)'}
-              strokeWidth={boost ? 1.6 : 1}
-              opacity={layerOpacity(layer.key)}
-              className="cursor-pointer"
-              style={{
-                transition: 'opacity 200ms ease-out, stroke 200ms ease-out, stroke-width 200ms ease-out',
-                filter: boost ? 'saturate(1.12) brightness(1.04)' : undefined,
-              }}
-              onMouseEnter={() => onHoverKey?.(layer.key)}
-            />
-          );
-        })}
-
         <circle
           cx={cx}
           cy={cy}
-          r={44 * Math.max(progress, 0.01)}
-          fill="url(#attCenterGlow)"
-          stroke="rgba(0, 151, 167, 0.12)"
-          strokeWidth="1"
+          r={radius}
+          fill="none"
+          stroke="#FFFFFF"
+          strokeWidth={stroke}
         />
+        <circle
+          cx={cx}
+          cy={cy}
+          r={radius}
+          fill="none"
+          stroke={CYAN}
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={`${coveredLen} ${circumference}`}
+          transform={`rotate(-90 ${cx} ${cy})`}
+          className="transition-[stroke-dasharray] duration-200 ease-out"
+        />
+        <circle cx={cx} cy={cy} r={radius - stroke / 2 - 8} fill="#FFFFFF" />
       </svg>
 
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-        <span className="text-[2.75rem] font-bold leading-none tracking-tight tabular-nums text-[#0F282F]">
+        <span className="text-[2.75rem] font-bold leading-none tracking-tight tabular-nums text-[#0F172A]">
           {animatedCoverage}%
         </span>
-        <span className="mt-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#00838F]">
+        <span className="mt-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#00B2EE]">
           Covered
         </span>
       </div>
 
       {activeTip && (
-        <div className="pointer-events-none absolute left-1/2 top-2 z-10 w-max max-w-[92%] -translate-x-1/2 rounded-xl border border-[#C7EFF5] bg-white/95 px-3 py-2 text-center shadow-[0_8px_24px_-10px_rgba(0,151,167,0.22)] transition-opacity duration-[200ms] ease-out">
-          <p className="text-[12px] font-semibold text-[#0F282F]">{activeTip.title}</p>
+        <div className="pointer-events-none absolute left-1/2 top-2 z-10 w-max max-w-[92%] -translate-x-1/2 rounded-xl border border-[#C2ECF9] bg-white/95 px-3 py-2 text-center shadow-[0_8px_24px_-10px_rgba(0,178,238,0.22)]">
+          <p className="text-[12px] font-semibold text-[#0F172A]">{activeTip.title}</p>
           <p className="mt-0.5 text-[11px] font-medium text-[#64748B]">{activeTip.detail}</p>
         </div>
       )}
@@ -503,18 +453,7 @@ function LayeredAttendanceViz({
 function AttendanceSegmentLegend({ segments, headcount, activeKey, onHoverKey, reveal }) {
   const share = (value) => (headcount ? Math.round((value / headcount) * 100) : 0);
 
-  const indicatorStyle = (key) => {
-    if (key === 'onSite') {
-      return { background: 'linear-gradient(135deg, #0097A7 0%, #006978 100%)' };
-    }
-    if (key === 'remote') {
-      return { background: 'linear-gradient(135deg, #8FE3EE 0%, #0097A7 100%)' };
-    }
-    return {
-      background: 'linear-gradient(135deg, #F2FCFD 0%, #C7EFF5 100%)',
-      border: '1px solid #C7EFF5',
-    };
-  };
+  const indicatorStyle = () => ({ backgroundColor: CYAN });
 
   return (
     <ul className="flex h-full w-full flex-col justify-center">
@@ -525,7 +464,7 @@ function AttendanceSegmentLegend({ segments, headcount, activeKey, onHoverKey, r
         return (
           <li
             key={segment.key}
-            className="flex cursor-pointer items-center gap-3 border-b border-[#E6F7F9] py-4 last:border-b-0"
+            className="flex cursor-pointer items-center gap-3 border-b border-[#00B2EE]/10 py-4 last:border-b-0"
             style={{
               opacity: reveal ? (muted ? 0.38 : 1) : 0,
               transform: reveal ? 'translateY(0)' : 'translateY(6px)',
@@ -536,20 +475,20 @@ function AttendanceSegmentLegend({ segments, headcount, activeKey, onHoverKey, r
             onMouseLeave={() => onHoverKey?.(null)}
           >
             <span
-              className="h-2.5 w-2.5 shrink-0 rounded-full transition-shadow duration-[200ms] ease-out"
+              className="h-2.5 w-2.5 shrink-0 rounded-full bg-[#00B2EE] transition-shadow duration-[200ms] ease-out"
               style={{
                 ...indicatorStyle(segment.key),
-                boxShadow: active ? '0 0 0 4px rgba(0, 151, 167, 0.16)' : undefined,
+                boxShadow: active ? '0 0 0 4px rgba(0, 178, 238, 0.16)' : undefined,
               }}
               aria-hidden
             />
-            <span className="min-w-0 flex-1 truncate text-[15px] font-medium text-[#0F282F]">
+            <span className="min-w-0 flex-1 truncate text-[15px] font-medium text-[#0F172A]">
               {segment.label}
             </span>
-            <span className="shrink-0 text-[15px] font-semibold tabular-nums text-[#0F282F]">
+            <span className="shrink-0 text-[15px] font-semibold tabular-nums text-[#0F172A]">
               {segment.value}
             </span>
-            <span className="w-12 shrink-0 text-right text-[13px] font-medium tabular-nums text-[#64748B]">
+            <span className="w-12 shrink-0 text-right text-[13px] font-semibold tabular-nums text-[#00B2EE]">
               {pct}%
             </span>
           </li>
@@ -601,7 +540,7 @@ function GhostAction({ onClick, children, ariaLabel }) {
       type="button"
       onClick={onClick}
       aria-label={ariaLabel}
-      className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-hairline bg-white px-2.5 text-xs font-semibold text-ink-muted transition-all duration-200 hover:border-accent-200 hover:bg-accent-50 hover:text-accent-800 ${FOCUS_RING}`}
+      className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-hairline bg-white px-2.5 text-xs font-semibold text-ink-muted transition-all duration-200 hover:border-accent-200 hover:bg-[#E6F4FA] hover:text-accent-600 ${FOCUS_RING}`}
     >
       {children}
     </button>
@@ -624,7 +563,7 @@ function OverviewBanner({ adminName, stats, loading, statusPills = [] }) {
     <section className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
-          <p className="text-micro font-semibold uppercase tracking-[0.08em] text-accent-700">Dashboard</p>
+          <p className="text-micro font-semibold uppercase tracking-[0.08em] text-[#0F172A]">Dashboard</p>
           <h1 className="mt-1 truncate text-title font-semibold tracking-tight text-ink sm:text-title-lg">
             Welcome back, {adminName}
           </h1>
@@ -646,9 +585,9 @@ function OverviewBanner({ adminName, stats, loading, statusPills = [] }) {
       </div>
 
       {/* Mobile: horizontal snap scroll. Desktop: equal 4-up with lead emphasis via surface. */}
-      <div className="-mx-1 flex gap-4 overflow-x-auto px-1 pb-1 snap-x snap-mandatory sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-4">
+      <div className="-mx-1 flex gap-4 overflow-x-auto px-1 pb-1 snap-x snap-mandatory sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-4 lg:gap-5">
         {stats.map((stat, index) => (
-          <div key={stat.label} className="min-w-[17rem] shrink-0 snap-start sm:min-w-0">
+          <div key={stat.label} className="min-w-[17rem] shrink-0 snap-start sm:min-w-0 sm:h-full">
             <KpiStat {...stat} hero={index === 0} loading={loading} />
           </div>
         ))}
@@ -659,14 +598,91 @@ function OverviewBanner({ adminName, stats, loading, statusPills = [] }) {
 
 /** Semantic insight dots — cyan for brand-neutral; amber/red only for attention. */
 const KPI_STATUS_DOTS = {
-  neutral: 'bg-accent-600',
-  good: 'bg-accent-700',
-  watch: 'bg-amber-400',
+  neutral: 'bg-[#00B2EE]',
+  good: 'bg-[#00B2EE]',
+  watch: 'bg-[#F59E0B]',
   urgent: 'bg-[#EF4444]',
 };
 
+const KPI_BADGE_TONES = {
+  neutral: 'border-[#00B2EE]/40 bg-[rgba(0,178,238,0.1)]',
+  good: 'border-[#00B2EE]/40 bg-[rgba(0,178,238,0.1)]',
+  watch: 'border-[#F59E0B]/50 bg-[rgba(245,158,11,0.12)]',
+  urgent: 'border-[#EF4444]/45 bg-[rgba(239,68,68,0.1)]',
+};
+
+/** Pixel-sharp KPI glyphs — stroke icons only, no filled art. */
+function KpiSvg({ className = '', children }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      {children}
+    </svg>
+  );
+}
+
+function KpiIconWorkforce({ className }) {
+  return (
+    <KpiSvg className={className}>
+      <circle cx="12" cy="6.25" r="2.35" />
+      <path d="M7.75 15.25c.7-2.35 2.25-3.7 4.25-3.7s3.55 1.35 4.25 3.7" />
+      <circle cx="5.35" cy="8.1" r="1.95" />
+      <path d="M2.2 15.4c.55-1.9 1.75-3 3.15-3" />
+      <circle cx="18.65" cy="8.1" r="1.95" />
+      <path d="M21.8 15.4c-.55-1.9-1.75-3-3.15-3" />
+    </KpiSvg>
+  );
+}
+
+function KpiIconCalendar({ className }) {
+  return (
+    <KpiSvg className={className}>
+      <rect x="3.5" y="5" width="17" height="15" rx="2" />
+      <path d="M3.5 9.5h17" />
+      <path d="M8 3.5v3" />
+      <path d="M16 3.5v3" />
+      <path d="M7.5 13h2" />
+      <path d="M11 13h2" />
+      <path d="M14.5 13h2" />
+      <path d="M7.5 16.25h2" />
+      <path d="M11 16.25h2" />
+    </KpiSvg>
+  );
+}
+
+function KpiIconWifi({ className }) {
+  return (
+    <KpiSvg className={className}>
+      <path d="M4.2 10.2a11 11 0 0 1 15.6 0" />
+      <path d="M7.1 13.1a7 7 0 0 1 9.8 0" />
+      <path d="M10 16a3.2 3.2 0 0 1 4 0" />
+      <circle cx="12" cy="19" r="1.05" fill="currentColor" stroke="none" />
+    </KpiSvg>
+  );
+}
+
+function KpiIconClock({ className }) {
+  return (
+    <KpiSvg className={className}>
+      <circle cx="12" cy="12" r="8.25" />
+      {/* 10:10 — hour ≈ 305°, minute = 60° */}
+      <path d="M12 12L8.85 9.35" />
+      <path d="M12 12L15.55 10" />
+      <circle cx="12" cy="12" r="0.9" fill="currentColor" stroke="none" />
+    </KpiSvg>
+  );
+}
+
 /**
- * White KPI card with cyan accent — strong metric hierarchy, quiet insight footer.
+ * KPI metric card — identical padding, vivid cyan frame, crisp vector icons.
  */
 function KpiStat({
   icon: Icon,
@@ -685,64 +701,52 @@ function KpiStat({
 }) {
   const animated = useCountUp(count ?? 0);
   const Tag = onClick ? 'button' : 'div';
+  void hero;
 
   return (
     <Tag
       {...(onClick ? { type: 'button', onClick } : {})}
-      className={`kpi-folder group relative flex h-full w-full flex-col overflow-visible p-5 pt-9 text-left transition-transform duration-[200ms] ease-out hover:-translate-y-0.5 ${
-        hero ? 'kpi-folder--lead' : ''
-      } ${FOCUS_RING}`}
+      className={`group relative flex h-full w-full flex-col overflow-hidden rounded-2xl border-2 border-[#00B2EE] bg-white p-5 text-left shadow-[0_4px_18px_rgba(0,178,238,0.1)] transition-all duration-[200ms] ease-out hover:-translate-y-0.5 hover:shadow-[0_10px_26px_rgba(0,178,238,0.16)] ${FOCUS_RING}`}
     >
-      <span className="kpi-folder-surface" aria-hidden />
+      <span className="absolute inset-x-0 top-0 h-1.5 bg-[#00B2EE]" aria-hidden />
 
-      <span
-        className={`pointer-events-none absolute bottom-4 left-5 top-9 w-0.5 rounded-full bg-accent-600 transition-opacity duration-[200ms] ease-out ${
-          hero ? 'opacity-100' : 'opacity-35 group-hover:opacity-70'
-        }`}
-        aria-hidden
-      />
-
-      <span className="relative flex w-full flex-1 flex-col pl-2.5 text-ink">
-        <span className="flex w-full items-center justify-between gap-3">
-          <span className="truncate text-micro font-semibold uppercase tracking-[0.1em] text-accent-700">
+      <span className="relative flex w-full flex-1 flex-col">
+        <span className="flex w-full items-start justify-between gap-3">
+          <span className="truncate pt-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#64748B]">
             {label}
           </span>
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-accent-200 bg-accent-50 text-accent-700 transition-all duration-[200ms] ease-out group-hover:border-accent-300 group-hover:bg-accent-100">
-            <Icon className="h-4 w-4" strokeWidth={1.9} aria-hidden />
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[#00B2EE]/30 bg-[#E6F4FA] text-[#00B2EE]">
+            <Icon className="h-5 w-5" />
           </span>
         </span>
 
-        <span className="mt-2.5 block w-full">
+        <span className="mt-4 block w-full">
           {loading ? (
             <span className="skeleton block h-9 w-24 rounded-lg" aria-hidden />
           ) : (
-            <span
-              className={`block font-semibold tracking-tight tabular-nums text-ink ${
-                hero ? 'text-display' : 'text-metric'
-              }`}
-            >
+            <span className="block text-[34px] font-bold leading-none tracking-tight tabular-nums text-[#0F172A]">
               {count != null ? `${formatNumber(animated)}${suffix}` : value}
             </span>
           )}
         </span>
 
         {typeof progress === 'number' && (
-          <span className="ui-track mt-3 h-1 w-full" aria-hidden>
+          <span className="mt-3.5 h-2 w-full overflow-hidden rounded-full bg-[#E2E8F0]" aria-hidden>
             <span
-              className="ui-track-fill bg-accent-600"
+              className="block h-full rounded-full bg-[#00B2EE]"
               style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
             />
           </span>
         )}
 
         {context && (
-          <span className={`mt-2 block truncate text-caption font-medium text-ink-muted ${loading ? 'opacity-0' : ''}`}>
+          <span className={`mt-3 block truncate text-caption font-medium text-[#64748B] ${loading ? 'opacity-0' : ''}`}>
             {context}
           </span>
         )}
 
         {detail && (
-          <span className={`mt-1 block truncate text-caption text-ink-faint ${loading ? 'opacity-0' : ''}`}>
+          <span className={`mt-1 block truncate text-caption text-[#94A3B8] ${loading ? 'opacity-0' : ''}`}>
             {detail}
           </span>
         )}
@@ -750,19 +754,13 @@ function KpiStat({
         {insight && (
           <span className={`mt-auto block w-full pt-4 ${loading ? 'opacity-0' : ''}`}>
             <span
-              className={`flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 ${
-                insightTone === 'watch'
-                  ? 'border-amber-200/80 bg-amber-50/90'
-                  : insightTone === 'urgent'
-                    ? 'border-red-200/80 bg-red-50/90'
-                    : 'border-accent-200 bg-accent-50/80'
-              }`}
+              className={`flex w-full items-center gap-2 rounded-full border px-2.5 py-2 ${KPI_BADGE_TONES[insightTone] || KPI_BADGE_TONES.neutral}`}
             >
               <span
                 className={`h-1.5 w-1.5 shrink-0 rounded-full ${KPI_STATUS_DOTS[insightTone]}`}
                 aria-hidden
               />
-              <span className="truncate text-caption font-semibold text-ink">{insight}</span>
+              <span className="truncate text-caption font-semibold text-[#0F172A]">{insight}</span>
             </span>
           </span>
         )}
@@ -771,37 +769,30 @@ function KpiStat({
   );
 }
 
-/** Compact ops metric — accent edge carries semantic tone without rainbow fills. */
+/** Compact ops metric — white layered tile on soft-sky operations surface. */
 function OpsTile({ label, value, caption, tone = 'neutral', onClick }) {
   const Tag = onClick ? 'button' : 'div';
-  const edge = {
-    neutral: 'bg-accent-600/50',
-    warning: 'bg-amber-400',
-    danger: 'bg-danger-solid',
-    good: 'bg-accent-700',
-  };
   const valueTone = {
-    neutral: 'text-ink',
+    neutral: 'text-[#0F172A]',
     warning: 'text-warning-ink',
     danger: 'text-danger-ink',
-    good: 'text-accent-800',
+    good: 'text-[#00B2EE]',
   };
 
   return (
     <Tag
       {...(onClick ? { type: 'button', onClick } : {})}
-      className={`group/ops relative flex flex-col gap-1 overflow-hidden rounded-xl border border-hairline bg-surface-subtle/80 p-3 text-left transition-all duration-200 ease-out ${
+      className={`group/ops relative flex flex-col gap-1 overflow-hidden rounded-xl border border-[#70C9EF]/35 bg-white p-3 text-left shadow-[0_2px_10px_rgba(112,201,239,0.08)] transition-all duration-200 ease-out ${
         onClick
-          ? `hover:-translate-y-px hover:border-accent-200 hover:bg-white hover:shadow-hair ${FOCUS_RING}`
+          ? `hover:-translate-y-px hover:border-[#70C9EF] hover:shadow-[0_6px_16px_rgba(112,201,239,0.16)] ${FOCUS_RING}`
           : ''
       }`}
     >
-      <span className={`absolute bottom-3 left-0 top-3 w-0.5 rounded-full ${edge[tone]}`} aria-hidden />
-      <span className="pl-2.5 text-caption font-medium leading-tight text-ink-muted">{label}</span>
-      <span className={`pl-2.5 text-heading font-semibold leading-none tabular-nums ${valueTone[tone]}`}>
+      <span className="text-caption font-medium leading-tight text-[#64748B]">{label}</span>
+      <span className={`text-heading font-semibold leading-none tabular-nums ${valueTone[tone]}`}>
         {value}
       </span>
-      <span className="pl-2.5 truncate text-micro font-medium leading-tight text-ink-muted">{caption}</span>
+      <span className="truncate text-micro font-medium leading-tight text-[#64748B]">{caption}</span>
     </Tag>
   );
 }
@@ -826,8 +817,9 @@ function CheckinHeatmap({ matrix, onOpen, onRefresh }) {
   const closeMenu = useCallback(() => setMenuOpen(false), []);
   const rootRef = useDismiss(closeMenu, triggerRef);
   const { containerRef, onKeyDown } = useMenuNavigation({ open: menuOpen, onClose: closeMenu });
+  const reduceMotion = prefersReducedMotion();
 
-  const { rows, days, total, step, busiest, busiestBand } = matrix;
+  const { rows, days, total, busiest, busiestBand } = matrix;
 
   const refresh = async () => {
     closeMenu();
@@ -840,16 +832,11 @@ function CheckinHeatmap({ matrix, onOpen, onRefresh }) {
     }
   };
 
-  /* Band edges are printed rather than assumed, so the key always matches the grid. */
-  const legend = [1, 2, 3, 4].map((level) => {
-    const from = step * (level - 1) + 1;
-    const to = step * level;
-    return {
-      level,
-      dot: HEATMAP_LEVELS[level].dot,
-      label: level === 4 ? `${from}+` : from === to ? `${from}` : `${from}–${to}`,
-    };
-  });
+  /* Fixed density key — matches absolute gradient bands. */
+  const legend = [1, 2, 3].map((level) => ({
+    level,
+    ...HEATMAP_LEVELS[level],
+  }));
 
   const summary =
     total > 0
@@ -864,7 +851,7 @@ function CheckinHeatmap({ matrix, onOpen, onRefresh }) {
           <p className="mt-0.5 text-micro text-ink-muted">
             Last 7 days · per {HEATMAP_BAND_HOURS}-hour band
           </p>
-            </div>
+        </div>
 
         <div ref={rootRef} className="relative shrink-0">
           <button
@@ -874,7 +861,7 @@ function CheckinHeatmap({ matrix, onOpen, onRefresh }) {
             aria-haspopup="menu"
             aria-expanded={menuOpen}
             aria-label="Check-in heatmap options"
-            className={`grid h-8 w-8 place-items-center rounded-full text-ink-muted transition-colors duration-200 ease-premium hover:bg-accent-50 hover:text-accent-800 ${FOCUS_RING}`}
+            className={`grid h-8 w-8 place-items-center rounded-full text-ink-muted transition-colors duration-200 ease-premium hover:bg-[#E6F4FA] hover:text-[#00B2EE] ${FOCUS_RING}`}
           >
             <MoreHorizontal className="h-4 w-4" strokeWidth={2} aria-hidden />
           </button>
@@ -903,7 +890,7 @@ function CheckinHeatmap({ matrix, onOpen, onRefresh }) {
 
       {total === 0 ? (
         <div className="mt-3 flex flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-hairline bg-surface-subtle px-4 py-8 text-center">
-          <span className="grid h-10 w-10 place-items-center rounded-full border border-accent-200 bg-white text-accent-700 shadow-hair">
+          <span className="grid h-10 w-10 place-items-center rounded-full border border-[#E6F4FA] bg-[#E6F4FA] text-[#00B2EE] shadow-hair">
             <Clock className="h-4 w-4" strokeWidth={2} aria-hidden />
           </span>
           <div className="space-y-1">
@@ -928,7 +915,11 @@ function CheckinHeatmap({ matrix, onOpen, onRefresh }) {
           <ul className="flex flex-wrap items-center gap-x-4 gap-y-2 sm:w-16 sm:flex-col sm:items-start sm:justify-center sm:gap-2.5">
             {legend.map((item) => (
               <li key={item.level} className="flex items-center gap-2">
-                <span className={`h-2.5 w-2.5 shrink-0 rounded-[4px] ${item.dot}`} aria-hidden />
+                <span
+                  className="h-2.5 w-2.5 shrink-0 rounded-[4px] ring-1 ring-white/70"
+                  style={{ backgroundImage: item.gradient }}
+                  aria-hidden
+                />
                 <span className="text-micro font-medium tabular-nums text-ink-muted">{item.label}</span>
               </li>
             ))}
@@ -940,18 +931,48 @@ function CheckinHeatmap({ matrix, onOpen, onRefresh }) {
             className="grid min-w-0 flex-1 gap-1.5"
             style={{ gridTemplateColumns: `auto repeat(${HEATMAP_DAYS}, minmax(0, 1fr))` }}
           >
-            {rows.map((row) => (
+            {rows.map((row, rowIndex) => (
               <Fragment key={row.label}>
                 <span className="pr-1.5 text-right text-micro font-medium leading-8 text-ink-muted">
                   {row.label}
                 </span>
-                {row.cells.map((cell) => (
-                  <span
-                    key={`${row.label}-${cell.day.dateLabel}`}
-                    title={`${row.rangeLabel} · ${cell.day.label} ${cell.day.dateLabel} · ${cell.count} check-in${cell.count === 1 ? '' : 's'}`}
-                    className={`h-8 rounded-md border border-white/60 shadow-[inset_0_0_0_1px_rgba(0,151,167,0.06)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_4px_12px_-4px_rgba(0,151,167,0.28)] ${HEATMAP_LEVELS[cell.level].cell}`}
-                  />
-                ))}
+                {row.cells.map((cell, dayIndex) => {
+                  const tone = HEATMAP_LEVELS[cell.level] || HEATMAP_LEVELS[0];
+                  return (
+                    <motion.span
+                      key={`${row.label}-${cell.day.dateLabel}`}
+                      title={`${row.rangeLabel} · ${cell.day.label} ${cell.day.dateLabel} · ${cell.count} check-in${cell.count === 1 ? '' : 's'}`}
+                      className={`heatmap-cell h-8 rounded-md ${tone.pulse ? 'heatmap-cell-pulse' : ''}`}
+                      style={{
+                        backgroundImage: tone.gradient,
+                        border: tone.border,
+                        backgroundSize: tone.pulse ? '200% 200%' : undefined,
+                      }}
+                      initial={reduceMotion ? false : { opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={
+                        reduceMotion
+                          ? { duration: 0 }
+                          : {
+                              type: 'spring',
+                              stiffness: 420,
+                              damping: 28,
+                              delay: dayIndex * 0.045 + rowIndex * 0.03,
+                            }
+                      }
+                      whileHover={
+                        reduceMotion
+                          ? undefined
+                          : {
+                              scale: 1.08,
+                              y: -2,
+                              boxShadow: tone.glow,
+                              transition: { duration: 0.25, ease: [0.4, 0, 0.2, 1] },
+                            }
+                      }
+                    />
+                  );
+                })}
               </Fragment>
             ))}
 
@@ -960,7 +981,7 @@ function CheckinHeatmap({ matrix, onOpen, onRefresh }) {
               <span
                 key={day.dateLabel}
                 className={`truncate text-center text-micro font-medium ${
-                  day.today ? 'text-accent-800' : 'text-ink-muted'
+                  day.today ? 'text-accent-600' : 'text-ink-muted'
                 }`}
               >
                 {day.label}
@@ -1015,7 +1036,7 @@ function AttendanceOpsCard({
   }, [range, active.onSite, active.remote, absent, headcount]);
 
   return (
-    <div className={CARD_TIERS.primary.shell}>
+    <div className="flex h-full flex-col rounded-2xl border border-[#C2ECF9] bg-[#E6F4FA] p-5 shadow-[0_4px_20px_rgba(0,178,238,0.06)] sm:p-6">
       <CardHeader
         tier="primary"
         eyebrow="Operations"
@@ -1115,7 +1136,7 @@ function AttendanceOpsCard({
           />
       </div>
 
-        <div className="flex flex-1 flex-col border-t border-hairline pt-4">
+        <div className="flex flex-1 flex-col border-t border-[#00B2EE]/15 pt-4">
           <CheckinHeatmap matrix={heatmap} onOpen={onOpen} onRefresh={onRefresh} />
         </div>
       </div>
@@ -1133,7 +1154,7 @@ function ActionQueueCard({ items, approvableCount, busyId, batching, onBatchAppr
   const showBatch = approvableCount > 1;
 
   return (
-    <div className={CARD_TIERS.secondary.shell}>
+    <div className="flex h-full flex-col rounded-2xl border border-[#70C9EF] bg-white p-5 shadow-[0_4px_20px_rgba(112,201,239,0.12)]">
       <CardHeader
         tier="secondary"
         eyebrow="Inbox"
@@ -1163,11 +1184,11 @@ function ActionQueueCard({ items, approvableCount, busyId, batching, onBatchAppr
               return (
                 <div
                   key={item.id}
-                  className="group/item rounded-xl border border-hairline bg-white p-4 transition-all duration-200 ease-out hover:border-accent-200 hover:bg-accent-50/40 hover:shadow-hair"
+                  className="group/item rounded-2xl border border-[#70C9EF] bg-[#F8FCFD] p-4 transition-all duration-200 ease-out hover:-translate-y-px hover:bg-white hover:shadow-[0_6px_16px_rgba(112,201,239,0.14)]"
                 >
                   <div className="flex items-start gap-3">
                     <span
-                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-accent-200 bg-accent-50 text-label font-semibold uppercase text-accent-800"
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#70C9EF]/40 bg-[#E6F4FA] text-label font-semibold uppercase text-[#00B2EE]"
                       aria-hidden
                     >
                       {item.initials}
@@ -1181,7 +1202,7 @@ function ActionQueueCard({ items, approvableCount, busyId, batching, onBatchAppr
                       </p>
                     </div>
 
-                    <span className={`shrink-0 rounded-md px-2 py-0.5 text-micro font-semibold ${item.badgeClass}`}>
+                    <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-micro font-semibold ${item.badgeClass}`}>
                       {item.badgeLabel}
                     </span>
                   </div>
@@ -1202,8 +1223,8 @@ function ActionQueueCard({ items, approvableCount, busyId, batching, onBatchAppr
                       </span>
 
                       {item.urgent && (
-                        <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-warning-solid/25 bg-warning-solid/10 px-2 py-0.5 text-micro font-semibold tracking-tight text-warning-ink">
-                          <AlertCircle className="h-3 w-3 shrink-0 text-warning-solid" strokeWidth={2.5} aria-hidden />
+                        <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-amber-200 bg-[#FEF9C3] px-2 py-0.5 text-micro font-semibold tracking-tight text-amber-700">
+                          <AlertCircle className="h-3 w-3 shrink-0 text-amber-600" strokeWidth={2.5} aria-hidden />
                           {item.urgent}
                         </span>
                       )}
@@ -1211,7 +1232,7 @@ function ActionQueueCard({ items, approvableCount, busyId, batching, onBatchAppr
                   )}
 
                   {item.reason && (
-                    <p className="mt-2 line-clamp-2 rounded-lg border-l-2 border-accent-600 bg-accent-50/50 px-3 py-2 text-caption italic leading-relaxed text-ink-muted">
+                    <p className="mt-2 line-clamp-2 rounded-lg border-l-2 border-[#70C9EF] bg-[#E6F4FA] px-3 py-2 text-caption italic leading-relaxed text-[#64748B]">
                       {item.reason}
                     </p>
                   )}
@@ -1234,6 +1255,7 @@ function ActionQueueCard({ items, approvableCount, busyId, batching, onBatchAppr
                           type="button"
                           disabled={busy}
                           onClick={item.onApprove}
+                          data-on-dark
                           className={`${BTN_SOFT_APPROVE} min-h-[40px] ${FOCUS_RING}`}
                         >
                           {busy ? (
@@ -1279,7 +1301,7 @@ function ActionQueueCard({ items, approvableCount, busyId, batching, onBatchAppr
                   await onBatchApprove();
                   setConfirmBatch(false);
                 }}
-                className={`font-semibold text-accent-800 underline decoration-accent-200 underline-offset-4 transition-colors hover:decoration-accent-700 ${FOCUS_RING}`}
+                className={`font-semibold text-[#00B2EE] underline decoration-[#70C9EF] underline-offset-4 transition-colors hover:decoration-[#0090C4] ${FOCUS_RING}`}
               >
                 {batching ? 'Approving…' : `Confirm ${approvableCount}`}
               </button>
@@ -1295,7 +1317,7 @@ function ActionQueueCard({ items, approvableCount, busyId, batching, onBatchAppr
             <button
               type="button"
               onClick={() => setConfirmBatch(true)}
-              className={`font-semibold text-accent-800 underline decoration-accent-200 underline-offset-4 transition-colors hover:decoration-accent-700 ${FOCUS_RING}`}
+              className={`font-semibold text-[#00B2EE] underline decoration-[#70C9EF] underline-offset-4 transition-colors hover:decoration-[#0090C4] ${FOCUS_RING}`}
             >
               Batch approve
             </button>
@@ -1304,7 +1326,7 @@ function ActionQueueCard({ items, approvableCount, busyId, batching, onBatchAppr
           <button
             type="button"
             onClick={onOpen}
-            className={`font-semibold text-accent-800 underline decoration-accent-200 underline-offset-4 transition-colors hover:decoration-accent-700 ${FOCUS_RING}`}
+            className={`font-semibold text-[#00B2EE] underline decoration-[#70C9EF] underline-offset-4 transition-colors hover:decoration-[#0090C4] ${FOCUS_RING}`}
           >
             View all requests
           </button>
@@ -1323,13 +1345,13 @@ function DirectorySnapshotCard({ loading, directoryRows, onLeaveKeys, checkedInK
   const offDutyCount = Math.max(directoryRows.length - presentCount - onLeaveCount, 0);
   /* Status split doubles as the legend for the presence dots on each row. */
   const statusSplit = [
-    { label: 'On shift', value: presentCount, dot: 'bg-accent-600' },
+    { label: 'On shift', value: presentCount, dot: 'bg-[#00B2EE]' },
     { label: 'On leave', value: onLeaveCount, dot: 'bg-warning-solid' },
     { label: 'Off duty', value: offDutyCount, dot: 'bg-ink-faint' },
   ];
 
   return (
-    <article className={`${CARD_TIERS.utility.shell} print:break-inside-avoid`}>
+    <article className="flex h-full flex-col rounded-2xl border border-[#00B2EE]/30 bg-white p-4 shadow-[0_4px_20px_rgba(0,178,238,0.06)] print:break-inside-avoid sm:p-5">
       <CardHeader
         tier="utility"
         title="Directory snapshot"
@@ -1338,12 +1360,12 @@ function DirectorySnapshotCard({ loading, directoryRows, onLeaveKeys, checkedInK
       />
 
       {!loading && directoryRows.length > 0 && (
-        <div className={`ui-inset ${CARD_TIERS.utility.gap} flex items-center justify-between gap-4 px-3 py-2`}>
+        <div className={`${CARD_TIERS.utility.gap} flex items-center justify-between gap-4 rounded-2xl border border-[#00B2EE]/15 bg-[#E6F4FA] px-3 py-2`}>
           {statusSplit.map((entry) => (
             <span key={entry.label} className="flex items-center gap-2">
               <span className={`h-2 w-2 rounded-full ${entry.dot}`} aria-hidden />
-              <span className="text-caption font-medium text-ink-muted">{entry.label}</span>
-              <span className="text-label font-semibold tabular-nums text-ink">{entry.value}</span>
+              <span className="text-caption font-medium text-[#64748B]">{entry.label}</span>
+              <span className="text-label font-semibold tabular-nums text-[#0F172A]">{entry.value}</span>
             </span>
           ))}
         </div>
@@ -1389,7 +1411,7 @@ function DirectorySnapshotCard({ loading, directoryRows, onLeaveKeys, checkedInK
                   className={`group/row flex w-full items-center gap-3 rounded-xl p-2.5 text-left transition-all duration-200 ease-out hover:bg-accent-50/80 hover:shadow-hair ${FOCUS_RING}`}
                 >
                   <span className="relative shrink-0">
-                    <span className="grid h-8 w-8 place-items-center rounded-full bg-accent-100 text-micro font-semibold uppercase leading-none text-accent-800">
+                    <span className="grid h-8 w-8 place-items-center rounded-full bg-[#E6F4FA] text-micro font-semibold uppercase leading-none text-[#00B2EE]">
                       {getInitials(displayName)}
                     </span>
                     <span
@@ -1414,7 +1436,7 @@ function DirectorySnapshotCard({ loading, directoryRows, onLeaveKeys, checkedInK
                   <StatusBadge status={status} dot={false} />
                   {/* Arrow fades in and leans toward its destination on hover. */}
                   <ArrowUpRight
-                    className="h-3.5 w-3.5 shrink-0 text-ink-faint opacity-0 transition-all duration-fast ease-premium group-hover/row:translate-x-0.5 group-hover/row:opacity-100"
+                    className="h-3.5 w-3.5 shrink-0 text-[#00B2EE] opacity-0 transition-all duration-fast ease-premium group-hover/row:translate-x-0.5 group-hover/row:opacity-100"
                     strokeWidth={2}
                     aria-hidden
                   />
@@ -1428,7 +1450,7 @@ function DirectorySnapshotCard({ loading, directoryRows, onLeaveKeys, checkedInK
           Showing <strong className="font-semibold text-ink">{directoryRows.length}</strong> of the directory
         </span>
         <span>
-          Checked in <strong className="font-semibold text-ink">{presentCount}</strong>
+          Checked in <strong className="font-semibold text-[#00B2EE]">{presentCount}</strong>
         </span>
         </div>
     </article>
@@ -1450,7 +1472,7 @@ function AttendanceTrendCard({ loading, data, isEmpty, monthDelta, onViewAttenda
   const monthlyAverage = data.length ? Math.round(totalCheckins / data.length) : 0;
 
   return (
-    <div className={CARD_TIERS.secondary.shell}>
+    <div className="flex h-full flex-col rounded-2xl border border-[#70C9EF] bg-white p-5 shadow-[0_4px_20px_rgba(112,201,239,0.12)]">
       <CardHeader
         tier="secondary"
         eyebrow="Last 6 months"
@@ -1491,19 +1513,19 @@ function AttendanceTrendCard({ loading, data, isEmpty, monthDelta, onViewAttenda
 
       {!loading && !isEmpty && (
         <div className="mt-4 grid grid-cols-3 gap-2">
-          <div className="rounded-xl border border-hairline bg-surface-subtle/80 px-3 py-2.5">
-            <p className="truncate text-micro font-medium text-ink-muted">This month</p>
-            <p className="mt-1 text-subheading font-semibold tabular-nums text-ink">
+          <div className="rounded-2xl border border-[#70C9EF]/35 bg-[#E6F4FA] px-3 py-2.5">
+            <p className="truncate text-micro font-medium text-[#64748B]">This month</p>
+            <p className="mt-1 text-subheading font-semibold tabular-nums text-[#0F172A]">
               {formatNumber(latest?.checkins || 0)}
             </p>
           </div>
-          <div className="rounded-xl border border-hairline bg-surface-subtle/80 px-3 py-2.5">
-            <p className="truncate text-micro font-medium text-ink-muted">Monthly average</p>
-            <p className="mt-1 text-subheading font-semibold tabular-nums text-ink">{formatNumber(monthlyAverage)}</p>
+          <div className="rounded-2xl border border-[#70C9EF]/35 bg-[#E6F4FA] px-3 py-2.5">
+            <p className="truncate text-micro font-medium text-[#64748B]">Monthly average</p>
+            <p className="mt-1 text-subheading font-semibold tabular-nums text-[#0F172A]">{formatNumber(monthlyAverage)}</p>
           </div>
-          <div className="rounded-xl border border-hairline bg-surface-subtle/80 px-3 py-2.5">
-            <p className="truncate text-micro font-medium text-ink-muted">Busiest month</p>
-            <p className="mt-1 truncate text-subheading font-semibold text-ink">
+          <div className="rounded-2xl border border-[#70C9EF]/35 bg-[#E6F4FA] px-3 py-2.5">
+            <p className="truncate text-micro font-medium text-[#64748B]">Busiest month</p>
+            <p className="mt-1 truncate text-subheading font-semibold text-[#0F172A]">
               {busiest?.checkins ? busiest.label : '—'}
             </p>
           </div>
@@ -1514,11 +1536,11 @@ function AttendanceTrendCard({ loading, data, isEmpty, monthDelta, onViewAttenda
         <span className="flex items-center gap-4">
           <span className="inline-flex items-center gap-2">
             {/* Legend dots track CHART_COLORS.primary / .tertiary exactly. */}
-            <span className="h-2 w-2 rounded-full bg-accent-600" aria-hidden />
+            <span className="h-2 w-2 rounded-full bg-[#70C9EF]" aria-hidden />
             Check-ins
           </span>
           <span className="inline-flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-accent-800" aria-hidden />
+            <span className="h-2 w-2 rounded-full bg-[#3ABCEF]" aria-hidden />
             Active headcount
           </span>
         </span>
@@ -1533,16 +1555,16 @@ function AttendanceTrendCard({ loading, data, isEmpty, monthDelta, onViewAttenda
 /* Event type reads from the rail dot. Check-in uses brand cyan — presence without green. */
 const ACTIVITY_STYLES = {
   checkin: {
-    dot: '#0097A7',
+    dot: '#00B2EE',
     label: 'Check-in',
     icon: LogIn,
-    chip: 'bg-accent-100 text-accent-800',
-    glow: 'shadow-[0_0_0_3px_rgba(0,151,167,0.22)]',
+    chip: 'bg-[#00B2EE] text-white',
+    glow: 'shadow-[0_0_0_3px_rgba(0,178,238,0.22)]',
   },
-  checkout: { dot: '#006978', label: 'Check-out', icon: LogOut, chip: 'bg-accent-50 text-accent-800' },
+  checkout: { dot: '#00B2EE', label: 'Check-out', icon: LogOut, chip: 'bg-[#E6F4FA] text-[#00B2EE]' },
   manual: { dot: '#F59E0B', label: 'Manual override', icon: PenLine, chip: 'bg-warning-surface text-warning-ink' },
-  leave: { dot: '#4DD0E1', label: 'Leave', icon: CalendarDays, chip: 'bg-accent-50 text-accent-800' },
-  user: { dot: '#94A3B8', label: 'Profile update', icon: UserCog, chip: 'bg-surface-muted text-[#475569]' },
+  leave: { dot: '#00B2EE', label: 'Leave', icon: CalendarDays, chip: 'bg-[#E6F4FA] text-[#00B2EE]' },
+  user: { dot: '#94A3B8', label: 'Profile update', icon: UserCog, chip: 'bg-surface-muted text-[#64748B]' },
 };
 
 /**
@@ -1569,7 +1591,7 @@ function ActivityTimelineCard({ loading, items, lastEventLabel, onOpen }) {
   ];
 
   return (
-    <div className={CARD_TIERS.utility.shell}>
+    <div className="flex h-full flex-col rounded-2xl border border-[#00B2EE]/25 bg-white p-4 shadow-[0_4px_20px_rgba(0,178,238,0.06)] sm:p-5">
       <CardHeader
         tier="utility"
         title="Live activity"
@@ -1582,12 +1604,15 @@ function ActivityTimelineCard({ loading, items, lastEventLabel, onOpen }) {
           {summary.map((entry) => {
             const meta = ACTIVITY_STYLES[entry.key];
             return (
-              <div key={entry.key} className="ui-inset px-3 py-2">
+              <div
+                key={entry.key}
+                className="rounded-2xl border border-[#00B2EE]/20 bg-[#E6F4FA] px-3 py-2"
+              >
                 <span className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: meta.dot }} aria-hidden />
-                  <span className="truncate text-micro font-medium text-ink-muted">{entry.label}</span>
+                  <span className="h-2 w-2 rounded-full bg-[#00B2EE]" style={{ backgroundColor: meta.dot }} aria-hidden />
+                  <span className="truncate text-micro font-medium text-[#64748B]">{entry.label}</span>
                 </span>
-                <span className="mt-1 block text-subheading font-semibold tabular-nums text-ink">{entry.value}</span>
+                <span className="mt-1 block text-subheading font-semibold tabular-nums text-[#00B2EE]">{entry.value}</span>
               </div>
             );
           })}
@@ -1619,12 +1644,12 @@ function ActivityTimelineCard({ loading, items, lastEventLabel, onOpen }) {
             <div key={group.label} className="mb-2 last:mb-0">
               <p className="sticky top-0 z-10 flex items-center gap-2 bg-white/95 py-1.5 text-micro font-semibold uppercase tracking-[0.07em] text-ink-muted backdrop-blur">
                 {group.label}
-                <span className="h-px flex-1 bg-hairline" aria-hidden />
+                <span className="h-px flex-1 bg-[#00B2EE]/25" aria-hidden />
               </p>
 
               <ul className="relative">
                 {/* Continuous rail behind the dots ties the group into one thread. */}
-                <span className="absolute bottom-3 left-[3.75rem] top-3 w-px bg-hairline" aria-hidden />
+                <span className="absolute bottom-3 left-[3.75rem] top-3 w-px bg-[#00B2EE]/35" aria-hidden />
 
                 {group.items.map((item) => {
                   const meta = ACTIVITY_STYLES[item.kind] || ACTIVITY_STYLES.user;
@@ -1650,7 +1675,7 @@ function ActivityTimelineCard({ loading, items, lastEventLabel, onOpen }) {
                       </span>
                       {/* Avatar carries who, the corner badge carries what — one glance, two facts. */}
                       <span className="relative shrink-0">
-                        <span className="grid h-8 w-8 place-items-center rounded-full bg-accent-100 text-micro font-semibold uppercase leading-none text-accent-800">
+                        <span className="grid h-8 w-8 place-items-center rounded-full bg-[#E6F4FA] text-micro font-semibold uppercase leading-none text-[#00B2EE]">
                           {getInitials(item.person)}
                   </span>
                         <span
@@ -1704,7 +1729,7 @@ function DepartmentBreakdownCard({ rows, loading, navigate, canManage }) {
     .join('. ');
 
   return (
-    <div className={CARD_TIERS.secondary.shell}>
+    <div className="flex h-full flex-col rounded-2xl border border-[#00B2EE]/30 bg-white p-5 shadow-[0_4px_20px_rgba(0,178,238,0.06)]">
       <CardHeader
         tier="secondary"
         eyebrow="Team mix"
@@ -1736,21 +1761,19 @@ function DepartmentBreakdownCard({ rows, loading, navigate, canManage }) {
             {bars.map((bar) => (
               <li
                 key={bar.label}
-                className="rounded-xl border border-hairline bg-white px-4 py-3 transition-all duration-200 ease-out hover:-translate-y-px hover:border-accent-200 hover:bg-accent-50/40 hover:shadow-hair"
+                className="rounded-2xl border border-[#00B2EE]/20 bg-[#F8FCFD] px-4 py-3 transition-all duration-200 ease-out hover:-translate-y-px hover:border-[#00B2EE]/40 hover:bg-white hover:shadow-[0_6px_16px_rgba(0,178,238,0.1)]"
               >
                 <div className="flex items-center gap-3">
-                  {/* Manager avatar doubles as the department's colour key. */}
                   <span
-                    className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-micro font-semibold uppercase leading-none text-white"
-                    style={{ backgroundColor: bar.color }}
+                    className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#E6F4FA] text-micro font-semibold uppercase leading-none text-[#00B2EE]"
                     aria-hidden
                   >
                     {getInitials(bar.manager || bar.label)}
                   </span>
 
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-label font-semibold leading-tight text-ink">{bar.label}</p>
-                    <p className="mt-0.5 truncate text-micro leading-tight text-ink-muted">
+                    <p className="truncate text-label font-semibold leading-tight text-[#0F172A]">{bar.label}</p>
+                    <p className="mt-0.5 truncate text-micro leading-tight text-[#64748B]">
                       {bar.manager ? `Led by ${bar.manager}` : 'No manager assigned'}
                     </p>
                   </div>
@@ -1762,23 +1785,22 @@ function DepartmentBreakdownCard({ rows, loading, navigate, canManage }) {
                         {bar.added}
                       </span>
                     )}
-                    <span className="text-subheading font-semibold tabular-nums text-ink">{bar.total}</span>
+                    <span className="text-subheading font-semibold tabular-nums text-[#0F172A]">{bar.total}</span>
                   </div>
                 </div>
 
-                {/* Headcount share reads as the bar; today's attendance sits beside it. */}
-                <div className="ui-track mt-3 h-1.5">
-                  <div
-                    className="ui-track-fill"
-                    style={{ width: `${bar.width}%`, backgroundColor: bar.color }}
-                  />
-                </div>
-
-                <div className="mt-2 flex items-center justify-between gap-4 text-micro tabular-nums text-ink-muted">
+                <div className="mt-2 flex items-center justify-between gap-4 text-micro tabular-nums text-[#64748B]">
                   <span>{bar.percentage}% of workforce</span>
                   <span>
-                    <strong className="font-semibold text-ink">{bar.attendance}%</strong> in today
+                    <strong className="font-semibold text-[#00B2EE]">{bar.attendance}%</strong> in today
                   </span>
+                </div>
+
+                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[#E6F4FA]" aria-hidden>
+                  <div
+                    className="h-full rounded-full bg-[#00B2EE] transition-[width] duration-500 ease-out"
+                    style={{ width: `${Math.min(100, Math.max(0, bar.attendance))}%` }}
+                  />
                 </div>
               </li>
             ))}
@@ -1788,10 +1810,10 @@ function DepartmentBreakdownCard({ rows, loading, navigate, canManage }) {
 
       <div className={cardFooter('secondary')}>
         <span>
-          Active departments <strong className="font-semibold text-ink">{activeDepartments}</strong>
+          Active departments <strong className="font-semibold text-[#0F172A]">{activeDepartments}</strong>
         </span>
         <span>
-          Unassigned <strong className="font-semibold text-ink">{unassigned}</strong>
+          Unassigned <strong className="font-semibold text-[#0F172A]">{unassigned}</strong>
         </span>
       </div>
     </div>
@@ -2191,10 +2213,9 @@ export function DashboardPage() {
       }
     }
 
-    /* Integer step with a floor of 1, so the four bands never collapse onto the same
-       range on a quiet week. */
-    const step = Math.max(1, Math.ceil(peak / 4));
-    const levelOf = (count) => (count === 0 ? 0 : Math.min(4, Math.ceil(count / step)));
+    /* Absolute density bands match the gradient key (0 / 1–2 / 3–4 / 5–6 / 7+). */
+    const step = 2;
+    const levelOf = heatmapLevelOf;
 
     const rows = counts.map((band, index) => {
       const from = ACTIVITY_WINDOW.from + index * HEATMAP_BAND_HOURS;
@@ -2353,7 +2374,7 @@ export function DashboardPage() {
         reason: leave.reason || null,
         urgent: startsIn != null && startsIn <= 2 ? (startsIn <= 0 ? 'Starts today' : 'Starts soon') : null,
         badgeLabel: 'Leave',
-        badgeClass: 'bg-accent-100 text-accent-800',
+        badgeClass: 'border border-[#70C9EF] bg-[#F0F9FF] text-[#0F172A]',
         onApprove: canApproveLeave ? () => processLeave(leave.id, 'approved') : undefined,
         onReject: canRejectLeave ? () => processLeave(leave.id, 'rejected') : undefined,
       });
@@ -2379,7 +2400,7 @@ export function DashboardPage() {
         meta,
         reason: request.reason || null,
         badgeLabel: 'Work mode',
-        badgeClass: 'bg-warning-surface text-warning-ink',
+        badgeClass: 'border border-[#70C9EF] bg-[#F0F9FF] text-[#0F172A]',
         onApprove: canApproveWorkMode ? () => processWorkMode(request.id, 'approved') : undefined,
         onReject: canRejectWorkMode ? () => processWorkMode(request.id, 'rejected') : undefined,
       });
@@ -2398,7 +2419,7 @@ export function DashboardPage() {
         detail: `${String(ticket.priority || 'high')} priority ticket awaiting triage`,
         meta,
         badgeLabel: 'Ticket',
-        badgeClass: 'bg-danger-surface text-danger-ink',
+        badgeClass: 'border border-[#70C9EF] bg-[#F0F9FF] text-[#0F172A]',
         onOpen: () => navigate('/tickets'),
       });
     }
@@ -2595,7 +2616,7 @@ export function DashboardPage() {
    */
   const overviewStats = [
     {
-      icon: Users,
+      icon: KpiIconWorkforce,
       label: 'Total workforce',
       count: totalUsers,
       context: `${plural(activeUsers, 'active employee')} · ${formatNumber(deactivated)} deactivated`,
@@ -2610,7 +2631,7 @@ export function DashboardPage() {
       onClick: canViewUsers ? () => navigate('/users') : undefined,
     },
     {
-      icon: CalendarCheck,
+      icon: KpiIconCalendar,
       label: 'Attendance rate',
       count: attendanceRate,
       suffix: '%',
@@ -2633,7 +2654,7 @@ export function DashboardPage() {
       onClick: canViewAttendance ? () => navigate('/attendance') : undefined,
     },
     {
-      icon: Wifi,
+      icon: KpiIconWifi,
       label: 'Remote / hybrid',
       count: attendanceToday.remote,
       context: `${formatNumber(attendanceToday.onSite)} on-site · ${remoteShare}% of today's check-ins`,
@@ -2647,7 +2668,7 @@ export function DashboardPage() {
       onClick: canViewWorkModes ? () => navigate('/work-mode-requests') : undefined,
     },
     {
-      icon: Clock,
+      icon: KpiIconClock,
       label: 'Pending approvals',
       count: pendingApprovals,
       context: `${formatNumber(pendingCounts.leaves)} leave · ${formatNumber(pendingCounts.workModes)} work-mode`,
@@ -2670,7 +2691,7 @@ export function DashboardPage() {
   ];
 
   return (
-    <div className="dashboard-page animate-fade-up space-y-8">
+    <div className="dashboard-page animate-fade-up space-y-8 bg-[#F8FCFD]">
       <OverviewBanner
         adminName={adminName}
         stats={overviewStats}

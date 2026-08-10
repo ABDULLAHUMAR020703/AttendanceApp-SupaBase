@@ -47,7 +47,7 @@ const POPOVER_ROOT = 'relative flex h-full items-center';
 const PANEL = 'ui-menu absolute right-0 top-[calc(100%+0.5rem)] z-30 w-60';
 /* Borderless 32px square: the container only appears on hover, Linear-style. */
 const HEADER_ICON_BTN =
-  'inline-flex h-8 w-8 items-center justify-center rounded-lg text-ink-muted transition-all duration-200 ease-premium hover:bg-accent-50 hover:text-accent-800 active:scale-95';
+  'inline-flex h-8 w-8 items-center justify-center rounded-lg text-ink-muted transition-all duration-200 ease-premium hover:bg-[#E6F4FA] hover:text-accent-600 active:scale-95';
 
 /** Jump-to-screen search: filters the screens this user can actually reach. */
 function ScreenSearch({ items }) {
@@ -86,7 +86,7 @@ function ScreenSearch({ items }) {
   return (
     <div ref={ref} className={`${POPOVER_ROOT} hidden lg:flex`}>
       <Search
-        className="pointer-events-none absolute left-2.5 top-1/2 h-[15px] w-[15px] -translate-y-1/2 text-ink-muted"
+        className="pointer-events-none absolute left-2.5 top-1/2 h-[15px] w-[15px] -translate-y-1/2 text-[#00BFFF]"
         aria-hidden
       />
       <input
@@ -114,9 +114,9 @@ function ScreenSearch({ items }) {
             go(matches[cursor]);
           }
         }}
-        className="ui-input h-8 min-h-0 w-52 rounded-lg bg-white py-0 pl-8 pr-10 text-label transition-all duration-200 hover:bg-surface-subtle focus:w-64 focus:bg-white"
+        className="ui-input h-8 min-h-0 w-52 rounded-lg border-[#D0ECF9] bg-white py-0 pl-8 pr-10 text-label transition-all duration-200 hover:border-[#70C9EF] hover:bg-[#F0F8FF] focus:w-64 focus:border-[#00BFFF] focus:bg-white"
       />
-      <kbd className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 rounded border border-hairline bg-surface-subtle px-1.5 py-px text-micro font-semibold text-ink-muted xl:block">
+      <kbd className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 rounded border border-[#D0ECF9] bg-[#E6F4FA] px-1.5 py-px text-micro font-semibold text-[#00BFFF] xl:block">
         ⌘K
       </kbd>
 
@@ -139,7 +139,7 @@ function ScreenSearch({ items }) {
                   onClick={() => go(item)}
                   className={`ui-menu-item ${index === cursor ? 'ui-menu-item-active' : ''}`}
                 >
-                  <Icon className="shrink-0 text-accent-600" aria-hidden />
+                  <Icon className="shrink-0 text-[#00BFFF]" aria-hidden />
                   <span className="min-w-0 flex-1 truncate">{item.label}</span>
                 </button>
               );
@@ -185,7 +185,7 @@ function QuickActions({ canSee }) {
         onClick={() => setOpen((value) => !value)}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="ui-btn-primary ui-btn-sm gap-1.5 rounded-lg px-2.5"
+        className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-[#00BFFF] px-2.5 text-label font-semibold text-white shadow-[0_1px_3px_rgba(0,191,255,0.35)] transition-all duration-200 ease-premium hover:bg-[#00A8E6] hover:shadow-[0_4px_12px_rgba(0,191,255,0.35)] active:scale-95 active:bg-[#00A8E6]"
       >
         <Plus
           className={`h-[15px] w-[15px] icon-rotate ${open ? 'rotate-45' : ''}`}
@@ -248,11 +248,11 @@ function NotificationBell({ unreadCount }) {
         onClick={toggle}
         aria-haspopup="dialog"
         aria-expanded={open}
-        className={`${HEADER_ICON_BTN} relative text-[#0F282F] hover:bg-cyan-50 hover:text-[#0F282F]`}
+        className={`${HEADER_ICON_BTN} relative text-ink hover:bg-[#E6F4FA] hover:text-accent-600`}
         aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
       >
         <Bell className="h-[18px] w-[18px]" strokeWidth={1.9} aria-hidden />
-        <CountBadge count={unreadCount} className="absolute -right-0.5 -top-0.5" />
+        <CountBadge count={unreadCount} tone="brand" className="absolute -right-0.5 -top-0.5" />
       </button>
 
       {open && (
@@ -265,7 +265,7 @@ function NotificationBell({ unreadCount }) {
             <p className="text-label font-semibold text-ink">Notifications</p>
             <button
               type="button"
-              className="text-label font-semibold text-accent-800 transition-colors hover:text-accent-900"
+              className="text-label font-semibold text-accent-600 transition-colors hover:text-accent-700"
               onClick={() => {
                 setOpen(false);
                 navigate('/notifications');
@@ -305,7 +305,7 @@ function NotificationBell({ unreadCount }) {
                   className="flex w-full gap-3 rounded-xl px-3 py-2.5 text-left transition-colors duration-fast hover:bg-accent-50"
                 >
                   <span
-                    className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${item.read ? 'bg-ink-faint' : 'bg-[#02EFF0]'}`}
+                    className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${item.read ? 'bg-ink-faint' : 'bg-accent-600'}`}
                     aria-hidden
                   />
                   <span className="min-w-0 flex-1">
@@ -333,7 +333,7 @@ export function TopBar({ pathname, items, canSee, unreadCount = 0, onOpenMobileN
   const showNotifications = canSee({ to: '/notifications', feature: 'notifications' });
 
   return (
-    <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-4 border-b border-hairline bg-white/85 px-4 backdrop-blur-xl md:px-6">
+    <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-4 bg-white/85 px-4 backdrop-blur-xl md:px-6">
       <button
         type="button"
         onClick={onOpenMobileNav}

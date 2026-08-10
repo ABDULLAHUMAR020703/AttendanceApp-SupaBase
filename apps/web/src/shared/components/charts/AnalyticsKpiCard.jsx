@@ -15,10 +15,10 @@ export const AnalyticsKpiCard = memo(function AnalyticsKpiCard({
    * four distinct chips. Every step is AA on the accent-50 chip behind it.
    */
   const accentClasses = {
-    blue: 'bg-accent-50 text-accent-700 shadow-[0_0_0_1px_rgba(0,131,143,0.26)]',
-    green: 'bg-accent-50 text-accent-800 shadow-[0_0_0_1px_rgba(0,105,120,0.24)]',
-    amber: 'bg-accent-50 text-accent-900 shadow-[0_0_0_1px_rgba(0,90,102,0.20)]',
-    purple: 'bg-accent-50 text-accent-900 shadow-[0_0_0_1px_rgba(0,90,102,0.18)]',
+    blue: 'bg-accent-50 text-accent-600 shadow-[0_0_0_1px_rgba(0,191,255,0.22)]',
+    green: 'bg-accent-50 text-accent-600 shadow-[0_0_0_1px_rgba(112,201,239,0.28)]',
+    amber: 'bg-accent-50 text-accent-600 shadow-[0_0_0_1px_rgba(0,191,255,0.18)]',
+    purple: 'bg-accent-50 text-accent-600 shadow-[0_0_0_1px_rgba(112,201,239,0.2)]',
   };
 
   if (loading) {
@@ -42,7 +42,7 @@ export const AnalyticsKpiCard = memo(function AnalyticsKpiCard({
           </svg>
         </span>
       </div>
-      <p className="mt-3 text-2xl font-semibold tabular-nums text-[#1B2430]" aria-live="polite">
+      <p className="mt-3 text-2xl font-semibold tabular-nums text-[#0F172A]" aria-live="polite">
         {value}
       </p>
       {hint && <p className="mt-1.5 text-[11px] text-ink-muted">{hint}</p>}

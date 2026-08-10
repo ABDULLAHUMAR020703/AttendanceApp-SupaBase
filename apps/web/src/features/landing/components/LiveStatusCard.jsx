@@ -62,7 +62,7 @@ function StackedEmployeeCard({ employee, index, total, scrollProgress }) {
       className="absolute inset-x-0 bottom-8 rounded-2xl border border-white/80 bg-white/90 p-5 shadow-xl backdrop-blur-xl"
     >
       <div className="flex items-center">
-        <span className="inline-flex items-center rounded-full border border-[#0097A7]/20 bg-[#E6F7F9] px-3 py-0.5 text-[11px] font-medium text-[#00838F]">
+        <span className="inline-flex items-center rounded-full border border-[#00BFFF]/20 bg-[#E0F6FC] px-3 py-0.5 text-[11px] font-medium text-[#00BFFF]">
           {employee.date}
         </span>
       </div>
@@ -71,8 +71,8 @@ function StackedEmployeeCard({ employee, index, total, scrollProgress }) {
         {employee.name}
       </h3>
 
-      <div className="mt-6 flex items-center justify-between border-t border-[#E2F3F5] pt-3.5 text-[13px]">
-        <span className="font-medium text-[#475569]">{employee.status}</span>
+      <div className="mt-6 flex items-center justify-between border-t border-[#DCEFF7] pt-3.5 text-[13px]">
+        <span className="font-medium text-[#64748B]">{employee.status}</span>
         <span className="flex items-center gap-1.5 font-semibold text-[#0F172A]">
           <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.14)] animate-pulse" />
           {employee.time}

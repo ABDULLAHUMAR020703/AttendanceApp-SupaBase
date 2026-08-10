@@ -19,9 +19,9 @@ export function DateRangeSelector({
   }, {});
 
   return (
-    <div className="ui-toolbar space-y-4 rounded-2xl border border-hairline bg-white p-4 shadow-[0_12px_32px_rgba(27,36,48,0.06)]">
+    <div className="ui-toolbar space-y-4 rounded-2xl border border-hairline bg-white p-4 shadow-[0_12px_32px_rgba(15,23,42,0.06)]">
       <div>
-        <h2 className="text-sm font-semibold text-[#1B2430]">Date range</h2>
+        <h2 className="text-sm font-semibold text-[#0F172A]">Date range</h2>
         <p className="mt-1 text-xs text-ink-muted">
           All attendance charts and KPI cards update for the selected period.
         </p>
@@ -85,7 +85,7 @@ export function DateRangeSelector({
         {selectedRange && !rangeInvalid && (
           <span>
             Showing data for{' '}
-            <span className="font-semibold text-[#1B2430]">{formatRangeLabel(selectedRange.start, selectedRange.end)}</span>
+            <span className="font-semibold text-[#0F172A]">{formatRangeLabel(selectedRange.start, selectedRange.end)}</span>
           </span>
         )}
         {rangeInvalid && (

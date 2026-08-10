@@ -8,34 +8,28 @@
  * so the leading value is the heaviest mark on the page.
  */
 export const CHART_COLORS = {
-  primary: '#0097A7',
-  primarySoft: 'rgba(0, 151, 167, 0.22)',
-  secondary: '#00838F',
-  secondarySoft: 'rgba(0, 131, 143, 0.18)',
-  tertiary: '#006978',
-  quaternary: '#005A66',
-  muted: '#C7EFF5',
+  primary: '#00B2EE',
+  primarySoft: 'rgba(0, 178, 238, 0.22)',
+  secondary: '#70C9EF',
+  secondarySoft: 'rgba(112, 201, 239, 0.22)',
+  tertiary: '#3ABCEF',
+  quaternary: '#0090C4',
+  muted: '#C2ECF9',
   /* Chart chrome tracks the surface and border ladders in index.css. */
-  grid: 'rgba(27, 36, 48, 0.055)',
-  axis: '#E2F3F5',
-  /* Ice-teal well, matching `.ui-track` — the grey it used to be made a short bar
-     read as a defect rather than as a low value. */
-  track: '#E6F7F9',
-  tick: '#55657B',
+  grid: 'rgba(15, 23, 42, 0.06)',
+  axis: '#DCEFF7',
+  /* Ice cyan well — short bars still read as values, never defects. */
+  track: '#E0F6FC',
+  tick: '#64748B',
   tooltipBg: '#FFFFFF',
-  tooltipBorder: '#E2F3F5',
+  tooltipBorder: '#DCEFF7',
 };
 
 /*
- * Rank ladder: tier 1 deep, tier 2 brand, tier 3 light. Weight falls with rank, so
- * position in an ordered list is legible without reading a single number.
- *
- * Ranks past third share one pale tint on purpose — a fourth and fifth distinct step
- * would be a difference the reader has to decode rather than see, and the list order
- * already carries it. `rankColor` clamps, so a 20-row list stays on the system.
+ * Rank ladder: vivid → sky (no deep forest teal).
  */
-export const CHART_RANKS = ['#006978', '#0097A7', '#4DD0E1'];
-export const CHART_RANK_REST = '#A9E4EC';
+export const CHART_RANKS = ['#00B2EE', '#3ABCEF', '#70C9EF'];
+export const CHART_RANK_REST = '#C2ECF9';
 
 export const rankColor = (index) => CHART_RANKS[index] || CHART_RANK_REST;
 
@@ -75,9 +69,9 @@ export const CHART_TOOLTIP_STYLE = {
   backgroundColor: CHART_COLORS.tooltipBg,
   border: `1px solid ${CHART_COLORS.tooltipBorder}`,
   borderRadius: '14px',
-  color: '#1B2430',
+  color: '#0F172A',
   fontSize: '12px',
-  boxShadow: '0 12px 32px rgba(27,36,48,0.10)',
+  boxShadow: '0 12px 32px rgba(15,23,42,0.10)',
   padding: '10px 12px',
 };
 

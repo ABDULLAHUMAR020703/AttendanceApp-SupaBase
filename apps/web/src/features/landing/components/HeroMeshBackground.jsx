@@ -140,12 +140,12 @@ export function HeroMeshBackground() {
 
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-      <div className="absolute inset-0 bg-[#F8FDFC]" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_16%,rgba(230,247,249,0.45),transparent_28%),radial-gradient(circle_at_78%_24%,rgba(0,151,167,0.18),transparent_30%),linear-gradient(180deg,#F8FDFC_0%,#E6F7F9_48%,#F8FDFC_100%)]" />
-      <div className="animate-float-slow absolute -left-24 top-20 h-[34rem] w-[34rem] rounded-full bg-[#0097A7]/14 blur-[120px]" />
-      <div className="animate-float-slower absolute -right-28 top-28 h-[36rem] w-[36rem] rounded-full bg-[#00838F]/14 blur-[135px]" />
-      <div className="animate-float-slow absolute bottom-8 left-1/2 h-[22rem] w-[46rem] -translate-x-1/2 rounded-full bg-[#E6F7F9]/60 blur-[150px]" />
-      <div className="absolute inset-0 opacity-[0.22] bg-[linear-gradient(rgba(0,151,167,0.10)_1px,transparent_1px),linear-gradient(90deg,rgba(0,151,167,0.10)_1px,transparent_1px)] bg-[size:44px_44px]" />
+      <div className="absolute inset-0 bg-[#F8FCFD]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_16%,rgba(230,247,249,0.45),transparent_28%),radial-gradient(circle_at_78%_24%,rgba(0,191,255,0.18),transparent_30%),linear-gradient(180deg,#F8FCFD_0%,#E0F6FC_48%,#F8FCFD_100%)]" />
+      <div className="animate-float-slow absolute -left-24 top-20 h-[34rem] w-[34rem] rounded-full bg-[#00BFFF]/14 blur-[120px]" />
+      <div className="animate-float-slower absolute -right-28 top-28 h-[36rem] w-[36rem] rounded-full bg-[#70C9EF]/18 blur-[135px]" />
+      <div className="animate-float-slow absolute bottom-8 left-1/2 h-[22rem] w-[46rem] -translate-x-1/2 rounded-full bg-[#E0F6FC]/60 blur-[150px]" />
+      <div className="absolute inset-0 opacity-[0.22] bg-[linear-gradient(rgba(0,191,255,0.10)_1px,transparent_1px),linear-gradient(90deg,rgba(0,191,255,0.10)_1px,transparent_1px)] bg-[size:44px_44px]" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,transparent_48%,rgba(248,253,252,0.72)_100%)]" />
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full mix-blend-multiply" />
     </div>

@@ -1,15 +1,18 @@
 export const BRAND = {
-  teal: '#0097A7',
-  // tealText is the smallest-safe teal: #0097A7 only reaches 3.5:1 on white.
-  tealText: '#00838F',
-  tealDeep: '#006978',
-  tealDeepest: '#005A66',
-  canvas: '#F8FDFC',
+  cyan: '#00BFFF',
+  sky: '#70C9EF',
+  skyTint: '#E6F4FA',
+  // teal aliases kept for landing components still importing BRAND.teal*
+  teal: '#00BFFF',
+  tealText: '#00BFFF',
+  tealDeep: '#00BFFF',
+  tealDeepest: '#70C9EF',
+  canvas: '#F8FCFD',
   surface: '#FFFFFF',
-  hairline: '#E2F3F5',
-  tint: '#E6F7F9',
+  hairline: '#DCEFF7',
+  tint: '#E0F6FC',
   ink: '#0F172A',
-  muted: '#475569',
+  muted: '#64748B',
 };
 
 export const NAV_LINKS = [

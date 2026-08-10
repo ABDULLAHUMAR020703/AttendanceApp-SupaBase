@@ -146,7 +146,7 @@ export function StaggerItem({ children, className = '' }) {
 export function DarkMotionCard({ children, className = '' }) {
   const reduce = useReducedMotion();
   const base =
-    'rounded-[1.35rem] border border-[#E2F3F5] bg-white will-change-transform';
+    'rounded-[1.35rem] border border-[#DCEFF7] bg-white will-change-transform';
 
   if (reduce) {
     return <div className={`${base} ${className}`}>{children}</div>;
@@ -159,8 +159,8 @@ export function DarkMotionCard({ children, className = '' }) {
       whileHover={{
         y: -4,
         scale: 1.01,
-        borderColor: 'rgba(0, 151, 167, 0.5)',
-        boxShadow: '0 20px 50px rgba(0,105,120,0.10), 0 0 0 1px rgba(0,151,167,0.12)',
+        borderColor: 'rgba(0, 191, 255, 0.5)',
+        boxShadow: '0 20px 50px rgba(0,136,199,0.10), 0 0 0 1px rgba(0,191,255,0.12)',
       }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
     >

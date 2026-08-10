@@ -11,12 +11,12 @@ export function ChartEmptyState({
       aria-live="polite"
     >
       {icon && (
-        <div className="grid h-11 w-11 place-items-center rounded-full border border-hairline bg-accent-50 text-accent-700">
+        <div className="grid h-11 w-11 place-items-center rounded-full border border-[#D0ECF9] bg-[#E6F4FA] text-[#00BFFF]">
           {icon}
         </div>
       )}
       <div className="space-y-1.5 max-w-sm">
-        <p className="text-sm font-semibold text-[#1B2430]">{title}</p>
+        <p className="text-sm font-semibold text-[#0F172A]">{title}</p>
         {description && <p className="text-xs leading-relaxed text-ink-muted">{description}</p>}
       </div>
       {actions.length > 0 && (
@@ -26,7 +26,7 @@ export function ChartEmptyState({
               key={action.label}
               type="button"
               onClick={action.onClick}
-              className="rounded-2xl border border-hairline bg-white px-3 py-1.5 text-xs font-semibold text-ink transition-all duration-200 hover:-translate-y-0.5 hover:border-accent-200 hover:bg-accent-50 hover:text-accent-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-600/30"
+              className="rounded-2xl border border-hairline bg-white px-3 py-1.5 text-xs font-semibold text-ink transition-all duration-200 hover:-translate-y-0.5 hover:border-accent-200 hover:bg-[#E6F4FA] hover:text-accent-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-600/30"
             >
               {action.label}
             </button>

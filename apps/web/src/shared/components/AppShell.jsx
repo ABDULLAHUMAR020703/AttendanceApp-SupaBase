@@ -50,26 +50,27 @@ export function AppShell() {
 
   return (
     /*
-      Soft landing canvas (.page-wash) behind the whole admin shell — same ice-teal
-      wash as the marketing hero, held still for readable data surfaces.
+      Soft page-wash behind a floating rounded app frame (sidebar + white canvas).
     */
-    <div className="app-admin-surface page-wash m-0 flex h-screen w-screen overflow-hidden p-0 text-ink">
-      <Sidebar canSee={canSee} onLogout={logout} unreadCount={unreadCount} />
+    <div className="app-admin-surface page-wash m-0 flex h-screen w-screen overflow-hidden p-0 text-ink md:p-4">
+      <div className="admin-frame relative flex min-h-0 min-w-0 flex-1 overflow-hidden rounded-none bg-white shadow-none md:rounded-3xl md:shadow-[0_24px_64px_-16px_rgba(15,23,42,0.18)]">
+        <Sidebar canSee={canSee} onLogout={logout} unreadCount={unreadCount} />
 
-      <div className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-transparent">
-        <TopBar
-          pathname={location.pathname}
-          items={items}
-          canSee={canSee}
-          unreadCount={unreadCount}
-          onOpenMobileNav={() => setMobileNavOpen(true)}
-        />
+        <div className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white md:rounded-r-3xl">
+          <TopBar
+            pathname={location.pathname}
+            items={items}
+            canSee={canSee}
+            unreadCount={unreadCount}
+            onOpenMobileNav={() => setMobileNavOpen(true)}
+          />
 
-        <main className="admin-main h-full min-h-0 flex-1 overflow-y-auto bg-transparent px-4 pb-24 pt-4 text-ink md:px-8 md:pb-8 md:pt-6">
-          <div className="mx-auto w-full max-w-[1600px]">
-            <Outlet />
-          </div>
-        </main>
+          <main className="admin-main h-full min-h-0 flex-1 overflow-y-auto bg-white px-4 pb-24 pt-4 text-ink md:px-8 md:pb-8 md:pt-6">
+            <div className="mx-auto w-full max-w-[1600px]">
+              <Outlet />
+            </div>
+          </main>
+        </div>
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-hairline bg-white/92 px-2 pb-safe backdrop-blur-2xl md:hidden">
@@ -80,7 +81,7 @@ export function AppShell() {
               <NavLink
                 key={item.to}
                 to={item.to}
-                className={({ isActive }) => `relative flex flex-1 flex-col items-center gap-0.5 py-2.5 text-micro font-medium transition-colors duration-fast ease-premium ${isActive ? 'text-accent-800' : 'text-ink-muted'}`}
+                className={({ isActive }) => `relative flex flex-1 flex-col items-center gap-0.5 py-2.5 text-micro font-medium transition-colors duration-fast ease-premium ${isActive ? 'text-[#00B2EE]' : 'text-ink-muted'}`}
               >
                 {({ isActive }) => (
                   <>
@@ -113,10 +114,10 @@ export function AppShell() {
           className={`absolute inset-0 bg-slate-950/30 backdrop-blur-sm transition-opacity ${mobileNavOpen ? 'opacity-100' : 'opacity-0'}`}
           onClick={() => setMobileNavOpen(false)}
         />
-        <aside className={`absolute left-0 top-0 flex h-full max-h-dvh w-[min(20rem,85vw)] flex-col overflow-hidden rounded-none bg-[#0097A7] shadow-overlay transition-transform duration-slow ease-premium ${mobileNavOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-          <div className="flex h-16 shrink-0 items-center justify-between px-4">
+        <aside className={`nav-surface absolute left-0 top-0 flex h-full max-h-dvh w-[min(20rem,85vw)] flex-col overflow-hidden rounded-r-3xl shadow-overlay transition-transform duration-slow ease-premium ${mobileNavOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+          <div className="flex h-16 shrink-0 items-center justify-between border-b border-white/20 px-4">
             <div className="flex items-center gap-2.5">
-              <span className="grid h-9 w-9 place-items-center rounded-[13px] bg-white shadow-[0_2px_8px_rgba(0,70,79,0.22)]">
+              <span className="grid h-9 w-9 place-items-center rounded-[13px] bg-white shadow-[0_2px_8px_rgba(15,23,42,0.14)]">
                 <img src="/logo.jpeg" alt="Hadir.ai logo" className="h-6 w-6 rounded-[9px] object-cover" />
               </span>
               <span>
@@ -127,26 +128,32 @@ export function AppShell() {
             <button
               type="button"
               onClick={() => setMobileNavOpen(false)}
-              className="grid h-9 w-9 place-items-center rounded-[10px] text-white transition-[background-color,transform] duration-fast ease-premium hover:bg-white/15 active:scale-95"
+              className="grid h-9 w-9 place-items-center rounded-[10px] text-white/85 transition-[background-color,transform] duration-fast ease-premium hover:bg-white/15 hover:text-white active:scale-95"
               aria-label="Close menu"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
 
-          <div className="no-scrollbar min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain py-3 pb-8 pl-3">
+          <div className="no-scrollbar min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain py-3 pb-8">
             {items.map((item) => {
               const Icon = item.icon;
               return (
                 <NavLink
                   key={item.to}
                   to={item.to}
-                  className={({ isActive }) => `group/row relative flex items-center gap-3 rounded-l-full px-3 py-2.5 text-left text-[15px] font-medium tracking-[-0.01em] transition-colors duration-200 ease-premium ${isActive ? 'page-wash font-semibold text-accent-900' : 'font-semibold text-white hover:bg-white/20'}`}
+                  className={({ isActive }) =>
+                    `group/row relative mx-3 flex h-11 items-center gap-3 rounded-xl px-3.5 text-left text-[15px] font-medium tracking-[-0.01em] transition-colors duration-200 ease-premium ${
+                      isActive
+                        ? 'bg-white font-semibold text-[#00B2EE]'
+                        : 'font-semibold text-white/85 hover:bg-white/15 hover:text-white'
+                    }`
+                  }
                 >
                   {({ isActive }) => (
                     <>
                       <Icon
-                        className={`h-[20px] w-[20px] shrink-0 transition-colors duration-200 ease-premium ${isActive ? 'text-accent-700' : 'text-white'}`}
+                        className={`h-[20px] w-[20px] shrink-0 transition-colors duration-200 ease-premium ${isActive ? 'text-[#00B2EE]' : 'text-white/85 group-hover/row:text-white'}`}
                         strokeWidth={isActive ? 2 : 1.75}
                       />
                       {item.label}
@@ -157,13 +164,13 @@ export function AppShell() {
             })}
           </div>
 
-          <div className="relative z-20 shrink-0 bg-[#0097A7] py-3 pl-3">
+          <div className="relative z-20 shrink-0 border-t border-white/20 bg-transparent py-3">
             <button
               type="button"
               onClick={logout}
-              className="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left text-[15px] font-semibold text-white transition-all hover:bg-white/10"
+              className="mx-3 flex h-11 w-[calc(100%-1.5rem)] items-center gap-3 rounded-xl px-3.5 text-left text-[15px] font-semibold text-white/85 transition-all hover:bg-white/15 hover:text-white"
             >
-              <LogOut className="h-5 w-5 shrink-0 text-white" strokeWidth={1.75} />
+              <LogOut className="h-5 w-5 shrink-0" strokeWidth={1.75} />
               <span>Logout</span>
             </button>
           </div>

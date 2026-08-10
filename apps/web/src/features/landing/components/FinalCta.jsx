@@ -17,10 +17,10 @@ export function FinalCta({ onSignInClick }) {
   };
 
   return (
-    <section id="signin" className="bg-[#F8FDFC] px-4 py-20 sm:px-6 sm:py-28 lg:px-8">
+    <section id="signin" className="bg-[#F8FCFD] px-4 py-20 sm:px-6 sm:py-28 lg:px-8">
       <div className="mx-auto max-w-2xl text-center">
         <FadeIn>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#005A66]">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#00BFFF]">
             Early Access &amp; Portal Sign-In
           </p>
         </FadeIn>
@@ -32,7 +32,7 @@ export function FinalCta({ onSignInClick }) {
         </FadeIn>
 
         <FadeIn delay={0.12}>
-          <p className="mx-auto mt-4 max-w-lg text-base leading-relaxed text-[#475569]">
+          <p className="mx-auto mt-4 max-w-lg text-base leading-relaxed text-[#64748B]">
             Enter your work email and jump into the Hadir.ai admin portal — attendance, approvals,
             and analytics ready in minutes.
           </p>
@@ -41,7 +41,7 @@ export function FinalCta({ onSignInClick }) {
         <FadeIn delay={0.16} className="mt-9">
           <form
             onSubmit={submit}
-            className="mx-auto flex w-full max-w-xl items-center gap-2 rounded-full border border-[#E2F3F5] bg-white p-1.5 shadow-[0_20px_50px_rgba(0,105,120,0.10)]"
+            className="mx-auto flex w-full max-w-xl items-center gap-2 rounded-full border border-[#DCEFF7] bg-white p-1.5 shadow-[0_20px_50px_rgba(0,136,199,0.10)]"
           >
             <div className="flex min-w-0 flex-1 items-center gap-2 pl-3.5">
               <Mail className="h-4 w-4 shrink-0 text-[#94A3B8]" />
@@ -56,7 +56,7 @@ export function FinalCta({ onSignInClick }) {
             </div>
             <motion.button
               type="submit"
-              className="shrink-0 rounded-full bg-[#00838F] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#006978] active:bg-[#005A66] sm:px-5"
+              className="shrink-0 rounded-full bg-[#00BFFF] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#00A8E6] active:bg-[#00A8E6] sm:px-5"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >

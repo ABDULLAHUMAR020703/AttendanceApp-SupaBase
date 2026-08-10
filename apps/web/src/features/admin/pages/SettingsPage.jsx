@@ -178,8 +178,8 @@ export function SettingsPage() {
                 aria-current={active === s.id ? 'true' : undefined}
                 className={`w-full rounded-xl px-3 py-2 text-left text-sm transition-colors duration-200 ${
                   active === s.id
-                    ? 'bg-accent-100 font-semibold text-accent-800'
-                    : 'text-ink-muted hover:bg-accent-50 hover:text-accent-800'
+                    ? 'bg-accent-100 font-semibold text-accent-600'
+                    : 'text-ink-muted hover:bg-[#E6F4FA] hover:text-accent-600'
                 }`}
               >
                 {s.label}

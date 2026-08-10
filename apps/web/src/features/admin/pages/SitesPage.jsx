@@ -179,7 +179,7 @@ export function SitesPage() {
           {assignEmployeeUid && (
             <div className="flex flex-wrap gap-2">
               {sites.map((s) => (
-                <label key={s.id} className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1 text-xs transition-colors duration-200 ${assignSiteIds.includes(s.id) ? 'border-accent-200 bg-accent-100 font-semibold text-accent-800' : 'border-hairline bg-white text-ink-muted hover:border-accent-200 hover:text-accent-800'}`}>
+                <label key={s.id} className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1 text-xs transition-colors duration-200 ${assignSiteIds.includes(s.id) ? 'border-accent-200 bg-accent-100 font-semibold text-accent-600' : 'border-hairline bg-white text-ink-muted hover:border-accent-200 hover:text-accent-600'}`}>
                   <input
                     type="checkbox"
                     className="sr-only"

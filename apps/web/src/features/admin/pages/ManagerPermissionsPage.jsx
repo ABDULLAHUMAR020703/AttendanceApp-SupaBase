@@ -109,7 +109,7 @@ export function ManagerPermissionsPage() {
       </div>
 
       {error && <GlassCard className="p-4 text-sm text-red-100">{error}</GlassCard>}
-      {message && <GlassCard className="p-4 text-sm text-emerald-100">{message}</GlassCard>}
+      {message && <GlassCard className="p-4 text-sm text-accent-600">{message}</GlassCard>}
 
       <div className="grid grid-cols-1 xl:grid-cols-[22rem_1fr] gap-5">
         <GlassCard className="p-4">
@@ -150,12 +150,12 @@ export function ManagerPermissionsPage() {
                   onClick={() => setSelectedUid(manager.uid)}
                   className={`w-full rounded-lg border px-3 py-3 text-left transition-colors duration-fast ease-premium ${
                     active
-                      ? 'border-accent-600/40 bg-accent-50 text-accent-900'
+                      ? 'border-accent-600/40 bg-accent-50 text-accent-600'
                       : 'border-hairline bg-white text-ink hover:border-hairline-strong hover:bg-surface-subtle'
                   }`}
                 >
                   <span className="block text-sm font-semibold">{manager.name || manager.username}</span>
-                  <span className={`block text-xs ${active ? 'text-accent-800' : 'text-ink-muted'}`}>
+                  <span className={`block text-xs ${active ? 'text-accent-600' : 'text-ink-muted'}`}>
                     {manager.department || 'No department'} / {(manager.permissions || []).length} permissions
                   </span>
                 </button>

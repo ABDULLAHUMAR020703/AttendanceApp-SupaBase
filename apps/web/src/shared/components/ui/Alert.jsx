@@ -5,7 +5,7 @@ const STYLES = {
   success: 'border-success-border bg-success-surface text-success-ink',
   error: 'border-danger-border bg-danger-surface text-danger-ink',
   warning: 'border-warning-border bg-warning-surface text-warning-ink',
-  info: 'border-accent-200 bg-accent-50 text-accent-800',
+  info: 'border-accent-200 bg-accent-50 text-accent-600',
 };
 
 const ICONS = {

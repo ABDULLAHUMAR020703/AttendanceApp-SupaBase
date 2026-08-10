@@ -69,7 +69,12 @@ export const useAuthStore = create((set) => ({
       if (import.meta.env.DEV) {
         console.log('[authStore] login', { isEmail, identPreview: isEmail ? `${ident.slice(0, 2)}***@${ident.split('@')[1]}` : ident });
       }
-      const { data } = await api.post(apiUrl('/api/auth/login'), { usernameOrEmail: ident, password });
+      // Keep gateway attempt short — if Coolify/API is down, fall through to Supabase quickly.
+      const { data } = await api.post(
+        apiUrl('/api/auth/login'),
+        { usernameOrEmail: ident, password },
+        { timeout: 5000 }
+      );
       if (!data.success) throw new Error(data.error || 'Login failed');
       const signInEmail = normalizeEmailForAuth(data.user.email);
       const { error: signInErr } = await supabase.auth.signInWithPassword({ email: signInEmail, password });
@@ -109,11 +114,16 @@ export const useAuthStore = create((set) => ({
         gatewayIsLocal: IS_API_GATEWAY_LOCAL,
       });
 
+      const errMsg = String(error?.message || '').toLowerCase();
       const gatewayLikelyUnavailable =
         !IS_API_GATEWAY_CONFIGURED ||
         (!import.meta.env.DEV && IS_API_GATEWAY_LOCAL) ||
-        error?.message?.toLowerCase().includes('network') ||
-        error?.code === 'ERR_NETWORK';
+        errMsg.includes('network') ||
+        errMsg.includes('timeout') ||
+        error?.code === 'ERR_NETWORK' ||
+        error?.code === 'ECONNABORTED' ||
+        error?.code === 'ETIMEDOUT' ||
+        error?.code === 'ECONNREFUSED';
 
       if (gatewayLikelyUnavailable) {
         try {

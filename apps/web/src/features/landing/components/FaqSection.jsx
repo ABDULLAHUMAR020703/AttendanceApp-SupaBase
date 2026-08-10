@@ -12,11 +12,11 @@ export function FaqSection() {
   const [openIndex, setOpenIndex] = useState(0);
 
   return (
-    <section id="faq" className="bg-[#F8FDFC] px-4 py-20 sm:px-6 sm:py-28 lg:px-8">
+    <section id="faq" className="bg-[#F8FCFD] px-4 py-20 sm:px-6 sm:py-28 lg:px-8">
       <div className="mx-auto grid max-w-5xl gap-12 lg:grid-cols-[0.85fr_1.15fr] lg:gap-16 lg:items-start">
         {/* Left — sticky heading */}
         <FadeIn className="lg:sticky lg:top-28">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#005A66]">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#00BFFF]">
             Frequently Asked Questions
           </p>
           <h2 className="mt-4 text-3xl font-semibold tracking-tight text-[#0F172A] sm:text-4xl lg:text-[2.6rem] lg:leading-[1.15]">
@@ -36,7 +36,7 @@ export function FaqSection() {
                   key={item.q}
                   className={[
                     'overflow-hidden rounded-2xl transition-colors duration-300',
-                    open ? 'bg-white' : 'bg-transparent hover:bg-[#E6F7F9]/70',
+                    open ? 'bg-white' : 'bg-transparent hover:bg-[#E0F6FC]/70',
                   ].join(' ')}
                 >
                   <button
@@ -50,8 +50,8 @@ export function FaqSection() {
                     </span>
                     <motion.span
                       className={[
-                        'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#00838F]',
-                        open ? 'bg-[#E6F7F9]' : 'bg-white',
+                        'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#00BFFF]',
+                        open ? 'bg-[#E0F6FC]' : 'bg-white',
                       ].join(' ')}
                       animate={{ rotate: open ? 45 : 0 }}
                       transition={{ duration: 0.3, ease: 'easeInOut' }}
@@ -71,7 +71,7 @@ export function FaqSection() {
                         transition={{ duration: 0.35, ease: 'easeInOut' }}
                         className="overflow-hidden"
                       >
-                        <p className="px-4 pb-5 text-sm leading-relaxed text-[#475569] sm:px-5 sm:pb-5 sm:text-[15px] sm:leading-7">
+                        <p className="px-4 pb-5 text-sm leading-relaxed text-[#64748B] sm:px-5 sm:pb-5 sm:text-[15px] sm:leading-7">
                           {item.a}
                         </p>
                       </motion.div>

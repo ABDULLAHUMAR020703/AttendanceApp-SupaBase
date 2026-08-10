@@ -229,7 +229,7 @@ export function CompanyOnboardingPage() {
               <p className="text-center text-label text-ink-muted">
                 <Link
                   to="/login"
-                  className="font-semibold text-accent-800 transition-colors duration-fast hover:text-accent-900 hover:underline"
+                  className="font-semibold text-accent-600 transition-colors duration-fast hover:text-accent-700 hover:underline"
                 >
                   Back to sign in
                 </Link>
