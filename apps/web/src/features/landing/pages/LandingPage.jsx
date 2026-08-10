@@ -6,8 +6,8 @@ import {
   BadgeCheck,
   BellRing,
   BrainCircuit,
+  Building2,
   CalendarClock,
-  Check,
   ChevronRight,
   Clock3,
   DatabaseZap,
@@ -17,6 +17,7 @@ import {
   KeyRound,
   Layers3,
   LockKeyhole,
+  Mail,
   MapPin,
   Radar,
   ShieldCheck,
@@ -26,6 +27,9 @@ import {
 import { useAuthStore } from '../../auth/store/authStore';
 import { HalftoneAura } from '../../../shared/components/HalftoneAura';
 import { LandingNav } from '../components/LandingNav';
+import { IntegrationLogoBar } from '../components/IntegrationLogoBar';
+import { FeatureHighlightsChecklist } from '../components/FeatureHighlightsChecklist';
+import { HeroCtaButton, ONBOARD_URL } from '../components/HeroCtaButton';
 
 const spring = { type: 'spring', stiffness: 260, damping: 24, mass: 0.8 };
 const fadeUp = {
@@ -52,26 +56,12 @@ const FEATURES = [
   ['Compliance Reports', BadgeCheck, 'Policy-ready reports for reviews, audits, and leadership updates.', ''],
 ];
 
-const INTEGRATION_LOGOS = [
-  { src: '/assets/slack1_3.webp', alt: 'Slack' },
-  { src: '/assets/teams1_3.png', alt: 'Microsoft Teams' },
-  { src: '/assets/workspace1_3.png', alt: 'Google Workspace' },
-  { src: '/assets/outlook1_3.jpg', alt: 'Outlook' },
-  { src: '/assets/quickbooks1_3.jpg', alt: 'QuickBooks' },
-  { src: '/assets/discord1_3.avif', alt: 'Discord' },
-];
 const SECURITY = [
   ['Encryption', 'Enterprise-grade AES-256 data protection at rest and in transit across all attendance records.', '/assets/security-buyer-bg1.png'],
   ['Role Permissions', 'Granular access control keeping managers focused on their teams while securing sensitive personnel data.', '/assets/security-buyer-bg2.png'],
   ['Audit Logs', 'Traceable activity histories for every check-in, leave approval, and manual override across your enterprise.', '/assets/security-buyer-bg3.png'],
   ['Compliance Monitoring', 'Operational rules kept visible, reviewable, and aligned with local labor regulations automatically.', '/assets/security-buyer-bg4.png'],
 ];
-
-function PrimaryButton({ children, href = '#contact', onClick }) {
-  const className = 'group inline-flex items-center justify-center gap-2 rounded-[15px] bg-[#00BFFF] px-5 py-3 text-[15px] font-semibold text-white shadow-[0_12px_28px_rgba(0,191,255,0.28)] transition duration-200 ease-out hover:-translate-y-0.5 hover:bg-[#00A8E6] hover:shadow-[0_18px_40px_rgba(0,168,230,0.32)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00BFFF]/45 focus-visible:ring-offset-4 active:scale-[0.98] active:bg-[#00A8E6]';
-  if (onClick) return <button type="button" onClick={onClick} className={className}>{children}</button>;
-  return <a href={href} className={className}>{children}</a>;
-}
 
 function SecondaryButton({ children, href = '#product' }) {
   return (
@@ -83,7 +73,8 @@ function SecondaryButton({ children, href = '#product' }) {
 
 function SlotNumber({ value }) {
   const ref = useRef(null);
-  const inView = useInView(ref, { once: true, margin: '-80px' });
+  // Replay count-up whenever the metric re-enters the viewport (scroll up or down).
+  const inView = useInView(ref, { once: false, amount: 0.4, margin: '-80px' });
   const characters = String(value).split('');
 
   return (
@@ -100,7 +91,11 @@ function SlotNumber({ value }) {
               className="flex flex-col leading-none"
               initial={{ y: '0em' }}
               animate={{ y: inView ? `-${digit}em` : '0em' }}
-              transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1], delay: index * 0.05 }}
+              transition={
+                inView
+                  ? { duration: 1.2, ease: [0.16, 1, 0.3, 1], delay: index * 0.05 }
+                  : { duration: 0 }
+              }
             >
               {Array.from({ length: 10 }, (_, number) => (
                 <span key={number} className="block h-[1em] leading-none">{number}</span>
@@ -201,18 +196,18 @@ function DashboardMockup({ dark = false, compact = false }) {
 function ScrollProgressBar() {
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, { stiffness: 120, damping: 24, mass: 0.35 });
-  const backgroundColor = useTransform(scrollYProgress, [0, 1], ['#00BFFF', '#00A8E6']);
+  const backgroundColor = useTransform(scrollYProgress, [0, 1], ['#22C55E', '#16A34A']);
 
   return (
     <motion.div
-      className="fixed left-0 right-0 top-0 z-50 h-[7px] origin-left shadow-[0_0_20px_rgba(0,191,255,0.38)]"
+      className="fixed left-0 right-0 top-0 z-50 h-[7px] origin-left shadow-[0_0_20px_rgba(34,197,94,0.38)]"
       style={{ scaleX, backgroundColor }}
       aria-hidden="true"
     />
   );
 }
 
-function Hero({ onLaunch }) {
+function Hero() {
   return (
     <section id="top" aria-label="Hero" data-section="Hero" className="relative min-h-[72vh] overflow-hidden px-4 pb-16 pt-28 sm:px-6 sm:pb-20 sm:pt-32 lg:px-8">
       <HalftoneAura />
@@ -221,7 +216,7 @@ function Hero({ onLaunch }) {
           <h1 className="text-[60px] font-bold leading-[0.98] tracking-[-0.02em] text-[#0F172A] sm:text-[68px] lg:text-[72px]">Automated <span className="text-[#00BFFF]">workforce intelligence</span> for enterprise teams.</h1>
           <p className="mx-auto mt-6 max-w-2xl text-base leading-[1.6] text-[#64748B] sm:text-lg">Automate check-ins, enforce geofencing rules, track leave, and sync payroll without manual attendance cleanup.</p>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <PrimaryButton onClick={onLaunch}>Book Demo <ArrowRight className="h-4 w-4" /></PrimaryButton>
+            <HeroCtaButton />
             <SecondaryButton href="#product">Explore Platform <ChevronRight className="h-4 w-4" /></SecondaryButton>
           </div>
         </motion.div>
@@ -240,7 +235,7 @@ function AttendanceOverview() {
     <section ref={sectionRef} id="product" aria-label="Attendance Overview" data-section="Attendance Overview" className="relative overflow-hidden px-4 pb-28 pt-20 sm:px-6 lg:px-8">
       <HalftoneAura />
       <div className="relative z-10 mx-auto max-w-[1400px]">
-        <motion.div className="max-w-3xl" variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true, amount: 0.35 }}>
+        <motion.div className="max-w-3xl" variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: false, amount: 0.35 }}>
           <p className="text-sm font-medium uppercase tracking-[0.20em] text-[#00BFFF]">Attendance Overview</p>
           <h2 className="mt-4 text-4xl font-bold tracking-tight text-[#0F172A] sm:text-5xl">Live operations, summarized into decisions.</h2>
         </motion.div>
@@ -251,7 +246,7 @@ function AttendanceOverview() {
               className="pt-0"
               initial={{ opacity: 0, y: 18 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.35 }}
+              viewport={{ once: false, amount: 0.35 }}
               transition={{ duration: 0.55, delay: index * 0.06, ease: [0.16, 1, 0.3, 1] }}
             >
               <div className="mb-4 h-[2px] w-full bg-[#00BFFF]/60" />
@@ -402,68 +397,40 @@ function ProductShowcase() {
   const stories = [
     ['Detailed Attendance Analytics & Reports', 'Export attendance logs, track daily and monthly breakdowns, and generate profile-level reports that help HR and operations teams close payroll with confidence.'],
   ];
-  // Showcase band: vivid cyan → sky — no deep forest/navy teal.
+  // Showcase band: solid cyan (#00bcff) with soft ambient glow + curved process path.
   return (
-    <section id="solutions" aria-label="Product Showcase" data-section="Product Showcase" className="relative overflow-hidden bg-[#00BFFF] px-4 py-24 text-white sm:px-6 lg:px-8">
+    <section id="solutions" aria-label="Product Showcase" data-section="Product Showcase" className="relative overflow-hidden bg-[#00bcff] px-4 py-24 text-white sm:px-6 lg:px-8">
       <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_28%_48%,rgba(112,201,239,0.45),transparent_34%),linear-gradient(120deg,#00BFFF_0%,#3ABCEF_48%,#00A8E6_100%)]" />
-        <motion.div className="absolute -left-[10%] -top-[24%] h-[72%] w-[52%] opacity-70 bg-[radial-gradient(circle,rgba(255,255,255,0.78)_1.55px,transparent_1.85px)] bg-[size:13px_13px] [mask-image:linear-gradient(135deg,#000_0%,#000_46%,transparent_82%)]" animate={{ x: [0, 10, 0], y: [0, -6, 0] }} transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }} />
-        <motion.div className="absolute -bottom-[32%] right-[-10%] h-[78%] w-[66%] opacity-58 bg-[radial-gradient(circle,rgba(255,255,255,0.70)_1.55px,transparent_1.85px)] bg-[size:13px_13px] [mask-image:linear-gradient(315deg,#000_0%,#000_48%,transparent_84%)]" animate={{ x: [0, -12, 0], y: [0, 8, 0] }} transition={{ duration: 20, repeat: Infinity, ease: 'easeInOut' }} />
-        <div className="absolute left-[20%] top-[24%] h-72 w-72 rounded-full bg-[#70C9EF]/35 blur-[70px]" />
-        <div className="absolute bottom-8 right-[28%] h-56 w-56 rounded-full bg-white/10 blur-[80px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_28%_48%,rgba(255,255,255,0.28),transparent_34%),radial-gradient(circle_at_78%_18%,rgba(112,201,239,0.35),transparent_30%),linear-gradient(160deg,#00bcff_0%,#00B2EE_52%,#0096e0_100%)]" />
+        <div className="absolute left-[18%] top-[20%] h-80 w-80 rounded-full bg-white/15 blur-[90px]" />
+        <div className="absolute bottom-6 right-[22%] h-64 w-64 rounded-full bg-[#70C9EF]/30 blur-[80px]" />
       </div>
-      <div className="relative z-10 mx-auto max-w-[1400px] space-y-24">
+      <div className="relative z-10 mx-auto max-w-[1400px] space-y-10 lg:space-y-14">
         {stories.map(([title, copy], index) => (
           <div key={title} className="grid gap-12 lg:grid-cols-[0.88fr_1.12fr] lg:items-center">
             <motion.div className={index % 2 ? 'lg:order-2' : ''} variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true, amount: 0.25 }}>
               <p className="text-sm font-semibold uppercase tracking-[0.20em] text-white/78">Product Showcase</p>
               <h2 className="mt-4 max-w-xl text-4xl font-bold tracking-[-0.02em] text-white sm:text-5xl">{title}</h2>
               <p className="mt-5 max-w-2xl text-lg leading-8 text-white/78">{copy}</p>
-              <div className="mt-9 grid max-w-xl gap-3">
-                {['Export attendance logs', 'Profile-level reports', 'Monthly breakdowns', 'Payroll-ready summaries'].map((item) => (
-                  <span key={item} className="group inline-flex h-11 items-center gap-3 rounded-[14px] border border-white/28 bg-white/16 px-4 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(0,136,199,0.16)] backdrop-blur-xl transition-all duration-200 hover:-translate-y-0.5 hover:border-white/45 hover:bg-white/24 hover:shadow-[0_16px_34px_rgba(0,136,199,0.22)]">
-                    <span className="grid h-5 w-5 shrink-0 place-items-center rounded-[7px] bg-white/20 transition group-hover:bg-white/28"><Check className="h-3.5 w-3.5 text-white" /></span> {item}
-                  </span>
-                ))}
-              </div>
             </motion.div>
             <AnalyticsShowcaseMockup />
           </div>
         ))}
+
+        <motion.div
+          variants={fadeUp}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, amount: 0.2 }}
+          className="rounded-2xl bg-white px-5 py-2 shadow-[0_12px_36px_rgba(0,80,140,0.12)] sm:px-8"
+        >
+          <FeatureHighlightsChecklist />
+        </motion.div>
       </div>
     </section>
   );
 }
 
-
-function Integrations() {
-  const marqueeItems = [...INTEGRATION_LOGOS, ...INTEGRATION_LOGOS, ...INTEGRATION_LOGOS];
-
-  return (
-    <section id="company" aria-label="Integration Logo Ticker" data-section="Integration Logo Ticker" className="relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] w-screen max-w-none overflow-hidden bg-white p-0 pb-10 pt-4">
-      <style>{`@keyframes hadir-logo-marquee { from { transform: translateX(0); } to { transform: translateX(-33.333%); } }`}</style>
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_0%,rgba(0,191,255,0.10),transparent_28%),radial-gradient(circle_at_84%_100%,rgba(0,191,255,0.08),transparent_30%)]" aria-hidden="true" />
-      <div className="pointer-events-none absolute inset-0 opacity-[0.18] bg-[radial-gradient(circle,rgba(0,191,255,0.34)_1px,transparent_1.3px)] bg-[size:18px_18px] [mask-image:linear-gradient(to_bottom,transparent_0%,#000_24%,#000_72%,transparent_100%)]" aria-hidden="true" />
-      <div className="relative z-10 mx-auto mb-4 max-w-7xl px-4 text-center sm:px-6 lg:px-8">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#00BFFF]">Integrates seamlessly with your existing enterprise stack</p>
-      </div>
-      <div className="relative z-10 m-0 w-full max-w-none overflow-hidden p-0">
-        <div className="flex w-max items-center gap-3 py-2 [animation:hadir-logo-marquee_38s_linear_infinite] hover:[animation-play-state:paused] md:gap-4">
-          {marqueeItems.map((logo, index) => (
-            <span key={`${logo.src}-${index}`} className="flex h-36 w-[58vw] shrink-0 items-center justify-center p-2 sm:w-[40vw] md:h-40 md:w-[30vw] md:p-3 lg:w-[24vw] xl:w-[23vw]">
-              <img
-                src={logo.src}
-                alt={logo.alt}
-                className="h-full w-full object-contain transition-transform duration-300 hover:scale-105"
-                loading="lazy"
-              />
-            </span>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
 
 function SecurityWave({ src }) {
   return (
@@ -516,15 +483,202 @@ function Security() {
   );
 }
 
-function FinalCTA({ onLaunch }) {
+const DEMO_CONTACT_EMAIL = 'demo@hadir.ai';
+
+function ContactUsForm() {
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [message, setMessage] = useState('');
+  const [status, setStatus] = useState('idle');
+
+  const resetStatus = () => {
+    if (status !== 'idle') setStatus('idle');
+  };
+
+  const onSubmit = (event) => {
+    event.preventDefault();
+    const trimmedFirst = firstName.trim();
+    const trimmedLast = lastName.trim();
+    const trimmedEmail = email.trim();
+    const trimmedMessage = message.trim();
+
+    if (!trimmedFirst || !trimmedLast || !trimmedEmail || !trimmedMessage) {
+      setStatus('error');
+      return;
+    }
+
+    const fullName = `${trimmedFirst} ${trimmedLast}`;
+    const subject = encodeURIComponent(`Hadir.ai contact — ${fullName}`);
+    const body = encodeURIComponent(
+      `Name: ${fullName}\nEmail: ${trimmedEmail}\n\nMessage:\n${trimmedMessage}`,
+    );
+    setStatus('sent');
+    window.location.href = `mailto:${DEMO_CONTACT_EMAIL}?subject=${subject}&body=${body}`;
+  };
+
+  const fieldClass =
+    'mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#00bcff] focus:bg-white focus:ring-2 focus:ring-[#00bcff]/25';
+
   return (
-    <section id="contact" aria-label="Request Demo CTA" data-section="Request Demo CTA" className="relative overflow-hidden px-4 py-32 sm:px-6 lg:px-8">
+    <form
+      onSubmit={onSubmit}
+      noValidate
+      className="rounded-3xl border border-slate-100 bg-white p-6 shadow-[0_16px_40px_rgba(15,23,42,0.06)] sm:p-8"
+    >
+      <h2 className="text-2xl font-bold text-slate-900">Contact Us</h2>
+      <p className="mt-2 text-sm leading-relaxed text-slate-500">
+        We are deeply committed to delivering unparalleled service and unwavering support to ensure your experience exceeds expectations.
+      </p>
+
+      <div className="mt-6 space-y-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <label className="block text-xs font-semibold text-slate-700">
+            First Name <span className="text-red-500">*</span>
+            <input
+              type="text"
+              name="firstName"
+              autoComplete="given-name"
+              required
+              value={firstName}
+              onChange={(e) => {
+                setFirstName(e.target.value);
+                resetStatus();
+              }}
+              placeholder="First name"
+              className={fieldClass}
+            />
+          </label>
+          <label className="block text-xs font-semibold text-slate-700">
+            Last Name <span className="text-red-500">*</span>
+            <input
+              type="text"
+              name="lastName"
+              autoComplete="family-name"
+              required
+              value={lastName}
+              onChange={(e) => {
+                setLastName(e.target.value);
+                resetStatus();
+              }}
+              placeholder="Last name"
+              className={fieldClass}
+            />
+          </label>
+        </div>
+
+        <label className="block text-xs font-semibold text-slate-700">
+          Email <span className="text-red-500">*</span>
+          <input
+            type="email"
+            name="email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              resetStatus();
+            }}
+            placeholder="you@company.com"
+            className={fieldClass}
+          />
+        </label>
+
+        <label className="block text-xs font-semibold text-slate-700">
+          Description <span className="text-red-500">*</span>
+          <textarea
+            name="message"
+            rows={4}
+            required
+            value={message}
+            onChange={(e) => {
+              setMessage(e.target.value);
+              resetStatus();
+            }}
+            placeholder="Message"
+            className={`${fieldClass} resize-none`}
+          />
+        </label>
+      </div>
+
+      <button
+        type="submit"
+        className="mt-5 w-full rounded-xl bg-[#00bcff] py-3 text-sm font-semibold text-white transition-colors hover:bg-[#00a3e0] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00bcff]/45 focus-visible:ring-offset-2"
+      >
+        Submit
+      </button>
+
+      {status === 'error' && (
+        <p className="mt-2 text-xs font-medium text-red-600" role="alert">
+          Please complete all required fields.
+        </p>
+      )}
+      {status === 'sent' && (
+        <p className="mt-2 text-xs font-medium text-emerald-600" role="status">
+          Opening your email client…
+        </p>
+      )}
+    </form>
+  );
+}
+
+function FinalCTA() {
+  return (
+    <section
+      id="contact"
+      aria-label="Contact Us and Request Demo"
+      data-section="Contact Us"
+      className="relative overflow-hidden px-4 py-24 sm:px-6 lg:px-8"
+    >
       <HalftoneAura />
-      <div className="relative z-10 mx-auto max-w-4xl rounded-[18px] border border-[#DCEFF7] bg-white/88 p-8 text-center shadow-[0_1px_1px_rgba(15,23,42,0.04),0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur-2xl sm:p-12">
-        <p className="text-sm font-medium uppercase tracking-[0.20em] text-[#00BFFF]">Request Demo</p>
-        <h2 className="mx-auto mt-4 max-w-2xl text-4xl font-extrabold tracking-[-0.04em] text-[#0F172A] sm:text-6xl">See attendance automation operating live.</h2>
-        <p className="mx-auto mt-5 max-w-xl text-lg leading-8 text-[#64748B]">Explore how AI attendance, geofencing, analytics, integrations, and enterprise controls work together.</p>
-        <div className="mt-8"><PrimaryButton onClick={onLaunch}>Book Demo <ArrowRight className="h-4 w-4" /></PrimaryButton></div>
+      <div className="relative z-10 mx-auto grid max-w-6xl grid-cols-1 items-start gap-6 lg:grid-cols-2 lg:gap-8">
+        <ContactUsForm />
+
+        <div className="flex flex-col gap-4">
+          <div className="rounded-2xl bg-[#00bcff] p-6 text-white shadow-[0_18px_40px_rgba(0,188,255,0.28)]">
+            <p className="text-xs font-semibold uppercase tracking-wider text-white/80">Request Demo</p>
+            <h3 className="mt-2 text-xl font-bold leading-snug sm:text-2xl">
+              See attendance automation operating live.
+            </h3>
+            <p className="mt-3 text-sm leading-relaxed text-white/90">
+              Explore how AI attendance, geofencing, analytics, integrations, and enterprise controls work together.
+            </p>
+            <a
+              href={ONBOARD_URL}
+              className="mt-5 inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-[#00bcff] transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#00bcff]"
+            >
+              Book Demo
+              <ArrowRight className="h-4 w-4" aria-hidden />
+            </a>
+          </div>
+
+          <a
+            href="https://techdotglobal.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-start gap-4 rounded-2xl border border-cyan-100 bg-cyan-50/50 p-5 transition hover:border-[#00bcff]/40 hover:bg-cyan-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00bcff]/35"
+          >
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white text-[#00bcff] shadow-sm">
+              <Building2 className="h-5 w-5" aria-hidden />
+            </span>
+            <span>
+              <span className="block text-sm font-bold text-slate-900">Parent Company</span>
+              <span className="mt-1 block text-sm text-slate-600">
+                A product proudly backed by TechDotGlobal
+              </span>
+            </span>
+          </a>
+
+          <div className="flex items-start gap-4 rounded-2xl border border-slate-100 bg-slate-50 p-5">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white text-[#00bcff] shadow-sm">
+              <Mail className="h-5 w-5" aria-hidden />
+            </span>
+            <div>
+              <p className="text-sm font-bold text-slate-900">Direct Inquiries</p>
+              <p className="mt-1 text-sm text-slate-600">We usually respond within 24 hours</p>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   );
@@ -572,18 +726,17 @@ export function LandingPage() {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const onSignInClick = () => navigate(user ? '/dashboard' : '/login');
-  const onCreateAccountClick = () => navigate(user ? '/dashboard' : '/onboard');
   return (
     <div className="landing-page min-h-screen scroll-smooth bg-[#F8FCFD] text-[#0F172A] antialiased [font-family:'Plus_Jakarta_Sans',Inter,system-ui,sans-serif]">
       <ScrollProgressBar />
-      <LandingNav onSignInClick={onSignInClick} onCreateAccountClick={onCreateAccountClick} />
+      <LandingNav onSignInClick={onSignInClick} />
       <main>
-        <Hero onLaunch={onSignInClick} />
-        <Integrations />
+        <Hero />
+        <IntegrationLogoBar />
         <AttendanceOverview />
         <ProductShowcase />
         <Security />
-        <FinalCTA onLaunch={onSignInClick} />
+        <FinalCTA />
       </main>
       <Footer />
     </div>

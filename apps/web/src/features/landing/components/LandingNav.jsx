@@ -1,5 +1,6 @@
 import { useEffect, useId, useState } from 'react';
 import { ArrowRight, Menu, X } from 'lucide-react';
+import { resolveOnboardHref } from './HeroCtaButton';
 
 const LOGO_PATH = '/logo.jpeg';
 
@@ -19,16 +20,18 @@ function HadirMark() {
         alt="Hadir.ai logo"
         className="h-8 w-8 rounded-[15px] object-cover shadow-[0_8px_20px_rgba(15,23,42,0.10)]"
       />
-      <span className="text-[15px] font-extrabold tracking-[-0.02em] text-black">Hadir.ai</span>
+      <span className="text-[15px] font-bold tracking-[-0.01em] text-slate-700">Hadir.ai</span>
     </span>
   );
 }
 
-export function LandingNav({ onSignInClick, onCreateAccountClick }) {
+export function LandingNav({ onSignInClick }) {
   const mobileMenuId = useId();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [hiddenPastHero, setHiddenPastHero] = useState(false);
+  // Backend: /onboard → CompanyOnboardingPage (dev) or production onboard host.
+  const createAccountHref = resolveOnboardHref();
 
   useEffect(() => {
     const onScroll = () => {
@@ -84,14 +87,13 @@ export function LandingNav({ onSignInClick, onCreateAccountClick }) {
             >
               Sign In
             </button>
-            <button
-              type="button"
-              onClick={onCreateAccountClick}
+            <a
+              href={createAccountHref}
               className="inline-flex items-center justify-center gap-2 rounded-[15px] bg-[#00BFFF] px-4 py-2.5 text-[15px] font-semibold text-white shadow-[0_10px_24px_rgba(0,191,255,0.28)] transition duration-200 ease-out hover:-translate-y-0.5 hover:bg-[#00A8E6] hover:shadow-[0_16px_34px_rgba(0,168,230,0.30)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00BFFF]/45 focus-visible:ring-offset-4 active:scale-[0.98] active:bg-[#00A8E6]"
             >
               Create Free Account
               <ArrowRight className="h-4 w-4" />
-            </button>
+            </a>
           </div>
 
           <button
@@ -122,10 +124,14 @@ export function LandingNav({ onSignInClick, onCreateAccountClick }) {
               <button type="button" onClick={onSignInClick} className="mt-1 rounded-2xl border border-[#DCEFF7] bg-white px-4 py-3 text-sm font-semibold text-[#0F172A]">
                 Sign In
               </button>
-              <button type="button" onClick={() => { closeMobile(); onCreateAccountClick?.(); }} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#00BFFF] px-4 py-3 text-sm font-semibold text-white hover:bg-[#00A8E6] active:bg-[#00A8E6]">
+              <a
+                href={createAccountHref}
+                onClick={closeMobile}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#00BFFF] px-4 py-3 text-sm font-semibold text-white hover:bg-[#00A8E6] active:bg-[#00A8E6]"
+              >
                 Create Free Account
                 <ArrowRight className="h-4 w-4" />
-              </button>
+              </a>
             </nav>
           </div>
         )}

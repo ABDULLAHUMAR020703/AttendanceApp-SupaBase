@@ -708,7 +708,7 @@ function KpiStat({
       {...(onClick ? { type: 'button', onClick } : {})}
       className={`group relative flex h-full w-full flex-col overflow-hidden rounded-2xl border-2 border-[#00B2EE] bg-white p-5 text-left shadow-[0_4px_18px_rgba(0,178,238,0.1)] transition-all duration-[200ms] ease-out hover:-translate-y-0.5 hover:shadow-[0_10px_26px_rgba(0,178,238,0.16)] ${FOCUS_RING}`}
     >
-      <span className="absolute inset-x-0 top-0 h-1.5 bg-[#00B2EE]" aria-hidden />
+      <span className="absolute inset-x-0 top-0 h-1.5 bg-[#22C55E]" aria-hidden />
 
       <span className="relative flex w-full flex-1 flex-col">
         <span className="flex w-full items-start justify-between gap-3">
