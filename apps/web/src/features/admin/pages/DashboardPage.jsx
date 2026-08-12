@@ -584,10 +584,10 @@ function OverviewBanner({ adminName, stats, loading, statusPills = [] }) {
         )}
       </div>
 
-      {/* Mobile: horizontal snap scroll. Desktop: equal 4-up with lead emphasis via surface. */}
-      <div className="-mx-1 flex gap-4 overflow-x-auto px-1 pb-1 snap-x snap-mandatory sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-4 lg:gap-5">
+      {/* Mobile stack → tablet 2-up → desktop 4 compact tiles. Never horizontal-scroll. */}
+      <div className="grid grid-cols-1 gap-4 py-1 sm:grid-cols-2 lg:grid-cols-4 lg:gap-5">
         {stats.map((stat, index) => (
-          <div key={stat.label} className="min-w-[17rem] shrink-0 snap-start sm:min-w-0 sm:h-full">
+          <div key={stat.label} className="min-w-0 h-full">
             <KpiStat {...stat} hero={index === 0} loading={loading} />
           </div>
         ))}
@@ -682,7 +682,7 @@ function KpiIconClock({ className }) {
 }
 
 /**
- * KPI metric card — identical padding, vivid cyan frame, crisp vector icons.
+ * KPI metric tile — folder-tab silhouette, existing cyan/green palette, stacked content.
  */
 function KpiStat({
   icon: Icon,
@@ -706,13 +706,13 @@ function KpiStat({
   return (
     <Tag
       {...(onClick ? { type: 'button', onClick } : {})}
-      className={`group relative flex h-full w-full flex-col overflow-hidden rounded-2xl border-2 border-[#00B2EE] bg-white p-5 text-left shadow-[0_4px_18px_rgba(0,178,238,0.1)] transition-all duration-[200ms] ease-out hover:-translate-y-0.5 hover:shadow-[0_10px_26px_rgba(0,178,238,0.16)] ${FOCUS_RING}`}
+      className={`kpi-folder group relative flex h-full min-h-[13.75rem] w-full appearance-none flex-col border-0 bg-transparent p-0 text-left shadow-none transition-transform duration-[200ms] ease-out hover:-translate-y-0.5 ${onClick ? 'cursor-pointer' : ''} ${FOCUS_RING}`}
     >
-      <span className="absolute inset-x-0 top-0 h-1.5 bg-[#22C55E]" aria-hidden />
+      <span className="kpi-folder-surface" aria-hidden />
 
-      <span className="relative flex w-full flex-1 flex-col">
+      <span className="kpi-folder-content">
         <span className="flex w-full items-start justify-between gap-3">
-          <span className="truncate pt-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#64748B]">
+          <span className="min-w-0 pt-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#64748B]">
             {label}
           </span>
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[#00B2EE]/30 bg-[#E6F4FA] text-[#00B2EE]">
@@ -739,31 +739,27 @@ function KpiStat({
           </span>
         )}
 
-        {context && (
-          <span className={`mt-3 block truncate text-caption font-medium text-[#64748B] ${loading ? 'opacity-0' : ''}`}>
-            {context}
-          </span>
-        )}
-
-        {detail && (
-          <span className={`mt-1 block truncate text-caption text-[#94A3B8] ${loading ? 'opacity-0' : ''}`}>
-            {detail}
-          </span>
-        )}
-
-        {insight && (
-          <span className={`mt-auto block w-full pt-4 ${loading ? 'opacity-0' : ''}`}>
-            <span
-              className={`flex w-full items-center gap-2 rounded-full border px-2.5 py-2 ${KPI_BADGE_TONES[insightTone] || KPI_BADGE_TONES.neutral}`}
-            >
+        <span className={`mt-auto flex flex-col pt-4 ${loading ? 'opacity-0' : ''}`}>
+          {context && (
+            <span className="block text-caption font-medium leading-snug text-[#64748B]">{context}</span>
+          )}
+          {detail && (
+            <span className="mt-1 block text-caption leading-snug text-[#94A3B8]">{detail}</span>
+          )}
+          {insight && (
+            <span className="mt-3 block w-full">
               <span
-                className={`h-1.5 w-1.5 shrink-0 rounded-full ${KPI_STATUS_DOTS[insightTone]}`}
-                aria-hidden
-              />
-              <span className="truncate text-caption font-semibold text-[#0F172A]">{insight}</span>
+                className={`flex w-full items-center gap-2 rounded-full border px-2.5 py-2 ${KPI_BADGE_TONES[insightTone] || KPI_BADGE_TONES.neutral}`}
+              >
+                <span
+                  className={`h-1.5 w-1.5 shrink-0 rounded-full ${KPI_STATUS_DOTS[insightTone]}`}
+                  aria-hidden
+                />
+                <span className="text-caption font-semibold leading-snug text-[#0F172A]">{insight}</span>
+              </span>
             </span>
-          </span>
-        )}
+          )}
+        </span>
       </span>
     </Tag>
   );
