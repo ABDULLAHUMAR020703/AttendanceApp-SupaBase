@@ -596,19 +596,19 @@ function OverviewBanner({ adminName, stats, loading, statusPills = [] }) {
   );
 }
 
-/** Semantic insight dots — cyan for brand-neutral; amber/red only for attention. */
+/** Semantic insight dots — white on the cyan tile; amber/red only for attention. */
 const KPI_STATUS_DOTS = {
-  neutral: 'bg-[#00B2EE]',
-  good: 'bg-[#00B2EE]',
+  neutral: 'bg-white',
+  good: 'bg-white',
   watch: 'bg-[#F59E0B]',
   urgent: 'bg-[#EF4444]',
 };
 
 const KPI_BADGE_TONES = {
-  neutral: 'border-[#00B2EE]/40 bg-[rgba(0,178,238,0.1)]',
-  good: 'border-[#00B2EE]/40 bg-[rgba(0,178,238,0.1)]',
-  watch: 'border-[#F59E0B]/50 bg-[rgba(245,158,11,0.12)]',
-  urgent: 'border-[#EF4444]/45 bg-[rgba(239,68,68,0.1)]',
+  neutral: 'border-white/35 bg-white/15',
+  good: 'border-white/35 bg-white/15',
+  watch: 'border-[#F59E0B]/70 bg-[rgba(245,158,11,0.28)]',
+  urgent: 'border-[#EF4444]/70 bg-[rgba(239,68,68,0.28)]',
 };
 
 /** Pixel-sharp KPI glyphs — stroke icons only, no filled art. */
@@ -712,10 +712,10 @@ function KpiStat({
 
       <span className="kpi-folder-content">
         <span className="flex w-full items-start justify-between gap-3">
-          <span className="min-w-0 pt-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#64748B]">
+          <span className="min-w-0 pt-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-white/80">
             {label}
           </span>
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[#00B2EE]/30 bg-[#E6F4FA] text-[#00B2EE]">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/30 bg-white/15 text-white">
             <Icon className="h-5 w-5" />
           </span>
         </span>
@@ -724,16 +724,16 @@ function KpiStat({
           {loading ? (
             <span className="skeleton block h-9 w-24 rounded-lg" aria-hidden />
           ) : (
-            <span className="block text-[34px] font-bold leading-none tracking-tight tabular-nums text-[#0F172A]">
+            <span className="block text-[34px] font-bold leading-none tracking-tight tabular-nums text-white">
               {count != null ? `${formatNumber(animated)}${suffix}` : value}
             </span>
           )}
         </span>
 
         {typeof progress === 'number' && (
-          <span className="mt-3.5 h-2 w-full overflow-hidden rounded-full bg-[#E2E8F0]" aria-hidden>
+          <span className="mt-3.5 h-2 w-full overflow-hidden rounded-full bg-white/25" aria-hidden>
             <span
-              className="block h-full rounded-full bg-[#00B2EE]"
+              className="block h-full rounded-full bg-white"
               style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
             />
           </span>
@@ -741,10 +741,10 @@ function KpiStat({
 
         <span className={`mt-auto flex flex-col pt-4 ${loading ? 'opacity-0' : ''}`}>
           {context && (
-            <span className="block text-caption font-medium leading-snug text-[#64748B]">{context}</span>
+            <span className="block text-caption font-medium leading-snug text-white/80">{context}</span>
           )}
           {detail && (
-            <span className="mt-1 block text-caption leading-snug text-[#94A3B8]">{detail}</span>
+            <span className="mt-1 block text-caption leading-snug text-white/65">{detail}</span>
           )}
           {insight && (
             <span className="mt-3 block w-full">
@@ -755,7 +755,7 @@ function KpiStat({
                   className={`h-1.5 w-1.5 shrink-0 rounded-full ${KPI_STATUS_DOTS[insightTone]}`}
                   aria-hidden
                 />
-                <span className="text-caption font-semibold leading-snug text-[#0F172A]">{insight}</span>
+                <span className="text-caption font-semibold leading-snug text-white">{insight}</span>
               </span>
             </span>
           )}
