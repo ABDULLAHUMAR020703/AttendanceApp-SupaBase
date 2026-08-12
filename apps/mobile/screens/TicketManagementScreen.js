@@ -128,7 +128,7 @@ function TicketManagementList({ user, onSelectTicket }) {
       >
         <ActivityIndicator size="large" color={colors.primary} />
         <Text style={{ color: colors.textSecondary, marginTop: spacing.md }}>
-          Loading ticketsâ€¦
+          Loading tickets…
         </Text>
       </View>
     );
@@ -273,7 +273,7 @@ function TicketManagementList({ user, onSelectTicket }) {
                 {item.subject}
               </Text>
               <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 4 }}>
-                By {item.createdBy} â€¢ {formatTicketDate(item.createdAt)}
+                By {item.createdBy} • {formatTicketDate(item.createdAt)}
               </Text>
               <View
                 style={{
@@ -307,7 +307,7 @@ function TicketManagementList({ user, onSelectTicket }) {
                 </Text>
                 {item.assignedTo ? (
                   <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
-                    â†’ {item.assignedTo}
+                    → {item.assignedTo}
                   </Text>
                 ) : null}
               </View>
@@ -369,7 +369,7 @@ export default function TicketManagementScreen({ navigation, route }) {
           }}
         >
           <ActivityIndicator size="large" />
-          <Text style={{ marginTop: 12, color: '#6b7280' }}>Loading accountâ€¦</Text>
+          <Text style={{ marginTop: 12, color: '#6b7280' }}>Loading account…</Text>
         </View>
       );
     }
@@ -628,7 +628,7 @@ function TicketManagementDetail({ navigation, user, initialTicket, onBack }) {
       >
         <ActivityIndicator size="large" color={colors.primary} />
         <Text style={{ color: colors.textSecondary, marginTop: spacing.md }}>
-          Loading ticketâ€¦
+          Loading ticket…
         </Text>
       </View>
     );
@@ -749,7 +749,7 @@ function TicketManagementDetail({ navigation, user, initialTicket, onBack }) {
                     color: colors.textTertiary,
                   }}
                 >
-                  Created by {ticket.createdBy} â€¢ {formatDate(ticket.createdAt)}
+                  Created by {ticket.createdBy} • {formatDate(ticket.createdAt)}
                 </Text>
               </View>
               <View style={{ alignItems: 'flex-end' }}>
@@ -800,7 +800,7 @@ function TicketManagementDetail({ navigation, user, initialTicket, onBack }) {
               </Text>
               {ticket.assignedTo && (
                 <>
-                  <Text style={{ color: colors.textTertiary, marginHorizontal: 8 }}>â€¢</Text>
+                  <Text style={{ color: colors.textTertiary, marginHorizontal: 8 }}>•</Text>
                   <Ionicons name="person-outline" size={16} color={colors.textSecondary} />
                   <Text style={{ fontSize: 14, color: colors.textSecondary, marginLeft: 6 }}>
                     Assigned to {ticket.assignedTo}
@@ -984,7 +984,7 @@ function TicketManagementDetail({ navigation, user, initialTicket, onBack }) {
                   const displayName = item.name || item.username || 'Unknown';
                   const displayPosition = item.position || '';
                   const displayText = displayPosition 
-                    ? `${displayName} â€” ${displayPosition} (${roleLabel})`
+                    ? `${displayName} — ${displayPosition} (${roleLabel})`
                     : `${displayName} (${roleLabel})`;
                   
                   return (

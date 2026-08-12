@@ -339,7 +339,7 @@ router.delete('/users/:uid', async (req, res) => {
 });
 
 /**
- * PATCH /api/auth/users/uid/:uid/role â€” update role by user id (preferred)
+ * PATCH /api/auth/users/uid/:uid/role — update role by user id (preferred)
  */
 router.patch('/users/uid/:uid/role', async (req, res) => {
   const timestamp = new Date().toISOString();

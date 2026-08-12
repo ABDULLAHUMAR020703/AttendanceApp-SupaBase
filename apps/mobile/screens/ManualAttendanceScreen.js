@@ -321,7 +321,7 @@ export default function ManualAttendanceScreen({ navigation }) {
         
         {item.location?.address && (
           <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary, marginTop: spacing.xs / 2 }}>
-            ðŸ“ {item.location.address}
+            📍 {item.location.address}
           </Text>
         )}
 
@@ -376,7 +376,7 @@ export default function ManualAttendanceScreen({ navigation }) {
         {employee.name}
       </Text>
       <Text numberOfLines={1} style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
-        {employee.username} â€¢ {employee.department}
+        {employee.username} • {employee.department}
       </Text>
     </TouchableOpacity>
   );

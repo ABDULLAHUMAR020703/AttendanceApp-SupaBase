@@ -19,6 +19,15 @@ const {
 const app = express();
 const PORT = process.env.PORT || 3002;
 
+app.use((req, res, next) => {
+  const json = res.json.bind(res);
+  res.json = (body) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    return json(body);
+  };
+  next();
+});
+
 // Middleware
 app.use(cors());
 app.use(express.json());

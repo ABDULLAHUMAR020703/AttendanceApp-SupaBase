@@ -14,6 +14,17 @@ const REPORTING_SERVICE_URL = (process.env.REPORTING_SERVICE_URL || 'http://loca
   ''
 );
 
+// Express JSON responses are UTF-8 by default; keep the charset explicit for
+// clients/proxies that otherwise guess a legacy encoding.
+app.use((req, res, next) => {
+  const json = res.json.bind(res);
+  res.json = (body) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    return json(body);
+  };
+  next();
+});
+
 // Middleware
 app.use(cors());
 app.use(express.json());

@@ -720,7 +720,7 @@ export const createLeaveRequest = async (employeeId, leaveType, startDate, endDa
           endDate,
           assignedTo: assignedManager?.username || null,
           navigation: {
-            screen: 'HRDashboard', // Use HR Dashboard for leave management
+            screen: 'EmployeeManagement', // Authoritative leave-request management screen
             params: {
               initialTab: 'leaves', // Open leaves tab
               openLeaveRequests: true,

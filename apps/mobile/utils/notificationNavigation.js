@@ -65,8 +65,8 @@ const ROLE_ROUTE_MAP = {
   
   // Leave notifications
   leave_request: {
-    manager: ROUTES.HR_DASHBOARD, // HR Dashboard for managers to approve
-    super_admin: ROUTES.HR_DASHBOARD, // HR Dashboard for super admins
+    manager: ROUTES.EMPLOYEE_MANAGEMENT, // Authoritative leave-request management screen
+    super_admin: ROUTES.EMPLOYEE_MANAGEMENT,
     employee: null,
   },
   leave_approved: {
@@ -120,10 +120,9 @@ export const getNotificationRoute = (notificationType, userRole, notificationDat
         mergedParams.initialTab = mergedParams.initialTab || 'leaves';
         mergedParams.openLeaveRequests = true;
       }
-      const normalizedScreen =
-        screen === 'HRDashboard' || screen === ROUTES.HR_DASHBOARD
-          ? ROUTES.HR_DASHBOARD
-          : screen;
+      const normalizedScreen = screen === 'HRDashboard' || screen === ROUTES.HR_DASHBOARD
+        ? (notificationType === 'leave_request' ? ROUTES.EMPLOYEE_MANAGEMENT : ROUTES.HR_DASHBOARD)
+        : screen;
       return { screen: normalizedScreen, params: mergedParams };
     }
   }

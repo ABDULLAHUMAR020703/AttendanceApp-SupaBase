@@ -29,7 +29,7 @@ import {
   getTicketById,
 } from '../utils/ticketManagement';
 import { getManageableEmployees, canManageEmployee } from '../utils/employees';
-import { generateAttendanceReport, generateLeaveReport, shareReportFile } from '../utils/export';
+import { generateAttendanceReport, generateLeaveReport, shareReportFile, downloadReportFile } from '../utils/export';
 import { ROUTES } from '../shared/constants/routes';
 import { spacing, fontSize, responsivePadding, responsiveFont, iconSize, isTablet } from '../shared/utils/responsive';
 import { isHRAdmin } from '../shared/constants/roles';
@@ -104,6 +104,7 @@ export default function HRDashboard({ navigation, route }) {
   const [tickets, setTickets] = useState([]);
   const [ticketDepartments, setTicketDepartments] = useState([]);
   const [ticketFilter, setTicketFilter] = useState('all');
+  const [generatedReports, setGeneratedReports] = useState({ attendance: null, leave: null });
 
   const filterTicketsForCurrentUser = async (allTickets, departments) => {
     if (user.role === 'super_admin' || isHRAdmin(user)) {
@@ -327,6 +328,7 @@ export default function HRDashboard({ navigation, route }) {
       const result = await generateAttendanceReport(user?.companyId);
 
       if (result.success) {
+        setGeneratedReports((current) => ({ ...current, attendance: result }));
         const shareResult = await shareReportFile(result.fileUri, result.fileName);
         if (shareResult.error && shareResult.error !== 'Share cancelled') {
           Alert.alert(
@@ -350,6 +352,7 @@ export default function HRDashboard({ navigation, route }) {
       const result = await generateLeaveReport(user?.companyId);
 
       if (result.success) {
+        setGeneratedReports((current) => ({ ...current, leave: result }));
         const shareResult = await shareReportFile(result.fileUri, result.fileName);
         if (shareResult.error && shareResult.error !== 'Share cancelled') {
           Alert.alert(
@@ -364,6 +367,31 @@ export default function HRDashboard({ navigation, route }) {
     } catch (error) {
       console.error('Error generating leave report:', error);
       Alert.alert('Error', 'Failed to generate leave report');
+    }
+  };
+
+  const handleDownloadLocalReport = async (kind) => {
+    const report = generatedReports[kind];
+    if (!report) {
+      Alert.alert('Download unavailable', 'Generate this report first.');
+      return;
+    }
+    const result = await downloadReportFile(report.fileUri, report.fileName);
+    Alert.alert(
+      result.success ? 'PDF Ready' : 'Download failed',
+      result.success ? `${report.fileName} was downloaded to the app documents and is ready to open or share.` : result.error
+    );
+  };
+
+  const handleShareLocalReport = async (kind) => {
+    const report = generatedReports[kind];
+    if (!report) {
+      Alert.alert('Share unavailable', 'Generate this report first.');
+      return;
+    }
+    const result = await shareReportFile(report.fileUri, report.fileName);
+    if (!result.success && result.error !== 'Share cancelled') {
+      Alert.alert('Share failed', result.error || 'Unable to open the document share sheet.');
     }
   };
 
@@ -767,7 +795,7 @@ export default function HRDashboard({ navigation, route }) {
                   Generate Attendance Report
                 </Text>
                 <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
-                  Export attendance PDF (share via WhatsApp)
+                  Generate and download an attendance PDF
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={iconSize.md} color={colors.textSecondary} />
@@ -806,11 +834,35 @@ export default function HRDashboard({ navigation, route }) {
                   Generate Leave Report
                 </Text>
                 <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
-                  Export leave PDF (share via WhatsApp)
+                  Generate and download a leave PDF
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={iconSize.md} color={colors.textSecondary} />
             </TouchableOpacity>
+            {generatedReports.attendance && (
+              <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                <TouchableOpacity onPress={() => handleDownloadLocalReport('attendance')} style={{ flex: 1, backgroundColor: colors.success || '#10b981', borderRadius: 10, padding: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="download-outline" size={iconSize.md} color="#fff" />
+                  <Text style={{ color: '#fff', fontWeight: '600', marginLeft: spacing.sm }}>Download PDF</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => handleShareLocalReport('attendance')} style={{ flex: 1, backgroundColor: colors.primary, borderRadius: 10, padding: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="share-outline" size={iconSize.md} color="#fff" />
+                  <Text style={{ color: '#fff', fontWeight: '600', marginLeft: spacing.sm }}>Share PDF</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            {generatedReports.leave && (
+              <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                <TouchableOpacity onPress={() => handleDownloadLocalReport('leave')} style={{ flex: 1, backgroundColor: colors.success || '#10b981', borderRadius: 10, padding: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="download-outline" size={iconSize.md} color="#fff" />
+                  <Text style={{ color: '#fff', fontWeight: '600', marginLeft: spacing.sm }}>Download PDF</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => handleShareLocalReport('leave')} style={{ flex: 1, backgroundColor: colors.primary, borderRadius: 10, padding: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="share-outline" size={iconSize.md} color="#fff" />
+                  <Text style={{ color: '#fff', fontWeight: '600', marginLeft: spacing.sm }}>Share PDF</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </View>
       </View>

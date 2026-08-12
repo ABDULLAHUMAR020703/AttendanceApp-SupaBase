@@ -135,8 +135,7 @@ export const authenticateUser = async (usernameOrEmail, password) => {
     
     let data = {};
     try {
-      const raw = await response.text();
-      data = raw ? JSON.parse(raw) : {};
+      data = await response.json();
     } catch (parseErr) {
       gatewayFailureKind = 'transport';
       gatewayFailureDetail = {

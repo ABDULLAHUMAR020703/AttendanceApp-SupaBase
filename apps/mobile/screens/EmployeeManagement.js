@@ -61,9 +61,10 @@ export default function EmployeeManagement({
   refreshing = false,
   onRefresh,
 }) {
-  const { user: routeUser, openLeaveRequests } = route.params || {};
+  const { user: routeUser, openLeaveRequests, leaveRequestId: leaveRequestIdParam, requestId: requestIdParam } = route.params || {};
+  const focusedLeaveRequestId = leaveRequestIdParam || requestIdParam || null;
   const { user: authUser, isLoading: authContextLoading } = useAuth();
-  /** Single source of truth for identity and tenant â€” never use stale navigation params. */
+  /** Single source of truth for identity and tenant — never use stale navigation params. */
   const user = authUser;
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -81,7 +82,7 @@ export default function EmployeeManagement({
   const [pendingRequests, setPendingRequests] = useState([]);
   const [showRequestsModal, setShowRequestsModal] = useState(false);
   const [pendingLeaveRequests, setPendingLeaveRequests] = useState([]);
-  const [showLeaveRequestsModal, setShowLeaveRequestsModal] = useState(openLeaveRequests || false);
+  const [showLeaveRequestsModal, setShowLeaveRequestsModal] = useState(Boolean(openLeaveRequests || focusedLeaveRequestId));
   const [selectedLeaveRequest, setSelectedLeaveRequest] = useState(null);
   const [employeeLeaveBalances, setEmployeeLeaveBalances] = useState({}); // { employeeId: { remaining, balance } }
   const [stats, setStats] = useState({ total: 0, inOffice: 0, semiRemote: 0, fullyRemote: 0 });
@@ -108,6 +109,12 @@ export default function EmployeeManagement({
   useEffect(() => {
     loadData();
   }, [user?.uid, user?.companyId, user?.role, authContextLoading]);
+
+  useEffect(() => {
+    if (openLeaveRequests || focusedLeaveRequestId) {
+      setShowLeaveRequestsModal(true);
+    }
+  }, [openLeaveRequests, focusedLeaveRequestId]);
 
   // Trigger full reload from parent (used by AdminDashboard pull-to-refresh).
   useEffect(() => {
@@ -688,7 +695,7 @@ export default function EmployeeManagement({
             numberOfLines={1}
             ellipsizeMode="tail"
           >
-            {item.department} â€¢ {item.position}
+            {item.department} • {item.position}
           </Text>
             {/* HR Role Display */}
             {item.position && (
@@ -869,6 +876,7 @@ export default function EmployeeManagement({
   );
 
   const renderPendingLeaveRequest = ({ item }) => {
+    const isFocused = focusedLeaveRequestId && String(item.id) === String(focusedLeaveRequestId);
     // Get employee name
     const employee = employees.find(emp => emp.id === item.employeeId);
     const employeeName = employee ? employee.name : item.employeeId;
@@ -883,7 +891,7 @@ export default function EmployeeManagement({
     };
 
     return (
-      <View className="rounded-xl p-4 mb-3 shadow-sm" style={{ backgroundColor: colors.surface }}>
+      <View className="rounded-xl p-4 mb-3 shadow-sm" style={{ backgroundColor: colors.surface, borderWidth: isFocused ? 2 : 0, borderColor: colors.primary }}>
         <View className="flex-row items-center justify-between mb-2">
           <Text className="text-lg font-semibold" style={{ color: colors.text }}>
             {employeeName}
@@ -895,7 +903,7 @@ export default function EmployeeManagement({
         
         <Text className="mb-2" style={{ color: colors.textSecondary }}>
           <Text className="font-medium">{getLeaveTypeLabel(item.leaveType)}</Text>
-          {' â€¢ '}
+          {' • '}
           <Text className="font-medium">
             {item.isHalfDay ? 'Half day' : `${item.days} day${item.days !== 1 ? 's' : ''}`}
           </Text>
@@ -1081,7 +1089,11 @@ export default function EmployeeManagement({
       onRequestClose={() => setShowLeaveRequestsModal(false)}
     >
       <View className="flex-1 justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
-        <View className="rounded-xl p-6 mx-4 w-full max-w-md max-h-96" style={{ backgroundColor: colors.surface }}>
+        <View className="rounded-xl p-6 mx-4 w-full max-w-md" style={{ backgroundColor: colors.surface, maxHeight: '78%' }}>
+          <KeyboardAwareModal
+            contentContainerStyle={{ paddingBottom: spacing.lg }}
+            extraScrollHeight={24}
+          >
           <View className="flex-row items-center justify-between mb-4">
             <Text className="text-xl font-bold" style={{ color: colors.text }}>
               Pending Leave Requests
@@ -1092,18 +1104,16 @@ export default function EmployeeManagement({
           </View>
           
           {pendingLeaveRequests.length > 0 ? (
-            <FlatList
-              data={pendingLeaveRequests}
-              renderItem={renderPendingLeaveRequest}
-              keyExtractor={(item) => item.id}
-              showsVerticalScrollIndicator={false}
-            />
+            pendingLeaveRequests.map((item) => (
+              <View key={String(item.id)}>{renderPendingLeaveRequest({ item })}</View>
+            ))
           ) : (
             <View className="items-center py-8">
               <Ionicons name="checkmark-circle" size={48} color={colors.success} />
               <Text className="mt-2" style={{ color: colors.textSecondary }}>No pending leave requests</Text>
             </View>
           )}
+          </KeyboardAwareModal>
         </View>
       </View>
     </Modal>

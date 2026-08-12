@@ -187,7 +187,7 @@ export const exportAttendanceToCSV = async (companyId = null) => {
 
 /**
  * Share a local report file (PDF/CSV) via the system share sheet.
- * Prefer file URL so WhatsApp/other apps receive a document, not plain text.
+ * Prefer a file URL so native share targets receive a document, not plain text.
  */
 export const shareReportFile = async (fileUri, fileName) => {
   try {
@@ -199,6 +199,7 @@ export const shareReportFile = async (fileUri, fileName) => {
     await Share.share({
       url: shareUri,
       title: fileName || 'Report',
+      mimeType: 'application/pdf',
       message:
         Platform.OS === 'android'
           ? fileName || 'Hadir report'
@@ -214,12 +215,41 @@ export const shareReportFile = async (fileUri, fileName) => {
   }
 };
 
+/** Verify and retain a generated PDF for explicit download/retry actions. */
+export const downloadReportFile = async (fileUri, fileName) => {
+  try {
+    if (!fileUri) throw new Error('Report file is not available.');
+    const info = await FileSystem.getInfoAsync(fileUri);
+    if (!info.exists || (info.size != null && info.size < 100)) {
+      throw new Error('Generated PDF is missing or corrupted.');
+    }
+    const headerB64 = await FileSystem.readAsStringAsync(fileUri, {
+      encoding: FileSystem.EncodingType.Base64,
+      length: 8,
+      position: 0,
+    });
+    if (typeof globalThis.atob === 'function' && globalThis.atob(headerB64).slice(0, 4) !== '%PDF') {
+      throw new Error('Generated file is not a valid PDF.');
+    }
+    const downloadDir = `${FileSystem.documentDirectory}downloads/`;
+    await FileSystem.makeDirectoryAsync(downloadDir, { intermediates: true });
+    const downloadedUri = `${downloadDir}${fileName || 'report.pdf'}`;
+    if (downloadedUri !== fileUri) {
+      await FileSystem.copyAsync({ from: fileUri, to: downloadedUri });
+    }
+    return { success: true, fileUri: downloadedUri, fileName };
+  } catch (error) {
+    console.error('Error preparing report download:', error);
+    return { success: false, error: error.message || 'Failed to download report' };
+  }
+};
+
 /** @deprecated use shareReportFile — kept for AdminDashboard compatibility */
 export const shareCSVFile = async (fileUri, fileName) =>
   shareReportFile(fileUri, fileName);
 
 /**
- * Generate attendance report as a valid PDF, then shareable via WhatsApp.
+ * Generate attendance report as a valid PDF for download or native sharing.
  */
 export const generateAttendanceReport = async (companyId = null) => {
   try {
@@ -282,7 +312,7 @@ export const generateAttendanceReport = async (companyId = null) => {
 };
 
 /**
- * Generate leave report as a valid PDF, then shareable via WhatsApp.
+ * Generate leave report as a valid PDF for download or native sharing.
  */
 export const generateLeaveReport = async (companyId = null) => {
   try {

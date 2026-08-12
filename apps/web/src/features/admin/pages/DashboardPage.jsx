@@ -706,13 +706,14 @@ function KpiStat({
   return (
     <Tag
       {...(onClick ? { type: 'button', onClick } : {})}
-      className={`kpi-folder group relative flex h-full min-h-[13.75rem] w-full appearance-none flex-col border-0 bg-transparent p-0 text-left shadow-none transition-transform duration-[200ms] ease-out hover:-translate-y-0.5 ${onClick ? 'cursor-pointer' : ''} ${FOCUS_RING}`}
+      className={`kpi-folder group relative flex h-full min-h-[13.75rem] w-full appearance-none flex-col border-0 bg-transparent p-0 text-left text-white shadow-none transition-transform duration-[200ms] ease-out hover:-translate-y-0.5 ${onClick ? 'cursor-pointer' : ''} ${FOCUS_RING}`}
+      data-on-dark
     >
       <span className="kpi-folder-surface" aria-hidden />
 
       <span className="kpi-folder-content">
         <span className="flex w-full items-start justify-between gap-3">
-          <span className="min-w-0 pt-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-white/80">
+          <span className="min-w-0 pt-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-white">
             {label}
           </span>
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/30 bg-white/15 text-white">
@@ -741,10 +742,10 @@ function KpiStat({
 
         <span className={`mt-auto flex flex-col pt-4 ${loading ? 'opacity-0' : ''}`}>
           {context && (
-            <span className="block text-caption font-medium leading-snug text-white/80">{context}</span>
+            <span className="block text-caption font-medium leading-snug text-white">{context}</span>
           )}
           {detail && (
-            <span className="mt-1 block text-caption leading-snug text-white/65">{detail}</span>
+            <span className="mt-1 block text-caption leading-snug text-white">{detail}</span>
           )}
           {insight && (
             <span className="mt-3 block w-full">
