@@ -102,8 +102,8 @@ export function ApprovalWorkflowsPage() {
   return (
     <div className="space-y-5 animate-fade-up">
       <div>
-        <h1 className="text-2xl font-semibold text-white">Approval Workflows</h1>
-        <p className="text-sm text-slate-300 mt-1">Configure multi-level approval chains per request type. Drag steps to reorder.</p>
+        <h1 className="page-title">Approval Workflows</h1>
+        <p className="mt-1 text-sm text-ink-muted">Configure multi-level approval chains per request type. Drag steps to reorder.</p>
       </div>
 
       <GlassCard className="ui-toolbar p-4 flex flex-wrap gap-2">
@@ -125,14 +125,14 @@ export function ApprovalWorkflowsPage() {
       </GlassCard>
 
       {message && (
-        <div className={`rounded-lg border px-4 py-3 text-sm ${message.ok ? 'border-green-300/25 bg-green-500/15 text-green-100' : 'border-red-300/25 bg-red-500/15 text-red-100'}`}>
+        <div className={`rounded-lg border px-4 py-3 text-sm ${message.ok ? 'border-success-border bg-success-surface text-success-ink' : 'border-danger-border bg-danger-surface text-danger-ink'}`}>
           {message.text}
         </div>
       )}
 
       <GlassCard className="p-5 space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-medium text-white">{REQUEST_TYPE_LABELS[selectedType]} chain</h2>
+          <h2 className="card-title">{REQUEST_TYPE_LABELS[selectedType]} chain</h2>
           <button type="button" onClick={addStep} className="ui-btn-secondary ui-btn-sm">+ Add step</button>
         </div>
 

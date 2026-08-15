@@ -7,10 +7,10 @@ import { Button } from './Button';
  */
 export function PageHeader({ title, subtitle, actions, onRefresh, refreshing }) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-4">
+    <div className="ui-card flex flex-wrap items-end justify-between gap-4 px-4 py-3 sm:px-5">
       <div className="min-w-0">
-        <h1 className="page-title">{title}</h1>
-        {subtitle && <p className="page-subtitle">{subtitle}</p>}
+        <h1 className="page-title text-[#0F172A]">{title}</h1>
+        {subtitle && <p className="page-subtitle text-[#64748B]">{subtitle}</p>}
       </div>
       {(onRefresh || actions) && (
         <div className="flex flex-wrap items-center gap-2">

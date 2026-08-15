@@ -92,7 +92,7 @@ export function SitesPage() {
   return (
     <div className="space-y-5 animate-fade-up">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold text-white">Sites</h1>
+        <h1 className="page-title">Sites</h1>
         <button
           type="button"
           onClick={load}
@@ -101,22 +101,22 @@ export function SitesPage() {
           Refresh
         </button>
       </div>
-      {error && <GlassCard className="p-4 text-sm text-red-100">{error}</GlassCard>}
+      {error && <GlassCard className="p-4 text-sm text-danger-ink">{error}</GlassCard>}
 
       <PermissionGate permission={PERMISSIONS.MANAGE_GEOFENCING}>
         <div className="grid md:grid-cols-5 gap-2 mb-4">
-          <input className="rounded bg-slate-800/80 p-2 text-slate-100" placeholder="name" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
-          <input className="rounded bg-slate-800/80 p-2 text-slate-100" placeholder="latitude" value={form.latitude} onChange={(e) => setForm((p) => ({ ...p, latitude: e.target.value }))} />
-          <input className="rounded bg-slate-800/80 p-2 text-slate-100" placeholder="longitude" value={form.longitude} onChange={(e) => setForm((p) => ({ ...p, longitude: e.target.value }))} />
-          <input className="rounded bg-slate-800/80 p-2 text-slate-100" placeholder="radius" value={form.radius} onChange={(e) => setForm((p) => ({ ...p, radius: e.target.value }))} />
+          <input className="ui-input" placeholder="name" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
+          <input className="ui-input" placeholder="latitude" value={form.latitude} onChange={(e) => setForm((p) => ({ ...p, latitude: e.target.value }))} />
+          <input className="ui-input" placeholder="longitude" value={form.longitude} onChange={(e) => setForm((p) => ({ ...p, longitude: e.target.value }))} />
+          <input className="ui-input" placeholder="radius" value={form.radius} onChange={(e) => setForm((p) => ({ ...p, radius: e.target.value }))} />
           <select
-            className="glass-select rounded bg-slate-800/80 p-2 text-slate-100"
+            className="ui-select"
             value={form.department_id}
             onChange={(e) => setForm((p) => ({ ...p, department_id: e.target.value }))}
           >
-            <option value="" className="bg-slate-100 text-slate-900">Select department</option>
+            <option value="">Select department</option>
             {departments.map((d) => (
-              <option key={d.id} value={d.id} className="bg-slate-100 text-slate-900">
+              <option key={d.id} value={d.id}>
                 {d.name}
               </option>
             ))}
@@ -150,8 +150,8 @@ export function SitesPage() {
       <PermissionGate permission={PERMISSIONS.MANAGE_GEOFENCING}>
         <GlassCard className="p-5 space-y-4">
           <div>
-            <h2 className="text-base font-medium text-white">Employee location assignments</h2>
-            <p className="text-xs text-slate-300 mt-1">Assign multiple geofence sites per employee (synced to mobile check-in).</p>
+            <h2 className="card-title">Employee location assignments</h2>
+            <p className="mt-1 text-xs text-ink-muted">Assign multiple geofence sites per employee (synced to mobile check-in).</p>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             <select

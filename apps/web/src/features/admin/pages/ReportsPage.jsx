@@ -69,7 +69,7 @@ function Spinner() {
 function Alert({ ok, message }) {
   if (!message) return null;
   return (
-    <div className={`rounded-lg border px-4 py-3 text-sm ${ok ? 'border-green-300/25 bg-green-500/15 text-green-100' : 'border-red-300/25 bg-red-500/15 text-red-100'}`}>
+    <div className={`rounded-lg border px-4 py-3 text-sm ${ok ? 'border-success-border bg-success-surface text-success-ink' : 'border-danger-border bg-danger-surface text-danger-ink'}`}>
       {message}
     </div>
   );
@@ -318,28 +318,28 @@ export function ReportsPage() {
   return (
     <div className="space-y-6 animate-fade-up">
       <div>
-        <h1 className="text-2xl font-semibold text-white">Reports</h1>
-        <p className="mt-1 text-sm text-slate-300">Generate, preview, download, and schedule attendance reports.</p>
+        <h1 className="page-title">Reports</h1>
+        <p className="mt-1 text-sm text-ink-muted">Generate, preview, download, and schedule attendance reports.</p>
       </div>
 
       <PermissionGate permission={PERMISSIONS.EXPORT_REPORTS}>
         {/* Generate Reports */}
         <GlassCard className="p-5 space-y-4">
           <div>
-            <h2 className="text-base font-medium text-white">Generate Reports</h2>
-            <p className="text-xs text-slate-300 mt-1">Create PDF reports without requiring email delivery.</p>
+            <h2 className="card-title">Generate Reports</h2>
+            <p className="text-xs text-ink-muted mt-1">Create PDF reports without requiring email delivery.</p>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-slate-300">Report type</label>
+              <label className="text-xs text-ink-muted">Report type</label>
               <select
                 value={reportRange}
                 onChange={(e) => setReportRange(e.target.value)}
                 className="ui-select"
               >
                 {RANGE_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value} className="bg-slate-800">{opt.label}</option>
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
             </div>
@@ -347,12 +347,12 @@ export function ReportsPage() {
             {reportRange === 'custom' && (
               <>
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs text-slate-300">From</label>
+                  <label className="text-xs text-ink-muted">From</label>
                   <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)}
                     className="ui-input" />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs text-slate-300">To</label>
+                  <label className="text-xs text-ink-muted">To</label>
                   <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)}
                     className="ui-input" />
                 </div>
@@ -387,7 +387,7 @@ export function ReportsPage() {
 
           <Alert {...(actionResult || {})} />
           {generating && (
-            <p className="text-xs text-slate-400 flex items-center gap-2">
+            <p className="text-xs text-ink-muted flex items-center gap-2">
               <Spinner /> Building report data and PDF — large reports may take up to a minute.
             </p>
           )}
@@ -396,8 +396,8 @@ export function ReportsPage() {
         {/* Scheduled Reports */}
         <GlassCard className="p-5 space-y-5">
           <div>
-            <h2 className="text-base font-medium text-white">Scheduled Reports</h2>
-            <p className="text-xs text-slate-300 mt-1">Configure automatic delivery. Super admin emails are always included.</p>
+            <h2 className="card-title">Scheduled Reports</h2>
+            <p className="text-xs text-ink-muted mt-1">Configure automatic delivery. Super admin emails are always included.</p>
           </div>
 
           {scheduleLoading ? (
@@ -405,7 +405,7 @@ export function ReportsPage() {
           ) : (
             <div className="space-y-5">
               <div className="flex flex-wrap items-center gap-4">
-                <label className="flex items-center gap-2 text-sm text-slate-200 cursor-pointer shrink-0">
+                <label className="flex items-center gap-2 text-sm text-ink-muted cursor-pointer shrink-0">
                   <button
                     type="button"
                     role="switch"
@@ -421,28 +421,28 @@ export function ReportsPage() {
 
               <div className={`grid gap-4 sm:grid-cols-2 ${autoSend ? '' : 'opacity-40 pointer-events-none'}`}>
                 <div className="flex flex-col gap-1 min-w-0">
-                  <label className="text-xs text-slate-300">Frequency</label>
+                  <label className="text-xs text-ink-muted">Frequency</label>
                   <select
                     value={frequency}
                     onChange={(e) => setFrequency(e.target.value)}
                     className="ui-select w-full"
                   >
                     {FREQUENCY_OPTIONS.map((f) => (
-                      <option key={f.value} value={f.value} className="bg-slate-800">{f.label}</option>
+                      <option key={f.value} value={f.value}>{f.label}</option>
                     ))}
                   </select>
                 </div>
 
                 {frequency === 'monthly' && (
                   <div className="flex flex-col gap-1 min-w-0">
-                    <label className="text-xs text-slate-300">Day of month (1–28)</label>
+                    <label className="text-xs text-ink-muted">Day of month (1–28)</label>
                     <select
                       value={scheduleDay}
                       onChange={(e) => setScheduleDay(Number(e.target.value))}
                       className="ui-select w-full"
                     >
                       {DAY_OPTIONS.map((d) => (
-                        <option key={d} value={d} className="bg-slate-800">{ordinal(d)}</option>
+                        <option key={d} value={d}>{ordinal(d)}</option>
                       ))}
                     </select>
                   </div>
@@ -451,8 +451,8 @@ export function ReportsPage() {
 
               <div className="space-y-3">
                 <div>
-                  <label className="text-xs text-slate-300">Additional recipient emails</label>
-                  <p className="text-xs text-slate-400 mt-0.5">Saved per company. Super admin addresses are always included.</p>
+                  <label className="text-xs text-ink-muted">Additional recipient emails</label>
+                  <p className="text-xs text-ink-muted mt-0.5">Saved per company. Super admin addresses are always included.</p>
                 </div>
 
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
@@ -495,7 +495,7 @@ export function ReportsPage() {
                 </div>
 
                 {recipients.length > 0 && (
-                  <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-xs text-slate-300">
+                  <div className="rounded-lg border border-hairline bg-[#F8FCFD] px-4 py-3 text-xs text-ink-muted">
                     <p className="text-slate-400 mb-1">All delivery recipients ({recipients.length})</p>
                     <p className="break-words">{recipients.join(', ')}</p>
                   </div>
@@ -515,31 +515,31 @@ export function ReportsPage() {
 
         {/* Current Schedule */}
         <GlassCard className="p-5 space-y-3">
-          <h2 className="text-base font-medium text-white">Current Schedule</h2>
+          <h2 className="card-title">Current Schedule</h2>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 text-sm">
-            <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3">
-              <p className="text-xs text-slate-400">Auto send</p>
-              <p className="text-white mt-1">{autoSend ? 'Enabled' : 'Disabled'}</p>
+            <div className="rounded-lg border border-hairline bg-[#F8FCFD] px-4 py-3">
+              <p className="text-xs text-ink-muted">Auto send</p>
+              <p className="text-ink mt-1">{autoSend ? 'Enabled' : 'Disabled'}</p>
             </div>
-            <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3">
-              <p className="text-xs text-slate-400">Frequency</p>
-              <p className="text-white mt-1 capitalize">{frequency}</p>
+            <div className="rounded-lg border border-hairline bg-[#F8FCFD] px-4 py-3">
+              <p className="text-xs text-ink-muted">Frequency</p>
+              <p className="text-ink mt-1 capitalize">{frequency}</p>
             </div>
-            <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3">
-              <p className="text-xs text-slate-400">Next execution</p>
-              <p className="text-white mt-1">{formatDateTime(scheduleMeta.nextExecution)}</p>
+            <div className="rounded-lg border border-hairline bg-[#F8FCFD] px-4 py-3">
+              <p className="text-xs text-ink-muted">Next execution</p>
+              <p className="text-ink mt-1">{formatDateTime(scheduleMeta.nextExecution)}</p>
             </div>
-            <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3">
-              <p className="text-xs text-slate-400">Last execution</p>
-              <p className="text-white mt-1">{formatDateTime(scheduleMeta.lastExecution)}</p>
+            <div className="rounded-lg border border-hairline bg-[#F8FCFD] px-4 py-3">
+              <p className="text-xs text-ink-muted">Last execution</p>
+              <p className="text-ink mt-1">{formatDateTime(scheduleMeta.lastExecution)}</p>
             </div>
-            <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3">
-              <p className="text-xs text-slate-400">Last status</p>
-              <p className="text-white mt-1 capitalize">{scheduleMeta.lastStatus || '—'}</p>
+            <div className="rounded-lg border border-hairline bg-[#F8FCFD] px-4 py-3">
+              <p className="text-xs text-ink-muted">Last status</p>
+              <p className="text-ink mt-1 capitalize">{scheduleMeta.lastStatus || '—'}</p>
             </div>
-            <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3">
-              <p className="text-xs text-slate-400">Recipients</p>
-              <p className="text-white mt-1">{recipients.length} total</p>
+            <div className="rounded-lg border border-hairline bg-[#F8FCFD] px-4 py-3">
+              <p className="text-xs text-ink-muted">Recipients</p>
+              <p className="text-ink mt-1">{recipients.length} total</p>
             </div>
           </div>
         </GlassCard>
@@ -548,8 +548,8 @@ export function ReportsPage() {
         <GlassCard className="p-5 space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-base font-medium text-white">Delivery Status</h2>
-              <p className="text-xs text-slate-300 mt-1">Recent scheduled and manual email deliveries.</p>
+              <h2 className="card-title">Delivery Status</h2>
+              <p className="text-xs text-ink-muted mt-1">Recent scheduled and manual email deliveries.</p>
             </div>
             <button onClick={loadDeliveryLogs} disabled={deliveryLogsLoading}
               className="ui-btn-secondary ui-btn-sm">
@@ -594,8 +594,8 @@ export function ReportsPage() {
         <GlassCard className="p-5 space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-base font-medium text-white">Report History</h2>
-              <p className="text-xs text-slate-300 mt-1">Previously generated reports for your company.</p>
+              <h2 className="card-title">Report History</h2>
+              <p className="text-xs text-ink-muted mt-1">Previously generated reports for your company.</p>
             </div>
             <button onClick={loadHistory} disabled={historyLoading}
               className="ui-btn-secondary ui-btn-sm">

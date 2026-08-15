@@ -167,15 +167,15 @@ export function TicketsPage() {
         <GlassCard className="p-5 lg:col-span-2 space-y-4">
           {showCreate && (
             <PermissionGate permission={PERMISSIONS.MANAGE_TICKETS}>
-              <form onSubmit={handleCreate} className="space-y-3 border-b border-white/10 pb-4">
-                <h3 className="text-sm font-medium text-white">Create ticket</h3>
+              <form onSubmit={handleCreate} className="space-y-3 border-b border-hairline pb-4">
+                <h3 className="text-sm font-medium text-ink">Create ticket</h3>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <select required value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))} className="ui-select">
-                    <option value="" className="bg-slate-800">Department</option>
-                    {departments.map((d) => <option key={d.id} value={d.id} className="bg-slate-800">{d.name}</option>)}
+                    <option value="">Department</option>
+                    {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                   </select>
                   <select value={form.priority} onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value }))} className="ui-select">
-                    {PRIORITIES.map((p) => <option key={p} value={p} className="bg-slate-800">{p}</option>)}
+                    {PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
                   </select>
                 </div>
                 <input required placeholder="Subject" value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))} className="ui-input w-full" />
@@ -212,9 +212,9 @@ export function TicketsPage() {
                   {selected.status !== 'closed' && (
                     <div className="flex gap-2 items-center">
                       <select value={assignTo} onChange={(e) => setAssignTo(e.target.value)} className="ui-select ui-input-sm w-auto">
-                        <option value="" className="bg-slate-800">Assign to…</option>
+                        <option value="">Assign to…</option>
                         {users.filter((u) => u.role !== 'employee').map((u) => (
-                          <option key={u.uid} value={u.username} className="bg-slate-800">{u.name || u.username}</option>
+                          <option key={u.uid} value={u.username}>{u.name || u.username}</option>
                         ))}
                       </select>
                       <button type="button" disabled={!assignTo || busy} onClick={handleAssign} className="ui-btn-secondary ui-btn-sm">Assign</button>

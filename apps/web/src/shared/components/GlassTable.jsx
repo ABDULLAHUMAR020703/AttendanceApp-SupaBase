@@ -162,7 +162,7 @@ const initialsOf = (value) =>
 export function TableIdentity({ name, secondary, onClick, tone = 'accent' }) {
   const Tag = onClick ? 'button' : 'div';
   const palette =
-    tone === 'neutral' ? 'bg-surface-muted text-ink-muted' : 'bg-[#E6F4FA] text-[#00BFFF]';
+    tone === 'neutral' ? 'bg-surface-muted text-ink-muted' : 'bg-[#E6F4FA] text-[#00BCFF]';
 
   return (
     <Tag

@@ -18,7 +18,7 @@ export function EmptyGlyph({ icon: Icon = Inbox, size = 'md', className = '' }) 
     <span className={cn('relative grid place-items-center', s.halo, className)}>
       <span className="absolute inset-0 rounded-full bg-accent-50" aria-hidden />
       <span className={cn('absolute rounded-full bg-accent-100', s.inner)} aria-hidden />
-      <span className={cn('relative grid place-items-center bg-[#E6F4FA] text-[#00BFFF] shadow-hair', s.tile)}>
+      <span className={cn('relative grid place-items-center bg-[#E6F4FA] text-[#00BCFF] shadow-hair', s.tile)}>
         <Icon className={s.icon} aria-hidden />
       </span>
     </span>

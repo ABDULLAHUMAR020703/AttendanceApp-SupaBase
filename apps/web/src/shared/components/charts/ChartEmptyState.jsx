@@ -11,7 +11,7 @@ export function ChartEmptyState({
       aria-live="polite"
     >
       {icon && (
-        <div className="grid h-11 w-11 place-items-center rounded-full border border-[#D0ECF9] bg-[#E6F4FA] text-[#00BFFF]">
+        <div className="grid h-11 w-11 place-items-center rounded-full border border-[#D0ECF9] bg-[#E6F4FA] text-[#00BCFF]">
           {icon}
         </div>
       )}

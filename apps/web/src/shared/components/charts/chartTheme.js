@@ -8,8 +8,8 @@
  * so the leading value is the heaviest mark on the page.
  */
 export const CHART_COLORS = {
-  primary: '#00B2EE',
-  primarySoft: 'rgba(0, 178, 238, 0.22)',
+  primary: '#00BCFF',
+  primarySoft: 'rgba(0,188,255, 0.22)',
   secondary: '#70C9EF',
   secondarySoft: 'rgba(112, 201, 239, 0.22)',
   tertiary: '#3ABCEF',
@@ -28,7 +28,7 @@ export const CHART_COLORS = {
 /*
  * Rank ladder: vivid → sky (no deep forest teal).
  */
-export const CHART_RANKS = ['#00B2EE', '#3ABCEF', '#70C9EF'];
+export const CHART_RANKS = ['#00BCFF', '#3ABCEF', '#70C9EF'];
 export const CHART_RANK_REST = '#C2ECF9';
 
 export const rankColor = (index) => CHART_RANKS[index] || CHART_RANK_REST;

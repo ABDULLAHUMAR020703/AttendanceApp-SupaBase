@@ -2,12 +2,12 @@ import { cn } from '../../lib/cn';
 
 /**
  * Soft UI unread/count pill.
- * Brand tones only — Deep Sky Blue / white — so badges match the Hadir system
+ * Brand tones only — Vivid Cyan / white — so badges match the Hadir system
  * on both the cyan rail and light chrome.
  *
  * @param {'brand' | 'onBrand'} [tone='brand']
  *   brand   — cyan fill, white ink (headers, white surfaces)
- *   onBrand — white fill, deep cyan ink (sidebar / cyan rail)
+ *   onBrand — white fill, vivid cyan ink (sidebar / cyan rail)
  */
 export function CountBadge({ count, max = 9, className = '', ring = true, tone = 'brand' }) {
   if (!count || count < 1) return null;
@@ -22,8 +22,8 @@ export function CountBadge({ count, max = 9, className = '', ring = true, tone =
         'text-[10px] font-bold tabular-nums leading-none tracking-tight',
         'antialiased [font-feature-settings:"tnum"]',
         tone === 'onBrand'
-          ? 'bg-white text-[#00B2EE]'
-          : 'bg-[#00B2EE] text-white',
+          ? 'bg-white text-[#00B0FF]'
+          : 'bg-[#00B0FF] text-white',
         ring && (tone === 'onBrand' ? 'ring-2 ring-white/50' : 'ring-2 ring-white'),
         className,
       )}

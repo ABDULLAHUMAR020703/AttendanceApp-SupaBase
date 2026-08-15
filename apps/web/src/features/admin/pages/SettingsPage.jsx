@@ -160,10 +160,10 @@ export function SettingsPage() {
   return (
     <PermissionGate permission={PERMISSIONS.ACCESS_SYSTEM_SETTINGS}>
       <div className="space-y-5 animate-fade-up">
-        <h1 className="text-2xl font-semibold text-white">Settings</h1>
+        <h1 className="page-title">Settings</h1>
 
         {message && (
-          <div className={`rounded-lg border px-4 py-3 text-sm ${message.ok ? 'border-green-300/25 bg-green-500/15 text-green-100' : 'border-red-300/25 bg-red-500/15 text-red-100'}`}>
+          <div className={`rounded-lg border px-4 py-3 text-sm ${message.ok ? 'border-success-border bg-success-surface text-success-ink' : 'border-danger-border bg-danger-surface text-danger-ink'}`}>
             {message.text}
           </div>
         )}
@@ -188,7 +188,7 @@ export function SettingsPage() {
           </GlassCard>
 
           <GlassCard className="p-5 lg:col-span-3 space-y-4">
-            <h2 className="text-base font-medium text-white capitalize">{active} settings</h2>
+            <h2 className="card-title capitalize">{active} settings</h2>
             {loading ? (
               <SkeletonForm fields={4} />
             ) : (

@@ -15,9 +15,9 @@ export const AnalyticsKpiCard = memo(function AnalyticsKpiCard({
    * four distinct chips. Every step is AA on the accent-50 chip behind it.
    */
   const accentClasses = {
-    blue: 'bg-accent-50 text-accent-600 shadow-[0_0_0_1px_rgba(0,191,255,0.22)]',
+    blue: 'bg-accent-50 text-accent-600 shadow-[0_0_0_1px_rgba(0,188,255,0.22)]',
     green: 'bg-accent-50 text-accent-600 shadow-[0_0_0_1px_rgba(112,201,239,0.28)]',
-    amber: 'bg-accent-50 text-accent-600 shadow-[0_0_0_1px_rgba(0,191,255,0.18)]',
+    amber: 'bg-accent-50 text-accent-600 shadow-[0_0_0_1px_rgba(0,188,255,0.18)]',
     purple: 'bg-accent-50 text-accent-600 shadow-[0_0_0_1px_rgba(112,201,239,0.2)]',
   };
 

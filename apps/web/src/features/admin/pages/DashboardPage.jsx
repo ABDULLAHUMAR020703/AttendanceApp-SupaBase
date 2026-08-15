@@ -5,8 +5,10 @@ import {
   AlertCircle,
   ArrowUpRight,
   Building2,
+  CalendarCheck,
   CalendarDays,
   Check,
+  ChevronRight,
   Clock,
   LogIn,
   LogOut,
@@ -14,16 +16,19 @@ import {
   MoreHorizontal,
   PenLine,
   RefreshCw,
+  Ticket,
   TrendingDown,
   TrendingUp,
+  UserCheck,
   UserCog,
+  UserPlus,
   Users,
   X,
 } from 'lucide-react';
 import { adminService } from '../services/adminService';
 import { useAuthStore } from '../../auth/store/authStore';
 import { canAccessFeature, hasAnyPermission, hasPermission, PERMISSIONS } from '../permissions';
-import { normalizeAttendanceType } from '../utils/analyticsCharts';
+import { buildUserGrowthSeries, normalizeAttendanceType } from '../utils/analyticsCharts';
 import { formatEmployeeDisplay, formatLeaveTypeLabel } from '../utils/leaveDisplay';
 import { useSilentPoll } from '../../../shared/hooks/useSilentPoll';
 import { useDismiss } from '../../../shared/lib/useDismiss';
@@ -36,6 +41,16 @@ import { buildDashboardMock, shouldSeedDashboardMock } from '../utils/dashboardM
 const AttendanceTrendAreaChart = lazy(() =>
   import('../../../shared/components/charts/AttendanceTrendAreaChart').then((m) => ({
     default: m.AttendanceTrendAreaChart,
+  }))
+);
+const UserGrowthLineChart = lazy(() =>
+  import('../../../shared/components/charts/UserGrowthLineChart').then((m) => ({
+    default: m.UserGrowthLineChart,
+  }))
+);
+const AttendanceMixPieChart = lazy(() =>
+  import('../../../shared/components/charts/AttendanceMixPieChart').then((m) => ({
+    default: m.AttendanceMixPieChart,
   }))
 );
 /*
@@ -82,9 +97,9 @@ const CARD_TIERS = {
 const cardFooter = (tier) =>
   `${CARD_TIERS[tier].footer} flex items-center justify-between gap-4 border-t border-hairline text-caption font-medium text-ink-muted`;
 const FOCUS_RING =
-  'focus:outline-none focus-visible:ring-[3px] focus-visible:ring-[rgba(0,178,238,0.25)] focus-visible:ring-offset-2';
+  'focus:outline-none focus-visible:ring-[3px] focus-visible:ring-[rgba(0,167,214,0.25)] focus-visible:ring-offset-2';
 /* Design tokens for this dashboard (Hadir cyan system). */
-const CYAN = '#00B2EE';
+const CYAN = '#00BCFF';
 const SKY = '#70C9EF';
 const SOFT_SKY = '#E6F4FA';
 const SLATE = '#0F172A';
@@ -94,16 +109,16 @@ const ICE = '#F8FCFD';
 /* One button vocabulary for the whole dashboard: filled cyan leads, outline follows. */
 const BTN_BASE =
   'inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition-all duration-200 ease-premium active:translate-y-px';
-const BTN_PRIMARY = `${BTN_BASE} bg-[#00B2EE] text-white shadow-[0_1px_3px_rgba(0,178,238,0.28)] hover:-translate-y-px hover:bg-[#0090C4] hover:shadow-[0_6px_16px_rgba(0,144,196,0.3)]`;
-const BTN_QUIET = `${BTN_BASE} border border-[#70C9EF]/50 bg-white text-[#64748B] hover:border-[#70C9EF] hover:bg-[#E6F4FA] hover:text-[#00B2EE]`;
+const BTN_PRIMARY = `${BTN_BASE} bg-[#00B0FF] text-white shadow-[0_1px_3px_rgba(0,176,255,0.28)] hover:-translate-y-px hover:bg-[#0099E6] hover:shadow-[0_6px_16px_rgba(0,153,230,0.3)]`;
+const BTN_QUIET = `${BTN_BASE} border border-[#70C9EF]/50 bg-white text-[#64748B] hover:border-[#70C9EF] hover:bg-[#E6F4FA] hover:text-[#00BCFF]`;
 const BTN_DANGER_QUIET = `${BTN_BASE} border border-hairline bg-white text-ink-muted hover:border-danger-border hover:bg-danger-surface hover:text-danger-ink`;
 const BTN_SM = 'px-2.5 py-1.5 text-caption';
 const BTN_SOFT_BASE =
   'inline-flex w-full items-center justify-center gap-1.5 rounded-xl py-2 text-caption font-semibold transition-all duration-200 ease-premium active:scale-[0.98] disabled:cursor-not-allowed';
-const BTN_SOFT_APPROVE = `${BTN_SOFT_BASE} bg-[#00B2EE] text-white shadow-[0_1px_3px_rgba(0,178,238,0.22)] hover:-translate-y-px hover:bg-[#0090C4] hover:shadow-[0_8px_18px_rgba(0,178,238,0.28)]`;
+const BTN_SOFT_APPROVE = `${BTN_SOFT_BASE} bg-[#00B0FF] text-white shadow-[0_1px_3px_rgba(0,176,255,0.22)] hover:-translate-y-px hover:bg-[#0099E6] hover:shadow-[0_8px_18px_rgba(0,176,255,0.28)]`;
 const BTN_SOFT_DANGER = `${BTN_SOFT_BASE} border border-[#FECACA] bg-white text-[#DC2626] hover:border-[#F87171] hover:bg-[#FEF2F2]`;
 const ICON_BTN =
-  'grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline bg-white text-ink-muted transition-all duration-200 hover:border-[#70C9EF] hover:bg-[#E6F4FA] hover:text-[#00B2EE]';
+  'grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline bg-white text-ink-muted transition-all duration-200 hover:border-[#70C9EF] hover:bg-[#E6F4FA] hover:text-[#00BCFF]';
 const HEALTH_FILTERS = [
   { id: 'today', label: 'Today' },
   { id: 'week', label: 'This Week' },
@@ -123,8 +138,6 @@ const WORK_MODE_LABELS = {
 
 const REMOTE_MODES = new Set(['semi_remote', 'fully_remote', 'remote', 'hybrid']);
 
-const LATE_AFTER_MINUTES = 9 * 60 + 15;
-const LATE_LABEL = '09:15';
 const ACTIVITY_WINDOW = { from: 6, to: 20 };
 
 const HEATMAP_BAND_HOURS = 2;
@@ -138,28 +151,28 @@ const HEATMAP_LEVELS = [
   {
     gradient: `linear-gradient(135deg, ${ICE}, ${ICE})`,
     border: `1px solid ${SOFT_SKY}`,
-    glow: '0 4px 12px rgba(0, 178, 238, 0.3)',
+    glow: '0 4px 12px rgba(0,188,255, 0.3)',
     pulse: false,
     label: '0',
   },
   {
     gradient: `linear-gradient(135deg, ${SOFT_SKY}, ${SOFT_SKY})`,
     border: '1px solid transparent',
-    glow: '0 4px 12px rgba(0, 178, 238, 0.3)',
+    glow: '0 4px 12px rgba(0,188,255, 0.3)',
     pulse: false,
     label: '1–2',
   },
   {
     gradient: `linear-gradient(135deg, ${SKY}, ${SKY})`,
     border: '1px solid transparent',
-    glow: '0 4px 12px rgba(0, 178, 238, 0.3)',
+    glow: '0 4px 12px rgba(0,188,255, 0.3)',
     pulse: false,
     label: '3–4',
   },
   {
     gradient: `linear-gradient(135deg, ${CYAN}, #0088E8)`,
     border: '1px solid transparent',
-    glow: '0 4px 12px rgba(0, 178, 238, 0.35)',
+    glow: '0 4px 12px rgba(0,188,255, 0.35)',
     pulse: true,
     label: '5+',
   },
@@ -350,151 +363,123 @@ function DeltaChip({ delta, suffix = '' }) {
 }
 
 /**
- * Coverage donut — cyan→sky stroke, deep-slate center metric.
+ * Reference-style attendance composition: text rows on the left, connector lines,
+ * and filled cyan circles cropped from the lower-right edge.
  */
 function LayeredAttendanceViz({
-  onSite,
-  remote,
-  absent,
+  segments,
   headcount,
+  covered,
   coverage,
+  rangeLabel,
   activeKey,
   onHoverKey,
+  reveal,
 }) {
   const animatedCoverage = useCountUp(coverage, 820);
-  const [progress, setProgress] = useState(prefersReducedMotion() ? 1 : 0);
-
-  useEffect(() => {
-    if (prefersReducedMotion()) {
-      setProgress(1);
-      return undefined;
-    }
-    setProgress(0);
-    let frame;
-    const started = performance.now();
-    const duration = 900;
-    const step = (now) => {
-      const t = Math.min(1, (now - started) / duration);
-      setProgress(1 - (1 - t) ** 3);
-      if (t < 1) frame = requestAnimationFrame(step);
-    };
-    frame = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(frame);
-  }, [onSite, remote, absent, headcount, coverage]);
-
-  const vb = 300;
-  const cx = 150;
-  const cy = 150;
-  const radius = 104;
-  const stroke = 22;
-  const circumference = 2 * Math.PI * radius;
-  const coveredLen = circumference * (Math.min(100, Math.max(0, coverage)) / 100) * progress;
   const safeHead = Math.max(headcount, 1);
-  const pct = (n) => Math.round((Math.max(0, n) / safeHead) * 100);
-
-  const tips = {
-    onSite: { title: 'On-site', detail: `${onSite} employees · ${pct(onSite)}%` },
-    remote: { title: 'Remote / hybrid', detail: `${remote} employees · ${pct(remote)}%` },
-    absent: { title: 'Not checked in', detail: `${absent} employees · ${pct(absent)}%` },
-  };
-  const activeTip = activeKey ? tips[activeKey] : null;
+  const share = (value) => (safeHead ? Math.round((Math.max(0, value) / safeHead) * 100) : 0);
+  const attendanceRows = segments.map((segment) => ({
+    ...segment,
+    pct: share(segment.value),
+    note:
+      segment.key === 'onSite'
+        ? 'Checked in from an approved site'
+        : segment.key === 'remote'
+          ? 'Working remotely or hybrid today'
+          : 'Still waiting on today\'s check-in',
+  }));
+  const rowOffsets = ['top-[22%]', 'top-[48%]', 'top-[74%]'];
+  const lineWidths = ['w-[43%]', 'w-[50%]', 'w-[58%]'];
+  const circleOpacity = (key, resting) => (activeKey && activeKey !== key ? resting * 0.58 : resting);
+  const circleScale = (key) => (activeKey === key ? 'scale(1.025)' : 'scale(1)');
 
   return (
-    <div
-      className="relative mx-auto aspect-square w-full max-w-[19rem]"
+    <section
+      className="relative min-h-[20rem] overflow-hidden rounded-2xl border border-[#C2ECF9] bg-white/82 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)] sm:min-h-[21rem]"
       role="img"
-      aria-label={`${coverage} percent covered. On-site ${onSite}, remote ${remote}, not checked in ${absent}.`}
+      aria-label={`${coverage} percent covered. ${attendanceRows
+        .map((row) => `${row.label} ${row.value}, ${row.pct} percent`)
+        .join('. ')}.`}
       onMouseLeave={() => onHoverKey?.(null)}
     >
-      <svg viewBox={`0 0 ${vb} ${vb}`} className="h-full w-full overflow-visible" aria-hidden>
-        <circle
-          cx={cx}
-          cy={cy}
-          r={radius}
-          fill="none"
-          stroke="#FFFFFF"
-          strokeWidth={stroke}
-        />
-        <circle
-          cx={cx}
-          cy={cy}
-          r={radius}
-          fill="none"
-          stroke={CYAN}
-          strokeWidth={stroke}
-          strokeLinecap="round"
-          strokeDasharray={`${coveredLen} ${circumference}`}
-          transform={`rotate(-90 ${cx} ${cy})`}
-          className="transition-[stroke-dasharray] duration-200 ease-out"
-        />
-        <circle cx={cx} cy={cy} r={radius - stroke / 2 - 8} fill="#FFFFFF" />
-      </svg>
-
-      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-        <span className="text-[2.75rem] font-bold leading-none tracking-tight tabular-nums text-[#0F172A]">
-          {animatedCoverage}%
+      <div className="relative z-20 flex items-center justify-between gap-4 border-b border-[#C2ECF9]/70 px-4 py-3 sm:px-5">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#64748B]">
+          Attendance mix
         </span>
-        <span className="mt-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#00B2EE]">
-          Covered
+        <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#00BCFF]">
+          {covered}/{headcount} accounted - {rangeLabel}
         </span>
       </div>
 
-      {activeTip && (
-        <div className="pointer-events-none absolute left-1/2 top-2 z-10 w-max max-w-[92%] -translate-x-1/2 rounded-xl border border-[#C2ECF9] bg-white/95 px-3 py-2 text-center shadow-[0_8px_24px_-10px_rgba(0,178,238,0.22)]">
-          <p className="text-[12px] font-semibold text-[#0F172A]">{activeTip.title}</p>
-          <p className="mt-0.5 text-[11px] font-medium text-[#64748B]">{activeTip.detail}</p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** Cyan-family analytics legend — intensity distinguishes categories, no green. */
-function AttendanceSegmentLegend({ segments, headcount, activeKey, onHoverKey, reveal }) {
-  const share = (value) => (headcount ? Math.round((value / headcount) * 100) : 0);
-
-  const indicatorStyle = () => ({ backgroundColor: CYAN });
-
-  return (
-    <ul className="flex h-full w-full flex-col justify-center">
-      {segments.map((segment, index) => {
-        const pct = share(segment.value);
-        const active = activeKey === segment.key;
-        const muted = Boolean(activeKey && !active);
-        return (
-          <li
-            key={segment.key}
-            className="flex cursor-pointer items-center gap-3 border-b border-[#00B2EE]/10 py-4 last:border-b-0"
-            style={{
-              opacity: reveal ? (muted ? 0.38 : 1) : 0,
-              transform: reveal ? 'translateY(0)' : 'translateY(6px)',
-              transition: 'opacity 360ms ease-out, transform 360ms ease-out',
-              transitionDelay: reveal ? `${index * 80}ms` : '0ms',
-            }}
-            onMouseEnter={() => onHoverKey?.(segment.key)}
-            onMouseLeave={() => onHoverKey?.(null)}
-          >
-            <span
-              className="h-2.5 w-2.5 shrink-0 rounded-full bg-[#00B2EE] transition-shadow duration-[200ms] ease-out"
+      <div className="relative z-10 h-[17rem] sm:h-[18rem]">
+        {attendanceRows.map((row, index) => {
+          const active = activeKey === row.key;
+          const muted = Boolean(activeKey && !active);
+          return (
+            <button
+              key={row.key}
+              type="button"
+              className={`absolute left-4 z-20 flex w-[58%] -translate-y-1/2 items-start gap-3 text-left transition-[opacity,transform] duration-300 ease-premium sm:left-5 sm:w-[52%] ${rowOffsets[index]} ${FOCUS_RING}`}
               style={{
-                ...indicatorStyle(segment.key),
-                boxShadow: active ? '0 0 0 4px rgba(0, 178, 238, 0.16)' : undefined,
+                opacity: reveal ? (muted ? 0.42 : 1) : 0,
+                transform: reveal
+                  ? active
+                    ? 'translateY(-50%) translateX(3px)'
+                    : 'translateY(-50%) translateX(0)'
+                  : 'translateY(calc(-50% + 7px))',
+                transitionDelay: reveal ? `${index * 80}ms` : '0ms',
               }}
-              aria-hidden
-            />
-            <span className="min-w-0 flex-1 truncate text-[15px] font-medium text-[#0F172A]">
-              {segment.label}
+              onMouseEnter={() => onHoverKey?.(row.key)}
+              onFocus={() => onHoverKey?.(row.key)}
+              onMouseLeave={() => onHoverKey?.(null)}
+              onBlur={() => onHoverKey?.(null)}
+            >
+              <span className="relative mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-[#00BCFF] shadow-[0_0_0_4px_rgba(0,188,255,0.1)]" aria-hidden>
+                <span
+                  className={`absolute left-1/2 top-1/2 h-px -translate-y-1/2 bg-[#70C9EF]/60 transition-all duration-300 ease-premium ${lineWidths[index]}`}
+                />
+              </span>
+              <span className="relative z-10 max-w-[12.5rem] bg-white/86 pr-3 backdrop-blur-[1px]">
+                <span className="block text-[12px] font-semibold uppercase tracking-[0.1em] text-[#0F172A]">
+                  {row.label}
+                </span>
+                <span className="mt-1 block text-[13px] font-semibold text-[#0F172A]">
+                  {row.value} people <span className="text-[#00BCFF]">{row.pct}%</span>
+                </span>
+                <span className="mt-1 block text-[11px] font-medium leading-4 text-[#64748B]">
+                  {row.note}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+
+        <div
+          className="absolute -bottom-[9.5rem] -right-[10.5rem] z-0 h-[29rem] w-[29rem] rounded-full bg-[#E0F6FC] transition-[opacity,transform] duration-[520ms] ease-premium sm:-bottom-[10rem] sm:-right-[9.75rem]"
+          style={{ opacity: circleOpacity('absent', 0.82), transform: circleScale('absent') }}
+          aria-hidden
+        />
+        <div
+          className="absolute -bottom-[6.9rem] -right-[6.7rem] z-0 h-[21.5rem] w-[21.5rem] rounded-full bg-[#70C9EF]/58 transition-[opacity,transform] duration-[520ms] ease-premium"
+          style={{ opacity: circleOpacity('remote', 0.86), transform: circleScale('remote') }}
+          aria-hidden
+        />
+        <div
+          className="absolute -bottom-[4.2rem] -right-[2.9rem] z-0 flex h-[13.5rem] w-[13.5rem] items-start justify-start rounded-full bg-[#00BCFF] pl-10 pt-10 text-white shadow-[0_18px_42px_-30px_rgba(0,144,196,0.7)] transition-[opacity,transform] duration-[520ms] ease-premium sm:pl-11 sm:pt-11"
+          style={{ opacity: activeKey && activeKey !== 'onSite' ? 0.82 : 0.96, transform: circleScale('onSite') }}
+        >
+          <span className="text-center">
+            <span className="block text-[2.15rem] font-bold leading-none tabular-nums sm:text-[2.45rem]">
+              {animatedCoverage}%
             </span>
-            <span className="shrink-0 text-[15px] font-semibold tabular-nums text-[#0F172A]">
-              {segment.value}
+            <span className="mt-2 block text-[10px] font-semibold uppercase tracking-[0.16em] text-white/86">
+              Covered
             </span>
-            <span className="w-12 shrink-0 text-right text-[13px] font-semibold tabular-nums text-[#00B2EE]">
-              {pct}%
-            </span>
-          </li>
-        );
-      })}
-    </ul>
+          </span>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -558,60 +543,18 @@ function IconAction({ onClick, label }) {
 /**
  * Command-center header + KPI row — hierarchy, not four equal widgets.
  */
-function OverviewBanner({ adminName, stats, loading, statusPills = [] }) {
+function OverviewBanner({ stats, loading }) {
   return (
-    <section className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="min-w-0">
-          <p className="text-micro font-semibold uppercase tracking-[0.08em] text-[#0F172A]">Dashboard</p>
-          <h1 className="mt-1 truncate text-title font-semibold tracking-tight text-ink sm:text-title-lg">
-            Welcome back, {adminName}
-          </h1>
-          <p className="mt-1.5 max-w-xl text-label font-normal text-ink-muted">
-            Here&apos;s the live state of your workforce right now.
-          </p>
+    <section className="grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {stats.map((stat, index) => (
+        <div key={stat.label} className="min-h-0 min-w-0 h-full">
+          <KpiStat {...stat} hero={index === 0} loading={loading} />
         </div>
-
-        {statusPills.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2">
-            {statusPills.map((pill) => (
-              <span key={pill.label} className="dash-status-pill">
-                <span className="dash-status-pill-dot" aria-hidden />
-                {pill.label}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Mobile stack → tablet 2-up → desktop 4 compact tiles. Never horizontal-scroll. */}
-      <div className="grid grid-cols-1 gap-4 py-1 sm:grid-cols-2 lg:grid-cols-4 lg:gap-5">
-        {stats.map((stat, index) => (
-          <div key={stat.label} className="min-w-0 h-full">
-            <KpiStat {...stat} hero={index === 0} loading={loading} />
-          </div>
-        ))}
-      </div>
+      ))}
     </section>
   );
 }
 
-/** Semantic insight dots — white on the cyan tile; amber/red only for attention. */
-const KPI_STATUS_DOTS = {
-  neutral: 'bg-white',
-  good: 'bg-white',
-  watch: 'bg-[#F59E0B]',
-  urgent: 'bg-[#EF4444]',
-};
-
-const KPI_BADGE_TONES = {
-  neutral: 'border-white/35 bg-white/15',
-  good: 'border-white/35 bg-white/15',
-  watch: 'border-[#F59E0B]/70 bg-[rgba(245,158,11,0.28)]',
-  urgent: 'border-[#EF4444]/70 bg-[rgba(239,68,68,0.28)]',
-};
-
-/** Pixel-sharp KPI glyphs — stroke icons only, no filled art. */
 function KpiSvg({ className = '', children }) {
   return (
     <svg
@@ -673,7 +616,6 @@ function KpiIconClock({ className }) {
   return (
     <KpiSvg className={className}>
       <circle cx="12" cy="12" r="8.25" />
-      {/* 10:10 — hour ≈ 305°, minute = 60° */}
       <path d="M12 12L8.85 9.35" />
       <path d="M12 12L15.55 10" />
       <circle cx="12" cy="12" r="0.9" fill="currentColor" stroke="none" />
@@ -681,9 +623,6 @@ function KpiIconClock({ className }) {
   );
 }
 
-/**
- * KPI metric tile — folder-tab silhouette, existing cyan/green palette, stacked content.
- */
 function KpiStat({
   icon: Icon,
   label,
@@ -692,46 +631,44 @@ function KpiStat({
   suffix = '',
   context,
   detail,
-  insight,
-  insightTone = 'neutral',
-  hero = false,
   loading,
   onClick,
   progress = null,
+  hero = false,
 }) {
   const animated = useCountUp(count ?? 0);
   const Tag = onClick ? 'button' : 'div';
-  void hero;
 
   return (
     <Tag
       {...(onClick ? { type: 'button', onClick } : {})}
-      className={`kpi-folder group relative flex h-full min-h-[13.75rem] w-full appearance-none flex-col border-0 bg-transparent p-0 text-left shadow-none transition-transform duration-[200ms] ease-out hover:-translate-y-0.5 ${onClick ? 'cursor-pointer' : ''} ${FOCUS_RING}`}
+      data-on-dark
+      className={`kpi-folder group relative flex h-full min-h-[9.75rem] w-full appearance-none flex-col border-0 bg-transparent p-0 text-left text-white shadow-none transition-transform duration-[200ms] ease-out hover:-translate-y-0.5 ${onClick ? `cursor-pointer ${FOCUS_RING}` : ''}`}
     >
       <span className="kpi-folder-surface" aria-hidden />
 
       <span className="kpi-folder-content">
-        <span className="flex w-full items-start justify-between gap-3">
+        <span className={`flex w-full items-start justify-between gap-3 ${hero ? 'pt-2' : ''}`}>
           <span className="min-w-0 pt-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-white/80">
             {label}
           </span>
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/30 bg-white/15 text-white">
-            <Icon className="h-5 w-5" />
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-white/30 bg-white/15 text-white">
+            <Icon className="h-4 w-4" />
           </span>
         </span>
 
-        <span className="mt-4 block w-full">
+        <span className="mt-2 block w-full">
           {loading ? (
-            <span className="skeleton block h-9 w-24 rounded-lg" aria-hidden />
+            <span className="skeleton block h-7 w-20 rounded-lg bg-white/20" aria-hidden />
           ) : (
-            <span className="block text-[34px] font-bold leading-none tracking-tight tabular-nums text-white">
+            <span className="block text-[26px] font-bold leading-none tracking-tight tabular-nums text-white" style={{ color: '#FFFFFF' }}>
               {count != null ? `${formatNumber(animated)}${suffix}` : value}
             </span>
           )}
         </span>
 
         {typeof progress === 'number' && (
-          <span className="mt-3.5 h-2 w-full overflow-hidden rounded-full bg-white/25" aria-hidden>
+          <span className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/25" aria-hidden>
             <span
               className="block h-full rounded-full bg-white"
               style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
@@ -739,25 +676,12 @@ function KpiStat({
           </span>
         )}
 
-        <span className={`mt-auto flex flex-col pt-4 ${loading ? 'opacity-0' : ''}`}>
+        <span className={`mt-auto flex flex-col pt-2 ${loading ? 'opacity-0' : ''}`}>
           {context && (
             <span className="block text-caption font-medium leading-snug text-white/80">{context}</span>
           )}
           {detail && (
             <span className="mt-1 block text-caption leading-snug text-white/65">{detail}</span>
-          )}
-          {insight && (
-            <span className="mt-3 block w-full">
-              <span
-                className={`flex w-full items-center gap-2 rounded-full border px-2.5 py-2 ${KPI_BADGE_TONES[insightTone] || KPI_BADGE_TONES.neutral}`}
-              >
-                <span
-                  className={`h-1.5 w-1.5 shrink-0 rounded-full ${KPI_STATUS_DOTS[insightTone]}`}
-                  aria-hidden
-                />
-                <span className="text-caption font-semibold leading-snug text-white">{insight}</span>
-              </span>
-            </span>
           )}
         </span>
       </span>
@@ -772,7 +696,7 @@ function OpsTile({ label, value, caption, tone = 'neutral', onClick }) {
     neutral: 'text-[#0F172A]',
     warning: 'text-warning-ink',
     danger: 'text-danger-ink',
-    good: 'text-[#00B2EE]',
+    good: 'text-[#00BCFF]',
   };
 
   return (
@@ -857,7 +781,7 @@ function CheckinHeatmap({ matrix, onOpen, onRefresh }) {
             aria-haspopup="menu"
             aria-expanded={menuOpen}
             aria-label="Check-in heatmap options"
-            className={`grid h-8 w-8 place-items-center rounded-full text-ink-muted transition-colors duration-200 ease-premium hover:bg-[#E6F4FA] hover:text-[#00B2EE] ${FOCUS_RING}`}
+            className={`grid h-8 w-8 place-items-center rounded-full text-ink-muted transition-colors duration-200 ease-premium hover:bg-[#E6F4FA] hover:text-[#00BCFF] ${FOCUS_RING}`}
           >
             <MoreHorizontal className="h-4 w-4" strokeWidth={2} aria-hidden />
           </button>
@@ -886,7 +810,7 @@ function CheckinHeatmap({ matrix, onOpen, onRefresh }) {
 
       {total === 0 ? (
         <div className="mt-3 flex flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-hairline bg-surface-subtle px-4 py-8 text-center">
-          <span className="grid h-10 w-10 place-items-center rounded-full border border-[#E6F4FA] bg-[#E6F4FA] text-[#00B2EE] shadow-hair">
+          <span className="grid h-10 w-10 place-items-center rounded-full border border-[#E6F4FA] bg-[#E6F4FA] text-[#00BCFF] shadow-hair">
             <Clock className="h-4 w-4" strokeWidth={2} aria-hidden />
           </span>
           <div className="space-y-1">
@@ -1032,7 +956,7 @@ function AttendanceOpsCard({
   }, [range, active.onSite, active.remote, absent, headcount]);
 
   return (
-    <div className="flex h-full flex-col rounded-2xl border border-[#C2ECF9] bg-[#E6F4FA] p-5 shadow-[0_4px_20px_rgba(0,178,238,0.06)] sm:p-6">
+    <div className="flex h-full flex-col rounded-2xl border border-[#C2ECF9] bg-[#E6F4FA] p-5 shadow-[0_4px_20px_rgba(0,188,255,0.06)] sm:p-6">
       <CardHeader
         tier="primary"
         eyebrow="Operations"
@@ -1060,32 +984,17 @@ function AttendanceOpsCard({
       />
 
       <div className={`${CARD_TIERS.primary.gap} flex flex-1 flex-col gap-4`}>
-        {/*
-          Coverage visualization — exact 50/50: layered circular analytics | legend.
-        */}
-        <div className="grid grid-cols-1 items-center gap-6 md:gap-8 md:[grid-template-columns:1fr_1fr]">
-          <div className="flex min-h-[16rem] items-center justify-center px-1 py-1 sm:min-h-[17.5rem]">
-            <LayeredAttendanceViz
-              onSite={values.onSite}
-              remote={values.remote}
-              absent={absent}
-              headcount={headcount}
-              coverage={coverage}
-              activeKey={hoverKey}
-              onHoverKey={setHoverKey}
-            />
-          </div>
-
-          <div className="flex min-h-[14rem] items-center px-1 sm:min-h-[17.5rem] sm:px-2">
-            <AttendanceSegmentLegend
-              segments={segments}
-              headcount={headcount}
-              activeKey={hoverKey}
-              onHoverKey={setHoverKey}
-              reveal={legendReady}
-            />
-          </div>
-        </div>
+        {/* Reference-style attendance visualization: rows, connectors, cropped filled circles. */}
+        <LayeredAttendanceViz
+          segments={segments}
+          headcount={headcount}
+          covered={covered}
+          coverage={coverage}
+          rangeLabel={rangeLabel}
+          activeKey={hoverKey}
+          onHoverKey={setHoverKey}
+          reveal={legendReady}
+        />
 
         {/* Six exception counts — compact metric grid with semantic edge accents. */}
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3">
@@ -1132,7 +1041,7 @@ function AttendanceOpsCard({
           />
       </div>
 
-        <div className="flex flex-1 flex-col border-t border-[#00B2EE]/15 pt-4">
+        <div className="flex flex-1 flex-col border-t border-[#00BCFF]/15 pt-4">
           <CheckinHeatmap matrix={heatmap} onOpen={onOpen} onRefresh={onRefresh} />
         </div>
       </div>
@@ -1184,7 +1093,7 @@ function ActionQueueCard({ items, approvableCount, busyId, batching, onBatchAppr
                 >
                   <div className="flex items-start gap-3">
                     <span
-                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#70C9EF]/40 bg-[#E6F4FA] text-label font-semibold uppercase text-[#00B2EE]"
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#70C9EF]/40 bg-[#E6F4FA] text-label font-semibold uppercase text-[#00BCFF]"
                       aria-hidden
                     >
                       {item.initials}
@@ -1297,7 +1206,7 @@ function ActionQueueCard({ items, approvableCount, busyId, batching, onBatchAppr
                   await onBatchApprove();
                   setConfirmBatch(false);
                 }}
-                className={`font-semibold text-[#00B2EE] underline decoration-[#70C9EF] underline-offset-4 transition-colors hover:decoration-[#0090C4] ${FOCUS_RING}`}
+                className={`font-semibold text-[#00BCFF] underline decoration-[#70C9EF] underline-offset-4 transition-colors hover:decoration-[#0090C4] ${FOCUS_RING}`}
               >
                 {batching ? 'Approving…' : `Confirm ${approvableCount}`}
               </button>
@@ -1313,7 +1222,7 @@ function ActionQueueCard({ items, approvableCount, busyId, batching, onBatchAppr
             <button
               type="button"
               onClick={() => setConfirmBatch(true)}
-              className={`font-semibold text-[#00B2EE] underline decoration-[#70C9EF] underline-offset-4 transition-colors hover:decoration-[#0090C4] ${FOCUS_RING}`}
+              className={`font-semibold text-[#00BCFF] underline decoration-[#70C9EF] underline-offset-4 transition-colors hover:decoration-[#0090C4] ${FOCUS_RING}`}
             >
               Batch approve
             </button>
@@ -1322,7 +1231,7 @@ function ActionQueueCard({ items, approvableCount, busyId, batching, onBatchAppr
           <button
             type="button"
             onClick={onOpen}
-            className={`font-semibold text-[#00B2EE] underline decoration-[#70C9EF] underline-offset-4 transition-colors hover:decoration-[#0090C4] ${FOCUS_RING}`}
+            className={`font-semibold text-[#00BCFF] underline decoration-[#70C9EF] underline-offset-4 transition-colors hover:decoration-[#0090C4] ${FOCUS_RING}`}
           >
             View all requests
           </button>
@@ -1341,13 +1250,13 @@ function DirectorySnapshotCard({ loading, directoryRows, onLeaveKeys, checkedInK
   const offDutyCount = Math.max(directoryRows.length - presentCount - onLeaveCount, 0);
   /* Status split doubles as the legend for the presence dots on each row. */
   const statusSplit = [
-    { label: 'On shift', value: presentCount, dot: 'bg-[#00B2EE]' },
+    { label: 'On shift', value: presentCount, dot: 'bg-[#00BCFF]' },
     { label: 'On leave', value: onLeaveCount, dot: 'bg-warning-solid' },
     { label: 'Off duty', value: offDutyCount, dot: 'bg-ink-faint' },
   ];
 
   return (
-    <article className="flex h-full flex-col rounded-2xl border border-[#00B2EE]/30 bg-white p-4 shadow-[0_4px_20px_rgba(0,178,238,0.06)] print:break-inside-avoid sm:p-5">
+    <article className="flex h-full flex-col rounded-2xl border border-[#00BCFF]/30 bg-white p-4 shadow-[0_4px_20px_rgba(0,188,255,0.06)] print:break-inside-avoid sm:p-5">
       <CardHeader
         tier="utility"
         title="Directory snapshot"
@@ -1356,7 +1265,7 @@ function DirectorySnapshotCard({ loading, directoryRows, onLeaveKeys, checkedInK
       />
 
       {!loading && directoryRows.length > 0 && (
-        <div className={`${CARD_TIERS.utility.gap} flex items-center justify-between gap-4 rounded-2xl border border-[#00B2EE]/15 bg-[#E6F4FA] px-3 py-2`}>
+        <div className={`${CARD_TIERS.utility.gap} flex items-center justify-between gap-4 rounded-2xl border border-[#00BCFF]/15 bg-[#E6F4FA] px-3 py-2`}>
           {statusSplit.map((entry) => (
             <span key={entry.label} className="flex items-center gap-2">
               <span className={`h-2 w-2 rounded-full ${entry.dot}`} aria-hidden />
@@ -1407,7 +1316,7 @@ function DirectorySnapshotCard({ loading, directoryRows, onLeaveKeys, checkedInK
                   className={`group/row flex w-full items-center gap-3 rounded-xl p-2.5 text-left transition-all duration-200 ease-out hover:bg-accent-50/80 hover:shadow-hair ${FOCUS_RING}`}
                 >
                   <span className="relative shrink-0">
-                    <span className="grid h-8 w-8 place-items-center rounded-full bg-[#E6F4FA] text-micro font-semibold uppercase leading-none text-[#00B2EE]">
+                    <span className="grid h-8 w-8 place-items-center rounded-full bg-[#E6F4FA] text-micro font-semibold uppercase leading-none text-[#00BCFF]">
                       {getInitials(displayName)}
                     </span>
                     <span
@@ -1432,7 +1341,7 @@ function DirectorySnapshotCard({ loading, directoryRows, onLeaveKeys, checkedInK
                   <StatusBadge status={status} dot={false} />
                   {/* Arrow fades in and leans toward its destination on hover. */}
                   <ArrowUpRight
-                    className="h-3.5 w-3.5 shrink-0 text-[#00B2EE] opacity-0 transition-all duration-fast ease-premium group-hover/row:translate-x-0.5 group-hover/row:opacity-100"
+                    className="h-3.5 w-3.5 shrink-0 text-[#00BCFF] opacity-0 transition-all duration-fast ease-premium group-hover/row:translate-x-0.5 group-hover/row:opacity-100"
                     strokeWidth={2}
                     aria-hidden
                   />
@@ -1446,7 +1355,7 @@ function DirectorySnapshotCard({ loading, directoryRows, onLeaveKeys, checkedInK
           Showing <strong className="font-semibold text-ink">{directoryRows.length}</strong> of the directory
         </span>
         <span>
-          Checked in <strong className="font-semibold text-[#00B2EE]">{presentCount}</strong>
+          Checked in <strong className="font-semibold text-[#00BCFF]">{presentCount}</strong>
         </span>
         </div>
     </article>
@@ -1551,15 +1460,15 @@ function AttendanceTrendCard({ loading, data, isEmpty, monthDelta, onViewAttenda
 /* Event type reads from the rail dot. Check-in uses brand cyan — presence without green. */
 const ACTIVITY_STYLES = {
   checkin: {
-    dot: '#00B2EE',
+    dot: '#00BCFF',
     label: 'Check-in',
     icon: LogIn,
-    chip: 'bg-[#00B2EE] text-white',
-    glow: 'shadow-[0_0_0_3px_rgba(0,178,238,0.22)]',
+    chip: 'bg-[#00BCFF] text-white',
+    glow: 'shadow-[0_0_0_3px_rgba(0,188,255,0.22)]',
   },
-  checkout: { dot: '#00B2EE', label: 'Check-out', icon: LogOut, chip: 'bg-[#E6F4FA] text-[#00B2EE]' },
+  checkout: { dot: '#00BCFF', label: 'Check-out', icon: LogOut, chip: 'bg-[#E6F4FA] text-[#00BCFF]' },
   manual: { dot: '#F59E0B', label: 'Manual override', icon: PenLine, chip: 'bg-warning-surface text-warning-ink' },
-  leave: { dot: '#00B2EE', label: 'Leave', icon: CalendarDays, chip: 'bg-[#E6F4FA] text-[#00B2EE]' },
+  leave: { dot: '#00BCFF', label: 'Leave', icon: CalendarDays, chip: 'bg-[#E6F4FA] text-[#00BCFF]' },
   user: { dot: '#94A3B8', label: 'Profile update', icon: UserCog, chip: 'bg-surface-muted text-[#64748B]' },
 };
 
@@ -1587,7 +1496,7 @@ function ActivityTimelineCard({ loading, items, lastEventLabel, onOpen }) {
   ];
 
   return (
-    <div className="flex h-full flex-col rounded-2xl border border-[#00B2EE]/25 bg-white p-4 shadow-[0_4px_20px_rgba(0,178,238,0.06)] sm:p-5">
+    <div className="flex h-full flex-col rounded-2xl border border-[#00BCFF]/25 bg-white p-4 shadow-[0_4px_20px_rgba(0,188,255,0.06)] sm:p-5">
       <CardHeader
         tier="utility"
         title="Live activity"
@@ -1602,13 +1511,13 @@ function ActivityTimelineCard({ loading, items, lastEventLabel, onOpen }) {
             return (
               <div
                 key={entry.key}
-                className="rounded-2xl border border-[#00B2EE]/20 bg-[#E6F4FA] px-3 py-2"
+                className="rounded-2xl border border-[#00BCFF]/20 bg-[#E6F4FA] px-3 py-2"
               >
                 <span className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-[#00B2EE]" style={{ backgroundColor: meta.dot }} aria-hidden />
+                  <span className="h-2 w-2 rounded-full bg-[#00BCFF]" style={{ backgroundColor: meta.dot }} aria-hidden />
                   <span className="truncate text-micro font-medium text-[#64748B]">{entry.label}</span>
                 </span>
-                <span className="mt-1 block text-subheading font-semibold tabular-nums text-[#00B2EE]">{entry.value}</span>
+                <span className="mt-1 block text-subheading font-semibold tabular-nums text-[#00BCFF]">{entry.value}</span>
               </div>
             );
           })}
@@ -1640,12 +1549,12 @@ function ActivityTimelineCard({ loading, items, lastEventLabel, onOpen }) {
             <div key={group.label} className="mb-2 last:mb-0">
               <p className="sticky top-0 z-10 flex items-center gap-2 bg-white/95 py-1.5 text-micro font-semibold uppercase tracking-[0.07em] text-ink-muted backdrop-blur">
                 {group.label}
-                <span className="h-px flex-1 bg-[#00B2EE]/25" aria-hidden />
+                <span className="h-px flex-1 bg-[#00BCFF]/25" aria-hidden />
               </p>
 
               <ul className="relative">
                 {/* Continuous rail behind the dots ties the group into one thread. */}
-                <span className="absolute bottom-3 left-[3.75rem] top-3 w-px bg-[#00B2EE]/35" aria-hidden />
+                <span className="absolute bottom-3 left-[3.75rem] top-3 w-px bg-[#00BCFF]/35" aria-hidden />
 
                 {group.items.map((item) => {
                   const meta = ACTIVITY_STYLES[item.kind] || ACTIVITY_STYLES.user;
@@ -1671,7 +1580,7 @@ function ActivityTimelineCard({ loading, items, lastEventLabel, onOpen }) {
                       </span>
                       {/* Avatar carries who, the corner badge carries what — one glance, two facts. */}
                       <span className="relative shrink-0">
-                        <span className="grid h-8 w-8 place-items-center rounded-full bg-[#E6F4FA] text-micro font-semibold uppercase leading-none text-[#00B2EE]">
+                        <span className="grid h-8 w-8 place-items-center rounded-full bg-[#E6F4FA] text-micro font-semibold uppercase leading-none text-[#00BCFF]">
                           {getInitials(item.person)}
                   </span>
                         <span
@@ -1725,7 +1634,7 @@ function DepartmentBreakdownCard({ rows, loading, navigate, canManage }) {
     .join('. ');
 
   return (
-    <div className="flex h-full flex-col rounded-2xl border border-[#00B2EE]/30 bg-white p-5 shadow-[0_4px_20px_rgba(0,178,238,0.06)]">
+    <div className="flex h-full flex-col rounded-2xl border border-[#00BCFF]/30 bg-white p-5 shadow-[0_4px_20px_rgba(0,188,255,0.06)]">
       <CardHeader
         tier="secondary"
         eyebrow="Team mix"
@@ -1757,11 +1666,11 @@ function DepartmentBreakdownCard({ rows, loading, navigate, canManage }) {
             {bars.map((bar) => (
               <li
                 key={bar.label}
-                className="rounded-2xl border border-[#00B2EE]/20 bg-[#F8FCFD] px-4 py-3 transition-all duration-200 ease-out hover:-translate-y-px hover:border-[#00B2EE]/40 hover:bg-white hover:shadow-[0_6px_16px_rgba(0,178,238,0.1)]"
+                className="rounded-2xl border border-[#00BCFF]/20 bg-[#F8FCFD] px-4 py-3 transition-all duration-200 ease-out hover:-translate-y-px hover:border-[#00BCFF]/40 hover:bg-white hover:shadow-[0_6px_16px_rgba(0,188,255,0.1)]"
               >
                 <div className="flex items-center gap-3">
                   <span
-                    className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#E6F4FA] text-micro font-semibold uppercase leading-none text-[#00B2EE]"
+                    className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#E6F4FA] text-micro font-semibold uppercase leading-none text-[#00BCFF]"
                     aria-hidden
                   >
                     {getInitials(bar.manager || bar.label)}
@@ -1788,13 +1697,13 @@ function DepartmentBreakdownCard({ rows, loading, navigate, canManage }) {
                 <div className="mt-2 flex items-center justify-between gap-4 text-micro tabular-nums text-[#64748B]">
                   <span>{bar.percentage}% of workforce</span>
                   <span>
-                    <strong className="font-semibold text-[#00B2EE]">{bar.attendance}%</strong> in today
+                    <strong className="font-semibold text-[#00BCFF]">{bar.attendance}%</strong> in today
                   </span>
                 </div>
 
                 <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[#E6F4FA]" aria-hidden>
                   <div
-                    className="h-full rounded-full bg-[#00B2EE] transition-[width] duration-500 ease-out"
+                    className="h-full rounded-full bg-[#00BCFF] transition-[width] duration-500 ease-out"
                     style={{ width: `${Math.min(100, Math.max(0, bar.attendance))}%` }}
                   />
                 </div>
@@ -1813,6 +1722,130 @@ function DepartmentBreakdownCard({ rows, loading, navigate, canManage }) {
         </span>
       </div>
     </div>
+  );
+}
+
+function ViewportGrowthCard({ loading, data }) {
+  const isEmpty = !data.some((point) => (point.users || 0) > 0);
+
+  return (
+    <article className="flex h-full min-h-0 flex-col rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
+      <h2 className="mb-1 shrink-0 text-sm font-bold text-slate-900">User growth</h2>
+
+      <div className="relative min-h-0 w-full flex-1">
+        {loading ? (
+          <div className="skeleton h-full w-full rounded-xl" aria-hidden />
+        ) : isEmpty ? (
+          <CardEmpty
+            icon={TrendingUp}
+            title="No growth history"
+            description="New employee registrations will plot here as accounts are created."
+          />
+        ) : (
+          <Suspense fallback={<div className="skeleton h-full w-full rounded-xl" aria-hidden />}>
+            <UserGrowthLineChart data={data} />
+          </Suspense>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function ViewportAttendancePie({ loading, onSite, remote, notIn, coverage }) {
+  const total = onSite + remote + notIn;
+  const data = [
+    { name: 'On-site', value: onSite, color: '#00B0FF', share: total ? Math.round((onSite / total) * 100) : 0 },
+    { name: 'Remote', value: remote, color: '#70C8F4', share: total ? Math.round((remote / total) * 100) : 0 },
+    { name: 'Not in', value: notIn, color: '#C2ECF9', share: total ? Math.round((notIn / total) * 100) : 0 },
+  ];
+
+  return (
+    <article className="flex h-full min-h-0 flex-col rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
+      <h2 className="mb-2 shrink-0 text-sm font-bold text-slate-900">Today’s mix</h2>
+      <div className="flex min-h-0 w-full flex-[65] items-center justify-center">
+        {loading ? (
+          <div className="skeleton aspect-square h-full max-h-full w-auto max-w-full rounded-full" aria-hidden />
+        ) : (
+          <Suspense
+            fallback={<div className="skeleton aspect-square h-full max-h-full w-auto max-w-full rounded-full" aria-hidden />}
+          >
+            <div className="aspect-square h-full max-h-full w-auto max-w-full">
+              <AttendanceMixPieChart data={data} centerLabel={`${coverage}%`} centerHint="in today" />
+            </div>
+          </Suspense>
+        )}
+      </div>
+      <ul className="mt-2 flex min-h-0 flex-[35] flex-col items-start justify-center gap-2.5 pl-0.5">
+        {data.map((row) => (
+          <li key={row.name} className="flex items-center gap-2.5 text-sm font-semibold text-slate-700">
+            <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: row.color }} aria-hidden />
+            {row.name}
+          </li>
+        ))}
+      </ul>
+    </article>
+  );
+}
+
+function ViewportActivityCard({ loading, items }) {
+  const visibleItems = items.slice(0, 6);
+
+  return (
+    <article className="relative flex min-h-0 flex-[13] flex-col overflow-hidden rounded-2xl border border-[#B5E2FF] bg-[#B5E2FF] p-3 shadow-sm">
+      <h2 className="mb-1 shrink-0 text-sm font-bold text-slate-900">Recent activity</h2>
+      <div className="min-h-0 flex-1 space-y-1.5 overflow-hidden" aria-busy={loading}>
+        {loading &&
+          Array.from({ length: 6 }).map((_, index) => (
+            <div key={index} className="skeleton h-8 rounded-lg" aria-hidden />
+          ))}
+        {!loading && items.length === 0 && (
+          <p className="text-xs text-slate-600">Check-ins and approvals will stream in here.</p>
+        )}
+        {!loading &&
+          visibleItems.map((item) => (
+            <div
+              key={`${item.person}-${item.action}-${item.ts}`}
+              className="flex items-center gap-2.5 rounded-lg bg-white px-2 py-1.5"
+            >
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#F0F9FD] text-[10px] font-semibold uppercase text-[#00B0FF]">
+                {getInitials(item.person)}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-xs font-medium text-slate-800">{item.person}</span>
+                <span className="block truncate text-[11px] text-[#8898AA]">{item.action}</span>
+              </span>
+              <time className="shrink-0 text-[11px] text-[#8898AA]">{item.time}</time>
+            </div>
+          ))}
+      </div>
+    </article>
+  );
+}
+
+function ViewportQuickActions({ actions }) {
+  if (!actions.length) return null;
+
+  return (
+    <article className="flex min-h-0 flex-[7] flex-col justify-between gap-1.5 rounded-2xl border border-slate-100 bg-white p-2.5 shadow-sm">
+      <h2 className="text-sm font-bold text-slate-900">Quick actions</h2>
+      {actions.map((action) => {
+        const Icon = action.icon;
+        return (
+          <button
+            key={action.label}
+            type="button"
+            onClick={action.onClick}
+            className={`flex items-center justify-between rounded-lg bg-[#B5E2FF] px-3 py-1.5 text-xs font-semibold text-slate-700 transition-all hover:bg-[#00B0FF] hover:text-white ${FOCUS_RING}`}
+          >
+            <span className="flex items-center gap-2">
+              <Icon className="h-3.5 w-3.5" aria-hidden />
+              {action.label}
+            </span>
+            <ChevronRight className="h-3.5 w-3.5 opacity-70" aria-hidden />
+          </button>
+        );
+      })}
+    </article>
   );
 }
 
@@ -2103,48 +2136,25 @@ export function DashboardPage() {
   }, [attendance]);
 
   /**
-   * Operational read on today: who arrived late and who never closed a shift.
-   * Everything here comes from recorded attendance events — nothing is estimated.
+   * Who has already checked in today, used by the department heatmap present counts.
    */
   const todayOps = useMemo(() => {
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
     const firstCheckin = new Map();
-    /* Last event per employee per past day decides whether a shift was closed. */
-    const priorDays = new Map();
-    const window = Date.now() - 7 * 86400000;
 
     for (const row of attendance) {
       if (!row.timestamp) continue;
       const stamp = new Date(row.timestamp);
       if (Number.isNaN(stamp.getTime())) continue;
-      const type = normalizeAttendanceType(row.type);
+      if (stamp < startOfToday) continue;
+      if (normalizeAttendanceType(row.type) !== 'checkin') continue;
       const key = attendanceUserKey(row);
-
-      if (stamp >= startOfToday) {
-        if (type !== 'checkin') continue;
-        const seen = firstCheckin.get(key);
-        if (!seen || stamp < seen) firstCheckin.set(key, stamp);
-        continue;
-      }
-
-      if (stamp.getTime() < window) continue;
-      const dayKey = `${key}|${stamp.getFullYear()}-${stamp.getMonth()}-${stamp.getDate()}`;
-      const entry = priorDays.get(dayKey);
-      if (!entry || stamp > entry.stamp) priorDays.set(dayKey, { stamp, type });
+      const seen = firstCheckin.get(key);
+      if (!seen || stamp < seen) firstCheckin.set(key, stamp);
     }
 
-    let late = 0;
-    for (const stamp of firstCheckin.values()) {
-      if (stamp.getHours() * 60 + stamp.getMinutes() > LATE_AFTER_MINUTES) late += 1;
-    }
-
-    let openShifts = 0;
-    for (const entry of priorDays.values()) {
-      if (entry.type !== 'checkout') openShifts += 1;
-    }
-
-    return { late, openShifts, checkedInKeys: new Set(firstCheckin.keys()) };
+    return { checkedInKeys: new Set(firstCheckin.keys()) };
   }, [attendance]);
 
   /**
@@ -2237,57 +2247,6 @@ export function DashboardPage() {
 
     return { rows, days, peak, total, step, busiest, busiestBand };
   }, [attendance]);
-
-  /* Seven-day series behind the KPI day-over-day chips, derived from recorded events. */
-  const dailyTrend = useMemo(() => {
-    const midnight = new Date();
-    midnight.setHours(0, 0, 0, 0);
-    const days = [];
-    for (let i = 6; i >= 0; i -= 1) {
-      const start = new Date(midnight);
-      start.setDate(midnight.getDate() - i);
-      const end = new Date(start);
-      end.setDate(start.getDate() + 1);
-      days.push({ start, end, present: new Set(), remote: new Set(), requests: 0, headcount: 0 });
-    }
-    const bucketFor = (stamp) => days.find((day) => stamp >= day.start && stamp < day.end);
-
-    for (const row of attendance) {
-      if (!row.timestamp || normalizeAttendanceType(row.type) !== 'checkin') continue;
-      const stamp = new Date(row.timestamp);
-      if (Number.isNaN(stamp.getTime())) continue;
-      const day = bucketFor(stamp);
-      if (!day) continue;
-      const key = attendanceUserKey(row);
-      const mode = String(usersByKey.get(key)?.work_mode || 'in_office').toLowerCase();
-      day.present.add(key || `present-${day.present.size}`);
-      if (REMOTE_MODES.has(mode)) day.remote.add(key || `remote-${day.remote.size}`);
-    }
-
-    for (const leave of leaves) {
-      const raw = leave.requested_at || leave.created_at;
-      if (!raw) continue;
-      const stamp = new Date(raw);
-      if (Number.isNaN(stamp.getTime())) continue;
-      const day = bucketFor(stamp);
-      if (day) day.requests += 1;
-    }
-
-    for (const day of days) {
-      day.headcount = cachedUsers.filter((row) => {
-        if (!row.created_at) return false;
-        const created = new Date(row.created_at);
-        return !Number.isNaN(created.getTime()) && created < day.end;
-      }).length;
-    }
-
-    return {
-      remote: days.map((day) => day.remote.size),
-      requests: days.map((day) => day.requests),
-      rate: days.map((day) => (day.headcount ? Math.round((day.present.size / day.headcount) * 100) : 0)),
-      headcount: days.map((day) => day.headcount),
-    };
-  }, [attendance, leaves, cachedUsers, usersByKey]);
 
   const onLeaveKeys = useMemo(() => {
     const keys = new Set();
@@ -2540,51 +2499,20 @@ export function DashboardPage() {
     return buckets.map(({ key, label, checkins, headcount }) => ({ key, label, checkins, headcount }));
   }, [attendance, cachedUsers]);
 
-  const hasTrendData = useMemo(
-    () => attendanceTrend.some((point) => point.checkins > 0 || point.headcount > 0),
-    [attendanceTrend]
-  );
-
   const totalUsers = stats?.totalEmployees ?? cachedUsers.length;
   const activeUsers = stats?.activeUsers ?? cachedUsers.filter((row) => row.is_active).length;
   const pendingApprovals = stats?.pendingLeaves ?? pendingLeaves.length;
   const attendanceRate = activeUsers
     ? Math.min(100, Math.round((attendanceToday.uniqueCheckins / activeUsers) * 100))
     : 0;
-  const adminName = toTitleCaseName(user?.name?.split(' ')[0] || user?.username || 'Admin');
-
-  /* Month-over-month movement for the trend card's pill. */
-  const monthDelta =
-    attendanceTrend.length > 1
-      ? attendanceTrend[attendanceTrend.length - 1].checkins - attendanceTrend[attendanceTrend.length - 2].checkins
-      : null;
-
-  /* Age of the longest-waiting request, so the queue KPI can carry urgency. */
-  const oldestPending = useMemo(() => {
-    const stamps = [...pendingLeaves, ...pendingWorkModes]
-      .map((row) => new Date(row.requested_at || row.created_at || 0).getTime())
-      .filter((time) => Number.isFinite(time) && time > 0);
-    if (!stamps.length) return { days: null, label: null };
-    const days = Math.floor((Date.now() - Math.min(...stamps)) / 86400000);
-    return {
-      days,
-      label: days >= 1 ? `Oldest waiting ${days} day${days === 1 ? '' : 's'}` : 'Oldest waiting under a day',
-    };
-  }, [pendingLeaves, pendingWorkModes]);
-
-  const remoteShare = attendanceToday.uniqueCheckins
-    ? Math.round((attendanceToday.remote / attendanceToday.uniqueCheckins) * 100)
-    : 0;
 
   const deactivated = Math.max(totalUsers - activeUsers, 0);
   const roster = useMemo(() => {
     const departments = new Set();
-    let unassigned = 0;
     for (const row of cachedUsers) {
       if (row.department) departments.add(row.department);
-      else unassigned += 1;
     }
-    return { departmentCount: departments.size, unassigned };
+    return { departmentCount: departments.size };
   }, [cachedUsers]);
 
   /*
@@ -2598,18 +2526,11 @@ export function DashboardPage() {
     }),
     [leaves, workModes]
   );
-  const mean = (series) =>
-    series.length ? Math.round(series.reduce((sum, entry) => sum + entry, 0) / series.length) : 0;
-  const remoteWeekAvg = mean(dailyTrend.remote);
-  const requestsThisWeek = dailyTrend.requests.reduce((sum, entry) => sum + entry, 0);
+  const remoteShare = attendanceToday.uniqueCheckins
+    ? Math.round((attendanceToday.remote / attendanceToday.uniqueCheckins) * 100)
+    : 0;
   const plural = (count, word) => `${formatNumber(count)} ${word}${count === 1 ? '' : 's'}`;
 
-  /*
-   * Each KPI answers three things in a fixed order: the number, what it is made of
-   * (`context`), and what to do about it (`insight`). The insight is the line that
-   * turns a metric into an instruction, so it names a consequence — never "no change"
-   * or "flat", which tell the reader nothing.
-   */
   const overviewStats = [
     {
       icon: KpiIconWorkforce,
@@ -2617,13 +2538,6 @@ export function DashboardPage() {
       count: totalUsers,
       context: `${plural(activeUsers, 'active employee')} · ${formatNumber(deactivated)} deactivated`,
       detail: `${formatNumber(onShiftKeys.size)} on shift now · ${plural(roster.departmentCount, 'department')}`,
-      insight:
-        deactivated > 0
-          ? `${plural(deactivated, 'account')} deactivated — review access`
-          : roster.unassigned > 0
-            ? `${plural(roster.unassigned, 'employee')} without a department`
-            : `Every employee assigned across ${plural(roster.departmentCount, 'department')}`,
-      insightTone: deactivated > 0 || roster.unassigned > 0 ? 'watch' : 'good',
       onClick: canViewUsers ? () => navigate('/users') : undefined,
     },
     {
@@ -2633,20 +2547,6 @@ export function DashboardPage() {
       suffix: '%',
       context: `${formatNumber(attendanceToday.uniqueCheckins)} of ${formatNumber(activeUsers)} checked in today`,
       progress: attendanceRate,
-      insight:
-        attendanceToday.uniqueCheckins === 0
-          ? 'No check-ins recorded yet today'
-          : todayOps.late > 0
-            ? `${plural(todayOps.late, 'arrival')} after ${LATE_LABEL}`
-            : todayOps.openShifts > 0
-              ? `${plural(todayOps.openShifts, 'shift')} left open this week`
-              : 'Everyone in on time today',
-      insightTone:
-        attendanceToday.uniqueCheckins === 0
-          ? 'neutral'
-          : todayOps.late > 0 || todayOps.openShifts > 0
-            ? 'watch'
-            : 'good',
       onClick: canViewAttendance ? () => navigate('/attendance') : undefined,
     },
     {
@@ -2654,13 +2554,6 @@ export function DashboardPage() {
       label: 'Remote / hybrid',
       count: attendanceToday.remote,
       context: `${formatNumber(attendanceToday.onSite)} on-site · ${remoteShare}% of today's check-ins`,
-      insight:
-        attendanceToday.uniqueCheckins === 0
-          ? 'Waiting on today’s first check-in'
-          : attendanceToday.remote === 0
-            ? 'Whole team on-site today'
-            : `Averaging ${formatNumber(remoteWeekAvg)} remote per day this week`,
-      insightTone: 'neutral',
       onClick: canViewWorkModes ? () => navigate('/work-mode-requests') : undefined,
     },
     {
@@ -2668,130 +2561,63 @@ export function DashboardPage() {
       label: 'Pending approvals',
       count: pendingApprovals,
       context: `${formatNumber(pendingCounts.leaves)} leave · ${formatNumber(pendingCounts.workModes)} work-mode`,
-      insight:
-        pendingApprovals === 0
-          ? 'Queue is clear — nothing waiting on a decision'
-          : oldestPending.days != null && oldestPending.days >= 2
-            ? `${oldestPending.label} — decide today`
-            : requestsThisWeek > 0
-              ? `${plural(requestsThisWeek, 'request')} arrived this week`
-              : `${plural(pendingApprovals, 'request')} waiting on review`,
-      insightTone:
-        pendingApprovals === 0
-          ? 'good'
-          : oldestPending.days != null && oldestPending.days >= 3
-            ? 'urgent'
-            : 'watch',
       onClick: canViewLeaves ? () => navigate('/leaves') : undefined,
     },
   ];
 
+  const userGrowthSeries = useMemo(() => buildUserGrowthSeries(cachedUsers), [cachedUsers]);
+  const canAccessCalendar = canAccessFeature(user, 'calendar');
+  const quickActions = [
+    canViewUsers && {
+      label: 'Invite user',
+      icon: UserPlus,
+      onClick: () => navigate('/users', { state: { openCreate: true } }),
+    },
+    canManageDepartments && {
+      label: 'New department',
+      icon: Building2,
+      onClick: () => navigate('/departments', { state: { focusCreate: true } }),
+    },
+    canViewTickets && {
+      label: 'Log a ticket',
+      icon: Ticket,
+      onClick: () => navigate('/tickets'),
+    },
+    canAccessCalendar && {
+      label: 'Add calendar event',
+      icon: CalendarDays,
+      onClick: () => navigate('/calendar'),
+    },
+  ].filter(Boolean);
+
   return (
-    <div className="dashboard-page animate-fade-up space-y-8 bg-[#F8FCFD]">
-      <OverviewBanner
-        adminName={adminName}
-        stats={overviewStats}
-        loading={loading}
-        statusPills={[
-          { label: 'System synced' },
-          ...(onShiftKeys.size > 0 ? [{ label: `${onShiftKeys.size} on shift` }] : []),
-        ]}
-      />
-
+    <div className="flex h-full min-h-0 flex-1 flex-col gap-3 overflow-y-auto lg:overflow-hidden">
       {error && (
-        <div role="alert" className="rounded-xl border border-danger-border bg-danger-surface px-4 py-3">
-          <p className="text-sm font-medium text-danger-ink">{error}</p>
+        <div role="alert" className="shrink-0 rounded-xl border border-danger-border bg-danger-surface px-3 py-2">
+          <p className="text-xs font-medium text-danger-ink">{error}</p>
         </div>
       )}
 
-      {/*
-        Visual hierarchy: primary ops (8) + live feed (4) → action inbox (5) + departments (7)
-        → analytics trend (7) + directory (5).
-      */}
-      <div className="grid grid-cols-1 items-stretch gap-5 sm:gap-6 lg:grid-cols-12">
-        {loading ? (
-          <div className={`${CARD} skeleton h-[32rem] lg:col-span-8`} aria-hidden />
-        ) : (
-          <div className="lg:col-span-8">
-            <AttendanceOpsCard
-              metrics={attendanceRanges}
-              headcount={activeUsers}
-              onShiftNow={onShiftKeys.size}
-              ops={todayOps}
-              heatmap={checkinHeatmap}
-              onLeaveCount={onLeaveKeys.size}
-              onOpen={() => navigate('/attendance')}
-              onOpenLeaves={canViewLeaves ? () => navigate('/leaves') : undefined}
-              onRefresh={() => loadDashboard(true)}
-            />
-          </div>
-        )}
+      <OverviewBanner stats={overviewStats} loading={loading} />
 
-        <div className="lg:col-span-4">
-          <ActivityTimelineCard
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-12">
+        <div className="min-h-[12rem] lg:col-span-6 lg:h-full lg:min-h-0">
+          <ViewportGrowthCard loading={loading} data={userGrowthSeries} />
+        </div>
+        <div className="flex min-h-0 flex-col gap-2.5 lg:col-span-3 lg:h-full">
+          <ViewportActivityCard loading={loading} items={activityItems} />
+          {quickActions.length > 0 && <ViewportQuickActions actions={quickActions} />}
+        </div>
+        <div className="min-h-[12rem] lg:col-span-3 lg:h-full lg:min-h-0">
+          <ViewportAttendancePie
             loading={loading}
-            items={activityItems}
-            lastEventLabel={activityItems[0]?.time || '—'}
-            onOpen={canViewAttendance ? () => navigate('/attendance') : undefined}
+            onSite={attendanceToday.onSite}
+            remote={attendanceToday.remote}
+            notIn={Math.max(activeUsers - attendanceToday.uniqueCheckins, 0)}
+            coverage={attendanceRate}
           />
         </div>
-
-        <div className="lg:col-span-5">
-          <ActionQueueCard
-            items={actionQueue}
-            approvableCount={approvableCount}
-            busyId={queueBusyId}
-            batching={batching}
-            onBatchApprove={batchApprove}
-            onOpen={() => navigate(canViewLeaves ? '/leaves' : '/tickets')}
-          />
-        </div>
-
-        {canViewUsers && (
-          <div className="lg:col-span-7">
-            <DepartmentBreakdownCard
-              rows={departmentRows}
-              loading={loading}
-              navigate={navigate}
-              canManage={canManageDepartments}
-            />
-          </div>
-        )}
-
-        {canViewAttendance && (
-          <div className="lg:col-span-7">
-            <AttendanceTrendCard
-              loading={loading}
-              data={attendanceTrend}
-              isEmpty={!hasTrendData}
-              monthDelta={monthDelta}
-              onViewAttendance={() => navigate('/attendance')}
-            />
-          </div>
-        )}
-
-        {canViewUsers && (
-          <div className="lg:col-span-5">
-            <DirectorySnapshotCard
-              loading={loading}
-              directoryRows={cachedUsers.slice(0, 8)}
-              onLeaveKeys={onLeaveKeys}
-              checkedInKeys={onShiftKeys}
-              navigate={navigate}
-            />
-          </div>
-        )}
       </div>
-
-      {/* Compact directory and headcount summary. */}
-      {canViewUsers && !loading && (
-        <p className="flex flex-wrap items-center gap-2 text-caption font-medium text-ink-muted">
-          <Building2 className="h-3.5 w-3.5" strokeWidth={1.9} aria-hidden />
-          {departmentRows.length} department{departmentRows.length === 1 ? '' : 's'} tracked
-          <span aria-hidden>·</span>
-          {`${formatNumber(activeUsers)} active accounts`}
-        </p>
-      )}
     </div>
   );
 }

@@ -102,13 +102,13 @@ export function ManagerPermissionsPage() {
   return (
     <div className="space-y-5 animate-fade-up">
       <div>
-        <h1 className="text-2xl font-semibold text-white">User Permissions</h1>
-        <p className="mt-1 text-sm text-slate-200">
+        <h1 className="page-title">User Permissions</h1>
+        <p className="mt-1 text-sm text-ink-muted">
           Control portal access from one source of truth.
         </p>
       </div>
 
-      {error && <GlassCard className="p-4 text-sm text-red-100">{error}</GlassCard>}
+      {error && <GlassCard className="p-4 text-sm text-danger-ink">{error}</GlassCard>}
       {message && <GlassCard className="p-4 text-sm text-accent-600">{message}</GlassCard>}
 
       <div className="grid grid-cols-1 xl:grid-cols-[22rem_1fr] gap-5">
@@ -167,12 +167,12 @@ export function ManagerPermissionsPage() {
         <GlassCard className="p-5">
           {selectedManager ? (
             <>
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 border-b border-white/10 pb-4">
+              <div className="flex flex-col gap-3 border-b border-hairline pb-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <p className="text-lg font-semibold text-white">
+                  <p className="text-lg font-semibold text-ink">
                     {selectedManager.name || selectedManager.username}
                   </p>
-                  <p className="text-sm text-slate-300">
+                  <p className="text-sm text-ink-muted">
                     {grantedCount} of {allManagerPermissions.length} permissions granted
                   </p>
                 </div>
@@ -194,11 +194,11 @@ export function ManagerPermissionsPage() {
 
               <div className="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {managerPermissionGroups.map((group) => (
-                  <div key={group.group} className="rounded-lg border border-white/10 bg-white/10 p-4">
-                    <p className="font-semibold text-white">{group.group}</p>
+                  <div key={group.group} className="rounded-xl border border-hairline bg-[#F8FCFD] p-4">
+                    <p className="font-semibold text-ink">{group.group}</p>
                     <div className="mt-3 space-y-2">
                       {group.permissions.map(([key, label]) => (
-                        <label key={key} className="flex items-center gap-3 text-sm text-slate-100">
+                        <label key={key} className="flex items-center gap-3 text-sm text-ink">
                           <input
                             type="checkbox"
                             checked={permissionSet.has(key)}
@@ -214,14 +214,14 @@ export function ManagerPermissionsPage() {
               </div>
             </>
           ) : (
-            <p className="text-sm text-slate-200">Select a user to edit permissions.</p>
+            <p className="text-sm text-ink-muted">Select a user to edit permissions.</p>
           )}
         </GlassCard>
       </div>
 
       <GlassCard className="p-5">
         <div className="flex items-center justify-between">
-          <p className="text-lg font-semibold text-white">Audit History</p>
+          <p className="text-lg font-semibold text-ink">Audit History</p>
           <button type="button" onClick={loadData} className="ui-btn-secondary ui-btn-sm">
             Refresh
           </button>

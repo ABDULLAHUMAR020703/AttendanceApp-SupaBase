@@ -241,8 +241,8 @@ export function AnalyticsPage() {
     <div className="analytics-page space-y-6 animate-fade-up print:text-slate-900">
       <section className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between print:hidden">
         <div>
-          <h1 className="text-2xl font-semibold text-white">Analytics</h1>
-          <p className="mt-1 text-sm text-slate-200">
+          <h1 className="page-title">Analytics</h1>
+          <p className="mt-1 text-sm text-ink-muted">
             Department headcount and attendance activity for your company.
           </p>
         </div>
@@ -259,7 +259,7 @@ export function AnalyticsPage() {
 
       {error && (
         <GlassCard className="p-4" role="alert">
-          <p className="text-sm text-red-100">{error}</p>
+          <p className="text-sm text-danger-ink">{error}</p>
         </GlassCard>
       )}
 
@@ -345,8 +345,8 @@ export function AnalyticsPage() {
       </div>
 
       <GlassCard className="p-5">
-        <h2 className="mb-1 text-sm font-medium text-white">Organization insights</h2>
-        <p className="mb-4 text-xs text-slate-400">
+        <h2 className="card-title mb-1">Organization insights</h2>
+        <p className="mb-4 text-xs text-ink-muted">
           Account and structure metrics alongside your filtered attendance period
         </p>
         {/* Two columns per row, matching the label/value pairs that replace them. */}
@@ -361,20 +361,20 @@ export function AnalyticsPage() {
           </SkeletonGroup>
         )}
         {!loading && insightRows.length > 0 && (
-          <ul className="space-y-3 text-sm text-slate-200">
+          <ul className="space-y-3 text-sm text-ink">
             {insightRows.map((row) => (
               <li
                 key={row.label}
-                className="flex items-center justify-between gap-4 border-b border-white/5 pb-2 last:border-0"
+                className="flex items-center justify-between gap-4 border-b border-hairline pb-2 last:border-0"
               >
-                <span className="text-slate-300">{row.label}</span>
-                <span className="font-semibold tabular-nums text-white">{row.value}</span>
+                <span className="text-ink-muted">{row.label}</span>
+                <span className="font-semibold tabular-nums text-ink">{row.value}</span>
               </li>
             ))}
           </ul>
         )}
         {!loading && !insightRows.length && (
-          <p className="text-sm text-slate-300">Select a valid date range to view insights.</p>
+          <p className="text-sm text-ink-muted">Select a valid date range to view insights.</p>
         )}
       </GlassCard>
     </div>

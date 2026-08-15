@@ -20,7 +20,7 @@ const TONE_ALIASES = {
 const DOTS = {
   neutral: 'bg-ink-faint',
   accent: 'bg-accent-600',
-  success: 'bg-lime',
+  success: 'bg-success-solid',
   warning: 'bg-warning-solid',
   danger: 'bg-danger-solid',
 };

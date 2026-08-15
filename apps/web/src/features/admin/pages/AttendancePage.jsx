@@ -177,8 +177,8 @@ export function AttendancePage() {
     <div className="space-y-5 animate-fade-up">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-white">Attendance</h1>
-          <p className="mt-1 text-sm text-slate-300">Review records, apply manual corrections, and export attendance data.</p>
+          <h1 className="page-title">Attendance</h1>
+          <p className="mt-1 text-sm text-ink-muted">Review records, apply manual corrections, and export attendance data.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <PermissionGate permission={PERMISSIONS.MANUAL_ATTENDANCE}>
@@ -223,16 +223,16 @@ export function AttendancePage() {
           <GlassCard className="p-5 space-y-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-sm font-medium text-white">Manual Correction</h2>
-                <p className="mt-1 text-xs text-slate-400">Add a check-in or check-out on behalf of an employee.</p>
+                <h2 className="card-title">Manual Correction</h2>
+                <p className="mt-1 text-xs text-ink-muted">Add a check-in or check-out on behalf of an employee.</p>
               </div>
-              <button type="button" onClick={() => setShowManual(false)} className="text-xs text-slate-300 hover:text-white">
+              <button type="button" onClick={() => setShowManual(false)} className="text-xs text-ink-muted hover:text-ink">
                 Close
               </button>
             </div>
             <form onSubmit={handleManualSubmit} className="grid gap-4 md:grid-cols-2">
               <div className="flex flex-col gap-1">
-                <label htmlFor="manual-user" className="text-xs text-slate-300">Employee</label>
+                <label htmlFor="manual-user" className="text-xs font-medium text-ink-muted">Employee</label>
                 <select
                   id="manual-user"
                   value={manualForm.username}
@@ -240,28 +240,28 @@ export function AttendancePage() {
                   className="ui-select"
                   required
                 >
-                  <option value="" className="bg-slate-800">Select employee</option>
+                  <option value="">Select employee</option>
                   {users.map((u) => (
-                    <option key={u.uid || u.username} value={u.username} className="bg-slate-800">
+                    <option key={u.uid || u.username} value={u.username}>
                       {u.name || u.username} ({u.username})
                     </option>
                   ))}
                 </select>
               </div>
               <div className="flex flex-col gap-1">
-                <label htmlFor="manual-type" className="text-xs text-slate-300">Type</label>
+                <label htmlFor="manual-type" className="text-xs font-medium text-ink-muted">Type</label>
                 <select
                   id="manual-type"
                   value={manualForm.type}
                   onChange={(e) => setManualForm((f) => ({ ...f, type: e.target.value }))}
                   className="ui-select"
                 >
-                  <option value="checkin" className="bg-slate-800">Check-in</option>
-                  <option value="checkout" className="bg-slate-800">Check-out</option>
+                  <option value="checkin">Check-in</option>
+                  <option value="checkout">Check-out</option>
                 </select>
               </div>
               <div className="flex flex-col gap-1">
-                <label htmlFor="manual-time" className="text-xs text-slate-300">Date & time</label>
+                <label htmlFor="manual-time" className="text-xs font-medium text-ink-muted">Date & time</label>
                 <input
                   id="manual-time"
                   type="datetime-local"
@@ -272,7 +272,7 @@ export function AttendancePage() {
                 />
               </div>
               <div className="flex flex-col gap-1">
-                <label htmlFor="manual-location" className="text-xs text-slate-300">Location note (optional)</label>
+                <label htmlFor="manual-location" className="text-xs font-medium text-ink-muted">Location note (optional)</label>
                 <input
                   id="manual-location"
                   type="text"

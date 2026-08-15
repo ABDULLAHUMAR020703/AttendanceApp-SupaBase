@@ -105,12 +105,12 @@ export function NotificationsPage() {
 
       <GlassCard className="ui-toolbar p-4 flex flex-wrap gap-3">
         <Select value={readFilter} onChange={(e) => { setReadFilter(e.target.value); setPage(1); }} className="w-auto min-w-[8rem]">
-          <option value="" className="bg-slate-800">All</option>
-          <option value="false" className="bg-slate-800">Unread</option>
-          <option value="true" className="bg-slate-800">Read</option>
+          <option value="">All</option>
+          <option value="false">Unread</option>
+          <option value="true">Read</option>
         </Select>
         <Select value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }} className="w-auto min-w-[10rem]">
-          {TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value} className="bg-slate-800">{o.label}</option>)}
+          {TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </Select>
       </GlassCard>
 
@@ -168,7 +168,7 @@ export function NotificationsPage() {
       </div>
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-3 text-sm text-slate-300">
+        <div className="flex items-center justify-center gap-3 text-sm text-ink-muted">
           <button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)} className="ui-pager-btn">Previous</button>
           <span className="ui-pager-current" aria-current="page">Page {page} of {totalPages}</span>
           <button type="button" disabled={page >= totalPages} onClick={() => setPage(page + 1)} className="ui-pager-btn">Next</button>

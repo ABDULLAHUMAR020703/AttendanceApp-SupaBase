@@ -47,15 +47,24 @@ export const AttendanceTooltipContent = memo(function AttendanceTooltipContent({
   );
 });
 
-export const GrowthTooltipContent = memo(function GrowthTooltipContent({ active, payload, label }) {
+export const GrowthTooltipContent = memo(function GrowthTooltipContent({ active, payload }) {
   if (!active || !payload?.length) return null;
-  const row = payload[0]?.payload;
-  if (!row) return null;
+  const item = payload.find((entry) => entry.dataKey === 'users') || payload[0];
+  const n = Number(item?.value);
+  if (!Number.isFinite(n)) return null;
+  const label =
+    n >= 1000
+      ? `${Number((n / 1000).toFixed(n >= 10000 ? 0 : 1))}k`
+      : Number.isInteger(n)
+        ? String(n)
+        : n.toFixed(1);
 
   return (
-    <div className="min-w-[160px] space-y-2" role="tooltip">
-      <p className="text-xs font-semibold text-[#0F172A]">{label || row.label}</p>
-      <TooltipRow label="New registrations" value={`${row.users} users`} accent={CHART_COLORS.primary} />
+    <div
+      className="rounded-md border border-slate-100 bg-white/90 px-2 py-0.5 text-xs font-bold text-slate-800 shadow-sm backdrop-blur-sm"
+      role="tooltip"
+    >
+      {label}
     </div>
   );
 });

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { LogOut, Menu, X } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { useAuthStore } from '../../features/auth/store/authStore';
 import { canAccessFeature, isSuperAdmin } from '../../features/admin/permissions';
 import { useNotificationStore } from '../../features/notifications/store/notificationStore';
@@ -15,6 +15,7 @@ export function AppShell() {
   const { unreadCount, refresh: refreshBadge } = useNotificationStore();
   const location = useLocation();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const isDashboard = location.pathname === '/dashboard';
 
   useEffect(() => {
     if (!user) return undefined;
@@ -49,31 +50,43 @@ export function AppShell() {
   }, [location.pathname]);
 
   return (
-    /*
-      Soft page-wash behind a floating rounded app frame (sidebar + white canvas).
-    */
-    <div className="app-admin-surface page-wash m-0 flex h-screen w-screen overflow-hidden p-0 text-ink md:p-4">
-      <div className="admin-frame relative flex min-h-0 min-w-0 flex-1 overflow-hidden rounded-none bg-white shadow-none md:rounded-3xl md:shadow-[0_24px_64px_-16px_rgba(15,23,42,0.18)]">
-        <Sidebar canSee={canSee} onLogout={logout} unreadCount={unreadCount} />
+    <div className="app-admin-surface m-0 flex h-screen w-screen overflow-hidden bg-[#E8F3F8] p-0 text-ink md:p-4">
+      <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden rounded-none md:rounded-3xl md:shadow-[0_24px_64px_-16px_rgba(15,23,42,0.18)]">
+        <Sidebar canSee={canSee} onLogout={logout} unreadCount={unreadCount} className="hidden rounded-l-3xl md:flex" />
 
-        <div className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white md:rounded-r-3xl">
+        <div className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#F8FAFC] md:rounded-r-3xl">
           <TopBar
             pathname={location.pathname}
             items={items}
             canSee={canSee}
             unreadCount={unreadCount}
             onOpenMobileNav={() => setMobileNavOpen(true)}
+            onLogout={logout}
+            onRefresh={async () => {
+              await refreshPermissions();
+              await refreshBadge();
+            }}
           />
 
-          <main className="admin-main h-full min-h-0 flex-1 overflow-y-auto bg-white px-4 pb-24 pt-4 text-ink md:px-8 md:pb-8 md:pt-6">
-            <div className="mx-auto w-full max-w-[1600px]">
+          <main
+            className={`admin-main flex min-h-0 flex-1 flex-col bg-[#F8FAFC] px-4 pb-24 pt-4 text-ink md:p-6 md:pb-6 ${
+              isDashboard ? 'overflow-y-auto lg:overflow-hidden' : 'overflow-y-auto'
+            }`}
+          >
+            <div
+              className={
+                isDashboard
+                  ? 'flex h-full min-h-0 w-full flex-1 flex-col lg:overflow-hidden'
+                  : 'mx-auto w-full max-w-[1600px]'
+              }
+            >
               <Outlet />
             </div>
           </main>
         </div>
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-hairline bg-white/92 px-2 pb-safe backdrop-blur-2xl md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-100 bg-white/92 px-2 pb-safe backdrop-blur-2xl md:hidden">
         <div className="flex items-stretch justify-around">
           {mobileNavItems.map((item) => {
             const Icon = item.icon;
@@ -81,7 +94,11 @@ export function AppShell() {
               <NavLink
                 key={item.to}
                 to={item.to}
-                className={({ isActive }) => `relative flex flex-1 flex-col items-center gap-0.5 py-2.5 text-micro font-medium transition-colors duration-fast ease-premium ${isActive ? 'text-[#00B2EE]' : 'text-ink-muted'}`}
+                className={({ isActive }) =>
+                  `relative flex flex-1 flex-col items-center gap-0.5 py-2.5 text-micro font-medium transition-colors duration-200 ${
+                    isActive ? 'text-[#00B0FF]' : 'text-[#8898AA]'
+                  }`
+                }
               >
                 {({ isActive }) => (
                   <>
@@ -101,7 +118,7 @@ export function AppShell() {
           <button
             type="button"
             onClick={() => setMobileNavOpen(true)}
-            className="flex flex-1 flex-col items-center gap-0.5 py-2.5 text-micro font-medium text-ink-muted"
+            className="flex flex-1 flex-col items-center gap-0.5 py-2.5 text-micro font-medium text-[#8898AA]"
           >
             <Menu className="h-[18px] w-[18px]" />
             <span>More</span>
@@ -114,66 +131,25 @@ export function AppShell() {
           className={`absolute inset-0 bg-slate-950/30 backdrop-blur-sm transition-opacity ${mobileNavOpen ? 'opacity-100' : 'opacity-0'}`}
           onClick={() => setMobileNavOpen(false)}
         />
-        <aside className={`nav-surface absolute left-0 top-0 flex h-full max-h-dvh w-[min(20rem,85vw)] flex-col overflow-hidden rounded-r-3xl shadow-overlay transition-transform duration-slow ease-premium ${mobileNavOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-          <div className="flex h-16 shrink-0 items-center justify-between border-b border-white/20 px-4">
-            <div className="flex items-center gap-2.5">
-              <span className="grid h-9 w-9 place-items-center rounded-[13px] bg-white shadow-[0_2px_8px_rgba(15,23,42,0.14)]">
-                <img src="/logo.jpeg" alt="Hadir.ai logo" className="h-6 w-6 rounded-[9px] object-cover" />
-              </span>
-              <span>
-                <p className="text-[15px] font-bold leading-tight tracking-[-0.02em] text-white">Hadir.ai</p>
-                <p className="text-[11px] font-medium leading-tight text-white/75">Admin console</p>
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setMobileNavOpen(false)}
-              className="grid h-9 w-9 place-items-center rounded-[10px] text-white/85 transition-[background-color,transform] duration-fast ease-premium hover:bg-white/15 hover:text-white active:scale-95"
-              aria-label="Close menu"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-
-          <div className="no-scrollbar min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain py-3 pb-8">
-            {items.map((item) => {
-              const Icon = item.icon;
-              return (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  className={({ isActive }) =>
-                    `group/row relative mx-3 flex h-11 items-center gap-3 rounded-xl px-3.5 text-left text-[15px] font-medium tracking-[-0.01em] transition-colors duration-200 ease-premium ${
-                      isActive
-                        ? 'bg-white font-semibold text-[#00B2EE]'
-                        : 'font-semibold text-white/85 hover:bg-white/15 hover:text-white'
-                    }`
-                  }
-                >
-                  {({ isActive }) => (
-                    <>
-                      <Icon
-                        className={`h-[20px] w-[20px] shrink-0 transition-colors duration-200 ease-premium ${isActive ? 'text-[#00B2EE]' : 'text-white/85 group-hover/row:text-white'}`}
-                        strokeWidth={isActive ? 2 : 1.75}
-                      />
-                      {item.label}
-                    </>
-                  )}
-                </NavLink>
-              );
-            })}
-          </div>
-
-          <div className="relative z-20 shrink-0 border-t border-white/20 bg-transparent py-3">
-            <button
-              type="button"
-              onClick={logout}
-              className="mx-3 flex h-11 w-[calc(100%-1.5rem)] items-center gap-3 rounded-xl px-3.5 text-left text-[15px] font-semibold text-white/85 transition-all hover:bg-white/15 hover:text-white"
-            >
-              <LogOut className="h-5 w-5 shrink-0" strokeWidth={1.75} />
-              <span>Logout</span>
-            </button>
-          </div>
+        <aside
+          className={`nav-surface absolute left-0 top-0 flex h-full max-h-dvh w-[min(20rem,85vw)] flex-col overflow-hidden rounded-r-3xl shadow-xl transition-transform duration-200 ${
+            mobileNavOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
+        >
+          <button
+            type="button"
+            onClick={() => setMobileNavOpen(false)}
+            className="absolute right-3 top-3 z-10 grid h-9 w-9 place-items-center rounded-[10px] text-white/85 transition-colors hover:bg-white/15 hover:text-white"
+            aria-label="Close menu"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <Sidebar
+            canSee={canSee}
+            onLogout={logout}
+            unreadCount={unreadCount}
+            className="flex h-full w-full"
+          />
         </aside>
       </div>
     </div>

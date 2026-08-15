@@ -92,8 +92,8 @@ export function DepartmentsPage() {
   return (
     <div className="space-y-5 animate-fade-up">
       <div>
-        <h1 className="text-2xl font-semibold text-white">Departments</h1>
-        <p className="mt-1 text-sm text-slate-200">View department structure, managers, and member lists.</p>
+        <h1 className="page-title">Departments</h1>
+        <p className="mt-1 text-sm text-ink-muted">View department structure, managers, and member lists.</p>
       </div>
 
       <div className="mb-4 flex flex-col md:flex-row gap-2">
@@ -120,7 +120,7 @@ export function DepartmentsPage() {
           </>
         )}
       </div>
-      {error && <GlassCard className="p-4 text-sm text-red-100">{error}</GlassCard>}
+      {error && <GlassCard className="p-4 text-sm text-danger-ink">{error}</GlassCard>}
 
       <div className="space-y-3">
         {filteredRows.map((d) => (
@@ -130,18 +130,18 @@ export function DepartmentsPage() {
               onClick={() => toggleExpand(d.id)}
             >
               <div>
-                <p className="font-semibold text-white">{d.name}</p>
-                <p className="text-sm text-slate-300">
+                <p className="font-semibold text-ink">{d.name}</p>
+                <p className="text-sm text-ink-muted">
                   {d.employeeCount} active employee{d.employeeCount === 1 ? '' : 's'}
                 </p>
               </div>
-              <div className="text-sm text-slate-200">
+              <div className="text-sm text-ink-muted">
                 Manager: {d.manager?.name || d.manager?.username || 'Not assigned'}
               </div>
             </button>
 
             {expandedIds[d.id] && (
-              <div className="border-t border-white/10 p-4 space-y-3">
+              <div className="border-t border-hairline p-4 space-y-3">
                 {canManageDepartments && (
                   <PermissionGate permission={PERMISSIONS.MANAGE_DEPARTMENTS}>
                   <div className="flex flex-col md:flex-row gap-2">
@@ -162,14 +162,14 @@ export function DepartmentsPage() {
                 )}
 
                 <div className="space-y-2">
-                  {d.employees.length === 0 && <p className="text-sm text-slate-300">No employees in this department.</p>}
+                  {d.employees.length === 0 && <p className="text-sm text-ink-muted">No employees in this department.</p>}
                   {d.employees.map((emp) => (
-                    <div key={emp.uid} className="rounded-lg border border-white/10 bg-white/5 p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-1">
+                    <div key={emp.uid} className="flex flex-col gap-1 rounded-xl border border-hairline bg-[#F8FCFD] p-3 md:flex-row md:items-center md:justify-between">
                       <div>
-                        <p className="font-medium text-white">{emp.name || emp.username}</p>
-                        <p className="text-xs text-slate-300">{emp.username}</p>
+                        <p className="font-medium text-ink">{emp.name || emp.username}</p>
+                        <p className="text-xs text-ink-muted">{emp.username}</p>
                       </div>
-                      <div className="text-sm text-slate-200">
+                      <div className="text-sm text-ink-muted">
                         {emp.role} {emp.position ? `- ${emp.position}` : ''}
                       </div>
                     </div>

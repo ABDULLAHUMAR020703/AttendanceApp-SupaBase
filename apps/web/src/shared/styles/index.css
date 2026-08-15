@@ -25,31 +25,31 @@
   -webkit-backdrop-filter: saturate(180%) blur(20px);
   border: 1px solid rgba(220, 239, 247, 0.9);
   box-shadow:
-    0 8px 32px rgba(0, 178, 238, 0.06),
+    0 8px 32px rgba(0,188,255, 0.06),
     0 1px 0 rgba(255, 255, 255, 0.8) inset;
 }
 
 .landing-nav-shell--scrolled {
   background: rgba(248, 252, 253, 0.9);
   box-shadow:
-    0 10px 36px rgba(0, 178, 238, 0.09),
+    0 10px 36px rgba(0,188,255, 0.09),
     0 1px 0 rgba(255, 255, 255, 0.85) inset;
 }
 
 /* Join Waitlist — soft sky material, the quiet half of the CTA pair. */
 .landing-cta-waitlist {
-  background: linear-gradient(180deg, rgba(0, 178, 238, 0.14) 0%, rgba(112, 201, 239, 0.12) 100%);
-  border: 1px solid rgba(0, 178, 238, 0.3);
+  background: linear-gradient(180deg, rgba(0,188,255, 0.14) 0%, rgba(112, 201, 239, 0.12) 100%);
+  border: 1px solid rgba(0,188,255, 0.3);
   box-shadow:
-    0 4px 14px rgba(0, 178, 238, 0.08),
+    0 4px 14px rgba(0,188,255, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.55);
   transition: box-shadow 200ms ease, background 200ms ease;
 }
 
 .landing-cta-waitlist:hover {
-  background: linear-gradient(180deg, rgba(0, 178, 238, 0.2) 0%, rgba(112, 201, 239, 0.18) 100%);
+  background: linear-gradient(180deg, rgba(0,188,255, 0.2) 0%, rgba(112, 201, 239, 0.18) 100%);
   box-shadow:
-    0 6px 18px rgba(0, 178, 238, 0.12),
+    0 6px 18px rgba(0,188,255, 0.12),
     inset 0 1px 0 rgba(255, 255, 255, 0.65);
 }
 
@@ -75,7 +75,7 @@
     rgba(255, 255, 255, 0.55) 0%,
     transparent 42%,
     transparent 58%,
-    rgba(0, 178, 238, 0.12) 100%
+    rgba(0,188,255, 0.12) 100%
   );
   opacity: 0.9;
 }
@@ -97,11 +97,11 @@
 .landing-cta-primary {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, transparent 42%),
-    linear-gradient(145deg, #00B2EE 0%, #3ABCEF 52%, #00A8E6 100%);
+    linear-gradient(145deg, #00BCFF 0%, #3ABCEF 52%, #00A3E0 100%);
   border: 1px solid rgba(255, 255, 255, 0.28);
   box-shadow:
-    0 8px 22px rgba(0, 178, 238, 0.28),
-    0 0 0 1px rgba(0, 178, 238, 0.22),
+    0 8px 22px rgba(0,188,255, 0.28),
+    0 0 0 1px rgba(0,188,255, 0.22),
     inset 0 1px 0 rgba(255, 255, 255, 0.35),
     inset 0 -1px 0 rgba(0, 0, 0, 0.08);
   transition: box-shadow 220ms ease, filter 220ms ease;
@@ -109,8 +109,8 @@
 
 .landing-cta-primary:hover {
   box-shadow:
-    0 10px 28px rgba(0, 178, 238, 0.34),
-    0 0 0 1px rgba(0, 178, 238, 0.4),
+    0 10px 28px rgba(0,188,255, 0.34),
+    0 0 0 1px rgba(0,188,255, 0.4),
     0 0 24px rgba(112, 201, 239, 0.35),
     inset 0 1px 0 rgba(255, 255, 255, 0.45),
     inset 0 -1px 0 rgba(0, 0, 0, 0.08);
@@ -128,7 +128,7 @@
   -webkit-backdrop-filter: saturate(180%) blur(24px);
   border: 1px solid rgba(255, 255, 255, 0.9);
   box-shadow:
-    0 28px 60px -18px rgba(0, 178, 238, 0.16),
+    0 28px 60px -18px rgba(0,188,255, 0.16),
     0 12px 28px rgba(112, 201, 239, 0.14),
     inset 0 1px 0 rgba(255, 255, 255, 0.95);
 }
@@ -196,7 +196,7 @@
   /*
    * Brand cyan ramp (Hadir Cyan / Sky Blue).
    *   TIER 3  400 #70C9EF  Sky Blue — supporting fills, icons, soft accents
-   *   TIER 2  600 #00B2EE  Deep Sky Blue — identity / rail / primary CTAs
+   *   TIER 2  600 #00BCFF  Deep Sky Blue — identity / rail / primary CTAs
    *   Soft hover tint #E6F4FA — rows, menus, quiet interactive surfaces
    */
   --accent-50: #f0fbfe;
@@ -205,22 +205,26 @@
   --accent-300: #9addf4;
   --accent-400: #70c9ef;
   --accent-500: #3abcef;
-  --accent-600: #00B2EE;
+  --accent-600: #00B0FF;
   --accent-700: #0090C4;
   --accent-800: #0075A3;
   --accent-900: #005A7A;
   --sky-tint: #e6f4fa;
-  --focus-ring: 0 0 0 3px rgba(0, 178, 238, 0.25);
+  --focus-ring: 0 0 0 3px rgba(0,188,255, 0.25);
 
   /*
-   * Logo lime — the electric dot on the Hadir.ai mark. Live presence only:
-   * on-site dots, checked-in rings, notification counts. Not a CTA fill.
+   * Tertiary emerald — success, presence dots, and brand accent stripes.
+   * `--lime*` kept as aliases so older call sites resolve to the emerald system.
    */
-  --lime: #84cc16;
-  --lime-soft: #f7fee7;
-  --lime-muted: #d9f99d;
-  --lime-ink: #3f6212;
-  --lime-bright: #97e02c;
+  --lime: #10B981;
+  --lime-soft: #ecfdf5;
+  --lime-muted: #a7f3d0;
+  --lime-ink: #065f46;
+  --lime-bright: #34d399;
+  --emerald: #10B981;
+  --emerald-soft: #ecfdf5;
+  --emerald-muted: #a7f3d0;
+  --emerald-ink: #065f46;
 
   /*
    * Named views onto the ramp above, for the places that express rank rather than
@@ -236,12 +240,12 @@
   /*
    * Semantic triads: a surface to sit on, a border to define it, an ink that reads
    * on both. `--*-solid` is reserved for dots, bars and fills that carry no text.
-   * Success solid is the logo lime so "present / on-site" matches the mark.
+   * Success solid is brand emerald for present / approved / positive status.
    */
-  --success-surface: #f7fee7;
-  --success-border: #d9f99d;
-  --success-ink: #3f6212;
-  --success-solid: #84cc16;
+  --success-surface: #ecfdf5;
+  --success-border: #a7f3d0;
+  --success-ink: #065f46;
+  --success-solid: #10B981;
 
   --warning-surface: #fef7ea;
   --warning-border: #f3dfb4;
@@ -256,7 +260,7 @@
   /* Info reuses the brand cyan rather than adding a fourth hue. */
   --info-surface: #f0fbfe;
   --info-border: #c2ecf9;
-  --info-ink: #00B2EE;
+  --info-ink: #00BCFF;
 
   --radius-card: 1.125rem;
   --radius-input: 0.75rem;
@@ -283,10 +287,10 @@
   --color-text-muted: #64748b;
   --color-surface: #ffffff;
   --color-surface-border: #dceff7;
-  --color-primary: #00B2EE;
+  --color-primary: #00B0FF;
   --color-secondary: #70c9ef;
-  --color-accent: #00B2EE;
-  --color-success: #84cc16;
+  --color-accent: #00B0FF;
+  --color-success: #10B981;
   --color-error: #ef4444;
   --color-warning: #f59e0b;
 }
@@ -354,7 +358,7 @@
   }
 
   *:focus-visible {
-    outline: 3px solid rgba(0, 178, 238, 0.25);
+    outline: 3px solid rgba(0,188,255, 0.25);
     outline-offset: 2px;
   }
 
@@ -384,11 +388,9 @@
   .page-wash {
     background-color: #F8FCFD;
     background-image:
-      radial-gradient(circle at 20% 16%, rgba(230, 247, 249, 0.55), transparent 28%),
-      radial-gradient(circle at 78% 24%, rgba(0, 178, 238, 0.12), transparent 32%),
-      radial-gradient(62rem 38rem at 12% -8%, rgba(112, 201, 239, 0.10), transparent 62%),
-      radial-gradient(48rem 34rem at 104% 108%, rgba(0, 178, 238, 0.08), transparent 60%),
-      linear-gradient(180deg, #F8FCFD 0%, #F0F8FF 42%, #E0F6FC 72%, #F8FCFD 100%);
+      radial-gradient(circle at 18% 12%, rgba(230, 246, 252, 0.46), transparent 30%),
+      radial-gradient(circle at 82% 18%, rgba(0,188,255, 0.07), transparent 34%),
+      linear-gradient(180deg, #FFFFFF 0%, #F8FCFD 42%, #F5FBFD 100%);
     background-attachment: fixed;
     background-repeat: no-repeat;
   }
@@ -398,8 +400,8 @@
    * for the white cutout + inverted corner curves into the main canvas.
    */
   .nav-surface {
-    --nav-rail: #00B2EE;
-    --nav-cutout: #ffffff;
+    --nav-rail: #00B0FF;
+    --nav-cutout: #F8FAFC;
     background-color: var(--nav-rail);
     background-image: none;
     color: #ffffff;
@@ -418,7 +420,7 @@
   .nav-item-active {
     position: relative;
     background-color: var(--nav-cutout);
-    color: #00B2EE;
+    color: #00B0FF;
     border-top-left-radius: 20px;
     border-bottom-left-radius: 20px;
     border-top-right-radius: 0;
@@ -469,7 +471,7 @@
     content: '';
     position: absolute;
     inset: 0;
-    background-color: var(--nav-rail, #00B2EE);
+    background-color: var(--nav-rail, #00B0FF);
   }
 
   .nav-cut-top {
@@ -489,35 +491,26 @@
   }
 
   /*
-   * Folder-tab KPI tile — same Deep Sky Blue as the sidebar rail (#00B2EE).
-   *
-   * Compact 4:3-ish silhouette: a short tab on the top-left (~34% width) and a
-   * rounded body beneath it. Two overlapping rectangles share one fill so the
-   * throat is a single surface with no seam.
-   *
-   * Not clip-path: a polygon cannot round the corners this shape needs, and path()
-   * takes absolute pixel coordinates, so every radius would distort as the card
-   * resizes across the responsive grid. Two rectangles stay exact at any width.
-   *
-   * Not a CSS border either — a border on each piece draws a line through the join.
-   * The edge is stacked drop-shadows on the shape layer. Fill and elevation stay
-   * on variables so hover is one state change.
+   * Project-folder KPI tile: saturated Hadir cyan, flat card face, top-left tab.
+   * Matches the reference's coloured project cards while keeping dashboard data intact.
    */
   .kpi-folder {
-    --kpi-fill: #00b2ee;
-    --kpi-edge: #0090c4;
-    --kpi-lift: 0 4px 18px rgba(0, 178, 238, 0.22);
-    --kpi-tab-w: 34%;
-    --kpi-tab-h: 18px;
-    --kpi-radius: 16px;
-    --kpi-tab-radius: 12px;
+    --kpi-fill: #00B0FF;
+    --kpi-fill-2: #00B0FF;
+    --kpi-edge: rgba(0, 153, 230, 0.18);
+    --kpi-lift: 0 16px 34px -24px rgba(0, 176, 255, 0.42), 0 8px 18px -18px rgba(15, 23, 42, 0.28);
+    --kpi-tab-w: 30%;
+    --kpi-tab-h: 14px;
+    --kpi-radius: 10px;
+    --kpi-tab-radius: 8px;
     isolation: isolate;
     overflow: visible;
   }
 
   .kpi-folder:hover,
   .kpi-folder:focus-visible {
-    --kpi-lift: 0 10px 26px rgba(0, 144, 196, 0.32);
+    --kpi-edge: rgba(0, 153, 230, 0.32);
+    --kpi-lift: 0 22px 44px -26px rgba(0, 176, 255, 0.52), 0 12px 24px -20px rgba(15, 23, 42, 0.32);
   }
 
   .kpi-folder-surface {
@@ -526,8 +519,6 @@
     pointer-events: none;
     filter: drop-shadow(1px 0 0 var(--kpi-edge)) drop-shadow(-1px 0 0 var(--kpi-edge))
       drop-shadow(0 1px 0 var(--kpi-edge)) drop-shadow(0 -1px 0 var(--kpi-edge))
-      drop-shadow(2px 0 0 var(--kpi-edge)) drop-shadow(-2px 0 0 var(--kpi-edge))
-      drop-shadow(0 2px 0 var(--kpi-edge)) drop-shadow(0 -2px 0 var(--kpi-edge))
       drop-shadow(var(--kpi-lift));
     transition: filter 200ms cubic-bezier(0.32, 0.72, 0, 1);
   }
@@ -538,7 +529,7 @@
     left: 0;
     top: 0;
     width: var(--kpi-tab-w);
-    height: calc(var(--kpi-tab-h) + 12px);
+    height: calc(var(--kpi-tab-h) + 10px);
     border-radius: var(--kpi-tab-radius) var(--kpi-tab-radius) 0 0;
     background: var(--kpi-fill);
   }
@@ -549,9 +540,8 @@
     inset: var(--kpi-tab-h) 0 0;
     border-radius: 0 var(--kpi-radius) var(--kpi-radius) var(--kpi-radius);
     background: var(--kpi-fill);
-    /* Inner concave where the tab meets the body — same join as a file folder. */
-    -webkit-mask-image: radial-gradient(circle 12px at var(--kpi-tab-w) 0, transparent 12px, #000 12.5px);
-    mask-image: radial-gradient(circle 12px at var(--kpi-tab-w) 0, transparent 12px, #000 12.5px);
+    -webkit-mask-image: radial-gradient(circle 11px at var(--kpi-tab-w) 0, transparent 11px, #000 11.5px);
+    mask-image: radial-gradient(circle 11px at var(--kpi-tab-w) 0, transparent 11px, #000 11.5px);
   }
 
   .kpi-folder-content {
@@ -561,7 +551,7 @@
     min-height: 0;
     flex: 1 1 auto;
     flex-direction: column;
-    padding: calc(var(--kpi-tab-h) + 14px) 16px 16px;
+    padding: calc(var(--kpi-tab-h) + 24px) 12px 10px;
   }
 
   /* --------------------------------------------------------- type hierarchy
@@ -695,19 +685,73 @@
   }
 
   /* -------------------------------------------------------------- surfaces */
-  /* Layer 1: white content sitting on the tinted canvas. 18px radius — premium SaaS, not bubble UI. */
+  /* Layer 1: white content on tinted canvas. Emerald top accent = brand identity. */
   .ui-card {
-    @apply rounded-[18px] border border-[#E6F4FA] bg-white;
-    box-shadow: 0 4px 20px rgba(0, 178, 238, 0.05);
+    position: relative;
+    border-radius: 1.25rem;
+    border: 1px solid #E8F3F8;
+    background-color: #ffffff;
+    box-shadow: 0 10px 30px -24px rgba(15, 23, 42, 0.22), 0 8px 22px -24px rgba(0,188,255, 0.22);
+  }
+
+  /* Optional stronger brand edge for featured / hero cards */
+  .ui-card-brand {
+    border-color: #C2ECF9;
+    box-shadow: 0 16px 38px -26px rgba(15, 23, 42, 0.25), 0 12px 28px -24px rgba(0,188,255, 0.26);
+  }
+
+  /* Standalone emerald accent stripe for headers / nav / section shells */
+  .hadir-accent-stripe {
+    box-shadow: inset 0 3px 0 0 #10B981;
+  }
+
+  .calendar-weekday-header {
+    background: transparent;
+    border: 1px solid transparent;
+    box-shadow: none;
+    transition: all 0.2s ease;
+  }
+
+  .calendar-weekday-header--active {
+    background: linear-gradient(135deg, #00B0FF 0%, #70C8F4 100%);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    box-shadow: 0 8px 20px -4px rgba(0, 176, 255, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    color: #ffffff;
+  }
+
+  .calendar-weekday-header--active span {
+    color: #ffffff !important;
+  }
+
+  .calendar-card {
+    box-shadow: 0 8px 20px rgba(0, 167, 214, 0.08);
+    transition:
+      transform 0.2s ease,
+      box-shadow 0.2s ease,
+      z-index 0s;
+  }
+
+  .calendar-card:hover {
+    z-index: 8;
+    transform: translateY(-3px);
+    box-shadow: 0 18px 36px -10px rgba(0, 188, 255, 0.18), 0 8px 14px -8px rgba(15, 23, 42, 0.08);
+  }
+
+  .calendar-card:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(112, 200, 244, 0.45), 0 10px 25px -5px rgba(0, 188, 255, 0.10);
   }
 
   /* Dashboard command header status chips — ice surface, cyan presence dot. */
   .dash-status-pill {
-    @apply inline-flex items-center gap-1.5 rounded-full border border-[#D0ECF9] bg-white px-2.5 py-1 text-micro font-medium text-ink;
+    @apply inline-flex items-center gap-1.5 rounded-full border border-[#DCEFF7] bg-white px-2.5 py-1 text-micro font-medium text-ink shadow-[0_6px_16px_-14px_rgba(15,23,42,0.28)] transition-all duration-200 ease-premium hover:-translate-y-px hover:border-[#C2ECF9] hover:bg-[#F8FCFD];
   }
 
   .dash-status-pill-dot {
-    @apply h-1.5 w-1.5 shrink-0 rounded-full bg-[#00B2EE];
+    @apply h-1.5 w-1.5 shrink-0 rounded-full bg-[#00BCFF];
+    animation: statusBreath 3.6s ease-in-out infinite;
   }
 
   /*
@@ -747,7 +791,7 @@
 
   /* Segmented control: tinted track, white thumb, Apple-style. */
   .ui-segment {
-    @apply inline-flex w-fit items-center gap-0.5 rounded-xl border border-hairline bg-surface-muted p-1;
+    @apply inline-flex w-fit items-center gap-0.5 rounded-xl border border-[#DCEFF7] bg-[#F5FBFD] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.88)];
   }
 
   /* Selection is carried by weight first, then surface — legible without colour. */
@@ -794,25 +838,25 @@
   }
 
   /*
-   * Filled brand cyan with a white label. Identity fill is accent-600 (#00B2EE);
+   * Filled brand cyan with a white label. Identity fill is accent-600 (#00BCFF);
    * hover darkens to accent-700 / 800 so the control stays on-brand and readable.
    */
   .ui-btn-primary {
-    @apply ui-btn shadow-[0_1px_2px_rgba(0,178,238,0.28)];
-    @apply hover:shadow-[0_2px_10px_rgba(0,178,238,0.30)];
+    @apply ui-btn shadow-[0_1px_2px_rgba(0,176,255,0.28)];
+    @apply hover:shadow-[0_2px_10px_rgba(0,176,255,0.30)];
     @apply disabled:bg-surface-muted disabled:text-[#8493A6];
     /* Explicit hex so brand fill cannot fall back to a darker teal utility. */
-    background-color: #00B2EE;
+    background-color: #00B0FF;
     /* Plain declaration, never `@apply text-white` — see the note above .ui-btn. */
     color: #ffffff;
   }
 
   .ui-btn-primary:hover:not(:disabled) {
-    background-color: #00A8E6;
+    background-color: #0099E6;
   }
 
   .ui-btn-primary:active:not(:disabled) {
-    background-color: #0088C7;
+    background-color: #0088D6;
   }
 
   /*
@@ -852,8 +896,8 @@
   }
 
   .ui-btn-success {
-    @apply ui-btn bg-[#16A34A] shadow-[0_1px_2px_rgba(5,90,45,0.16)];
-    @apply hover:bg-[#15803D] hover:shadow-[0_2px_10px_rgba(22,163,74,0.26)];
+    @apply ui-btn bg-[#10B981] shadow-[0_1px_2px_rgba(5,150,105,0.16)];
+    @apply hover:bg-[#059669] hover:shadow-[0_2px_10px_rgba(16,185,129,0.26)];
     @apply disabled:bg-surface-muted disabled:text-[#8493A6];
     color: #ffffff;
   }
@@ -911,7 +955,7 @@
     @apply placeholder:text-ink-faint;
     @apply transition-[border-color,box-shadow,background-color] duration-fast;
     @apply hover:border-[#70C9EF];
-    @apply focus:border-[#00B2EE] focus:outline-none focus:ring-4 focus:ring-[rgba(0,178,238,0.25)];
+    @apply focus:border-[#00BCFF] focus:outline-none focus:ring-4 focus:ring-[rgba(0,188,255,0.25)];
     @apply focus-visible:outline-none;
     @apply disabled:cursor-not-allowed disabled:border-[#D0ECF9] disabled:bg-surface-subtle disabled:text-ink-muted;
   }
@@ -974,7 +1018,7 @@
 
   .ui-checkbox {
     @apply h-4 w-4 shrink-0 cursor-pointer rounded border-hairline-strong text-accent-600;
-    accent-color: #00B2EE;
+    accent-color: #00BCFF;
   }
 
   /* ---------------------------------------------------------------- tables */
@@ -1019,7 +1063,7 @@
   }
 
   .ui-table-row-selected {
-    @apply bg-accent-50 shadow-[inset_2px_0_0_0_#00B2EE] hover:bg-accent-100/70;
+    @apply bg-accent-50 shadow-[inset_2px_0_0_0_#00BCFF] hover:bg-accent-100/70;
   }
 
   .ui-table-cell {
@@ -1031,14 +1075,14 @@
   .ui-th-sortable {
     @apply -mx-2 inline-flex h-10 items-center gap-1.5 rounded-md px-2 text-inherit transition-colors;
     @apply hover:bg-white/70 hover:text-accent-600;
-    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(0,178,238,0.25)];
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(0,188,255,0.25)];
   }
 
   /* Row action trigger: invisible until the row is hovered or the menu has focus. */
   .ui-row-action {
     @apply grid h-8 w-8 place-items-center rounded-lg text-ink-muted transition-all duration-fast;
     @apply hover:bg-white hover:text-accent-600 hover:shadow-hair;
-    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(0,178,238,0.25)];
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(0,188,255,0.25)];
   }
 
   /* Portalled to escape the table's clipped overflow, so positioning is fixed. */
@@ -1058,7 +1102,7 @@
   .ui-pager-btn {
     @apply inline-flex h-8 min-w-[2rem] items-center justify-center rounded-lg px-2 text-label font-medium tabular-nums text-ink-muted transition-colors;
     @apply hover:bg-[#E6F4FA] hover:text-accent-600 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-ink-muted;
-    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(0,178,238,0.25)];
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(0,188,255,0.25)];
   }
 
   .ui-pager-current {
@@ -1087,7 +1131,7 @@
 
   /* Soft tag pill: the tint fill carries tier-1 ink, which is 6.4:1 on it. */
   .ui-badge-accent {
-    @apply border border-[#00B2EE]/35 bg-[#E6F4FA] text-[#00B2EE];
+    @apply border border-[#00BCFF]/35 bg-[#E6F4FA] text-[#00BCFF];
   }
 
   .ui-badge-success {
@@ -1116,14 +1160,14 @@
   .ui-menu-item {
     @apply flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-label font-medium text-ink;
     @apply transition-colors duration-fast;
-    @apply hover:bg-[#E6F4FA] hover:text-[#00B2EE];
-    @apply focus:bg-[#E6F4FA] focus:text-[#00B2EE] focus:outline-none;
+    @apply hover:bg-[#E6F4FA] hover:text-[#00BCFF];
+    @apply focus:bg-[#E6F4FA] focus:text-[#00BCFF] focus:outline-none;
     @apply disabled:cursor-not-allowed disabled:text-ink-faint disabled:hover:bg-transparent;
   }
 
   /* Keyboard cursor: arrow keys move this, so it must read as strongly as hover. */
   .ui-menu-item-active {
-    @apply bg-[#E6F4FA] text-[#00B2EE];
+    @apply bg-[#E6F4FA] text-[#00BCFF];
   }
 
   .ui-menu-item-danger {
@@ -1147,9 +1191,105 @@
   }
 }
 
+@keyframes pickerIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-picker-in {
+  animation: pickerIn 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.calendar-now-line {
+  height: 2px;
+  background: #00B0FF;
+}
+
+.calendar-now-dot {
+  position: absolute;
+  left: -5px;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin-top: -5px;
+  border-radius: 9999px;
+  background: #00B0FF;
+  animation: calendarNowPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes calendarNowPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 167, 214, 0.45); }
+  50% { box-shadow: 0 0 0 6px rgba(112, 200, 244, 0.28); }
+}
+
+@keyframes liquid-drift {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.liquid-wave,
+.liquid-wave-slow {
+  transform-box: fill-box;
+  transform-origin: 0 0;
+}
+
+.liquid-wave {
+  animation: liquid-drift 5.5s linear infinite;
+}
+
+.liquid-wave-slow {
+  animation: liquid-drift 8s linear infinite reverse;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .liquid-wave,
+  .liquid-wave-slow {
+    animation: none;
+  }
+}
+
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+
+@keyframes statusBreath {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0,188,255, 0.20); }
+  50% { box-shadow: 0 0 0 4px rgba(0,188,255, 0.04); }
+}
+
+@keyframes dashboardSettle {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes lineDraw {
+  from { transform: translateY(-50%) scaleX(0); opacity: 0; }
+  to { transform: translateY(-50%) scaleX(1); opacity: 1; }
+}
+
+@keyframes circleSettle {
+  from { opacity: 0; transform: scale(0.965); }
+  to { opacity: var(--circle-opacity, 1); transform: scale(1); }
+}
+
+.dashboard-enter {
+  animation: dashboardSettle 520ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+.kpi-enter {
+  animation: dashboardSettle 520ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+.attendance-circle-enter {
+  --circle-opacity: 1;
+  animation: circleSettle 680ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+.attendance-connector-line {
+  transform-origin: left center;
+  animation: lineDraw 620ms cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
 @keyframes fadeIn {
@@ -1259,7 +1399,7 @@ select option:hover {
 .chart-content { min-height: 300px; }
 
 .chart-panel:focus-within .chart-surface {
-  outline: 2px solid rgba(0, 178, 238, 0.4);
+  outline: 2px solid rgba(0,188,255, 0.4);
   outline-offset: 2px;
 }
 
@@ -1301,7 +1441,7 @@ select option:hover {
 
 .app-admin-surface select option:checked,
 .app-admin-surface select option:hover {
-  color: #00B2EE;
+  color: #00BCFF;
   background-color: #C2ECF9;
 }
 
@@ -1350,6 +1490,8 @@ select option:hover {
 .app-admin-surface .admin-main [data-on-dark].text-white,
 .app-admin-surface .admin-main [data-on-dark] .text-white,
 .app-admin-surface .admin-main [data-on-dark],
+.app-admin-surface .admin-main .kpi-folder,
+.app-admin-surface .admin-main .kpi-folder .text-white,
 .app-admin-surface .admin-main .bg-accent-600.text-white,
 .app-admin-surface .admin-main .bg-accent-600 .text-white,
 .app-admin-surface .admin-main .bg-accent-600,
@@ -1362,22 +1504,24 @@ select option:hover {
 .app-admin-surface .admin-main .bg-accent-900.text-white,
 .app-admin-surface .admin-main .bg-accent-900 .text-white,
 .app-admin-surface .admin-main .bg-accent-900,
-.app-admin-surface .admin-main .bg-\[\#00B2EE\].text-white,
-.app-admin-surface .admin-main .bg-\[\#00B2EE\] .text-white,
-.app-admin-surface .admin-main .bg-\[\#00B2EE\] {
+.app-admin-surface .admin-main .bg-\[\#00BCFF\].text-white,
+.app-admin-surface .admin-main .bg-\[\#00BCFF\] .text-white,
+.app-admin-surface .admin-main .bg-\[\#00BCFF\] {
   color: #FFFFFF;
 }
 
 /* Force brand fills/inks to Deep Sky Blue — defeats stale Tailwind or legacy remaps. */
-.app-admin-surface .admin-main .bg-accent-600 {
-  background-color: #00B2EE;
+.app-admin-surface .admin-main .bg-accent-600,
+.app-admin-surface .admin-main .bg-\[\#00BCFF\],
+.app-admin-surface .admin-main .bg-\[\#00A7D6\] {
+  background-color: #00B0FF;
 }
 .app-admin-surface .admin-main .bg-accent-700 {
-  background-color: #00A8E6;
+  background-color: #0099E6;
 }
 .app-admin-surface .admin-main .text-accent-600,
 .app-admin-surface .admin-main .hover\:text-accent-600:hover {
-  color: #00B2EE;
+  color: #00B0FF;
 }
 .app-admin-surface .admin-main .decoration-accent-200 {
   text-decoration-color: #70C9EF;
@@ -1419,13 +1563,13 @@ select option:hover {
 .app-admin-surface .admin-main .bg-indigo-600,
 .app-admin-surface .admin-main .bg-blue-600,
 .app-admin-surface .admin-main .bg-blue-700 {
-  background-color: #00B2EE;
+  background-color: #00B0FF;
   color: #FFFFFF;
 }
 
 .app-admin-surface .admin-main .hover\:bg-indigo-700:hover,
 .app-admin-surface .admin-main .hover\:bg-blue-700:hover {
-  background-color: #00A8E6;
+  background-color: #0099E6;
   color: #FFFFFF;
 }
 
@@ -1439,7 +1583,7 @@ select option:hover {
 .app-admin-surface .admin-main button.bg-blue-700 {
   color: #FFFFFF;
   border-radius: 14px;
-  box-shadow: 0 2px 8px rgba(0, 178, 238, 0.22);
+  box-shadow: 0 2px 8px rgba(0,188,255, 0.22);
   transition: transform 200ms cubic-bezier(0.32, 0.72, 0, 1), box-shadow 200ms ease, background-color 200ms ease;
 }
 
@@ -1447,7 +1591,7 @@ select option:hover {
 .app-admin-surface .admin-main button.bg-blue-600:hover:not(:disabled),
 .app-admin-surface .admin-main button.bg-blue-700:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 8px 20px rgba(0, 178, 238, 0.26);
+  box-shadow: 0 8px 20px rgba(0,188,255, 0.26);
 }
 
 /*
@@ -1465,7 +1609,7 @@ select option:hover {
 .app-admin-surface .admin-main [class*="text-cyan-2"],
 .app-admin-surface .admin-main [class*="text-brand-1"],
 .app-admin-surface .admin-main [class*="text-brand-2"] {
-  color: #00B2EE;
+  color: #00BCFF;
 }
 
 .app-admin-surface .admin-main [class*="text-green-1"],
@@ -1633,8 +1777,8 @@ select option:hover {
 .app-admin-surface .admin-main input:not([type='checkbox']):not([type='radio']):not(.ui-input):focus,
 .app-admin-surface .admin-main textarea:not(.ui-input):focus,
 .app-admin-surface .admin-main select:not(.ui-select):focus {
-  border-color: #00B2EE;
-  box-shadow: 0 0 0 4px rgba(0, 178, 238, 0.2);
+  border-color: #00BCFF;
+  box-shadow: 0 0 0 4px rgba(0,188,255, 0.2);
   outline: none;
 }
 
@@ -1646,7 +1790,7 @@ select option:hover {
 
 .app-admin-surface .admin-main input[type='checkbox'],
 .app-admin-surface .admin-main input[type='radio'] {
-  accent-color: #00B2EE;
+  accent-color: #00BCFF;
   width: 1rem;
   height: 1rem;
 }

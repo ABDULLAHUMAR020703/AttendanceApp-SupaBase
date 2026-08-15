@@ -4,15 +4,15 @@
  */
 
 const MOCK_ROSTER = [
-  { uid: 'mock-u1', username: 'sara.ahmed', name: 'Sara Ahmed', department: 'Engineering', work_mode: 'in_office', is_active: true },
-  { uid: 'mock-u2', username: 'bilal.khan', name: 'Bilal Khan', department: 'Engineering', work_mode: 'in_office', is_active: true },
-  { uid: 'mock-u3', username: 'nina.ortiz', name: 'Nina Ortiz', department: 'Product', work_mode: 'semi_remote', is_active: true },
-  { uid: 'mock-u4', username: 'omar.farooq', name: 'Omar Farooq', department: 'Operations', work_mode: 'in_office', is_active: true },
-  { uid: 'mock-u5', username: 'leia.chen', name: 'Leia Chen', department: 'People', work_mode: 'fully_remote', is_active: true },
-  { uid: 'mock-u6', username: 'hassan.ali', name: 'Hassan Ali', department: 'Engineering', work_mode: 'in_office', is_active: true },
-  { uid: 'mock-u7', username: 'maya.reed', name: 'Maya Reed', department: 'Product', work_mode: 'in_office', is_active: true },
-  { uid: 'mock-u8', username: 'zain.malik', name: 'Zain Malik', department: 'Operations', work_mode: 'semi_remote', is_active: true },
-  { uid: 'mock-u9', username: 'amira.noor', name: 'Amira Noor', department: 'People', work_mode: 'in_office', is_active: true },
+  { uid: 'mock-u1', username: 'sara.ahmed', name: 'Sara Ahmed', department: 'Engineering', role: 'Engineering Manager', work_mode: 'in_office', is_active: true, createdMonthOffset: 11 },
+  { uid: 'mock-u2', username: 'bilal.khan', name: 'Bilal Khan', department: 'Engineering', role: 'Employee', work_mode: 'in_office', is_active: true, createdMonthOffset: 9 },
+  { uid: 'mock-u3', username: 'nina.ortiz', name: 'Nina Ortiz', department: 'Product', role: 'Product Manager', work_mode: 'semi_remote', is_active: true, createdMonthOffset: 8 },
+  { uid: 'mock-u4', username: 'omar.farooq', name: 'Omar Farooq', department: 'Operations', role: 'Operations Manager', work_mode: 'in_office', is_active: true, createdMonthOffset: 6 },
+  { uid: 'mock-u5', username: 'leia.chen', name: 'Leia Chen', department: 'People', role: 'Employee', work_mode: 'fully_remote', is_active: true, createdMonthOffset: 5 },
+  { uid: 'mock-u6', username: 'hassan.ali', name: 'Hassan Ali', department: 'Engineering', role: 'Employee', work_mode: 'in_office', is_active: true, createdMonthOffset: 4 },
+  { uid: 'mock-u7', username: 'maya.reed', name: 'Maya Reed', department: 'Product', role: 'Employee', work_mode: 'in_office', is_active: true, createdMonthOffset: 3 },
+  { uid: 'mock-u8', username: 'zain.malik', name: 'Zain Malik', department: 'Operations', role: 'Employee', work_mode: 'semi_remote', is_active: true, createdMonthOffset: 1 },
+  { uid: 'mock-u9', username: 'amira.noor', name: 'Amira Noor', department: 'People', role: 'Employee', work_mode: 'in_office', is_active: true, createdMonthOffset: 0 },
 ];
 
 const atDayHour = (dayOffset, hour, minute = 0) => {
@@ -23,26 +23,56 @@ const atDayHour = (dayOffset, hour, minute = 0) => {
   return d.toISOString();
 };
 
-/** True when there are no check-ins in the last 7 days worth previewing. */
+const atMonthDayHour = (monthOffset, dayOfMonth, hour, minute = 0) => {
+  const d = new Date();
+  d.setHours(hour, minute, 0, 0);
+  d.setMonth(d.getMonth() - monthOffset, dayOfMonth);
+  return d.toISOString();
+};
+
+const createdAtMonthOffset = (monthOffset, dayOfMonth = 3) => atMonthDayHour(monthOffset, dayOfMonth, 9, 0);
+
+/** True when live data is too sparse to visually review the dashboard boards. */
 export function shouldSeedDashboardMock(attendanceRows = []) {
-  const windowStart = Date.now() - 7 * 86400000;
-  return !(attendanceRows || []).some((row) => {
-    if (String(row?.type || '').toLowerCase() !== 'checkin') return false;
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const weekStart = Date.now() - 7 * 86400000;
+  const recentKeys = new Set();
+  const todayKeys = new Set();
+
+  for (const row of attendanceRows || []) {
+    if (String(row?.type || '').toLowerCase() !== 'checkin') continue;
     const ts = new Date(row.timestamp).getTime();
-    return Number.isFinite(ts) && ts >= windowStart;
-  });
+    if (!Number.isFinite(ts)) continue;
+    const key = row.user_uid || row.user_id || row.uid || row.username || `${row.timestamp}-${recentKeys.size}`;
+    if (ts >= weekStart) recentKeys.add(key);
+    if (ts >= todayStart) todayKeys.add(key);
+  }
+
+  return recentKeys.size < 6 || todayKeys.size < 4;
 }
 
 export function buildDashboardMock({ existingUsers = [] } = {}) {
   const users =
     existingUsers.length >= 5
-      ? existingUsers.map((u, i) => ({
-          ...u,
-          work_mode: u.work_mode || MOCK_ROSTER[i % MOCK_ROSTER.length].work_mode,
-          department: u.department || MOCK_ROSTER[i % MOCK_ROSTER.length].department,
-          is_active: u.is_active !== false,
-        }))
-      : MOCK_ROSTER.map((row) => ({ ...row }));
+      ? existingUsers.map((u, i) => {
+          const seed = MOCK_ROSTER[i % MOCK_ROSTER.length];
+          return {
+            ...u,
+            name: u.name || seed.name,
+            username: u.username || seed.username,
+            work_mode: u.work_mode || seed.work_mode,
+            department: u.department || seed.department,
+            role: u.role || seed.role,
+            created_at: u.created_at || createdAtMonthOffset(seed.createdMonthOffset, 4 + (i % 12)),
+            is_active: u.is_active !== false,
+          };
+        })
+      : MOCK_ROSTER.map((row, i) => ({
+          ...row,
+          role: row.role || 'Employee',
+          created_at: createdAtMonthOffset(row.createdMonthOffset, 4 + (i % 12)),
+        }));
 
   const pick = (i) => users[i % users.length];
   const attendance = [];
@@ -120,6 +150,31 @@ export function buildDashboardMock({ existingUsers = [] } = {}) {
     timestamp: atDayHour(2, 9, 0),
     is_manual: false,
   });
+
+  /* Previous months: enough density for trend/progress boards to show shape. */
+  const monthlyVolumes = [18, 24, 31, 37, 44];
+  for (let monthOffset = 5; monthOffset >= 1; monthOffset -= 1) {
+    const volume = monthlyVolumes[5 - monthOffset];
+    for (let n = 0; n < volume; n += 1) {
+      const user = pick(n + monthOffset);
+      attendance.push({
+        user_uid: user.uid,
+        username: user.username,
+        type: 'checkin',
+        timestamp: atMonthDayHour(monthOffset, 2 + (n % 18), 8 + (n % 4), (n * 7) % 50),
+        is_manual: n % 17 === 0,
+      });
+      if (n % 4 === 0) {
+        attendance.push({
+          user_uid: user.uid,
+          username: user.username,
+          type: 'checkout',
+          timestamp: atMonthDayHour(monthOffset, 2 + (n % 18), 17 + (n % 2), (n * 5) % 45),
+          is_manual: false,
+        });
+      }
+    }
+  }
 
   const leaves = [
     {

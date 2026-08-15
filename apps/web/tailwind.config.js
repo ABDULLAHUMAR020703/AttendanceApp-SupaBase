@@ -33,7 +33,7 @@ export default {
          * Brand ramp — Deep Sky Blue (Hadir system).
          *
          *   TIER 3  400 #70C9EF  Sky Blue — icons, soft accents, secondary fills
-         *   TIER 2  600 #00B2EE  Vivid Cyan — primary CTAs, active bars, focus
+         *   TIER 2  600 #00B0FF  Vivid Cyan — primary CTAs, active bars, focus
          *   Soft hover surface: sky.tint #E6F4FA
          *   Deep steps (700–900) only for pressed fills / chart rank — never body text.
          */
@@ -44,7 +44,7 @@ export default {
           300: '#9ADDF4',
           400: '#70C9EF',
           500: '#3ABCEF',
-          600: '#00B2EE',
+          600: '#00B0FF',
           700: '#0090C4',
           800: '#0075A3',
           900: '#005A7A',
@@ -57,19 +57,30 @@ export default {
           DEFAULT: '#70C9EF',
           soft: '#E0F6FC',
           tint: '#E6F4FA',
-          ink: '#00B2EE',
+          ink: '#00BCFF',
         },
         /*
          * Logo signal — the electric lime dot on the Hadir.ai mark (`h.`).
          * Reserved for live presence: on-site dots, checked-in rings, notification
          * counts, and high-priority success pills. Not a substitute for cyan CTAs.
          */
+        /*
+         * Tertiary emerald — success / presence / brand accent stripe.
+         * `lime.*` kept as alias so existing `bg-lime` call sites resolve to emerald.
+         */
         lime: {
-          DEFAULT: '#84CC16',
-          soft: '#F7FEE7',
-          muted: '#D9F99D',
-          ink: '#3F6212',
-          bright: '#97E02C',
+          DEFAULT: '#10B981',
+          soft: '#ECFDF5',
+          muted: '#A7F3D0',
+          ink: '#065F46',
+          bright: '#34D399',
+        },
+        emerald: {
+          DEFAULT: '#10B981',
+          soft: '#ECFDF5',
+          muted: '#A7F3D0',
+          ink: '#065F46',
+          bright: '#34D399',
         },
         /*
          * Surface ladder. Five layers of cyan-tinted neutral.
@@ -87,10 +98,10 @@ export default {
           strong: '#B8DFF0',
         },
         success: {
-          surface: '#F7FEE7',
-          border: '#D9F99D',
-          ink: '#3F6212',
-          solid: '#84CC16',
+          surface: '#ECFDF5',
+          border: '#A7F3D0',
+          ink: '#065F46',
+          solid: '#10B981',
         },
         warning: {
           surface: '#FEF7EA',
@@ -117,7 +128,7 @@ export default {
           300: '#9ADDF4',
           400: '#70C9EF',
           500: '#3ABCEF',
-          600: '#00B2EE',
+          600: '#00B0FF',
           700: '#0090C4',
           800: '#0075A3',
           900: '#005A7A',
@@ -145,17 +156,17 @@ export default {
         control: '0.875rem',
       },
       boxShadow: {
-        glass: '0 8px 32px rgba(0, 191, 255, 0.14)',
-        'glass-lg': '0 12px 40px rgba(0, 191, 255, 0.18)',
-        glow: '0 0 0 1px rgba(112, 201, 239, 0.28), 0 8px 24px rgba(0, 191, 255, 0.22)',
-        focus: '0 0 0 3px rgba(0, 191, 255, 0.25)',
+        glass: '0 8px 32px rgba(0, 188, 255, 0.14)',
+        'glass-lg': '0 12px 40px rgba(0, 188, 255, 0.18)',
+        glow: '0 0 0 1px rgba(112, 201, 239, 0.28), 0 8px 24px rgba(0, 188, 255, 0.22)',
+        focus: '0 0 0 3px rgba(0, 188, 255, 0.25)',
         /*
          * Four-level elevation ramp — cyan-cool depth on ice canvas.
          * hair = resting card, raise = hover, pop = dropdown, overlay = modal.
          */
-        hair: '0 1px 2px rgba(15, 23, 42, 0.04), 0 2px 6px rgba(0, 191, 255, 0.04)',
-        raise: '0 2px 6px rgba(15, 23, 42, 0.05), 0 10px 24px rgba(0, 191, 255, 0.08)',
-        pop: '0 4px 10px rgba(15, 23, 42, 0.06), 0 16px 36px rgba(0, 191, 255, 0.12)',
+        hair: '0 1px 2px rgba(15, 23, 42, 0.04), 0 2px 6px rgba(0, 188, 255, 0.04)',
+        raise: '0 2px 6px rgba(15, 23, 42, 0.05), 0 10px 24px rgba(0, 188, 255, 0.08)',
+        pop: '0 4px 10px rgba(15, 23, 42, 0.06), 0 16px 36px rgba(0, 188, 255, 0.12)',
         overlay: '0 8px 20px rgba(15, 23, 42, 0.08), 0 32px 72px rgba(15, 23, 42, 0.14)',
       },
       spacing: {
