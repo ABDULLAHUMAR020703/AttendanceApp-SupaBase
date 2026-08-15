@@ -293,7 +293,7 @@ export default function TicketScreen({ navigation, route }) {
         </Text>
         {item.assignedTo && (
           <>
-            <Text style={{ color: colors.textTertiary, marginHorizontal: spacing.xs }}>â€¢</Text>
+            <Text style={{ color: colors.textTertiary, marginHorizontal: spacing.xs }}>•</Text>
             <Ionicons name="person-outline" size={iconSize.sm} color={colors.textSecondary} />
             <Text
               style={{
@@ -534,7 +534,7 @@ export default function TicketScreen({ navigation, route }) {
                 </Text>
                 {departmentsLoading ? (
                   <Text style={{ color: colors.textSecondary, fontSize: fontSize.sm }}>
-                    Loading departmentsâ€¦
+                    Loading departments…
                   </Text>
                 ) : departmentsError ? (
                   <View>

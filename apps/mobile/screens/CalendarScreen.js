@@ -142,7 +142,7 @@ export default function CalendarScreen({ navigation, route }) {
         return prevSelected.filter(username => validUsernames.has(username));
       });
       
-      console.log(`[CalendarScreen] âœ“ Loaded ${empList.length} employees from Supabase`);
+      console.log(`[CalendarScreen] ✓ Loaded ${empList.length} employees from Supabase`);
     } catch (error) {
       console.error('Error loading employees:', error);
       setEmployees([]); // Set empty array on error to prevent stale data

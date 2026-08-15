@@ -678,10 +678,10 @@ function KpiStat({
 
         <span className={`mt-auto flex flex-col pt-2 ${loading ? 'opacity-0' : ''}`}>
           {context && (
-            <span className="block text-caption font-medium leading-snug text-white/80">{context}</span>
+            <span className="block text-caption font-medium leading-snug text-white">{context}</span>
           )}
           {detail && (
-            <span className="mt-1 block text-caption leading-snug text-white/65">{detail}</span>
+            <span className="mt-1 block text-caption leading-snug text-white">{detail}</span>
           )}
         </span>
       </span>

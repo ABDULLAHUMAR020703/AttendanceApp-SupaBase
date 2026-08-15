@@ -552,6 +552,7 @@
     flex: 1 1 auto;
     flex-direction: column;
     padding: calc(var(--kpi-tab-h) + 24px) 12px 10px;
+    color: #ffffff;
   }
 
   /* --------------------------------------------------------- type hierarchy
@@ -1506,7 +1507,10 @@ select option:hover {
 .app-admin-surface .admin-main .bg-accent-900,
 .app-admin-surface .admin-main .bg-\[\#00BCFF\].text-white,
 .app-admin-surface .admin-main .bg-\[\#00BCFF\] .text-white,
-.app-admin-surface .admin-main .bg-\[\#00BCFF\] {
+.app-admin-surface .admin-main .bg-\[\#00BCFF\],
+.app-admin-surface .admin-main .kpi-folder,
+.app-admin-surface .admin-main .kpi-folder .text-white,
+.app-admin-surface .admin-main .kpi-folder [class*='text-white'] {
   color: #FFFFFF;
 }
 
