@@ -14,7 +14,6 @@ import {
   CHART_AXIS,
   CHART_COLORS,
   CHART_GRID,
-  CHART_HEIGHT,
   CHART_LEGEND_STYLE,
   CHART_MARGINS,
   CHART_TOOLTIP_STYLE,
@@ -39,7 +38,7 @@ export const DepartmentBarChart = memo(function DepartmentBarChart({
   const xAxisAngle = data.length > 4 ? -24 : 0;
 
   return (
-    <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
+    <ResponsiveContainer width="100%" height="100%">
       <BarChart data={data} margin={{ ...CHART_MARGINS.bar, bottom: xAxisHeight > 32 ? 8 : CHART_MARGINS.bar.bottom }}>
         <CartesianGrid {...CHART_GRID} />
         <XAxis

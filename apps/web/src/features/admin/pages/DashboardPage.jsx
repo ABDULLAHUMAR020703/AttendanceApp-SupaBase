@@ -1,6 +1,6 @@
 import { Fragment, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
   AlertCircle,
   ArrowUpRight,
@@ -15,7 +15,6 @@ import {
   Minus,
   MoreHorizontal,
   PenLine,
-  RefreshCw,
   Ticket,
   TrendingDown,
   TrendingUp,
@@ -28,7 +27,7 @@ import {
 import { adminService } from '../services/adminService';
 import { useAuthStore } from '../../auth/store/authStore';
 import { canAccessFeature, hasAnyPermission, hasPermission, PERMISSIONS } from '../permissions';
-import { buildUserGrowthSeries, normalizeAttendanceType } from '../utils/analyticsCharts';
+import { normalizeAttendanceType } from '../utils/analyticsCharts';
 import { formatEmployeeDisplay, formatLeaveTypeLabel } from '../utils/leaveDisplay';
 import { useSilentPoll } from '../../../shared/hooks/useSilentPoll';
 import { useDismiss } from '../../../shared/lib/useDismiss';
@@ -41,11 +40,6 @@ import { buildDashboardMock, shouldSeedDashboardMock } from '../utils/dashboardM
 const AttendanceTrendAreaChart = lazy(() =>
   import('../../../shared/components/charts/AttendanceTrendAreaChart').then((m) => ({
     default: m.AttendanceTrendAreaChart,
-  }))
-);
-const UserGrowthLineChart = lazy(() =>
-  import('../../../shared/components/charts/UserGrowthLineChart').then((m) => ({
-    default: m.UserGrowthLineChart,
   }))
 );
 const AttendanceMixPieChart = lazy(() =>
@@ -76,21 +70,21 @@ const CARD_TIERS = {
     shell: `${CARD} flex h-full flex-col p-5 sm:p-6`,
     title: 'text-heading font-semibold tracking-tight text-ink',
     gap: 'mt-5',
-    body: 'min-h-[16rem] flex-1',
+    body: 'min-h-0 flex-1',
     footer: 'mt-5 pt-4',
   },
   secondary: {
     shell: `${CARD} flex h-full flex-col p-5`,
     title: 'text-subheading font-semibold tracking-tight text-ink',
     gap: 'mt-4',
-    body: 'min-h-[14rem] flex-1',
+    body: 'min-h-0 flex-1',
     footer: 'mt-4 pt-4',
   },
   utility: {
     shell: `${CARD} flex h-full flex-col p-4 sm:p-5`,
     title: 'text-subheading font-semibold tracking-tight text-ink',
     gap: 'mt-4',
-    body: 'min-h-[12rem] flex-1',
+    body: 'min-h-0 flex-1',
     footer: 'mt-4 pt-3',
   },
 };
@@ -195,6 +189,148 @@ const formatHourLabel = (hour) => {
 const formatNumber = (value) =>
   new Intl.NumberFormat('en', { notation: value > 9999 ? 'compact' : 'standard' }).format(value || 0);
 
+/** Same 09:15 cutoff the operations card already uses for late arrivals. */
+const LATE_CUTOFF_MINUTES = 9 * 60 + 15;
+const TREND_RANGES = [
+  { id: '7d', label: '7 days', days: 7 },
+  { id: '30d', label: '30 days', days: 30 },
+  { id: '6m', label: '6 months', months: 6 },
+];
+
+const startOfLocalDay = (date = new Date()) => {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  return next;
+};
+
+const localDateKey = (date) => `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+
+const greetingForHour = (hour) => {
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+};
+
+const displayFirstName = (user) => {
+  const raw = String(user?.name || user?.username || user?.email || 'there')
+    .replace(/@.*/, '')
+    .trim();
+  return toTitleCaseName(raw).split(' ')[0] || 'there';
+};
+
+const formatLongDate = (date = new Date()) =>
+  date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+
+const clockTime12 = (isoValue) => {
+  const date = new Date(isoValue);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+};
+
+const activitySentence = (item) => {
+  const clock = clockTime12(item.ts);
+  const action = String(item.action || '').toLowerCase();
+  if (item.kind === 'checkin') {
+    const late = action.includes('late');
+    return `${item.person} checked in${clock ? ` at ${clock}` : ''}${late ? ' — late' : ''}`;
+  }
+  if (item.kind === 'checkout') return `${item.person} checked out${clock ? ` at ${clock}` : ''}`;
+  if (item.kind === 'leave') {
+    const status = String(item.action || '').toLowerCase();
+    if (status.includes('approved')) return `${item.person}'s leave request was approved`;
+    if (status.includes('rejected')) return `${item.person}'s leave request was declined`;
+    return `${item.person} requested leave`;
+  }
+  if (item.kind === 'manual') return `${item.person} submitted an attendance correction`;
+  return `${item.person} · ${item.action}`;
+};
+
+const buildDailyTrend = (attendance, days) => {
+  const midnight = startOfLocalDay();
+  const buckets = [];
+  const currentIndex = new Map();
+  const previousIndex = new Map();
+
+  for (let offset = days - 1; offset >= 0; offset -= 1) {
+    const start = new Date(midnight);
+    start.setDate(midnight.getDate() - offset);
+    const point = {
+      key: localDateKey(start),
+      label:
+        days <= 7
+          ? start.toLocaleDateString(undefined, { weekday: 'short' })
+          : start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+      checkins: 0,
+      previous: 0,
+    };
+    buckets.push(point);
+    currentIndex.set(point.key, point);
+    const prior = new Date(start);
+    prior.setDate(start.getDate() - days);
+    previousIndex.set(localDateKey(prior), point);
+  }
+
+  for (const row of attendance) {
+    if (!row.timestamp || normalizeAttendanceType(row.type) !== 'checkin') continue;
+    const stamp = new Date(row.timestamp);
+    if (Number.isNaN(stamp.getTime())) continue;
+    const key = localDateKey(stamp);
+    const current = currentIndex.get(key);
+    if (current) current.checkins += 1;
+    const previous = previousIndex.get(key);
+    if (previous) previous.previous += 1;
+  }
+
+  const currentTotal = buckets.reduce((sum, row) => sum + row.checkins, 0);
+  const previousTotal = buckets.reduce((sum, row) => sum + row.previous, 0);
+  const hasPrevious = previousTotal > 0;
+
+  return {
+    data: buckets.map((row) => ({ ...row, previous: hasPrevious ? row.previous : undefined })),
+    currentTotal,
+    previousTotal: hasPrevious ? previousTotal : null,
+    delta: hasPrevious ? Math.round(((currentTotal - previousTotal) / previousTotal) * 100) : null,
+    compareLabel: `vs prior ${days} days`,
+  };
+};
+
+const buildMonthlyTrend = (attendance, months) => {
+  const now = new Date();
+  const buckets = [];
+  const index = new Map();
+  for (let i = months - 1; i >= 0; i -= 1) {
+    const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const bucket = {
+      key: `${start.getFullYear()}-${start.getMonth()}`,
+      label: start.toLocaleDateString(undefined, { month: 'short' }),
+      checkins: 0,
+    };
+    buckets.push(bucket);
+    index.set(bucket.key, bucket);
+  }
+
+  for (const row of attendance) {
+    if (!row.timestamp || normalizeAttendanceType(row.type) !== 'checkin') continue;
+    const date = new Date(row.timestamp);
+    if (Number.isNaN(date.getTime())) continue;
+    const bucket = index.get(`${date.getFullYear()}-${date.getMonth()}`);
+    if (bucket) bucket.checkins += 1;
+  }
+
+  const latest = buckets[buckets.length - 1];
+  const prior = buckets[buckets.length - 2];
+  const previousTotal = prior?.checkins || 0;
+  const hasPrevious = previousTotal > 0;
+
+  return {
+    data: buckets,
+    currentTotal: buckets.reduce((sum, row) => sum + row.checkins, 0),
+    previousTotal: hasPrevious ? previousTotal : null,
+    delta: hasPrevious ? Math.round((((latest?.checkins || 0) - previousTotal) / previousTotal) * 100) : null,
+    compareLabel: 'vs last month',
+  };
+};
+
 const formatRelativeTime = (isoValue) => {
   if (!isoValue) return 'Unknown time';
   const deltaMs = Date.now() - new Date(isoValue).getTime();
@@ -296,16 +432,39 @@ const daysUntil = (value) => {
 const prefersReducedMotion = () =>
   typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
+const DASH_EASE = [0.16, 1, 0.3, 1];
+
+const dashStagger = {
+  hidden: {},
+  show: {
+    transition: { staggerChildren: 0.05 },
+  },
+};
+
+const dashFadeUp = {
+  hidden: { opacity: 0, y: 8 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.28, ease: DASH_EASE },
+  },
+};
+
+const SHELL =
+  'flex h-full min-h-0 flex-col rounded-xl border border-slate-200 bg-white p-4';
+
 /**
  * Eases a metric from its previous value to the next one so refreshed numbers
- * register as a change instead of silently swapping.
+ * register as a change instead of silently swapping. First paint ticks from 0.
  */
-function useCountUp(value, duration = 600) {
-  const target = Number.isFinite(value) ? value : 0;
-  const [display, setDisplay] = useState(target);
-  const fromRef = useRef(target);
+function useCountUp(value, duration = 400) {
+  const ready = Number.isFinite(value);
+  const target = ready ? value : 0;
+  const [display, setDisplay] = useState(0);
+  const fromRef = useRef(0);
 
   useEffect(() => {
+    if (!ready) return undefined;
     const from = fromRef.current;
     fromRef.current = target;
     if (from === target || prefersReducedMotion()) {
@@ -322,7 +481,7 @@ function useCountUp(value, duration = 600) {
     };
     frame = requestAnimationFrame(step);
     return () => cancelAnimationFrame(frame);
-  }, [target, duration]);
+  }, [ready, target, duration]);
 
   return display;
 }
@@ -540,17 +699,111 @@ function IconAction({ onClick, label }) {
   );
 }
 
-/**
- * Command-center header + KPI row — hierarchy, not four equal widgets.
- */
-function OverviewBanner({ stats, loading }) {
+function CommandHeader({ greeting, name, dateLabel, context, action, onAction }) {
   return (
-    <section className="grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      {stats.map((stat, index) => (
-        <div key={stat.label} className="min-h-0 min-w-0 h-full">
-          <KpiStat {...stat} hero={index === 0} loading={loading} />
-        </div>
-      ))}
+    <header className="flex shrink-0 flex-wrap items-end justify-between gap-3">
+      <div className="min-w-0">
+        <h1 className="!text-xl !font-semibold tracking-tight text-slate-900 sm:!text-2xl">
+          {greeting}, {name}
+        </h1>
+        <p className="mt-1 text-sm text-slate-500">{dateLabel}</p>
+        {context && <p className="mt-1 max-w-xl text-sm text-slate-600">{context}</p>}
+      </div>
+      {action && (
+        <button
+          type="button"
+          onClick={onAction}
+          data-on-dark
+          className={`inline-flex h-9 shrink-0 items-center rounded-lg bg-[#00B0FF] px-3.5 text-sm font-semibold text-white transition-colors duration-200 hover:bg-[#0099E6] ${FOCUS_RING}`}
+        >
+          {action}
+        </button>
+      )}
+    </header>
+  );
+}
+
+function SnapshotMetric({ label, value, loading, emphasize = false, onClick }) {
+  const animated = useCountUp(loading ? Number.NaN : value, 360);
+  const Tag = onClick ? 'button' : 'div';
+
+  return (
+    <Tag
+      {...(onClick ? { type: 'button', onClick } : {})}
+      className={`min-w-0 text-left transition-colors duration-150 ${
+        onClick ? `rounded-lg hover:bg-slate-50 ${FOCUS_RING}` : ''
+      } ${emphasize ? 'px-1 py-0.5 sm:px-2' : 'px-1 py-0.5'}`}
+    >
+      <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-400">{label}</p>
+      {loading ? (
+        <span className="mt-1 block h-7 w-12 animate-pulse rounded bg-slate-100" aria-hidden />
+      ) : (
+        <p
+          className={`mt-1 font-semibold tabular-nums tracking-tight text-slate-900 ${
+            emphasize ? 'text-3xl' : 'text-xl'
+          }`}
+        >
+          {formatNumber(animated)}
+        </p>
+      )}
+    </Tag>
+  );
+}
+
+function WorkforceSnapshot({ metrics, loading }) {
+  return (
+    <section className="shrink-0 rounded-xl border border-slate-200 bg-white px-4 py-3 sm:px-5">
+      <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
+        {metrics.map((metric, index) => (
+          <Fragment key={metric.label}>
+            {index > 0 && <span className="hidden h-10 w-px bg-slate-100 sm:block" aria-hidden />}
+            <SnapshotMetric {...metric} loading={loading} emphasize={index === 0} />
+          </Fragment>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function NeedsAttention({ items, loading }) {
+  return (
+    <section className="flex h-full min-h-0 flex-col rounded-xl border border-slate-200 border-l-[3px] border-l-[#00B0FF] bg-white p-4">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-sm font-semibold text-slate-900">Needs attention</h2>
+        {!loading && items.length > 0 && (
+          <span className="text-xs font-medium tabular-nums text-[#00B0FF]">{items.length}</span>
+        )}
+      </div>
+      <div className="mt-2 min-h-0 flex-1 overflow-y-auto">
+        {loading ? (
+          <div className="space-y-2" aria-hidden>
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="h-10 animate-pulse rounded-lg bg-slate-100" />
+            ))}
+          </div>
+        ) : items.length === 0 ? (
+          <p className="py-6 text-sm text-slate-500">Nothing queued this morning.</p>
+        ) : (
+          <ul className="divide-y divide-slate-100">
+            {items.map((item) => (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  onClick={item.onClick}
+                  className={`flex w-full items-center justify-between gap-4 py-2.5 text-left transition-colors duration-150 hover:bg-slate-50 ${FOCUS_RING}`}
+                >
+                  <span className="min-w-0 text-sm text-slate-700">
+                    <span className="font-semibold tabular-nums text-slate-900">{formatNumber(item.count)}</span>
+                    {' '}
+                    {item.label}
+                  </span>
+                  <span className="shrink-0 text-xs font-semibold text-[#00B0FF]">{item.action}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </section>
   );
 }
@@ -634,56 +887,57 @@ function KpiStat({
   loading,
   onClick,
   progress = null,
-  hero = false,
 }) {
-  const animated = useCountUp(count ?? 0);
+  const animated = useCountUp(loading ? Number.NaN : (count ?? 0), 400);
+  const reduceMotion = useReducedMotion();
   const Tag = onClick ? 'button' : 'div';
+  const progressWidth = typeof progress === 'number' ? Math.min(100, Math.max(0, progress)) : 0;
 
   return (
     <Tag
       {...(onClick ? { type: 'button', onClick } : {})}
       data-on-dark
-      className={`kpi-folder group relative flex h-full min-h-[9.75rem] w-full appearance-none flex-col border-0 bg-transparent p-0 text-left text-white shadow-none transition-transform duration-[200ms] ease-out hover:-translate-y-0.5 ${onClick ? `cursor-pointer ${FOCUS_RING}` : ''}`}
+      className={`kpi-card group relative flex h-full w-full appearance-none flex-col rounded-2xl bg-[#00B0FF] p-5 text-left text-white transition-transform duration-[200ms] ease-out hover:-translate-y-0.5 ${onClick ? `cursor-pointer ${FOCUS_RING}` : ''}`}
     >
-      <span className="kpi-folder-surface" aria-hidden />
-
-      <span className="kpi-folder-content">
-        <span className={`flex w-full items-start justify-between gap-3 ${hero ? 'pt-2' : ''}`}>
-          <span className="min-w-0 pt-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-white/80">
-            {label}
-          </span>
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-white/30 bg-white/15 text-white">
-            <Icon className="h-4 w-4" />
-          </span>
+      <span className="flex items-center justify-between gap-3">
+        <span className="min-w-0 text-xs font-semibold uppercase tracking-wider text-white/80">
+          {label}
         </span>
-
-        <span className="mt-2 block w-full">
-          {loading ? (
-            <span className="skeleton block h-7 w-20 rounded-lg bg-white/20" aria-hidden />
-          ) : (
-            <span className="block text-[26px] font-bold leading-none tracking-tight tabular-nums text-white" style={{ color: '#FFFFFF' }}>
-              {count != null ? `${formatNumber(animated)}${suffix}` : value}
-            </span>
-          )}
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white">
+          <Icon className="h-4 w-4" />
         </span>
+      </span>
 
-        {typeof progress === 'number' && (
-          <span className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/25" aria-hidden>
-            <span
-              className="block h-full rounded-full bg-white"
-              style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
-            />
+      <span className="mt-3 block w-full">
+        {loading ? (
+          <span className="skeleton block h-9 w-24 rounded-lg bg-white/20" aria-hidden />
+        ) : (
+          <span className="block text-3xl font-bold tracking-tight text-white tabular-nums">
+            {count != null ? `${formatNumber(animated)}${suffix}` : value}
           </span>
         )}
+      </span>
 
-        <span className={`mt-auto flex flex-col pt-2 ${loading ? 'opacity-0' : ''}`}>
-          {context && (
-            <span className="block text-caption font-medium leading-snug text-white">{context}</span>
-          )}
-          {detail && (
-            <span className="mt-1 block text-caption leading-snug text-white">{detail}</span>
-          )}
+      {typeof progress === 'number' && (
+        <span className="mt-3 h-2 w-full overflow-hidden rounded-full bg-white/25" aria-hidden>
+          <motion.span
+            className="block h-full w-full origin-left rounded-full bg-white"
+            initial={reduceMotion ? false : { scaleX: 0 }}
+            animate={{ scaleX: progressWidth / 100 }}
+            transition={{ duration: 0.45, ease: 'easeOut' }}
+          />
         </span>
+      )}
+
+      <span className={`mt-auto flex flex-col ${loading ? 'opacity-0' : ''}`}>
+        {context && (
+          <span className="mt-2 block text-xs font-medium leading-relaxed text-white/90">{context}</span>
+        )}
+        {detail && (
+          <span className={`${context ? 'mt-0.5' : 'mt-2'} block text-xs font-medium leading-relaxed text-white/90`}>
+            {detail}
+          </span>
+        )}
       </span>
     </Tag>
   );
@@ -730,9 +984,8 @@ function OpsTile({ label, value, caption, tone = 'neutral', onClick }) {
  * header already offers, so hover carries the exact count and the grid announces
  * itself once as an image with a spoken summary.
  */
-function CheckinHeatmap({ matrix, onOpen, onRefresh }) {
+function CheckinHeatmap({ matrix, onOpen }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const triggerRef = useRef(null);
   const closeMenu = useCallback(() => setMenuOpen(false), []);
   const rootRef = useDismiss(closeMenu, triggerRef);
@@ -740,17 +993,6 @@ function CheckinHeatmap({ matrix, onOpen, onRefresh }) {
   const reduceMotion = prefersReducedMotion();
 
   const { rows, days, total, busiest, busiestBand } = matrix;
-
-  const refresh = async () => {
-    closeMenu();
-    if (!onRefresh || refreshing) return;
-    setRefreshing(true);
-    try {
-      await onRefresh();
-    } finally {
-      setRefreshing(false);
-    }
-  };
 
   /* Fixed density key — matches absolute gradient bands. */
   const legend = [1, 2, 3].map((level) => ({
@@ -798,11 +1040,6 @@ function CheckinHeatmap({ matrix, onOpen, onRefresh }) {
                   Open attendance
                 </MenuItem>
               )}
-              {onRefresh && (
-                <MenuItem icon={RefreshCw} onSelect={refresh} disabled={refreshing}>
-                  {refreshing ? 'Refreshing…' : 'Refresh data'}
-                </MenuItem>
-              )}
             </MenuPanel>
           )}
         </div>
@@ -819,16 +1056,6 @@ function CheckinHeatmap({ matrix, onOpen, onRefresh }) {
               Check-ins will appear here once employees start their workday.
             </p>
           </div>
-          {onRefresh && (
-            <button type="button" onClick={refresh} className={`${BTN_QUIET} ${BTN_SM} min-h-[44px] ${FOCUS_RING}`}>
-              <RefreshCw
-                className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`}
-                strokeWidth={2.25}
-                aria-hidden
-              />
-              {refreshing ? 'Refreshing…' : 'Refresh data'}
-            </button>
-          )}
         </div>
       ) : (
         <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-stretch sm:gap-5">
@@ -928,7 +1155,6 @@ function AttendanceOpsCard({
   onLeaveCount,
   onOpen,
   onOpenLeaves,
-  onRefresh,
 }) {
   const [range, setRange] = useState('today');
   const [hoverKey, setHoverKey] = useState(null);
@@ -1042,7 +1268,7 @@ function AttendanceOpsCard({
       </div>
 
         <div className="flex flex-1 flex-col border-t border-[#00BCFF]/15 pt-4">
-          <CheckinHeatmap matrix={heatmap} onOpen={onOpen} onRefresh={onRefresh} />
+          <CheckinHeatmap matrix={heatmap} onOpen={onOpen} />
         </div>
       </div>
     </div>
@@ -1073,7 +1299,7 @@ function ActionQueueCard({ items, approvableCount, busyId, batching, onBatchAppr
       />
 
       <div
-        className={`no-scrollbar ${CARD_TIERS.secondary.gap} flex ${CARD_TIERS.secondary.body} max-h-[26rem] flex-col gap-2.5 overflow-y-auto pr-0.5`}
+        className={`no-scrollbar ${CARD_TIERS.secondary.gap} flex ${CARD_TIERS.secondary.body} min-h-0 flex-col gap-2.5 overflow-y-auto pr-0.5`}
       >
         {items.length === 0 ? (
           <CardEmpty
@@ -1525,7 +1751,7 @@ function ActivityTimelineCard({ loading, items, lastEventLabel, onOpen }) {
       )}
 
       <div
-        className={`no-scrollbar ${CARD_TIERS.utility.gap} min-h-[16rem] flex-1 overflow-y-auto pr-0.5 lg:min-h-[20rem]`}
+        className={`no-scrollbar ${CARD_TIERS.utility.gap} min-h-0 flex-1 overflow-y-auto pr-0.5`}
         aria-busy={loading}
       >
         {loading && (
@@ -1725,26 +1951,62 @@ function DepartmentBreakdownCard({ rows, loading, navigate, canManage }) {
   );
 }
 
-function ViewportGrowthCard({ loading, data }) {
-  const isEmpty = !data.some((point) => (point.users || 0) > 0);
+function ViewportTrendCard({ loading, series, range, onRangeChange, onViewAttendance }) {
+  const isEmpty = !series.data.some((point) => (point.checkins || 0) > 0);
+  const reduceMotion = useReducedMotion();
 
   return (
-    <article className="flex h-full min-h-0 flex-col rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
-      <h2 className="mb-1 shrink-0 text-sm font-bold text-slate-900">User growth</h2>
+    <article className={SHELL}>
+      <div className="flex shrink-0 flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold text-slate-900">Attendance trend</h2>
+          {!loading && !isEmpty && (
+            <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+              <span className="font-semibold tabular-nums text-slate-900">{formatNumber(series.currentTotal)}</span>
+              check-ins
+              {series.delta != null && <DeltaChip delta={series.delta} suffix={` ${series.compareLabel}`} />}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="ui-segment" role="tablist" aria-label="Trend range">
+            {TREND_RANGES.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                aria-selected={range === item.id}
+                onClick={() => onRangeChange(item.id)}
+                className={`ui-segment-item ${range === item.id ? 'ui-segment-item-active' : ''} ${FOCUS_RING}`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+          <GhostAction onClick={onViewAttendance}>View</GhostAction>
+        </div>
+      </div>
 
-      <div className="relative min-h-0 w-full flex-1">
+      <div className="mt-3 min-h-0 w-full flex-1" aria-busy={loading}>
         {loading ? (
-          <div className="skeleton h-full w-full rounded-xl" aria-hidden />
+          <div className="h-full min-h-0 animate-pulse rounded-lg bg-slate-100" aria-hidden />
         ) : isEmpty ? (
           <CardEmpty
             icon={TrendingUp}
-            title="No growth history"
-            description="New employee registrations will plot here as accounts are created."
+            title="No attendance history"
+            description="Check-ins will plot here as the team starts logging days."
           />
         ) : (
-          <Suspense fallback={<div className="skeleton h-full w-full rounded-xl" aria-hidden />}>
-            <UserGrowthLineChart data={data} />
-          </Suspense>
+          <motion.div
+            className="h-full min-h-0 w-full"
+            initial={reduceMotion ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.35, ease: DASH_EASE }}
+          >
+            <Suspense fallback={<div className="h-full animate-pulse rounded-lg bg-slate-100" aria-hidden />}>
+              <AttendanceTrendAreaChart data={series.data} />
+            </Suspense>
+          </motion.div>
         )}
       </div>
     </article>
@@ -1753,98 +2015,93 @@ function ViewportGrowthCard({ loading, data }) {
 
 function ViewportAttendancePie({ loading, onSite, remote, notIn, coverage }) {
   const total = onSite + remote + notIn;
-  const data = [
-    { name: 'On-site', value: onSite, color: '#00B0FF', share: total ? Math.round((onSite / total) * 100) : 0 },
-    { name: 'Remote', value: remote, color: '#70C8F4', share: total ? Math.round((remote / total) * 100) : 0 },
-    { name: 'Not in', value: notIn, color: '#C2ECF9', share: total ? Math.round((notIn / total) * 100) : 0 },
-  ];
+  const ranked = [
+    { name: 'On-site', value: onSite, color: '#00B0FF' },
+    { name: 'Remote', value: remote, color: '#70C8F4' },
+    { name: 'Not in', value: notIn, color: '#D7EAF3' },
+  ]
+    .map((row) => ({
+      ...row,
+      share: total ? Math.round((row.value / total) * 100) : 0,
+    }))
+    .sort((a, b) => b.value - a.value);
 
   return (
-    <article className="flex h-full min-h-0 flex-col rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
-      <h2 className="mb-2 shrink-0 text-sm font-bold text-slate-900">Today’s mix</h2>
-      <div className="flex min-h-0 w-full flex-[65] items-center justify-center">
-        {loading ? (
-          <div className="skeleton aspect-square h-full max-h-full w-auto max-w-full rounded-full" aria-hidden />
-        ) : (
-          <Suspense
-            fallback={<div className="skeleton aspect-square h-full max-h-full w-auto max-w-full rounded-full" aria-hidden />}
-          >
-            <div className="aspect-square h-full max-h-full w-auto max-w-full">
-              <AttendanceMixPieChart data={data} centerLabel={`${coverage}%`} centerHint="in today" />
-            </div>
-          </Suspense>
-        )}
+    <article className={SHELL}>
+      <div className="flex shrink-0 items-baseline justify-between gap-3">
+        <h2 className="text-sm font-semibold text-slate-900">Today’s mix</h2>
+        <p className="text-xs text-slate-500">
+          <span className="font-semibold tabular-nums text-slate-900">{coverage}%</span> in
+        </p>
       </div>
-      <ul className="mt-2 flex min-h-0 flex-[35] flex-col items-start justify-center gap-2.5 pl-0.5">
-        {data.map((row) => (
-          <li key={row.name} className="flex items-center gap-2.5 text-sm font-semibold text-slate-700">
-            <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: row.color }} aria-hidden />
-            {row.name}
-          </li>
-        ))}
-      </ul>
+      <div className="mt-2 flex min-h-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="mx-auto aspect-square h-full max-h-full w-auto max-w-[11rem] min-h-0 shrink-0">
+          {loading ? (
+            <div className="h-full w-full animate-pulse rounded-full bg-slate-100" aria-hidden />
+          ) : (
+            <Suspense fallback={<div className="h-full w-full animate-pulse rounded-full bg-slate-100" aria-hidden />}>
+              <AttendanceMixPieChart data={ranked} centerLabel={`${coverage}%`} centerHint="in today" />
+            </Suspense>
+          )}
+        </div>
+        <ul className="flex min-w-0 flex-1 flex-col justify-center gap-2">
+          {ranked.map((row, index) => (
+            <li key={row.name} className="flex items-baseline justify-between gap-3">
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: row.color }} aria-hidden />
+                <span className={`truncate ${index === 0 ? 'text-sm font-semibold text-slate-800' : 'text-sm text-slate-600'}`}>
+                  {row.name}
+                </span>
+              </span>
+              <span className="shrink-0 text-sm tabular-nums text-slate-900">
+                {formatNumber(row.value)}
+                <span className="ml-1.5 text-xs text-slate-400">{row.share}%</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
     </article>
   );
 }
 
 function ViewportActivityCard({ loading, items }) {
-  const visibleItems = items.slice(0, 6);
+  const visibleItems = items.slice(0, 7);
+  const reduceMotion = useReducedMotion();
 
   return (
-    <article className="relative flex min-h-0 flex-[13] flex-col overflow-hidden rounded-2xl border border-[#B5E2FF] bg-[#B5E2FF] p-3 shadow-sm">
-      <h2 className="mb-1 shrink-0 text-sm font-bold text-slate-900">Recent activity</h2>
-      <div className="min-h-0 flex-1 space-y-1.5 overflow-hidden" aria-busy={loading}>
-        {loading &&
-          Array.from({ length: 6 }).map((_, index) => (
-            <div key={index} className="skeleton h-8 rounded-lg" aria-hidden />
-          ))}
-        {!loading && items.length === 0 && (
-          <p className="text-xs text-slate-600">Check-ins and approvals will stream in here.</p>
+    <article className={SHELL}>
+      <h2 className="mb-1 shrink-0 text-sm font-semibold text-slate-900">Recent activity</h2>
+      <div className="min-h-0 flex-1 overflow-y-auto" aria-busy={loading}>
+        {loading && (
+          <div className="space-y-2">
+            {Array.from({ length: 5 }).map((_, index) => (
+              <div key={index} className="h-8 animate-pulse rounded bg-slate-100" aria-hidden />
+            ))}
+          </div>
         )}
-        {!loading &&
-          visibleItems.map((item) => (
-            <div
-              key={`${item.person}-${item.action}-${item.ts}`}
-              className="flex items-center gap-2.5 rounded-lg bg-white px-2 py-1.5"
-            >
-              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#F0F9FD] text-[10px] font-semibold uppercase text-[#00B0FF]">
-                {getInitials(item.person)}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-xs font-medium text-slate-800">{item.person}</span>
-                <span className="block truncate text-[11px] text-[#8898AA]">{item.action}</span>
-              </span>
-              <time className="shrink-0 text-[11px] text-[#8898AA]">{item.time}</time>
-            </div>
-          ))}
+        {!loading && items.length === 0 && (
+          <p className="py-4 text-sm text-slate-500">Check-ins and approvals will appear here as they happen.</p>
+        )}
+        <ul>
+          <AnimatePresence initial={false}>
+            {!loading &&
+              visibleItems.map((item) => (
+                <motion.li
+                  key={`${item.person}-${item.kind}-${item.ts}`}
+                  layout={!reduceMotion}
+                  initial={reduceMotion ? false : { opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={reduceMotion ? undefined : { opacity: 0 }}
+                  transition={{ duration: 0.2, ease: 'easeOut' }}
+                  className="border-b border-slate-100 py-2 last:border-0"
+                >
+                  <p className="truncate text-sm text-slate-700">{activitySentence(item)}</p>
+                </motion.li>
+              ))}
+          </AnimatePresence>
+        </ul>
       </div>
-    </article>
-  );
-}
-
-function ViewportQuickActions({ actions }) {
-  if (!actions.length) return null;
-
-  return (
-    <article className="flex min-h-0 flex-[7] flex-col justify-between gap-1.5 rounded-2xl border border-slate-100 bg-white p-2.5 shadow-sm">
-      <h2 className="text-sm font-bold text-slate-900">Quick actions</h2>
-      {actions.map((action) => {
-        const Icon = action.icon;
-        return (
-          <button
-            key={action.label}
-            type="button"
-            onClick={action.onClick}
-            className={`flex items-center justify-between rounded-lg bg-[#B5E2FF] px-3 py-1.5 text-xs font-semibold text-slate-700 transition-all hover:bg-[#00B0FF] hover:text-white ${FOCUS_RING}`}
-          >
-            <span className="flex items-center gap-2">
-              <Icon className="h-3.5 w-3.5" aria-hidden />
-              {action.label}
-            </span>
-            <ChevronRight className="h-3.5 w-3.5 opacity-70" aria-hidden />
-          </button>
-        );
-      })}
     </article>
   );
 }
@@ -1863,6 +2120,7 @@ export function DashboardPage() {
   const [error, setError] = useState('');
   const [queueBusyId, setQueueBusyId] = useState(null);
   const [batching, setBatching] = useState(false);
+  const [trendRange, setTrendRange] = useState('7d');
 
       const canViewUsers = hasAnyPermission(user, [
         PERMISSIONS.VIEW_EMPLOYEES,
@@ -2106,6 +2364,48 @@ export function DashboardPage() {
   }, [attendance, usersByKey]);
 
   const attendanceToday = attendanceRanges.today;
+
+  const todayIssues = useMemo(() => {
+    const startOfToday = startOfLocalDay();
+    const weekStart = new Date(startOfToday);
+    weekStart.setDate(startOfToday.getDate() - 7);
+    const firstCheckin = new Map();
+    const latest = new Map();
+    let manualToday = 0;
+
+    for (const row of attendance) {
+      if (!row.timestamp) continue;
+      const stamp = new Date(row.timestamp);
+      if (Number.isNaN(stamp.getTime())) continue;
+      const key = attendanceUserKey(row);
+      if (!key) continue;
+
+      if (stamp >= weekStart) {
+        const previous = latest.get(key);
+        if (!previous || stamp > previous.stamp) {
+          latest.set(key, { stamp, type: normalizeAttendanceType(row.type) });
+        }
+      }
+
+      if (stamp < startOfToday) continue;
+      if (row.is_manual) manualToday += 1;
+      if (normalizeAttendanceType(row.type) !== 'checkin') continue;
+      const seen = firstCheckin.get(key);
+      if (!seen || stamp < seen) firstCheckin.set(key, stamp);
+    }
+
+    let late = 0;
+    for (const stamp of firstCheckin.values()) {
+      if (stamp.getHours() * 60 + stamp.getMinutes() > LATE_CUTOFF_MINUTES) late += 1;
+    }
+
+    let missingCheckouts = 0;
+    for (const entry of latest.values()) {
+      if (entry.type !== 'checkout' && entry.stamp < startOfToday) missingCheckouts += 1;
+    }
+
+    return { late, missingCheckouts, manualToday };
+  }, [attendance]);
 
   /**
    * Who is on shift right now: the last event of the day per employee decides it,
@@ -2462,153 +2762,186 @@ export function DashboardPage() {
       }));
   }, [cachedUsers, todayOps]);
 
-  /* Six-month attendance volume against the headcount that existed each month. */
-  const attendanceTrend = useMemo(() => {
-    const now = new Date();
-    const buckets = [];
-    const index = new Map();
-    for (let i = 5; i >= 0; i -= 1) {
-      const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const bucket = {
-        key: `${start.getFullYear()}-${start.getMonth()}`,
-        label: start.toLocaleDateString(undefined, { month: 'short' }),
-        monthEnd: new Date(start.getFullYear(), start.getMonth() + 1, 0, 23, 59, 59, 999),
-        checkins: 0,
-        headcount: 0,
-      };
-      buckets.push(bucket);
-      index.set(bucket.key, bucket);
-    }
+  const liveTrendSeries = useMemo(() => {
+    const preset = TREND_RANGES.find((item) => item.id === trendRange) || TREND_RANGES[0];
+    if (preset.months) return buildMonthlyTrend(attendance, preset.months);
+    return buildDailyTrend(attendance, preset.days);
+  }, [attendance, trendRange]);
 
-    for (const row of attendance) {
-      if (!row.timestamp || normalizeAttendanceType(row.type) !== 'checkin') continue;
-      const date = new Date(row.timestamp);
-      if (Number.isNaN(date.getTime())) continue;
-      const bucket = index.get(`${date.getFullYear()}-${date.getMonth()}`);
-      if (bucket) bucket.checkins += 1;
-    }
-
-    for (const bucket of buckets) {
-      bucket.headcount = cachedUsers.filter((row) => {
-        if (!row.created_at) return false;
-        const created = new Date(row.created_at);
-        return !Number.isNaN(created.getTime()) && created <= bucket.monthEnd;
-      }).length;
-    }
-
-    return buckets.map(({ key, label, checkins, headcount }) => ({ key, label, checkins, headcount }));
-  }, [attendance, cachedUsers]);
-
-  const totalUsers = stats?.totalEmployees ?? cachedUsers.length;
   const activeUsers = stats?.activeUsers ?? cachedUsers.filter((row) => row.is_active).length;
-  const pendingApprovals = stats?.pendingLeaves ?? pendingLeaves.length;
   const attendanceRate = activeUsers
     ? Math.min(100, Math.round((attendanceToday.uniqueCheckins / activeUsers) * 100))
     : 0;
 
-  const deactivated = Math.max(totalUsers - activeUsers, 0);
-  const roster = useMemo(() => {
-    const departments = new Set();
-    for (const row of cachedUsers) {
-      if (row.department) departments.add(row.department);
-    }
-    return { departmentCount: departments.size };
-  }, [cachedUsers]);
-
-  /*
-   * The queue lists are capped for rendering, so the KPI counts come from the raw
-   * collections — otherwise a busy queue would report "8 leave" next to a total of 12.
-   */
   const pendingCounts = useMemo(
     () => ({
       leaves: leaves.filter((row) => String(row.status || '').toLowerCase() === 'pending').length,
       workModes: workModes.filter((row) => String(row.status || '').toLowerCase() === 'pending').length,
+      tickets: tickets.filter((ticket) => {
+        const status = String(ticket.status || '').toLowerCase();
+        const priority = String(ticket.priority || '').toLowerCase();
+        return status !== 'closed' && status !== 'resolved' && (priority === 'high' || priority === 'urgent');
+      }).length,
     }),
-    [leaves, workModes]
+    [leaves, workModes, tickets]
   );
-  const remoteShare = attendanceToday.uniqueCheckins
-    ? Math.round((attendanceToday.remote / attendanceToday.uniqueCheckins) * 100)
-    : 0;
-  const plural = (count, word) => `${formatNumber(count)} ${word}${count === 1 ? '' : 's'}`;
 
-  const overviewStats = [
+  const presentToday = attendanceToday.uniqueCheckins;
+  const onLeaveToday = onLeaveKeys.size;
+  const absentToday = Math.max(activeUsers - presentToday - onLeaveToday, 0);
+
+  const snapshotMetrics = [
     {
-      icon: KpiIconWorkforce,
-      label: 'Total workforce',
-      count: totalUsers,
-      context: `${plural(activeUsers, 'active employee')} · ${formatNumber(deactivated)} deactivated`,
-      detail: `${formatNumber(onShiftKeys.size)} on shift now · ${plural(roster.departmentCount, 'department')}`,
-      onClick: canViewUsers ? () => navigate('/users') : undefined,
-    },
-    {
-      icon: KpiIconCalendar,
-      label: 'Attendance rate',
-      count: attendanceRate,
-      suffix: '%',
-      context: `${formatNumber(attendanceToday.uniqueCheckins)} of ${formatNumber(activeUsers)} checked in today`,
-      progress: attendanceRate,
+      label: 'Present',
+      value: presentToday,
       onClick: canViewAttendance ? () => navigate('/attendance') : undefined,
     },
     {
-      icon: KpiIconWifi,
-      label: 'Remote / hybrid',
-      count: attendanceToday.remote,
-      context: `${formatNumber(attendanceToday.onSite)} on-site · ${remoteShare}% of today's check-ins`,
-      onClick: canViewWorkModes ? () => navigate('/work-mode-requests') : undefined,
+      label: 'Late',
+      value: todayIssues.late,
+      onClick: canViewAttendance ? () => navigate('/attendance') : undefined,
     },
     {
-      icon: KpiIconClock,
-      label: 'Pending approvals',
-      count: pendingApprovals,
-      context: `${formatNumber(pendingCounts.leaves)} leave · ${formatNumber(pendingCounts.workModes)} work-mode`,
+      label: 'Absent',
+      value: absentToday,
+      onClick: canViewAttendance ? () => navigate('/attendance') : undefined,
+    },
+    {
+      label: 'On leave',
+      value: onLeaveToday,
       onClick: canViewLeaves ? () => navigate('/leaves') : undefined,
     },
-  ];
-
-  const userGrowthSeries = useMemo(() => buildUserGrowthSeries(cachedUsers), [cachedUsers]);
-  const canAccessCalendar = canAccessFeature(user, 'calendar');
-  const quickActions = [
-    canViewUsers && {
-      label: 'Invite user',
-      icon: UserPlus,
-      onClick: () => navigate('/users', { state: { openCreate: true } }),
-    },
-    canManageDepartments && {
-      label: 'New department',
-      icon: Building2,
-      onClick: () => navigate('/departments', { state: { focusCreate: true } }),
-    },
-    canViewTickets && {
-      label: 'Log a ticket',
-      icon: Ticket,
-      onClick: () => navigate('/tickets'),
-    },
-    canAccessCalendar && {
-      label: 'Add calendar event',
-      icon: CalendarDays,
-      onClick: () => navigate('/calendar'),
+    attendanceToday.remote >= 0 && {
+      label: 'Remote',
+      value: attendanceToday.remote,
+      onClick: canViewWorkModes ? () => navigate('/work-mode-requests') : undefined,
     },
   ].filter(Boolean);
 
+  const attentionItems = [
+    canViewAttendance &&
+      todayIssues.late > 0 && {
+        id: 'late',
+        count: todayIssues.late,
+        label: todayIssues.late === 1 ? 'late arrival' : 'late arrivals',
+        action: 'View',
+        onClick: () => navigate('/attendance'),
+      },
+    canViewAttendance &&
+      todayIssues.missingCheckouts > 0 && {
+        id: 'open-shifts',
+        count: todayIssues.missingCheckouts,
+        label: todayIssues.missingCheckouts === 1 ? 'missing check-out' : 'missing check-outs',
+        action: 'Review',
+        onClick: () => navigate('/attendance'),
+      },
+    canViewLeaves &&
+      pendingCounts.leaves > 0 && {
+        id: 'leaves',
+        count: pendingCounts.leaves,
+        label: pendingCounts.leaves === 1 ? 'leave request' : 'leave requests',
+        action: canApproveLeave ? 'Approve' : 'View',
+        onClick: () => navigate('/leaves'),
+      },
+    canViewWorkModes &&
+      pendingCounts.workModes > 0 && {
+        id: 'work-modes',
+        count: pendingCounts.workModes,
+        label: pendingCounts.workModes === 1 ? 'work mode request' : 'work mode requests',
+        action: canApproveWorkMode ? 'Approve' : 'View',
+        onClick: () => navigate('/work-mode-requests'),
+      },
+    canViewAttendance &&
+      todayIssues.manualToday > 0 && {
+        id: 'corrections',
+        count: todayIssues.manualToday,
+        label: todayIssues.manualToday === 1 ? 'attendance correction' : 'attendance corrections',
+        action: 'Review',
+        onClick: () => navigate('/attendance'),
+      },
+    canViewTickets &&
+      pendingCounts.tickets > 0 && {
+        id: 'tickets',
+        count: pendingCounts.tickets,
+        label: pendingCounts.tickets === 1 ? 'urgent ticket' : 'urgent tickets',
+        action: 'Open',
+        onClick: () => navigate('/tickets'),
+      },
+  ].filter(Boolean);
+
+  const now = new Date();
+  const attentionTotal = attentionItems.reduce((sum, item) => sum + item.count, 0);
+  const headerContext = attentionTotal
+    ? `${formatNumber(attentionTotal)} ${attentionTotal === 1 ? 'item needs' : 'items need'} a decision this morning.`
+    : presentToday
+      ? `${formatNumber(presentToday)} of ${formatNumber(activeUsers)} ${
+          activeUsers === 1 ? 'person is' : 'people are'
+        } in. Coverage is ${attendanceRate}%.`
+      : 'No check-ins recorded yet today.';
+
+  const primaryAction = canViewUsers
+    ? {
+        label: 'Invite user',
+        onClick: () => navigate('/users', { state: { openCreate: true } }),
+      }
+    : canViewLeaves && pendingCounts.leaves > 0
+      ? { label: 'Review requests', onClick: () => navigate('/leaves') }
+      : null;
+
+  const reduceMotion = useReducedMotion();
+
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col gap-3 overflow-y-auto lg:overflow-hidden">
+    <motion.div
+      className="dash-viewport flex h-full min-h-0 flex-1 flex-col gap-4 overflow-y-auto lg:overflow-hidden"
+      variants={dashStagger}
+      initial={reduceMotion ? false : 'hidden'}
+      animate="show"
+    >
       {error && (
-        <div role="alert" className="shrink-0 rounded-xl border border-danger-border bg-danger-surface px-3 py-2">
+        <motion.div
+          variants={dashFadeUp}
+          role="alert"
+          className="shrink-0 rounded-xl border border-danger-border bg-danger-surface px-3 py-2"
+        >
           <p className="text-xs font-medium text-danger-ink">{error}</p>
-        </div>
+        </motion.div>
       )}
 
-      <OverviewBanner stats={overviewStats} loading={loading} />
+      <motion.div variants={dashFadeUp} className="shrink-0">
+        <CommandHeader
+          greeting={greetingForHour(now.getHours())}
+          name={displayFirstName(user)}
+          dateLabel={formatLongDate(now)}
+          context={headerContext}
+          action={primaryAction?.label}
+          onAction={primaryAction?.onClick}
+        />
+      </motion.div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-12">
-        <div className="min-h-[12rem] lg:col-span-6 lg:h-full lg:min-h-0">
-          <ViewportGrowthCard loading={loading} data={userGrowthSeries} />
-        </div>
-        <div className="flex min-h-0 flex-col gap-2.5 lg:col-span-3 lg:h-full">
+      <motion.div variants={dashFadeUp} className="shrink-0">
+        <WorkforceSnapshot metrics={snapshotMetrics} loading={loading} />
+      </motion.div>
+
+      <motion.div
+        variants={dashStagger}
+        className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-hidden lg:grid-cols-12 lg:grid-rows-2"
+      >
+        <motion.div variants={dashFadeUp} className="min-h-0 lg:col-span-5 lg:h-full">
+          <NeedsAttention items={attentionItems} loading={loading} />
+        </motion.div>
+        <motion.div variants={dashFadeUp} className="min-h-0 lg:col-span-7 lg:h-full">
           <ViewportActivityCard loading={loading} items={activityItems} />
-          {quickActions.length > 0 && <ViewportQuickActions actions={quickActions} />}
-        </div>
-        <div className="min-h-[12rem] lg:col-span-3 lg:h-full lg:min-h-0">
+        </motion.div>
+        <motion.div variants={dashFadeUp} className="min-h-0 lg:col-span-7 lg:h-full">
+          <ViewportTrendCard
+            loading={loading}
+            series={liveTrendSeries}
+            range={trendRange}
+            onRangeChange={setTrendRange}
+            onViewAttendance={() => navigate('/attendance')}
+          />
+        </motion.div>
+        <motion.div variants={dashFadeUp} className="min-h-0 lg:col-span-5 lg:h-full">
           <ViewportAttendancePie
             loading={loading}
             onSite={attendanceToday.onSite}
@@ -2616,8 +2949,8 @@ export function DashboardPage() {
             notIn={Math.max(activeUsers - attendanceToday.uniqueCheckins, 0)}
             coverage={attendanceRate}
           />
-        </div>
-      </div>
-    </div>
+        </motion.div>
+      </motion.div>
+    </motion.div>
   );
 }

@@ -1,4 +1,5 @@
 import { RANGE_PRESETS, formatRangeLabel } from '../../../features/admin/utils/analyticsCharts';
+import { Select } from '../ui/Select';
 
 export function DateRangeSelector({
   preset,
@@ -32,12 +33,11 @@ export function DateRangeSelector({
           <label htmlFor={`${idPrefix}-range`} className="text-xs font-semibold text-ink-muted">
             Period
           </label>
-          <select
+          <Select
             id={`${idPrefix}-range`}
             value={preset}
             onChange={(e) => onPresetChange(e.target.value)}
             aria-describedby={`${idPrefix}-range-hint`}
-            className="ui-select"
           >
             {Object.entries(groupedPresets).map(([group, options]) => (
               <optgroup key={group} label={group}>
@@ -48,7 +48,7 @@ export function DateRangeSelector({
                 ))}
               </optgroup>
             ))}
-          </select>
+          </Select>
         </div>
 
         {preset === 'custom' && (

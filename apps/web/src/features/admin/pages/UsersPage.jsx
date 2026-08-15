@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { adminService } from '../services/adminService';
 import { useAuthStore } from '../../auth/store/authStore';
-import { Pencil, Search, ShieldCheck, UserCheck, UserMinus, UserPlus, Users } from 'lucide-react';
+import { Pencil, Plus, Search, ShieldCheck, UserCheck, UserMinus, Users } from 'lucide-react';
 import {
   GlassTable,
   TableActions,
@@ -11,15 +11,15 @@ import {
   TablePagination,
   TableRow,
   TableSelectionBar,
-  TableToolbar,
 } from '../../../shared/components/GlassTable';
 import { SlideOverPanel } from '../../../shared/components/SlideOverPanel';
 import { PasswordInput } from '../../../shared/components/PasswordInput';
 import { Alert } from '../../../shared/components/ui/Alert';
-import { RoleBadge, StatusBadge } from '../../../shared/components/ui/Badge';
 import { Button } from '../../../shared/components/ui/Button';
-import { PageHeader } from '../../../shared/components/ui/PageHeader';
-import { hasPermission, PERMISSIONS } from '../permissions';
+import { Select } from '../../../shared/components/ui/Select';
+import { canAccessFeature, hasAnyPermission, hasPermission, PERMISSIONS } from '../permissions';
+import { normalizeAttendanceType } from '../utils/analyticsCharts';
+import { formatLeaveStatus, formatLeaveTypeLabel } from '../utils/leaveDisplay';
 
 const EMPTY_CREATE_FORM = {
   username: '',
@@ -33,13 +33,63 @@ const EMPTY_CREATE_FORM = {
   hireDate: '',
 };
 
+const WORK_MODE_LABELS = {
+  in_office: 'In office',
+  remote: 'Remote',
+  hybrid: 'Hybrid',
+  semi_remote: 'Hybrid',
+  fully_remote: 'Remote',
+};
+
+const PROFILE_TABS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'attendance', label: 'Attendance' },
+  { id: 'leave', label: 'Leave' },
+  { id: 'work_mode', label: 'Work mode' },
+  { id: 'activity', label: 'Activity' },
+];
+
 const roleCanBeToggled = (targetRole) => targetRole === 'employee' || targetRole === 'manager';
+
+const formatWorkMode = (value) => WORK_MODE_LABELS[String(value || 'in_office').toLowerCase()] || 'In office';
+
+const formatRole = (value) =>
+  String(value || 'employee')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
+const personKeys = (person) =>
+  [person?.uid, person?.id, person?.username, person?.employee_uid, person?.employeeUid, person?.employee_username]
+    .filter(Boolean)
+    .map((value) => String(value).toLowerCase());
+
+const recordKey = (row) =>
+  String(row?.user_uid || row?.uid || row?.username || row?.employee_uid || row?.employeeUid || '').toLowerCase();
+
+const belongsToUser = (row, user) => {
+  const keys = new Set(personKeys(user));
+  return personKeys(row).some((key) => keys.has(key)) || (recordKey(row) && keys.has(recordKey(row)));
+};
+
+const clockTime = (isoValue) => {
+  const date = new Date(isoValue);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+};
+
+const formatJoined = (isoValue) => {
+  if (!isoValue) return '—';
+  const date = new Date(isoValue);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+};
 
 /** Column key -> comparable value. Keys mirror the table's column keys. */
 const SORT_VALUES = {
   name: (row) => (row.name || row.username || '').toLowerCase(),
   role: (row) => (row.role || '').toLowerCase(),
   dept: (row) => (row.department || '').toLowerCase(),
+  work: (row) => formatWorkMode(row.work_mode).toLowerCase(),
   status: (row) => (row.is_active ? 0 : 1),
   last: (row) => (row.updated_at ? new Date(row.updated_at).getTime() : 0),
 };
@@ -55,11 +105,16 @@ export function UsersPage() {
   const [roleFilter, setRoleFilter] = useState('all');
   const [departmentFilter, setDepartmentFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [workModeFilter, setWorkModeFilter] = useState('all');
   const [sortKey, setSortKey] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [activeUser, setActiveUser] = useState(null);
+  const [profileTab, setProfileTab] = useState('overview');
+  const [attendanceRows, setAttendanceRows] = useState([]);
+  const [leaveRows, setLeaveRows] = useState([]);
+  const [workModeRows, setWorkModeRows] = useState([]);
   const [error, setError] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState(EMPTY_CREATE_FORM);
@@ -80,12 +135,27 @@ export function UsersPage() {
   const canChangeRoles = hasPermission(user, PERMISSIONS.CHANGE_USER_ROLE);
   const canEditLeaveBalance = hasPermission(user, PERMISSIONS.EDIT_LEAVE_BALANCE);
   const canBulkDeactivate = canDeactivate || canDelete;
+  const canViewAttendance = hasAnyPermission(user, [PERMISSIONS.VIEW_ATTENDANCE, PERMISSIONS.MANUAL_ATTENDANCE]);
+  const canViewLeaves = hasAnyPermission(user, [
+    PERMISSIONS.VIEW_LEAVE_REQUESTS,
+    PERMISSIONS.APPROVE_LEAVE,
+    PERMISSIONS.REJECT_LEAVE,
+  ]);
+  const canViewWorkModes = canAccessFeature(user, 'workModeRequests');
 
   const loadUsers = async () => {
     setError('');
     try {
-      const users = await adminService.getUsers();
+      const [users, attendance, leaves, workModes] = await Promise.all([
+        adminService.getUsers(),
+        canViewAttendance ? adminService.getAttendance().catch(() => []) : Promise.resolve([]),
+        canViewLeaves ? adminService.getLeaves().catch(() => []) : Promise.resolve([]),
+        canViewWorkModes ? adminService.getWorkModeRequests().catch(() => []) : Promise.resolve([]),
+      ]);
       setRows(users || []);
+      setAttendanceRows(attendance || []);
+      setLeaveRows(leaves || []);
+      setWorkModeRows(workModes || []);
     } catch (err) {
       console.error('[UsersPage] Failed to load users:', err);
       setError(err?.message || 'Failed to load users');
@@ -106,7 +176,7 @@ export function UsersPage() {
   useEffect(() => {
     loadUsers();
     loadDepartments();
-  }, []);
+  }, [canViewAttendance, canViewLeaves, canViewWorkModes]);
 
   const openCreate = () => {
     setCreateError('');
@@ -213,25 +283,46 @@ export function UsersPage() {
 
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
-      const bySearch = `${row.name || ''} ${row.username || ''} ${row.department || ''}`.toLowerCase().includes(search.toLowerCase().trim());
+      const bySearch = `${row.name || ''} ${row.username || ''} ${row.email || ''} ${row.department || ''} ${row.role || ''} ${row.work_mode || ''}`.toLowerCase().includes(search.toLowerCase().trim());
       const byRole = roleFilter === 'all' || row.role === roleFilter;
       const byDepartment = departmentFilter === 'all' || row.department === departmentFilter;
       const byStatus = statusFilter === 'all' || (statusFilter === 'active' ? row.is_active : !row.is_active);
-      return bySearch && byRole && byDepartment && byStatus;
+      const mode = String(row.work_mode || 'in_office').toLowerCase();
+      const byWorkMode = workModeFilter === 'all' || mode === workModeFilter;
+      return bySearch && byRole && byDepartment && byStatus && byWorkMode;
     });
-  }, [rows, search, roleFilter, departmentFilter, statusFilter]);
+  }, [rows, search, roleFilter, departmentFilter, statusFilter, workModeFilter]);
+
+  const presentTodayKeys = useMemo(() => {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const keys = new Set();
+    for (const row of attendanceRows) {
+      if (!row.timestamp || normalizeAttendanceType(row.type) !== 'checkin') continue;
+      const stamp = new Date(row.timestamp);
+      if (Number.isNaN(stamp.getTime()) || stamp < startOfToday) continue;
+      const key = recordKey(row);
+      if (key) keys.add(key);
+    }
+    return keys;
+  }, [attendanceRows]);
+
+  const isPresentToday = (person) => personKeys(person).some((key) => presentTodayKeys.has(key));
 
   const sortedRows = useMemo(() => {
-    const read = SORT_VALUES[sortKey];
-    if (!read) return filteredRows;
     const direction = sortDir === 'asc' ? 1 : -1;
+    const read =
+      sortKey === 'attendance'
+        ? (row) => (isPresentToday(row) ? 0 : 1)
+        : SORT_VALUES[sortKey];
+    if (!read) return filteredRows;
     return [...filteredRows].sort((a, b) => {
       const left = read(a);
       const right = read(b);
       if (left === right) return 0;
       return left > right ? direction : -direction;
     });
-  }, [filteredRows, sortKey, sortDir]);
+  }, [filteredRows, sortKey, sortDir, presentTodayKeys]);
 
   /* Paging is applied after sorting so page 1 always holds the top of the sort. */
   const pagedRows = useMemo(() => {
@@ -246,7 +337,7 @@ export function UsersPage() {
   }, [sortedRows.length, pageSize, page]);
 
   const requestSort = (key) => {
-    if (!SORT_VALUES[key]) return;
+    if (!SORT_VALUES[key] && key !== 'attendance') return;
     setSortDir((prev) => (sortKey === key ? (prev === 'asc' ? 'desc' : 'asc') : 'asc'));
     setSortKey(key);
     setPage(1);
@@ -256,9 +347,13 @@ export function UsersPage() {
     return ['all', ...Array.from(new Set(rows.map((r) => r.department).filter(Boolean))).sort()];
   }, [rows]);
 
+  const workModes = useMemo(() => {
+    return ['all', ...Array.from(new Set(rows.map((r) => String(r.work_mode || 'in_office').toLowerCase()))).sort()];
+  }, [rows]);
+
   useEffect(() => {
     setPage(1);
-  }, [search, roleFilter, departmentFilter, statusFilter]);
+  }, [search, roleFilter, departmentFilter, statusFilter, workModeFilter]);
 
   const selectedCount = Object.values(selected).filter(Boolean).length;
   /* Select-all covers the rows on screen, not the whole filtered set. */
@@ -301,13 +396,21 @@ export function UsersPage() {
     setEditForm(null);
     setEditError('');
     setEditLoading(false);
+    setProfileTab('overview');
   };
 
   const openUserPanel = async (u) => {
     setActiveUser(u);
+    setProfileTab('overview');
     setEditError('');
     if (!canEditProfiles) {
       setEditForm(null);
+      try {
+        const profile = await adminService.getUserProfile(u.uid);
+        if (profile) setActiveUser((prev) => (prev?.uid === u.uid ? { ...prev, ...profile } : prev));
+      } catch {
+        /* Directory row is enough for a read-only view. */
+      }
       return;
     }
     setEditLoading(true);
@@ -324,8 +427,8 @@ export function UsersPage() {
         sick_leaves: lb.sick_leaves ?? 10,
         casual_leaves: lb.casual_leaves ?? 5,
       });
-      if (!profile) {
-        setEditError('');
+      if (profile) {
+        setActiveUser((prev) => (prev?.uid === u.uid ? { ...prev, ...profile } : prev));
       }
     } catch (err) {
       console.error('[UsersPage] Failed to load profile for edit:', err);
@@ -406,64 +509,141 @@ export function UsersPage() {
     return new Date(then).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
-  return (
-    <div className="space-y-5 animate-fade-up">
-      <PageHeader
-        title="User Management"
-        subtitle="Manage users, roles, and department assignments."
-        actions={
-          canCreate && (
-            <Button onClick={openCreate}>
-              <UserPlus className="h-4 w-4" strokeWidth={2} aria-hidden />
-              Create user
-            </Button>
-          )
-        }
-      />
+  const directoryEmpty = !loading && rows.length === 0;
 
-      <TableToolbar
-        search={
-          <>
-            <Search
-              className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint"
-              strokeWidth={2}
-              aria-hidden
-            />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search users, roles..."
-              aria-label="Search users"
-              className="ui-input ui-input-icon"
-            />
-          </>
-        }
-        filters={
-          <>
-            <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} aria-label="Filter by role" className="ui-select w-auto">
-              <option value="all">All roles</option>
-              <option value="super_admin">Super Admin</option>
-              <option value="manager">Manager</option>
-              <option value="employee">Employee</option>
-            </select>
-            <select value={departmentFilter} onChange={(e) => setDepartmentFilter(e.target.value)} aria-label="Filter by department" className="ui-select w-auto">
-              {departments.map((dep) => (
-                <option key={dep} value={dep}>{dep === 'all' ? 'All departments' : dep}</option>
-              ))}
-            </select>
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Filter by status" className="ui-select w-auto">
-              <option value="all">All status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-          </>
-        }
-        actions={
-          <p className="text-caption font-medium tabular-nums text-ink-muted">
-            {filteredRows.length} {filteredRows.length === 1 ? 'user' : 'users'}
+  const activeAttendance = useMemo(() => {
+    if (!activeUser) return [];
+    return attendanceRows
+      .filter((row) => belongsToUser(row, activeUser))
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, 8);
+  }, [activeUser, attendanceRows]);
+
+  const activeLeaves = useMemo(() => {
+    if (!activeUser) return [];
+    return leaveRows
+      .filter((row) => belongsToUser(row, activeUser))
+      .sort((a, b) => new Date(b.requested_at || b.created_at || 0).getTime() - new Date(a.requested_at || a.created_at || 0).getTime())
+      .slice(0, 6);
+  }, [activeUser, leaveRows]);
+
+  const activeWorkModes = useMemo(() => {
+    if (!activeUser) return [];
+    return workModeRows
+      .filter((row) => belongsToUser(row, activeUser) || belongsToUser(row.employee || {}, activeUser))
+      .sort((a, b) => new Date(b.requested_at || b.created_at || 0).getTime() - new Date(a.requested_at || a.created_at || 0).getTime())
+      .slice(0, 6);
+  }, [activeUser, workModeRows]);
+
+  const tableColumns = [
+    {
+      key: 'check',
+      label: (
+        <input
+          type="checkbox"
+          checked={allVisibleSelected}
+          onChange={toggleSelectAll}
+          aria-label="Select all users on this page"
+          className="ui-checkbox"
+        />
+      ),
+      className: 'w-12',
+    },
+    { key: 'name', label: 'Employee', sortable: true },
+    { key: 'dept', label: 'Department', sortable: true },
+    { key: 'role', label: 'Role', sortable: true },
+    { key: 'work', label: 'Work mode', sortable: true },
+    canViewAttendance && { key: 'attendance', label: 'Attendance', sortable: true },
+    { key: 'status', label: 'Status', sortable: true },
+    { key: 'actions', label: <span className="sr-only">Actions</span>, className: 'w-16' },
+  ].filter(Boolean);
+
+  const openRow = (event, person) => {
+    if (event.target.closest('button, input, a, [data-row-action]')) return;
+    openUserPanel(person);
+  };
+
+  return (
+    <div className="users-directory admin-page gap-4 animate-fade-up">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Users</h1>
+          <p className="mt-1 text-sm text-slate-500">Manage employees, roles and workforce information.</p>
+        </div>
+        {canCreate && (
+          <button
+            type="button"
+            onClick={openCreate}
+            data-on-dark
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#00B0FF] px-3 text-sm font-semibold text-white transition-colors duration-150 hover:bg-[#0099E6]"
+          >
+            <Plus className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
+            Add user
+          </button>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-2 border-b border-slate-200 pb-3 lg:flex-row lg:items-center">
+        <div className="relative min-w-0 flex-1 lg:max-w-sm">
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
+            strokeWidth={2}
+            aria-hidden
+          />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search users"
+            aria-label="Search users"
+            className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-[#00B0FF] focus:outline-none focus:ring-2 focus:ring-[#00B0FF]/20"
+          />
+        </div>
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <Select value={departmentFilter} onChange={(e) => setDepartmentFilter(e.target.value)} aria-label="Filter by department" size="sm" className="w-auto min-w-[9.5rem]">
+            {departments.map((dep) => (
+              <option key={dep} value={dep}>{dep === 'all' ? 'All departments' : dep}</option>
+            ))}
+          </Select>
+          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Filter by status" size="sm" className="w-auto min-w-[8rem]">
+            <option value="all">All status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </Select>
+          <Select value={workModeFilter} onChange={(e) => setWorkModeFilter(e.target.value)} aria-label="Filter by work mode" size="sm" className="w-auto min-w-[8.5rem]">
+            {workModes.map((mode) => (
+              <option key={mode} value={mode}>{mode === 'all' ? 'All work modes' : formatWorkMode(mode)}</option>
+            ))}
+          </Select>
+          <Select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} aria-label="Filter by role" size="sm" className="w-auto min-w-[8rem]">
+            <option value="all">All roles</option>
+            <option value="super_admin">Super admin</option>
+            <option value="manager">Manager</option>
+            <option value="employee">Employee</option>
+          </Select>
+          <Select
+            value={sortKey}
+            onChange={(e) => {
+              setSortKey(e.target.value);
+              setSortDir('asc');
+              setPage(1);
+            }}
+            aria-label="Sort users"
+            size="sm"
+            className="w-auto min-w-[8.5rem]"
+          >
+            <option value="name">Sort: Name</option>
+            <option value="dept">Sort: Department</option>
+            <option value="role">Sort: Role</option>
+            <option value="work">Sort: Work mode</option>
+            {canViewAttendance && <option value="attendance">Sort: Attendance</option>}
+            <option value="status">Sort: Status</option>
+            <option value="last">Sort: Last active</option>
+          </Select>
+          <p className="pl-1 text-xs tabular-nums text-slate-400">
+            {filteredRows.length} {filteredRows.length === 1 ? 'employee' : 'employees'}
           </p>
-        }
-      />
+        </div>
+      </div>
 
       {error && <Alert type="error">{error}</Alert>}
       {saveSuccess && <Alert type="success">{saveSuccess}</Alert>}
@@ -475,40 +655,41 @@ export function UsersPage() {
         </Button>
       </TableSelectionBar>
 
+      <div className="admin-fill overflow-hidden rounded-xl border border-slate-200 bg-white">
       <GlassTable
+        className="rounded-none border-0 shadow-none"
         loading={loading}
         skeletonRows={6}
-        maxHeight="min(68vh, 42rem)"
         emptyIcon={Users}
-        emptyTitle="No users found"
-        emptyMessage="Try adjusting your search or filters to widen the results."
+        emptyTitle={directoryEmpty ? 'No employees yet' : 'No matching employees'}
+        emptyMessage={
+          directoryEmpty
+            ? 'Add the first person to start building your workforce directory. You can assign a role, department and work mode when they join.'
+            : 'Try a different search or filter to find the employee you need.'
+        }
+        emptyAction={
+          directoryEmpty && canCreate ? (
+            <button
+              type="button"
+              onClick={openCreate}
+              data-on-dark
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#00B0FF] px-3 text-sm font-semibold text-white transition-colors hover:bg-[#0099E6]"
+            >
+              Add user
+            </button>
+          ) : null
+        }
         sortKey={sortKey}
         sortDir={sortDir}
         onSort={requestSort}
-        columns={[
-          {
-            key: 'check',
-            label: (
-              <input
-                type="checkbox"
-                checked={allVisibleSelected}
-                onChange={toggleSelectAll}
-                aria-label="Select all users on this page"
-                className="ui-checkbox"
-              />
-            ),
-            className: 'w-12',
-          },
-          { key: 'name', label: 'Name', sortable: true },
-          { key: 'role', label: 'Role', sortable: true },
-          { key: 'dept', label: 'Department', sortable: true },
-          { key: 'status', label: 'Status', sortable: true },
-          { key: 'last', label: 'Last active', sortable: true, className: 'w-32' },
-          { key: 'actions', label: <span className="sr-only">Actions</span>, className: 'w-16' },
-        ]}
+        columns={tableColumns}
       >
         {pagedRows.map((u) => (
-          <TableRow key={u.uid} selected={Boolean(selected[u.uid])}>
+          <TableRow
+            key={u.uid}
+            selected={Boolean(selected[u.uid])}
+            onClick={(event) => openRow(event, u)}
+          >
             <TableCell>
               <input
                 type="checkbox"
@@ -520,59 +701,71 @@ export function UsersPage() {
             </TableCell>
             <TableCell>
               <TableIdentity
+                size="sm"
                 name={u.name || u.username}
-                secondary={u.email}
-                onClick={() => openUserPanel(u)}
+                secondary={u.email || u.username}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  openUserPanel(u);
+                }}
               />
             </TableCell>
+            <TableCell className="text-sm text-slate-500">{u.department || '—'}</TableCell>
+            <TableCell className="text-sm text-slate-600">{formatRole(u.role)}</TableCell>
+            <TableCell className="text-sm text-slate-500">{formatWorkMode(u.work_mode)}</TableCell>
+            {canViewAttendance && (
+              <TableCell>
+                <AttendanceMark present={isPresentToday(u)} active={u.is_active} />
+              </TableCell>
+            )}
             <TableCell>
-              <RoleBadge role={u.role} />
+              <QuietStatus active={u.is_active} />
             </TableCell>
-            <TableCell className="text-ink-muted">{u.department || '—'}</TableCell>
             <TableCell>
-              <StatusBadge status={u.is_active ? 'active' : 'inactive'} />
-            </TableCell>
-            <TableCell className="whitespace-nowrap text-caption text-ink-muted">{asLastActive(u)}</TableCell>
-            <TableCell>
-              <TableActions
-                label={`Actions for ${u.name || u.username}`}
-                items={[
-                  {
-                    label: canEditProfiles ? 'Edit details' : 'View details',
-                    icon: Pencil,
-                    onClick: () => openUserPanel(u),
-                  },
-                  ((u.is_active && canDeactivate) || (!u.is_active && canActivate)) && {
-                    label: u.is_active ? 'Disable access' : 'Enable access',
-                    icon: u.is_active ? UserMinus : UserCheck,
-                    tone: u.is_active ? 'danger' : undefined,
-                    onClick: () => toggleActive(u),
-                  },
-                  canChangeRoles &&
-                    roleCanBeToggled(u.role) && {
-                      label: u.role === 'employee' ? 'Make manager' : 'Make employee',
-                      icon: ShieldCheck,
-                      onClick: () => changeRole(u),
+              <span data-row-action>
+                <TableActions
+                  label={`Actions for ${u.name || u.username}`}
+                  items={[
+                    {
+                      label: canEditProfiles ? 'Edit details' : 'View details',
+                      icon: Pencil,
+                      onClick: () => openUserPanel(u),
                     },
-                ]}
-              />
+                    ((u.is_active && canDeactivate) || (!u.is_active && canActivate)) && {
+                      label: u.is_active ? 'Disable access' : 'Enable access',
+                      icon: u.is_active ? UserMinus : UserCheck,
+                      tone: u.is_active ? 'danger' : undefined,
+                      onClick: () => toggleActive(u),
+                    },
+                    canChangeRoles &&
+                      roleCanBeToggled(u.role) && {
+                        label: u.role === 'employee' ? 'Make manager' : 'Make employee',
+                        icon: ShieldCheck,
+                        onClick: () => changeRole(u),
+                      },
+                  ]}
+                />
+              </span>
             </TableCell>
           </TableRow>
         ))}
       </GlassTable>
 
-      {!loading && filteredRows.length > 0 && (
-        <TablePagination
-          page={page}
-          pageSize={pageSize}
-          total={sortedRows.length}
-          onPageChange={setPage}
-          onPageSizeChange={(size) => {
-            setPageSize(size);
-            setPage(1);
-          }}
-        />
-      )}
+        {!loading && filteredRows.length > 0 && (
+          <TablePagination
+            className="border-t border-slate-100 px-4 py-3"
+            page={page}
+            pageSize={pageSize}
+            total={sortedRows.length}
+            pageSizes={[10, 25, 50, 100]}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+          />
+        )}
+      </div>
 
       <SlideOverPanel open={createOpen} onClose={() => (createSubmitting ? null : setCreateOpen(false))}>
         <form className="h-full flex flex-col" onSubmit={submitCreate}>
@@ -733,25 +926,49 @@ export function UsersPage() {
       <SlideOverPanel open={Boolean(activeUser)} onClose={closePanel}>
           {activeUser && (
             <div className="h-full flex flex-col">
-              <div className="p-5 border-b border-hairline flex items-center justify-between">
-                <div>
-                  <p className="text-[17px] font-semibold tracking-[-0.015em] text-ink">{activeUser.name || activeUser.username}</p>
-                  <p className="mt-1 text-[13px] text-ink-muted">{activeUser.email}</p>
+              <div className="border-b border-slate-200 px-5 py-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-[17px] font-semibold tracking-tight text-slate-900">{activeUser.name || activeUser.username}</p>
+                    <p className="mt-0.5 truncate text-sm text-slate-500">{activeUser.email || activeUser.username}</p>
+                    <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-400">
+                      <span>{formatRole(activeUser.role)}</span>
+                      <span aria-hidden>·</span>
+                      <span>{activeUser.department || 'No department'}</span>
+                      <span aria-hidden>·</span>
+                      <QuietStatus active={activeUser.is_active} />
+                    </p>
+                  </div>
+                  <button type="button" onClick={closePanel} className="ui-btn-ghost ui-btn-sm">Close</button>
                 </div>
-                <button onClick={closePanel} className="ui-btn-ghost ui-btn-sm">Close</button>
+                <nav className="mt-4 flex gap-1 overflow-x-auto" aria-label="Employee sections">
+                  {PROFILE_TABS.map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setProfileTab(tab.id)}
+                      className={`shrink-0 rounded-md px-2.5 py-1.5 text-sm transition-colors duration-150 ${
+                        profileTab === tab.id
+                          ? 'bg-slate-100 font-semibold text-slate-900'
+                          : 'font-medium text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </nav>
               </div>
 
-              <div className="p-5 space-y-5 overflow-y-auto">
+              <div className="flex-1 overflow-y-auto px-5 py-4">
                 {editError && <Alert type="error">{editError}</Alert>}
 
-                <section>
-                  <p className="card-eyebrow mb-2 block">Profile</p>
-                  {canEditProfiles && editForm ? (
-                    <div className="rounded-xl border border-hairline bg-surface-subtle p-4 space-y-3 text-sm">
-                      {editLoading ? (
-                        <p className="text-ink-muted">Loading profile…</p>
+                {profileTab === 'overview' && (
+                  <div className="space-y-4">
+                    {canEditProfiles && editForm ? (
+                      editLoading ? (
+                        <p className="text-sm text-slate-500">Loading profile…</p>
                       ) : (
-                        <>
+                        <div className="space-y-3">
                           <label className="block space-y-1">
                             <span className="ui-label">Full name</span>
                             <input
@@ -778,9 +995,9 @@ export function UsersPage() {
                               className="ui-input"
                             />
                           </label>
-                          {activeUser?.role === 'super_admin' && (
+                          {activeUser.role === 'super_admin' && (
                             <label className="block space-y-1">
-                              <span className="ui-label">Report email <span className="text-ink-muted">(optional — overrides login email for reports)</span></span>
+                              <span className="ui-label">Report email <span className="font-normal text-slate-400">(optional)</span></span>
                               <input
                                 type="email"
                                 value={editForm.report_email || ''}
@@ -799,77 +1016,155 @@ export function UsersPage() {
                             >
                               <option value="">— None —</option>
                               {tenantDepartments.map((d) => (
-                                <option key={d.id} value={d.name}>
-                                  {d.name}
-                                </option>
+                                <option key={d.id} value={d.name}>{d.name}</option>
                               ))}
                             </select>
                           </label>
-                          <p className="text-xs text-ink-muted">
-                            Role: {activeUser.role} · Status: {activeUser.is_active ? 'Active' : 'Inactive'}
-                          </p>
-                        </>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="rounded-xl border border-hairline bg-surface-subtle p-4 space-y-2 text-sm">
-                      <p><span className="text-ink-muted">Name:</span> <span className="text-ink">{activeUser.name || '-'}</span></p>
-                      <p><span className="text-ink-muted">Username:</span> <span className="text-ink">{activeUser.username}</span></p>
-                      <p><span className="text-ink-muted">Role:</span> <span className="text-ink">{activeUser.role}</span></p>
-                      <p><span className="text-ink-muted">Department:</span> <span className="text-ink">{activeUser.department || '-'}</span></p>
-                      <p><span className="text-ink-muted">Status:</span> <span className="text-ink">{activeUser.is_active ? 'Active' : 'Inactive'}</span></p>
-                    </div>
-                  )}
-                </section>
-
-                {canEditLeaveBalance && editForm && !editLoading && (
-                  <section>
-                    <p className="card-eyebrow mb-2 block">Leave allocation</p>
-                    <div className="rounded-xl border border-hairline bg-surface-subtle p-4 grid grid-cols-3 gap-3 text-sm">
-                      <label className="block space-y-1">
-                        <span className="ui-label">Annual</span>
-                        <input
-                          type="number"
-                          min={0}
-                          value={editForm.annual_leaves}
-                          onChange={(e) => setEditForm((f) => ({ ...f, annual_leaves: e.target.value }))}
-                          className="ui-input"
-                        />
-                      </label>
-                      <label className="block space-y-1">
-                        <span className="ui-label">Sick</span>
-                        <input
-                          type="number"
-                          min={0}
-                          value={editForm.sick_leaves}
-                          onChange={(e) => setEditForm((f) => ({ ...f, sick_leaves: e.target.value }))}
-                          className="ui-input"
-                        />
-                      </label>
-                      <label className="block space-y-1">
-                        <span className="ui-label">Casual</span>
-                        <input
-                          type="number"
-                          min={0}
-                          value={editForm.casual_leaves}
-                          onChange={(e) => setEditForm((f) => ({ ...f, casual_leaves: e.target.value }))}
-                          className="ui-input"
-                        />
-                      </label>
-                    </div>
-                  </section>
+                        </div>
+                      )
+                    ) : (
+                      <dl>
+                        <ProfileField label="Name">{activeUser.name || '—'}</ProfileField>
+                        <ProfileField label="Username">{activeUser.username}</ProfileField>
+                        <ProfileField label="Email">{activeUser.email || '—'}</ProfileField>
+                        <ProfileField label="Role">{formatRole(activeUser.role)}</ProfileField>
+                        <ProfileField label="Department">{activeUser.department || '—'}</ProfileField>
+                        <ProfileField label="Position">{activeUser.position || '—'}</ProfileField>
+                        <ProfileField label="Status">{activeUser.is_active ? 'Active' : 'Inactive'}</ProfileField>
+                      </dl>
+                    )}
+                  </div>
                 )}
 
-                <section>
-                  <p className="card-eyebrow mb-2 block">Activity</p>
-                  <div className="rounded-xl border border-hairline bg-surface-subtle p-4 text-sm text-ink-muted">
-                    <p>Last updated: {asLastActive(activeUser)}</p>
+                {profileTab === 'attendance' && (
+                  <div>
+                    {!canViewAttendance ? (
+                      <p className="text-sm text-slate-500">Attendance records are not available for this account.</p>
+                    ) : activeAttendance.length === 0 ? (
+                      <p className="text-sm text-slate-500">No check-ins recorded yet for this employee.</p>
+                    ) : (
+                      <ul className="divide-y divide-slate-100">
+                        {activeAttendance.map((row, index) => {
+                          const type = normalizeAttendanceType(row.type);
+                          return (
+                            <li key={row.id || `${row.timestamp}-${index}`} className="flex items-baseline justify-between gap-3 py-2.5">
+                              <span className="text-sm text-slate-700">
+                                {type === 'checkout' ? 'Checked out' : row.is_manual ? 'Manual entry' : 'Checked in'}
+                              </span>
+                              <span className="shrink-0 text-xs tabular-nums text-slate-400">
+                                {clockTime(row.timestamp) || asLastActive({ updated_at: row.timestamp })}
+                              </span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                    {canViewAttendance && (
+                      <p className="mt-3 text-xs text-slate-400">
+                        Today: {isPresentToday(activeUser) ? 'In' : activeUser.is_active ? 'Not in' : 'Inactive'}
+                      </p>
+                    )}
                   </div>
-                </section>
+                )}
+
+                {profileTab === 'leave' && (
+                  <div className="space-y-4">
+                    {canEditLeaveBalance && editForm && !editLoading ? (
+                      <div className="grid grid-cols-3 gap-3">
+                        <label className="block space-y-1">
+                          <span className="ui-label">Annual</span>
+                          <input
+                            type="number"
+                            min={0}
+                            value={editForm.annual_leaves}
+                            onChange={(e) => setEditForm((f) => ({ ...f, annual_leaves: e.target.value }))}
+                            className="ui-input"
+                          />
+                        </label>
+                        <label className="block space-y-1">
+                          <span className="ui-label">Sick</span>
+                          <input
+                            type="number"
+                            min={0}
+                            value={editForm.sick_leaves}
+                            onChange={(e) => setEditForm((f) => ({ ...f, sick_leaves: e.target.value }))}
+                            className="ui-input"
+                          />
+                        </label>
+                        <label className="block space-y-1">
+                          <span className="ui-label">Casual</span>
+                          <input
+                            type="number"
+                            min={0}
+                            value={editForm.casual_leaves}
+                            onChange={(e) => setEditForm((f) => ({ ...f, casual_leaves: e.target.value }))}
+                            className="ui-input"
+                          />
+                        </label>
+                      </div>
+                    ) : activeUser.leave_balance ? (
+                      <dl>
+                        <ProfileField label="Annual">{activeUser.leave_balance.annual_leaves ?? '—'}</ProfileField>
+                        <ProfileField label="Sick">{activeUser.leave_balance.sick_leaves ?? '—'}</ProfileField>
+                        <ProfileField label="Casual">{activeUser.leave_balance.casual_leaves ?? '—'}</ProfileField>
+                      </dl>
+                    ) : (
+                      <p className="text-sm text-slate-500">Leave balances are not loaded for this employee.</p>
+                    )}
+                    {canViewLeaves && (
+                      activeLeaves.length === 0 ? (
+                        <p className="text-sm text-slate-500">No leave requests on file.</p>
+                      ) : (
+                        <ul className="divide-y divide-slate-100">
+                          {activeLeaves.map((leave) => (
+                            <li key={leave.id} className="flex items-baseline justify-between gap-3 py-2.5">
+                              <span className="text-sm text-slate-700">{formatLeaveTypeLabel(leave.leave_type)}</span>
+                              <span className="text-xs text-slate-400">{formatLeaveStatus(leave.status)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )
+                    )}
+                  </div>
+                )}
+
+                {profileTab === 'work_mode' && (
+                  <div>
+                    <dl>
+                      <ProfileField label="Current">{formatWorkMode(activeUser.work_mode)}</ProfileField>
+                    </dl>
+                    {!canViewWorkModes ? null : activeWorkModes.length === 0 ? (
+                      <p className="mt-3 text-sm text-slate-500">No work mode requests for this employee.</p>
+                    ) : (
+                      <ul className="mt-2 divide-y divide-slate-100">
+                        {activeWorkModes.map((request) => (
+                          <li key={request.id} className="flex items-baseline justify-between gap-3 py-2.5">
+                            <span className="text-sm text-slate-700">
+                              {formatWorkMode(request.current_work_mode)} → {formatWorkMode(request.requested_work_mode)}
+                            </span>
+                            <span className="text-xs text-slate-400">{formatLeaveStatus(request.status)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+
+                {profileTab === 'activity' && (
+                  <dl>
+                    <ProfileField label="Last updated">{asLastActive(activeUser)}</ProfileField>
+                    <ProfileField label="Joined">{formatJoined(activeUser.created_at)}</ProfileField>
+                    {activeLeaves[0] && (
+                      <ProfileField label="Latest leave">
+                        {formatLeaveTypeLabel(activeLeaves[0].leave_type)} · {formatLeaveStatus(activeLeaves[0].status)}
+                      </ProfileField>
+                    )}
+                  </dl>
+                )}
               </div>
 
-              <div className="mt-auto p-5 border-t border-hairline flex flex-wrap gap-2">
-                {canEditProfiles && editForm && (
+              <div className="mt-auto flex flex-wrap gap-2 border-t border-slate-200 px-5 py-4">
+                {canEditProfiles && editForm && profileTab === 'overview' && (
                   <button
                     type="button"
                     onClick={saveProfile}
@@ -877,6 +1172,16 @@ export function UsersPage() {
                     className="ui-btn-primary ui-btn-sm"
                   >
                     {editSaving ? 'Saving…' : 'Save profile'}
+                  </button>
+                )}
+                {canEditLeaveBalance && editForm && profileTab === 'leave' && (
+                  <button
+                    type="button"
+                    onClick={saveProfile}
+                    disabled={editSaving || editLoading}
+                    className="ui-btn-primary ui-btn-sm"
+                  >
+                    {editSaving ? 'Saving…' : 'Save leave'}
                   </button>
                 )}
                 {canChangeRoles && roleCanBeToggled(activeUser.role) && (
@@ -889,7 +1194,7 @@ export function UsersPage() {
                   </button>
                 )}
                 {((activeUser.is_active && canDeactivate) || (!activeUser.is_active && canActivate)) && activeUser.role !== 'super_admin' && (
-                  <button onClick={() => toggleActive(activeUser)} className="ui-btn-secondary ui-btn-sm">
+                  <button type="button" onClick={() => toggleActive(activeUser)} className="ui-btn-secondary ui-btn-sm">
                     {activeUser.is_active ? 'Deactivate' : 'Activate'}
                   </button>
                 )}
@@ -897,6 +1202,36 @@ export function UsersPage() {
             </div>
           )}
       </SlideOverPanel>
+    </div>
+  );
+}
+
+function QuietStatus({ active }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-sm text-slate-600">
+      <span className={`h-1.5 w-1.5 rounded-full ${active ? 'bg-emerald-500' : 'bg-slate-300'}`} aria-hidden />
+      {active ? 'Active' : 'Inactive'}
+    </span>
+  );
+}
+
+function AttendanceMark({ present, active }) {
+  if (!active) {
+    return <span className="text-sm text-slate-400">—</span>;
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 text-sm text-slate-600">
+      <span className={`h-1.5 w-1.5 rounded-full ${present ? 'bg-[#00B0FF]' : 'bg-slate-300'}`} aria-hidden />
+      {present ? 'In today' : 'Not in'}
+    </span>
+  );
+}
+
+function ProfileField({ label, children }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4 border-b border-slate-100 py-2.5 last:border-0">
+      <dt className="shrink-0 text-xs font-medium text-slate-400">{label}</dt>
+      <dd className="min-w-0 text-right text-sm text-slate-800">{children || '—'}</dd>
     </div>
   );
 }

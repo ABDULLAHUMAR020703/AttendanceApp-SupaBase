@@ -442,7 +442,10 @@ export const adminService = {
       if (params.read != null) q.set('read', params.read);
       if (params.type) q.set('type', params.type);
       const suffix = q.toString() ? `?${q.toString()}` : '';
-      return (await api.get(apiUrl(`/api/admin/notifications${suffix}`))).data;
+      const body = (await api.get(apiUrl(`/api/admin/notifications${suffix}`))).data;
+      const data = Array.isArray(body) ? body : Array.isArray(body?.data) ? body.data : [];
+      const total = Number.isFinite(body?.total) ? body.total : data.length;
+      return { data, total, page: body?.page, limit: body?.limit };
     }, 'Failed to load notifications'),
   getUnreadNotificationCount: async () =>
     executeApiCall(async () => (await api.get(apiUrl('/api/admin/notifications/unread-count'))).data.count, 'Failed to load count'),

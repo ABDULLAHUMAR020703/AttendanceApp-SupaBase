@@ -99,10 +99,10 @@ export function CompanyOnboardingPage() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-page">
+    <div className="auth-page relative overflow-y-auto bg-page">
       <HalftoneAura />
 
-      <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-10">
+      <div className="relative z-10 flex min-h-full items-center justify-center px-4 py-10">
         <div className="w-full max-w-md animate-fade-up">
           <Link to="/" className="mb-6 flex items-center justify-center gap-2 text-ink">
             <img

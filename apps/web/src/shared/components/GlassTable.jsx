@@ -12,6 +12,7 @@ import {
 import { cn } from '../lib/cn';
 import { useDismiss } from '../lib/useDismiss';
 import { EmptyStateBody } from './ui/EmptyState';
+import { Select } from './ui/Select';
 import { AnchoredMenu, MenuItem, useMenuNavigation } from './ui/Menu';
 
 /**
@@ -49,10 +50,11 @@ export function GlassTable({
   return (
     <div className={cn('ui-table-shell', className)}>
       {/*
-        A sticky head only sticks against a scrolling ancestor, so `maxHeight` turns
-        the table body into that scroll box. Without it the head is simply static.
+        Sticky heads need a scrolling ancestor. The table body always scrolls inside
+        this region; the page itself stays fixed. An optional maxHeight caps the box
+        when the parent is not a flex fill.
       */}
-      <div className={cn('overflow-x-auto', maxHeight && 'overflow-y-auto')} style={{ maxHeight }}>
+      <div className="ui-table-scroll" style={maxHeight ? { maxHeight } : undefined}>
         <table className="min-w-full">
           <thead className="ui-table-head sticky top-0 z-10">
             <tr>
@@ -134,8 +136,15 @@ export function TableEmpty({ icon = Inbox, title, message, hint, action }) {
   );
 }
 
-export function TableRow({ children, className = '', selected = false }) {
-  return <tr className={cn('ui-table-row', selected && 'ui-table-row-selected', className)}>{children}</tr>;
+export function TableRow({ children, className = '', selected = false, onClick }) {
+  return (
+    <tr
+      className={cn('ui-table-row', selected && 'ui-table-row-selected', onClick && 'cursor-pointer', className)}
+      onClick={onClick}
+    >
+      {children}
+    </tr>
+  );
 }
 
 export function TableCell({ children, className = '' }) {
@@ -159,19 +168,22 @@ const initialsOf = (value) =>
  * what makes a person look the same in every table instead of each page inventing
  * its own avatar size and email styling.
  */
-export function TableIdentity({ name, secondary, onClick, tone = 'accent' }) {
+export function TableIdentity({ name, secondary, onClick, tone = 'accent', size = 'md' }) {
   const Tag = onClick ? 'button' : 'div';
   const palette =
-    tone === 'neutral' ? 'bg-surface-muted text-ink-muted' : 'bg-[#E6F4FA] text-[#00BCFF]';
+    tone === 'neutral' ? 'bg-slate-100 text-slate-500' : 'bg-sky-50 text-sky-600';
+  const compact = size === 'sm';
 
   return (
     <Tag
+      data-identity
       {...(onClick ? { type: 'button', onClick } : {})}
-      className={cn('group flex min-w-0 items-center gap-3 text-left', onClick && 'cursor-pointer')}
+      className={cn('group flex min-w-0 items-center gap-2.5 text-left', onClick && 'cursor-pointer')}
     >
       <span
         className={cn(
-          'grid h-8 w-8 shrink-0 place-items-center rounded-full text-micro font-semibold uppercase',
+          'flex shrink-0 items-center justify-center rounded-full font-semibold uppercase',
+          compact ? 'h-8 w-8 text-[10px]' : 'h-9 w-9 text-xs',
           palette
         )}
         aria-hidden
@@ -181,13 +193,13 @@ export function TableIdentity({ name, secondary, onClick, tone = 'accent' }) {
       <span className="min-w-0">
         <span
           className={cn(
-            'block truncate text-body-tight font-medium text-ink transition-colors',
-            onClick && 'group-hover:text-accent-600'
+            'block truncate text-sm font-semibold text-slate-800 transition-colors',
+            onClick && 'group-hover:text-sky-600'
           )}
         >
           {name}
         </span>
-        {secondary && <span className="block truncate text-caption text-ink-muted">{secondary}</span>}
+        {secondary && <span className="block truncate text-xs text-slate-400">{secondary}</span>}
       </span>
     </Tag>
   );
@@ -315,7 +327,15 @@ export function TableSelectionBar({ count, onClear, children }) {
  * Pager. Shows the visible range rather than only page numbers, because "1-25 of
  * 240" answers the question a page number cannot.
  */
-export function TablePagination({ page, pageSize, total, onPageChange, onPageSizeChange, pageSizes = [25, 50, 100] }) {
+export function TablePagination({
+  page,
+  pageSize,
+  total,
+  onPageChange,
+  onPageSizeChange,
+  pageSizes = [25, 50, 100],
+  className = '',
+}) {
   const pageCount = Math.max(Math.ceil(total / pageSize), 1);
   const current = Math.min(page, pageCount);
   const from = total === 0 ? 0 : (current - 1) * pageSize + 1;
@@ -326,19 +346,20 @@ export function TablePagination({ page, pageSize, total, onPageChange, onPageSiz
   const pages = [windowStart, windowStart + 1, windowStart + 2].filter((value) => value >= 1 && value <= pageCount);
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 px-1">
-      <p className="text-caption font-medium tabular-nums text-ink-muted">
-        {total === 0 ? 'No results' : `${from}–${to} of ${total}`}
+    <div className={cn('flex flex-wrap items-center justify-between gap-3 px-1', className)}>
+      <p className="text-xs font-medium tabular-nums text-slate-400">
+        {total === 0 ? 'No results' : `Showing ${from}–${to} of ${total}`}
       </p>
 
       <div className="flex items-center gap-3">
         {onPageSizeChange && (
-          <label className="flex items-center gap-2 text-caption font-medium text-ink-muted">
-            Rows
-            <select
+          <label className="flex items-center gap-2 text-xs font-medium text-slate-400">
+            Rows per page
+            <Select
               value={pageSize}
               onChange={(event) => onPageSizeChange(Number(event.target.value))}
-              className="ui-select ui-input-sm w-auto"
+              size="sm"
+              className="w-auto"
               aria-label="Rows per page"
             >
               {pageSizes.map((size) => (
@@ -346,7 +367,7 @@ export function TablePagination({ page, pageSize, total, onPageChange, onPageSiz
                   {size}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
         )}
 

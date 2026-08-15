@@ -8,12 +8,13 @@ import {
   LogOut,
   Menu,
   Plus,
-  RefreshCw,
   Search,
   Ticket,
   UserPlus,
 } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { adminService } from '../../features/admin/services/adminService';
+import { queryMockNotifications, setMockFallbackActive } from '../../features/notifications/mockNotifications';
 import { useAuthStore } from '../../features/auth/store/authStore';
 import { useDismiss } from '../lib/useDismiss';
 import { NAV_SECTIONS } from './navConfig';
@@ -123,33 +124,43 @@ function ScreenSearch({ items }) {
         ⌘K
       </kbd>
 
-      {open && query.trim() !== '' && (
-        <div id="screen-search-results" role="listbox" className={`${PANEL} w-72`}>
-          {matches.length === 0 ? (
-            <p className="px-2.5 py-3 text-label text-ink-muted">
-              No screen matches “<span className="font-semibold text-ink">{query.trim()}</span>”.
-            </p>
-          ) : (
-            matches.map((item, index) => {
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.to}
-                  type="button"
-                  role="option"
-                  aria-selected={index === cursor}
-                  onMouseEnter={() => setCursor(index)}
-                  onClick={() => go(item)}
-                  className={`ui-menu-item ${index === cursor ? 'ui-menu-item-active' : ''}`}
-                >
-                  <Icon className="shrink-0 text-[#00BCFF]" aria-hidden />
-                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                </button>
-              );
-            })
-          )}
-        </div>
-      )}
+      <AnimatePresence>
+        {open && query.trim() !== '' && (
+          <motion.div
+            id="screen-search-results"
+            role="listbox"
+            className={`${PANEL} w-72`}
+            initial={{ opacity: 0, scale: 0.96, y: -4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: -4 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
+          >
+            {matches.length === 0 ? (
+              <p className="px-3 py-3 text-sm text-slate-500">
+                No screen matches “<span className="font-semibold text-slate-700">{query.trim()}</span>”.
+              </p>
+            ) : (
+              matches.map((item, index) => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.to}
+                    type="button"
+                    role="option"
+                    aria-selected={index === cursor}
+                    onMouseEnter={() => setCursor(index)}
+                    onClick={() => go(item)}
+                    className={`ui-menu-item ${index === cursor ? 'ui-menu-item-active' : ''}`}
+                  >
+                    <Icon className="shrink-0 text-[#00A3FF]" aria-hidden />
+                    <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                  </button>
+                );
+              })
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -198,23 +209,25 @@ function QuickActions({ canSee }) {
         <span className="hidden sm:inline">New</span>
       </button>
 
-      {open && (
-        <MenuPanel label="Quick actions" className={PANEL} containerRef={containerRef} onKeyDown={onKeyDown}>
-          <MenuLabel>Create</MenuLabel>
-          {actions.map((action) => (
-            <MenuItem
-              key={action.label}
-              icon={action.icon}
-              onSelect={() => {
-                close();
-                navigate(action.to, action.state ? { state: action.state } : undefined);
-              }}
-            >
-              {action.label}
-            </MenuItem>
-          ))}
-        </MenuPanel>
-      )}
+      <AnimatePresence>
+        {open && (
+          <MenuPanel label="Quick actions" className={PANEL} containerRef={containerRef} onKeyDown={onKeyDown}>
+            <MenuLabel>Create</MenuLabel>
+            {actions.map((action) => (
+              <MenuItem
+                key={action.label}
+                icon={action.icon}
+                onSelect={() => {
+                  close();
+                  navigate(action.to, action.state ? { state: action.state } : undefined);
+                }}
+              >
+                {action.label}
+              </MenuItem>
+            ))}
+          </MenuPanel>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -236,7 +249,14 @@ function NotificationBell({ unreadCount }) {
     setError('');
     try {
       const res = await adminService.getNotifications({ page: 1, limit: 5 });
-      setItems(res.data || []);
+      const live = Array.isArray(res.data) ? res.data : [];
+      if (live.length > 0) {
+        setMockFallbackActive(false);
+        setItems(live);
+      } else {
+        setMockFallbackActive(true);
+        setItems(queryMockNotifications({ page: 1, limit: 5 }).data);
+      }
     } catch (err) {
       setError(err?.message || 'Failed to load notifications');
     } finally {
@@ -258,12 +278,17 @@ function NotificationBell({ unreadCount }) {
         <CountBadge count={unreadCount} tone="brand" className="absolute -right-0.5 -top-0.5" />
       </button>
 
-      {open && (
-        <div
-          role="dialog"
-          aria-label="Recent notifications"
-          className="absolute right-0 top-[calc(100%+0.5rem)] z-30 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-hairline bg-white p-0 shadow-pop animate-scale-in"
-        >
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            role="dialog"
+            aria-label="Recent notifications"
+            className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-sky-100/80 bg-white p-0 shadow-[0_10px_25px_-5px_rgba(0,163,255,0.1),0_8px_10px_-6px_rgba(0,0,0,0.04)]"
+            initial={{ opacity: 0, scale: 0.96, y: -4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: -4 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
+          >
           <div className="flex items-center justify-between gap-3 border-b border-hairline bg-surface-subtle px-4 py-2.5">
             <p className="text-label font-semibold text-ink">Notifications</p>
             <button
@@ -320,13 +345,14 @@ function NotificationBell({ unreadCount }) {
                 </button>
               ))}
           </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
-function ProfileMenu({ onLogout, onRefresh }) {
+function ProfileMenu({ onLogout }) {
   const user = useAuthStore((state) => state.user);
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
@@ -352,38 +378,32 @@ function ProfileMenu({ onLogout, onRefresh }) {
       >
         {initials}
       </button>
-      {open && (
-        <div
-          role="menu"
-          className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-48 rounded-xl border border-slate-100 bg-white p-2 shadow-xl animate-picker-in"
-        >
-          <p className="truncate px-2 py-1.5 text-xs font-medium text-[#8898AA]">{label}</p>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={async () => {
-              await onRefresh?.();
-              close();
-            }}
-            className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-[#F0F9FD] hover:text-[#00B0FF]"
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            role="menu"
+            className="ui-menu absolute right-0 top-[calc(100%+0.5rem)] z-50 w-48"
+            initial={{ opacity: 0, scale: 0.96, y: -4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: -4 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
           >
-            <RefreshCw className="h-4 w-4" aria-hidden />
-            Refresh
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              close();
-              onLogout?.();
-            }}
-            className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-rose-600 transition-colors hover:bg-rose-50"
-          >
-            <LogOut className="h-4 w-4" aria-hidden />
-            Logout
-          </button>
-        </div>
-      )}
+            <p className="ui-menu-label truncate normal-case tracking-normal">{label}</p>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                close();
+                onLogout?.();
+              }}
+              className="ui-menu-item ui-menu-item-danger"
+            >
+              <LogOut aria-hidden />
+              Logout
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -391,7 +411,7 @@ function ProfileMenu({ onLogout, onRefresh }) {
 /**
  * Compact application header: breadcrumb + page title, then search and account.
  */
-export function TopBar({ pathname, items, canSee, unreadCount = 0, onOpenMobileNav, onLogout, onRefresh }) {
+export function TopBar({ pathname, items, canSee, unreadCount = 0, onOpenMobileNav, onLogout }) {
   const meta = routeMeta(pathname);
   const showNotifications = canSee({ to: '/notifications', feature: 'notifications' });
 
@@ -431,7 +451,7 @@ export function TopBar({ pathname, items, canSee, unreadCount = 0, onOpenMobileN
             <NotificationBell unreadCount={unreadCount} />
           </div>
         )}
-        <ProfileMenu onLogout={onLogout} onRefresh={onRefresh} />
+        <ProfileMenu onLogout={onLogout} />
       </div>
     </header>
   );

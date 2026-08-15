@@ -14,7 +14,6 @@ import {
   CHART_AXIS,
   CHART_COLORS,
   CHART_GRID,
-  CHART_HEIGHT,
   CHART_LEGEND_STYLE,
   CHART_MARGINS,
   CHART_TOOLTIP_STYLE,
@@ -28,7 +27,7 @@ export const AttendanceLineChart = memo(function AttendanceLineChart({
   const xLabel = granularity === 'monthly' ? 'Month' : granularity === 'weekly' ? 'Week' : 'Date';
 
   return (
-    <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
+    <ResponsiveContainer width="100%" height="100%">
       <LineChart data={data} margin={CHART_MARGINS.line}>
         <CartesianGrid {...CHART_GRID} />
         <XAxis

@@ -8,7 +8,7 @@ import { Skeleton } from './Skeleton';
  */
 export function AppLoader({ label = 'Loading workspace' }) {
   return (
-    <div className="page-wash flex h-screen w-full overflow-hidden" role="status" aria-busy="true" aria-live="polite">
+    <div className="page-wash flex h-full w-full overflow-hidden" role="status" aria-busy="true" aria-live="polite">
       <span className="sr-only">{label}</span>
 
       {/* Collapsed nav rail: same 64px footprint the real sidebar occupies at rest. */}

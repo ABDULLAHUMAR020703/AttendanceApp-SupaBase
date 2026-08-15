@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Calendar, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import { useDismiss } from '../../../shared/lib/useDismiss';
 
@@ -108,18 +109,23 @@ function PickerPopover({ open, triggerRef, panelRef, width, height, label, child
     };
   }, [open, triggerRef, width, height]);
 
-  if (!open || !placement) return null;
-
   return createPortal(
-    <div
-      ref={panelRef}
-      role="dialog"
-      aria-label={label}
-      style={{ position: 'fixed', top: placement.top, left: placement.left, width, zIndex: 80 }}
-      className="animate-picker-in"
-    >
-      {children}
-    </div>,
+    <AnimatePresence>
+      {open && placement ? (
+        <motion.div
+          ref={panelRef}
+          role="dialog"
+          aria-label={label}
+          initial={{ opacity: 0, scale: 0.96, y: -4 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.96, y: -4 }}
+          transition={{ duration: 0.15, ease: 'easeOut' }}
+          style={{ position: 'fixed', top: placement.top, left: placement.left, width, zIndex: 80, transformOrigin: 'top left' }}
+        >
+          {children}
+        </motion.div>
+      ) : null}
+    </AnimatePresence>,
     document.body,
   );
 }

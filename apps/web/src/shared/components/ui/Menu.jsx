@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { cn } from '../../lib/cn';
+
+export const DROPDOWN_MOTION = {
+  initial: { opacity: 0, scale: 0.96, y: -4 },
+  animate: { opacity: 1, scale: 1, y: 0 },
+  exit: { opacity: 0, scale: 0.96, y: -4 },
+  transition: { duration: 0.15, ease: 'easeOut' },
+};
 
 /**
  * One dropdown system for the whole product: header menus, row overflow menus and
@@ -21,7 +29,6 @@ export function useMenuNavigation({ open, onClose, autoFocus = true }) {
 
   useEffect(() => {
     if (!open || !autoFocus) return undefined;
-    /* One frame so the panel is mounted and measurable before focus lands. */
     const frame = requestAnimationFrame(() => itemsOf()[0]?.focus());
     return () => cancelAnimationFrame(frame);
   }, [open, autoFocus, itemsOf]);
@@ -89,7 +96,7 @@ export function MenuItem({ icon: Icon, tone, disabled, onSelect, children, class
     >
       {Icon && (
         <Icon
-          className={cn('shrink-0', tone === 'danger' ? 'text-current' : 'text-accent-600')}
+          className={cn('shrink-0', tone === 'danger' ? 'text-current' : 'text-[#00A3FF]')}
           aria-hidden
         />
       )}
@@ -100,19 +107,25 @@ export function MenuItem({ icon: Icon, tone, disabled, onSelect, children, class
 
 /** Panel shell. Use inside a `relative` popover root for trigger-anchored menus. */
 export function MenuPanel({ label, header, footer, className = '', containerRef, onKeyDown, style, children }) {
+  const reduceMotion = useReducedMotion();
+
   return (
-    <div
+    <motion.div
       ref={containerRef}
       role="menu"
       aria-label={label}
       onKeyDown={onKeyDown}
-      style={style}
+      style={{ transformOrigin: 'top right', ...style }}
       className={cn('ui-menu', className)}
+      initial={reduceMotion ? false : DROPDOWN_MOTION.initial}
+      animate={DROPDOWN_MOTION.animate}
+      exit={reduceMotion ? undefined : DROPDOWN_MOTION.exit}
+      transition={DROPDOWN_MOTION.transition}
     >
       {header}
       {children}
       {footer}
-    </div>
+    </motion.div>
   );
 }
 
@@ -134,18 +147,22 @@ export function AnchoredMenu({ open, onClose, placement, width, label, container
     };
   }, [open, onClose]);
 
-  if (!open || !placement) return null;
+  if (typeof document === 'undefined') return null;
 
   return createPortal(
-    <MenuPanel
-      label={label}
-      containerRef={containerRef}
-      onKeyDown={onKeyDown}
-      className="fixed z-50"
-      style={{ left: placement.left, top: placement.top, width }}
-    >
-      {children}
-    </MenuPanel>,
+    <AnimatePresence>
+      {open && placement ? (
+        <MenuPanel
+          label={label}
+          containerRef={containerRef}
+          onKeyDown={onKeyDown}
+          className="fixed z-50"
+          style={{ left: placement.left, top: placement.top, width }}
+        >
+          {children}
+        </MenuPanel>
+      ) : null}
+    </AnimatePresence>,
     document.body,
   );
 }

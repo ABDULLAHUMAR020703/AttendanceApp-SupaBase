@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import { motion } from 'framer-motion';
 import { CHART_COLORS } from './chartTheme';
 
 function TooltipRow({ label, value, accent }) {
@@ -60,11 +61,14 @@ export const GrowthTooltipContent = memo(function GrowthTooltipContent({ active,
         : n.toFixed(1);
 
   return (
-    <div
-      className="rounded-md border border-slate-100 bg-white/90 px-2 py-0.5 text-xs font-bold text-slate-800 shadow-sm backdrop-blur-sm"
+    <motion.div
+      initial={{ opacity: 0, y: 6, scale: 0.92 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+      className="rounded-full border border-slate-100 bg-white px-2.5 py-1 text-xs font-bold text-slate-800 shadow-md"
       role="tooltip"
     >
       {label}
-    </div>
+    </motion.div>
   );
 });

@@ -3,6 +3,7 @@ import { cn } from '../../lib/cn';
 const TONES = {
   neutral: 'ui-badge-neutral',
   accent: 'ui-badge-accent',
+  violet: 'ui-badge-violet',
   success: 'ui-badge-success',
   warning: 'ui-badge-warning',
   danger: 'ui-badge-danger',
@@ -18,9 +19,10 @@ const TONE_ALIASES = {
 };
 
 const DOTS = {
-  neutral: 'bg-ink-faint',
-  accent: 'bg-accent-600',
-  success: 'bg-success-solid',
+  neutral: 'bg-slate-400',
+  accent: 'bg-sky-500',
+  violet: 'bg-violet-500',
+  success: 'bg-emerald-500',
   warning: 'bg-warning-solid',
   danger: 'bg-danger-solid',
 };
@@ -96,8 +98,8 @@ const STATUS_TONES = {
 
 /** Roles are a separate axis: seniority reads through weight, not through alarm. */
 const ROLE_TONES = {
-  super_admin: 'accent',
-  admin: 'accent',
+  super_admin: 'violet',
+  admin: 'violet',
   manager: 'accent',
   employee: 'neutral',
 };

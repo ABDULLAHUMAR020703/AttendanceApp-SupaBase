@@ -13,28 +13,17 @@ export function ChartSkeleton({ height = 280, variant = 'chart' }) {
   }
 
   return (
-    <div className="space-y-3" aria-hidden="true">
-      <div className="space-y-2">
-        <div className="h-4 w-40 rounded skeleton" />
-        <div className="h-3 w-56 rounded skeleton" />
+    <div className="flex h-full min-h-0 flex-col justify-end gap-3" aria-hidden="true">
+      <div className="flex h-full min-h-0 items-end justify-between gap-2" style={{ minHeight: Math.min(height, 160) }}>
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div
+            key={i}
+            className="flex-1 rounded-t-md skeleton"
+            style={{ height: `${35 + (i % 3) * 18}%` }}
+          />
+        ))}
       </div>
-      <div
-        className="rounded-2xl border border-hairline bg-white p-4"
-        style={{ minHeight: height }}
-      >
-        <div className="flex h-full flex-col justify-end gap-3" style={{ minHeight: height - 32 }}>
-          <div className="flex items-end justify-between gap-2 h-40">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div
-                key={i}
-                className="flex-1 rounded-t-md skeleton"
-                style={{ height: `${35 + (i % 3) * 18}%` }}
-              />
-            ))}
-          </div>
-          <div className="h-3 w-full rounded skeleton" />
-        </div>
-      </div>
+      <div className="h-3 w-full rounded skeleton" />
     </div>
   );
 }

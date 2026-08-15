@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CalendarPlus, ChevronLeft, ChevronRight, Plus, Search, X } from 'lucide-react';
-import { PermissionGate } from '../../../shared/components/PermissionGate';
+import { CalendarPlus, ChevronLeft, ChevronRight, Clock3, Plus, Search, Users, X } from 'lucide-react';
+import { PermissionGate, useAnyPermission } from '../../../shared/components/PermissionGate';
 import { adminService } from '../services/adminService';
 import { PERMISSIONS } from '../permissions';
+import { SlideOverPanel } from '../../../shared/components/SlideOverPanel';
 import { useSilentPoll, useSessionState } from '../../../shared/hooks/useSilentPoll';
 import { EmptyStateBody } from '../../../shared/components/ui/EmptyState';
 import { SkeletonFeed } from '../../../shared/components/ui/Skeleton';
 import { DatePickerField, TimePickerField } from './calendarPickers';
+import { formatEmployeeDisplay, formatLeaveStatus, formatLeaveTypeLabel } from '../utils/leaveDisplay';
+import { normalizeAttendanceType } from '../utils/analyticsCharts';
 
 const RAIL = '#00B0FF';
-const SIDEBAR_GRADIENT = 'linear-gradient(180deg, #00B0FF 0%, #00A8E6 58%, #0099E6 100%)';
+const SIDEBAR_GRADIENT = 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)';
 
 const EVENT_TYPES = [
   { value: 'reminder', label: 'Reminder' },
@@ -150,6 +153,100 @@ function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 
+function startOfDay(date) {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  return next;
+}
+
+function endOfDay(date) {
+  const next = new Date(date);
+  next.setHours(23, 59, 59, 999);
+  return next;
+}
+
+function formatWorkMode(value) {
+  const mode = String(value || 'in_office').toLowerCase().replace(/-/g, '_');
+  const labels = {
+    in_office: 'In office',
+    office: 'In office',
+    remote: 'Remote',
+    fully_remote: 'Remote',
+    hybrid: 'Hybrid',
+    semi_remote: 'Hybrid',
+  };
+  return labels[mode] || String(value || 'Unknown').replace(/_/g, ' ');
+}
+
+function employeeName(row) {
+  return row?.employee?.name || row?.employee_name || row?.employeeName || row?.name || row?.username || row?.employee_uid || row?.user_uid || 'Employee';
+}
+
+function attendanceDateKey(row) {
+  if (!row?.timestamp) return '';
+  const date = new Date(row.timestamp);
+  return Number.isNaN(date.getTime()) ? '' : toDateKey(date);
+}
+
+function workModeDateKey(row) {
+  const raw = row?.effective_date || row?.requested_date || row?.created_at || row?.createdAt;
+  if (!raw) return '';
+  const date = new Date(raw);
+  return Number.isNaN(date.getTime()) ? '' : toDateKey(date);
+}
+
+function normalizeStatus(value) {
+  return String(value || 'pending').toLowerCase();
+}
+
+function leaveCoversDate(leave, dateKey) {
+  const start = parseDate(leave?.start_date);
+  const end = parseDate(leave?.end_date);
+  const day = parseDate(dateKey);
+  if (!start || !end || !day) return false;
+  return startOfDay(start) <= startOfDay(day) && startOfDay(end) >= startOfDay(day);
+}
+
+function formatStamp(iso) {
+  if (!iso) return 'All day';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return 'All day';
+  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+function daySummary({ dateKey, events = [], attendanceRows = [], leaveRows = [], workModeRows = [], users = [] }) {
+  const dayEvents = events.filter((event) => event.dateKey === dateKey);
+  const dayAttendance = attendanceRows.filter((row) => attendanceDateKey(row) === dateKey);
+  const dayLeaves = leaveRows.filter((row) => leaveCoversDate(row, dateKey));
+  const dayWorkModes = workModeRows.filter((row) => workModeDateKey(row) === dateKey);
+  const holidays = dayEvents.filter((event) => event.type === 'holiday');
+  const approvedLeaves = dayLeaves.filter((row) => normalizeStatus(row.status) === 'approved');
+  const pendingLeaves = dayLeaves.filter((row) => normalizeStatus(row.status) === 'pending');
+  const checkins = dayAttendance.filter((row) => normalizeAttendanceType(row.type) === 'checkin');
+  const checkouts = dayAttendance.filter((row) => normalizeAttendanceType(row.type) === 'checkout');
+  const workModes = users.reduce((counts, user) => {
+    if (user?.is_active === false) return counts;
+    const mode = formatWorkMode(user.work_mode || user.workMode || 'in_office');
+    counts[mode] = (counts[mode] || 0) + 1;
+    return counts;
+  }, {});
+
+  return {
+    dateKey,
+    events: dayEvents,
+    holidays,
+    attendance: dayAttendance,
+    checkins,
+    checkouts,
+    leaves: dayLeaves,
+    approvedLeaves,
+    pendingLeaves,
+    workModeRequests: dayWorkModes,
+    workModes,
+    hasData: dayEvents.length > 0 || dayAttendance.length > 0 || dayLeaves.length > 0 || dayWorkModes.length > 0 || Object.keys(workModes).length > 0,
+  };
+}
+
 function TimelineEventCard({ event, index, onClick, compact = false }) {
   const dash = EVENT_DASH[event.type] || EVENT_DASH.other;
   const start = eventStartMinutes(event, index);
@@ -188,19 +285,19 @@ function MiniCalendar({ monthDate, selectedDate, eventDays, onSelect, onShiftMon
   const selectedKey = selectedDate || '';
 
   return (
-    <div className="px-1 py-1 text-white">
+    <div className="px-1 py-1 text-slate-800">
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm font-bold tracking-tight">{formatMonthLabel(monthDate)}</p>
         <div className="flex gap-1">
-          <button type="button" onClick={() => onShiftMonth(-1)} className="grid h-8 w-8 place-items-center rounded-full text-white transition-all duration-200 hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70" aria-label="Previous month">
+          <button type="button" onClick={() => onShiftMonth(-1)} className="grid h-8 w-8 place-items-center rounded-full text-slate-400 transition-all duration-200 hover:bg-slate-100 hover:text-[#00B0FF] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00B0FF]/30" aria-label="Previous month">
             <ChevronLeft className="h-4 w-4" aria-hidden />
           </button>
-          <button type="button" onClick={() => onShiftMonth(1)} className="grid h-8 w-8 place-items-center rounded-full text-white transition-all duration-200 hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70" aria-label="Next month">
+          <button type="button" onClick={() => onShiftMonth(1)} className="grid h-8 w-8 place-items-center rounded-full text-slate-400 transition-all duration-200 hover:bg-slate-100 hover:text-[#00B0FF] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00B0FF]/30" aria-label="Next month">
             <ChevronRight className="h-4 w-4" aria-hidden />
           </button>
         </div>
       </div>
-      <div className="mb-2 grid grid-cols-7 text-center text-[10px] font-bold tracking-[0.08em] text-white/80">
+      <div className="mb-2 grid grid-cols-7 text-center text-[10px] font-bold tracking-[0.08em] text-slate-400">
         {MINI_WEEKDAYS.map((day, index) => <span key={`${day}-${index}`} className="py-1">{day}</span>)}
       </div>
       <div className="grid grid-cols-7 gap-y-1 text-center text-[12px]">
@@ -212,18 +309,18 @@ function MiniCalendar({ monthDate, selectedDate, eventDays, onSelect, onShiftMon
               key={cell.key}
               type="button"
               onClick={() => onSelect(cell.key)}
-              className={`relative mx-auto flex h-8 w-8 flex-col items-center justify-center rounded-full font-bold transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
+              className={`relative mx-auto flex h-8 w-8 flex-col items-center justify-center rounded-full font-bold transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00B0FF]/30 ${
                 active
-                  ? 'bg-white text-[#00B0FF] shadow-md'
+                  ? 'bg-[#00B0FF] text-white shadow-sm'
                   : cell.inMonth
-                    ? 'text-white hover:bg-white/15'
-                    : 'text-white/50 hover:bg-white/10'
+                    ? 'text-slate-700 hover:bg-slate-100'
+                    : 'text-slate-300 hover:bg-slate-100'
               }`}
             >
               <span className="leading-none">{cell.date.getDate()}</span>
               {hasEvent && (
                 <span
-                  className="absolute bottom-0.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-[#70C8F4]"
+                  className="absolute bottom-0.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-[#00B0FF]"
                   aria-hidden
                 />
               )}
@@ -235,51 +332,86 @@ function MiniCalendar({ monthDate, selectedDate, eventDays, onSelect, onShiftMon
   );
 }
 
-function MonthGrid({ monthDate, selectedDate, eventsByDay, onSelect, onOpenEvent }) {
+function TypeDot({ tone, label }) {
+  const tones = {
+    attendance: 'bg-emerald-500',
+    leave: 'bg-sky-500',
+    holiday: 'bg-amber-500',
+    work: 'bg-violet-400',
+    event: 'bg-[#00B0FF]',
+  };
+  return <span className={`h-1.5 w-1.5 rounded-full ${tones[tone] || tones.event}`} title={label} aria-label={label} />;
+}
+
+function MonthGrid({ monthDate, selectedDate, eventsByDay, summariesByDay, onSelect, onOpenEvent, onOpenDay }) {
   const cells = useMemo(() => buildMonthCells(monthDate), [monthDate]);
   const todayKey = toDateKey(new Date());
 
   return (
     <div className="grid min-h-0 flex-1 grid-cols-7 overflow-hidden rounded-2xl border border-[#E8F0F5] bg-white">
-      {MINI_WEEKDAYS.map((day, index) => (
-        <div key={`${day}-${index}`} className="border-b border-[#E8F0F5] bg-[#F0F9FD] px-2 py-2 text-center text-[11px] font-bold uppercase tracking-[0.08em] text-[#8898AA]">
+      {WEEKDAYS.map((day, index) => (
+        <div key={`${day}-${index}`} className="border-b border-[#E8F0F5] bg-slate-50 px-2 py-2 text-center text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">
           {day}
         </div>
       ))}
       {cells.map((cell) => {
         const dayEvents = eventsByDay.get(cell.key) || [];
+        const summary = summariesByDay.get(cell.key) || {};
         const active = cell.key === selectedDate;
         const isToday = cell.key === todayKey;
+        const hasAttendance = (summary.checkins?.length || 0) > 0;
+        const hasLeave = (summary.leaves?.length || 0) > 0;
+        const hasHoliday = (summary.holidays?.length || 0) > 0;
+        const hasWork = (summary.workModeRequests?.length || 0) > 0;
         return (
           <button
             key={cell.key}
             type="button"
-            onClick={() => onSelect(cell.key)}
-            className={`flex min-h-[92px] flex-col items-start gap-1 overflow-hidden border-b border-r border-[#E8F0F5] p-2 text-left transition hover:bg-[#F0F9FD] ${cell.inMonth ? 'bg-white' : 'bg-[#F8FAFC]'}`}
+            onClick={() => onOpenDay(cell.key)}
+            className={`group flex min-h-[108px] flex-col items-start gap-1.5 overflow-hidden border-b border-r border-[#E8F0F5] p-2 text-left transition hover:bg-slate-50/80 ${active ? 'bg-[#F0FAFF]' : cell.inMonth ? 'bg-white' : 'bg-slate-50/70'}`}
           >
-            <span className={`grid h-7 w-7 place-items-center rounded-full text-xs font-bold ${
-              active || isToday ? 'bg-[#00B0FF] text-white' : cell.inMonth ? 'text-[#0F172A]' : 'text-[#8898AA]'
-            }`}>
-              {cell.date.getDate()}
+            <span className="flex w-full items-center justify-between gap-2">
+              <span className={`grid h-7 w-7 place-items-center rounded-full text-xs font-semibold ${
+                active ? 'bg-[#00B0FF] text-white' : isToday ? 'border border-[#00B0FF]/40 bg-white text-[#0284C7]' : cell.inMonth ? 'text-slate-800' : 'text-slate-300'
+              }`}>
+                {cell.date.getDate()}
+              </span>
+              <span className="flex items-center gap-1" aria-hidden>
+                {hasAttendance && <TypeDot tone="attendance" label="Attendance" />}
+                {hasLeave && <TypeDot tone="leave" label="Leave" />}
+                {hasHoliday && <TypeDot tone="holiday" label="Holiday" />}
+                {hasWork && <TypeDot tone="work" label="Work mode" />}
+                {dayEvents.length > 0 && !hasHoliday && <TypeDot tone="event" label="Event" />}
+              </span>
             </span>
-            {dayEvents.slice(0, 3).map((event) => (
+            {summary.approvedLeaves?.length > 0 && (
+              <span className="rounded-md bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium text-sky-700">
+                {summary.approvedLeaves.length} on leave
+              </span>
+            )}
+            {summary.checkins?.length > 0 && (
+              <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
+                {summary.checkins.length} check-ins
+              </span>
+            )}
+            {dayEvents.slice(0, 2).map((event) => (
               <span
                 key={event.id}
                 role="presentation"
                 onClick={(e) => { e.stopPropagation(); onOpenEvent(event); }}
-                className="flex w-full items-center gap-1.5 truncate rounded-md bg-white px-1.5 py-1 text-[10px] font-semibold text-slate-800 shadow-[0_4px_10px_rgba(0,167,214,0.06)]"
+                className="mt-0.5 flex w-full items-center gap-1.5 truncate rounded-md bg-white/80 px-1.5 py-1 text-[10px] font-medium text-slate-700 ring-1 ring-slate-100 transition group-hover:bg-white"
               >
-                <span className="h-[3px] w-3.5 shrink-0 rounded-full" style={{ backgroundColor: EVENT_DASH[event.type] || EVENT_DASH.other }} aria-hidden />
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: EVENT_DASH[event.type] || EVENT_DASH.other }} aria-hidden />
                 {event.title}
               </span>
             ))}
+            {dayEvents.length > 2 && <span className="text-[10px] font-medium text-slate-400">+{dayEvents.length - 2} more</span>}
           </button>
         );
       })}
     </div>
   );
 }
-
 export function CalendarPage() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -293,19 +425,38 @@ export function CalendarPage() {
   const [monthDate, setMonthDate] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useSessionState('calendar:selectedDate', toDateKey(new Date()));
   const [query, setQuery] = useState('');
+  const [attendanceRows, setAttendanceRows] = useState([]);
+  const [leaveRows, setLeaveRows] = useState([]);
+  const [workModeRows, setWorkModeRows] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [activeDay, setActiveDay] = useState('');
+
+  const canViewAttendance = useAnyPermission([PERMISSIONS.VIEW_ATTENDANCE, PERMISSIONS.MANUAL_ATTENDANCE]);
+  const canViewLeaves = useAnyPermission([PERMISSIONS.VIEW_LEAVE_REQUESTS, PERMISSIONS.APPROVE_LEAVE, PERMISSIONS.REJECT_LEAVE]);
+  const canViewWorkModes = useAnyPermission([PERMISSIONS.VIEW_WORK_MODE_REQUESTS, PERMISSIONS.APPROVE_WORK_MODE, PERMISSIONS.REJECT_WORK_MODE]);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const data = await adminService.getCalendarEvents();
-      setEvents(data || []);
+      const [eventData, attendanceData, leaveData, workModeData, userData] = await Promise.all([
+        adminService.getCalendarEvents(),
+        canViewAttendance ? adminService.getAttendance().catch(() => []) : Promise.resolve([]),
+        canViewLeaves ? adminService.getLeaves().catch(() => []) : Promise.resolve([]),
+        canViewWorkModes ? adminService.getWorkModeRequests().catch(() => []) : Promise.resolve([]),
+        adminService.getUsers().catch(() => []),
+      ]);
+      setEvents(eventData || []);
+      setAttendanceRows(attendanceData || []);
+      setLeaveRows(leaveData || []);
+      setWorkModeRows(workModeData || []);
+      setUsers(userData || []);
       if (!silent) setError('');
     } catch (err) {
       if (!silent) setError(err.message || 'Failed to load events');
     } finally {
       if (!silent) setLoading(false);
     }
-  }, []);
+  }, [canViewAttendance, canViewLeaves, canViewWorkModes]);
 
   useEffect(() => { load(); }, [load]);
   useSilentPoll(load, 30000, []);
@@ -340,9 +491,36 @@ export function CalendarPage() {
     return map;
   }, [filteredEvents]);
 
+  const summariesByDay = useMemo(() => {
+    const keys = new Set([
+      ...filteredEvents.map((event) => event.dateKey).filter(Boolean),
+      ...attendanceRows.map(attendanceDateKey).filter(Boolean),
+      ...workModeRows.map(workModeDateKey).filter(Boolean),
+    ]);
+    for (const leave of leaveRows) {
+      const start = parseDate(leave.start_date);
+      const end = parseDate(leave.end_date);
+      if (!start || !end) continue;
+      const cursor = startOfDay(start);
+      const last = startOfDay(end);
+      while (cursor <= last) {
+        keys.add(toDateKey(cursor));
+        cursor.setDate(cursor.getDate() + 1);
+      }
+    }
+    const map = new Map();
+    keys.forEach((dateKey) => {
+      map.set(dateKey, daySummary({ dateKey, events: filteredEvents, attendanceRows, leaveRows, workModeRows, users }));
+    });
+    return map;
+  }, [filteredEvents, attendanceRows, leaveRows, workModeRows, users]);
+
   const timelineDays = useMemo(() => buildTimelineDays(selectedDate, view), [selectedDate, view]);
-  const eventDays = useMemo(() => new Set(normalizedEvents.map((event) => event.dateKey).filter(Boolean)), [normalizedEvents]);
+  const eventDays = useMemo(() => new Set(summariesByDay.keys()), [summariesByDay]);
   const selected = events.find((event) => event.id === selectedId);
+  const activeDaySummary = activeDay
+    ? summariesByDay.get(activeDay) || daySummary({ dateKey: activeDay, events: filteredEvents, attendanceRows, leaveRows, workModeRows, users })
+    : null;
   const now = new Date();
   const todayKey = toDateKey(now);
   const todayIndex = timelineDays.findIndex((day) => day.key === todayKey);
@@ -394,6 +572,21 @@ export function CalendarPage() {
     const nextKey = toDateKey(base);
     setSelectedDate(nextKey);
     setMonthDate(new Date(base.getFullYear(), base.getMonth(), 1));
+  }
+
+  function openDay(dateKey) {
+    setSelectedDate(dateKey);
+    updateForm('date', dateKey);
+    const date = parseDate(dateKey);
+    if (date) setMonthDate(new Date(date.getFullYear(), date.getMonth(), 1));
+    setActiveDay(dateKey);
+  }
+
+  function jumpToToday() {
+    const key = toDateKey(new Date());
+    setSelectedDate(key);
+    updateForm('date', key);
+    setMonthDate(new Date());
   }
 
   async function handleSubmit(e) {
@@ -452,12 +645,15 @@ export function CalendarPage() {
   const headerLabel = view === 'day' ? formatDayLabel(navigatorDate) : formatMonthLabel(navigatorDate);
 
   return (
-    <div className="flex h-[calc(100dvh-8.75rem)] min-h-0 flex-col gap-4 overflow-hidden font-sans text-[#0F172A] antialiased lg:flex-row">
+    <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden font-sans text-[#0F172A] antialiased lg:flex-row">
       <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-3xl border border-[rgba(136,152,170,0.18)] bg-[#F8FAFC] shadow-[0_8px_24px_rgba(0,167,214,0.08)]">
         <header className="flex shrink-0 flex-col gap-3 border-b border-[rgba(136,152,170,0.18)] bg-white px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Team schedule</h1>
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Calendar</h1>
+            <p className="mt-1 text-sm text-slate-500">See workforce availability at a glance.</p>
+          </div>
           <div className="flex flex-wrap items-center gap-3">
-            <div className="inline-flex rounded-xl border border-slate-200/60 bg-slate-100/80 p-1">
+            <div className="inline-flex ui-segment">
               {['month', 'week', 'day'].map((item) => {
                 const active = view === item;
                 return (
@@ -465,16 +661,15 @@ export function CalendarPage() {
                     key={item}
                     type="button"
                     onClick={() => setView(item)}
-                    className={`rounded-lg px-3.5 py-1.5 text-xs capitalize transition-all duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00B0FF]/40 ${
-                      active ? 'bg-[#00B0FF] font-semibold text-white shadow-sm' : 'font-medium text-[#8898AA] hover:bg-white/80 hover:text-slate-700'
-                    }`}
+                    className={`ui-segment-item capitalize ${active ? 'ui-segment-item-active' : ''}`}
                   >
                     {item}
                   </button>
                 );
               })}
             </div>
-            <div className="flex items-center gap-1.5 rounded-xl border border-slate-200/50 bg-[#F0F9FD] px-3 py-1.5">
+            <button type="button" onClick={jumpToToday} className="inline-flex h-9 items-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 transition-colors hover:border-[#00B0FF]/50 hover:text-[#00B0FF]">Today</button>
+            <div className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1">
               <button type="button" onClick={() => shiftRange(-1)} className="grid h-8 w-8 place-items-center rounded-full text-[#8898AA] transition-all duration-200 hover:bg-white hover:text-[#00B0FF] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00B0FF]/40" aria-label="Previous">
                 <ChevronLeft className="h-4 w-4" aria-hidden />
               </button>
@@ -491,7 +686,7 @@ export function CalendarPage() {
 
         {loading ? (
           <div className="min-h-0 flex-1 overflow-auto p-6"><SkeletonFeed count={5} /></div>
-        ) : events.length === 0 && view !== 'month' ? (
+        ) : summariesByDay.size === 0 && view !== 'month' ? (
           <EmptyStateBody
             size="sm"
             icon={CalendarPlus}
@@ -505,11 +700,13 @@ export function CalendarPage() {
               monthDate={monthDate}
               selectedDate={selectedDate}
               eventsByDay={eventsByDay}
+              summariesByDay={summariesByDay}
               onSelect={(dateKey) => {
                 setSelectedDate(dateKey);
                 updateForm('date', dateKey);
               }}
               onOpenEvent={startEdit}
+              onOpenDay={openDay}
             />
           </div>
         ) : (
@@ -522,20 +719,28 @@ export function CalendarPage() {
                 <div className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-[#8898AA]">Time</div>
                 {timelineDays.map((day) => {
                   const isSelected = day.key === selectedDate;
+                  const summary = summariesByDay.get(day.key) || {};
                   return (
                     <button
                       key={day.key}
                       type="button"
-                      onClick={() => setSelectedDate(day.key)}
-                      className={`calendar-weekday-header my-1 flex flex-col items-center justify-center rounded-2xl px-3 py-2 shadow-md transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00B0FF]/40 ${
-                        isSelected ? 'calendar-weekday-header--active' : 'bg-transparent shadow-none hover:bg-white/70'
-                      } ${view === 'day' ? 'mx-auto w-fit min-w-[6.5rem]' : 'mx-1 w-[calc(100%-0.5rem)]'}`}
+                      onClick={() => openDay(day.key)}
+                      className={`my-1 flex flex-col items-center justify-center rounded-xl px-3 py-2 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00B0FF]/40 ${
+                        isSelected ? 'bg-white shadow-sm ring-1 ring-[#00B0FF]/20' : 'bg-transparent hover:bg-white/70'
+                      } ${view === 'day' ? 'mx-auto w-fit min-w-[8rem]' : 'mx-1 w-[calc(100%-0.5rem)]'}`}
                     >
-                      <span className={`text-xs uppercase tracking-wider ${isSelected ? 'font-semibold text-white' : 'font-medium text-[#8898AA]'}`}>
+                      <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
                         {day.label}
                       </span>
-                      <span className={`mt-0.5 leading-tight ${isSelected ? 'text-base font-extrabold text-white' : 'text-base font-semibold text-slate-700'}`}>
+                      <span className="mt-0.5 text-base font-semibold leading-tight text-slate-800">
                         {day.date.getDate()}
+                      </span>
+                      <span className="mt-1 flex h-2 items-center gap-1" aria-hidden>
+                        {summary.checkins?.length > 0 && <TypeDot tone="attendance" label="Attendance" />}
+                        {summary.leaves?.length > 0 && <TypeDot tone="leave" label="Leave" />}
+                        {summary.holidays?.length > 0 && <TypeDot tone="holiday" label="Holiday" />}
+                        {summary.workModeRequests?.length > 0 && <TypeDot tone="work" label="Work mode" />}
+                        {summary.events?.length > 0 && !summary.holidays?.length && <TypeDot tone="event" label="Event" />}
                       </span>
                     </button>
                   );
@@ -580,20 +785,20 @@ export function CalendarPage() {
       </section>
 
       <aside
-        className="flex min-h-0 w-full shrink-0 flex-col overflow-hidden rounded-3xl p-4 text-white shadow-[0_12px_32px_rgba(0,167,214,0.22)] lg:w-[360px] lg:p-5"
+        className="flex min-h-0 w-full shrink-0 flex-col overflow-hidden rounded-3xl p-4 text-slate-800 shadow-[0_8px_24px_rgba(15,23,42,0.06)] lg:w-[360px] lg:p-5"
         style={{ background: SIDEBAR_GRADIENT }}
       >
-        <div className="relative flex w-full shrink-0 items-center rounded-full border border-white/30 bg-white/20 backdrop-blur-md transition-all duration-200 hover:bg-white/25 focus-within:border-white/60 focus-within:bg-white/30">
-          <Search className="pointer-events-none absolute left-3.5 h-4 w-4 text-white" aria-hidden />
+        <div className="relative flex w-full shrink-0 items-center rounded-full border border-slate-200 bg-white transition-all duration-200 hover:border-slate-300 focus-within:border-[#00B0FF]/50 focus-within:ring-2 focus-within:ring-[#00B0FF]/10">
+          <Search className="pointer-events-none absolute left-3.5 h-4 w-4 text-slate-400" aria-hidden />
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search..."
-            className={`w-full rounded-full bg-transparent py-2 pl-10 text-sm font-medium text-white outline-none placeholder:text-white/70 ${query ? 'pr-10' : 'pr-4'}`}
+            className={`w-full rounded-full bg-transparent py-2 pl-10 text-sm font-medium text-slate-800 outline-none placeholder:text-slate-400 ${query ? 'pr-10' : 'pr-4'}`}
           />
           {query && (
-            <button type="button" onClick={() => setQuery('')} className="absolute right-2 grid h-7 w-7 place-items-center rounded-full text-white/80 transition hover:bg-white/20 hover:text-white" aria-label="Clear search">
+            <button type="button" onClick={() => setQuery('')} className="absolute right-2 grid h-7 w-7 place-items-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" aria-label="Clear search">
               <X className="h-3.5 w-3.5" aria-hidden />
             </button>
           )}
@@ -620,8 +825,8 @@ export function CalendarPage() {
           >
             <div className="flex shrink-0 items-start justify-between gap-3">
               <div>
-                <h2 className="text-base font-bold tracking-tight text-slate-900">{mode === 'edit' ? 'Edit event' : 'Add New List'}</h2>
-                <p className="mt-0.5 text-xs font-medium text-[#8898AA]">Quickly schedule a company event</p>
+                <h2 className="text-base font-bold tracking-tight text-slate-900">{mode === 'edit' ? 'Edit event' : 'Add event'}</h2>
+                <p className="mt-0.5 text-xs font-medium text-[#8898AA]">Schedule a company event</p>
               </div>
               {(mode === 'edit' || form.title) && (
                 <button type="button" onClick={closePanel} className="grid h-8 w-8 place-items-center rounded-full text-[#8898AA] transition hover:bg-[#F0F9FD] hover:text-[#00B0FF] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00B0FF]/40" aria-label="Reset form">
@@ -699,7 +904,7 @@ export function CalendarPage() {
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#00B0FF] px-4 py-3 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:bg-[#0099E6] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#70C8F4]/70"
               >
                 <Plus className="h-4 w-4" aria-hidden />
-                {mode === 'edit' ? 'Save Event' : 'Submit List'}
+                {mode === 'edit' ? 'Save event' : 'Add event'}
               </button>
               {mode === 'edit' && selected && (
                 <PermissionGate permission={PERMISSIONS.DELETE_EVENTS}>
@@ -712,6 +917,139 @@ export function CalendarPage() {
           </form>
         </PermissionGate>
       </aside>
+
+      <SlideOverPanel
+        open={Boolean(activeDaySummary)}
+        onClose={() => setActiveDay('')}
+        title={activeDay ? formatDayLabel(parseDate(activeDay) || new Date()) : 'Day details'}
+        description="Attendance, leave, events and work mode context for this day."
+      >
+        {activeDaySummary && (
+          <DayContextPanel
+            summary={activeDaySummary}
+            onEditEvent={startEdit}
+            onClose={() => setActiveDay('')}
+          />
+        )}
+      </SlideOverPanel>
+    </div>
+  );
+}
+
+function DayContextPanel({ summary, onEditEvent, onClose }) {
+  const workModeEntries = Object.entries(summary.workModes || {}).sort((a, b) => b[1] - a[1]);
+  const hasWorkModeDistribution = workModeEntries.length > 0;
+  return (
+    <div className="space-y-5">
+      <ContextSummary summary={summary} />
+
+      <ContextSection title="People on leave" empty="No leave records for this day.">
+        {summary.leaves.map((leave) => (
+          <ContextRow
+            key={leave.id || `${leave.employee_uid}-${leave.start_date}`}
+            dot={normalizeStatus(leave.status) === 'approved' ? 'bg-sky-500' : 'bg-amber-500'}
+            title={formatEmployeeDisplay(leave)}
+            meta={`${formatLeaveTypeLabel(leave.leave_type)} / ${formatLeaveStatus(leave.status)}`}
+          />
+        ))}
+      </ContextSection>
+
+      <ContextSection title="Attendance" empty="No attendance records for this day.">
+        {summary.attendance.map((row) => (
+          <ContextRow
+            key={row.id || `${row.user_uid}-${row.timestamp}-${row.type}`}
+            dot={normalizeAttendanceType(row.type) === 'checkout' ? 'bg-slate-400' : 'bg-emerald-500'}
+            title={`${employeeName(row)} ${normalizeAttendanceType(row.type) === 'checkout' ? 'checked out' : 'checked in'}`}
+            meta={`${formatStamp(row.timestamp)}${row.is_manual ? ' / manual' : ''}`}
+          />
+        ))}
+      </ContextSection>
+
+      <ContextSection title="Events" empty="No calendar events for this day.">
+        {summary.events.map((event) => (
+          <button
+            key={event.id}
+            type="button"
+            onClick={() => {
+              onClose();
+              onEditEvent(event);
+            }}
+            className="flex w-full items-start gap-3 rounded-lg px-2 py-2 text-left transition hover:bg-slate-50"
+          >
+            <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: EVENT_DASH[event.type] || EVENT_DASH.other }} aria-hidden />
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-medium text-slate-800">{event.title}</span>
+              <span className="block text-xs text-slate-400">{timeLabel(event)} / {EVENT_TYPES.find((type) => type.value === event.type)?.label || 'Event'}</span>
+              {event.description && <span className="mt-0.5 line-clamp-2 block text-xs text-slate-500">{event.description}</span>}
+            </span>
+          </button>
+        ))}
+      </ContextSection>
+
+      <ContextSection title="Work mode information" empty={!hasWorkModeDistribution && summary.workModeRequests.length === 0 ? 'No work mode information for this day.' : ''}>
+        {hasWorkModeDistribution && (
+          <div className="grid grid-cols-2 gap-2">
+            {workModeEntries.map(([mode, count]) => (
+              <div key={mode} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+                <p className="text-xs text-slate-400">{mode}</p>
+                <p className="mt-0.5 text-sm font-semibold tabular-nums text-slate-800">{count}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        {summary.workModeRequests.map((request) => (
+          <ContextRow
+            key={request.id || `${request.employee_uid}-${request.created_at}`}
+            dot={normalizeStatus(request.status) === 'approved' ? 'bg-emerald-500' : normalizeStatus(request.status) === 'pending' ? 'bg-amber-500' : 'bg-slate-300'}
+            title={employeeName(request)}
+            meta={`${formatWorkMode(request.current_work_mode)} to ${formatWorkMode(request.requested_work_mode)} / ${normalizeStatus(request.status)}`}
+          />
+        ))}
+      </ContextSection>
+    </div>
+  );
+}
+
+function ContextSummary({ summary }) {
+  const items = [
+    { label: 'Check-ins', value: summary.checkins.length, Icon: Clock3, tone: 'text-emerald-700' },
+    { label: 'On leave', value: summary.approvedLeaves.length, Icon: Users, tone: 'text-sky-700' },
+    { label: 'Events', value: summary.events.length, Icon: CalendarPlus, tone: 'text-[#0284C7]' },
+  ];
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      {items.map(({ label, value, Icon, tone }) => (
+        <div key={label} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+          <Icon className={`h-4 w-4 ${tone}`} aria-hidden />
+          <p className="mt-2 text-lg font-semibold tabular-nums text-slate-900">{value}</p>
+          <p className="text-xs text-slate-400">{label}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ContextSection({ title, empty, children }) {
+  const content = Array.isArray(children) ? children.filter(Boolean) : children;
+  const isEmpty = Array.isArray(content) ? content.length === 0 : !content;
+  return (
+    <section>
+      <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">{title}</h3>
+      <div className="mt-2 divide-y divide-slate-100 rounded-lg border border-slate-100 bg-white">
+        {isEmpty ? <p className="px-3 py-3 text-sm text-slate-500">{empty}</p> : content}
+      </div>
+    </section>
+  );
+}
+
+function ContextRow({ dot, title, meta }) {
+  return (
+    <div className="flex items-start gap-3 px-3 py-2.5">
+      <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${dot}`} aria-hidden />
+      <span className="min-w-0">
+        <span className="block truncate text-sm font-medium text-slate-800">{title}</span>
+        {meta && <span className="block text-xs text-slate-400">{meta}</span>}
+      </span>
     </div>
   );
 }

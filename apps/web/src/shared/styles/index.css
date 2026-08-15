@@ -298,10 +298,20 @@
 @layer base {
   html {
     -webkit-tap-highlight-color: transparent;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  body,
+  #root {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
   }
 
   body {
-    margin: 0;
     font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
     font-size: 16px;
     line-height: 1.5;
@@ -309,7 +319,6 @@
     color: var(--ink);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    min-height: 100vh;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -396,8 +405,8 @@
   }
 
   /*
-   * Navigation rail — solid Deep Sky Blue. Active tab uses .nav-item-active
-   * for the white cutout + inverted corner curves into the main canvas.
+   * Navigation rail — solid Deep Sky Blue. The active item is an inset ice
+   * pill on that cyan, not a canvas cutout.
    */
   .nav-surface {
     --nav-rail: #00B0FF;
@@ -411,50 +420,59 @@
   .nav-surface :focus-visible {
     outline: 3px solid rgba(255, 255, 255, 0.85);
     outline-offset: -2px;
+    border-radius: 10px;
   }
 
   /*
-   * Active nav cutout — white pill flush with the main canvas, with concave
-   * cyan→white transitions via box-shadow pseudo corners (reference geometry).
+   * Active nav — soft light surface sitting on the cyan rail.
    */
   .nav-item-active {
-    position: relative;
     background-color: var(--nav-cutout);
     color: #00B0FF;
-    border-top-left-radius: 20px;
-    border-bottom-left-radius: 20px;
-    border-top-right-radius: 0;
-    border-bottom-right-radius: 0;
-    z-index: 10;
+    border-radius: 10px;
   }
 
-  .nav-item-active::before,
-  .nav-item-active::after {
-    content: '';
-    position: absolute;
-    right: 0;
-    width: 20px;
-    height: 20px;
-    background-color: transparent;
-    pointer-events: none;
-    z-index: 1;
+  .nav-surface .nav-section-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.42);
   }
 
-  .nav-item-active::before {
-    top: -20px;
-    border-bottom-right-radius: 20px;
-    box-shadow: 5px 5px 0 5px var(--nav-cutout);
+  .nav-surface .nav-footer-rule {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.14);
   }
 
-  .nav-item-active::after {
-    bottom: -20px;
-    border-top-right-radius: 20px;
-    box-shadow: 5px -5px 0 5px var(--nav-cutout);
+  @media (max-height: 820px) {
+    .nav-surface .nav-row {
+      height: 2.15rem;
+    }
+
+    .nav-surface .nav-section {
+      margin-top: 0.85rem;
+    }
+  }
+
+  @media (max-height: 700px) {
+    .nav-surface .nav-row {
+      height: 1.9rem;
+      font-size: 12px;
+    }
+
+    .nav-surface .nav-section {
+      margin-top: 0.55rem;
+    }
+
+    .nav-surface .nav-section-label {
+      font-size: 9px;
+    }
   }
 
   /*
    * Legacy nav-cut helpers kept for any remaining call sites; map onto the
-   * same white canvas so they don't fight the active cutout.
+   * same light surface so they don't fight the inset pill.
    */
   .nav-cut {
     position: absolute;
@@ -462,7 +480,7 @@
     height: 20px;
     width: 20px;
     pointer-events: none;
-    background-color: #ffffff;
+    background-color: transparent;
     background-image: none;
     z-index: 1;
   }
@@ -1018,13 +1036,49 @@
   }
 
   .ui-checkbox {
-    @apply h-4 w-4 shrink-0 cursor-pointer rounded border-hairline-strong text-accent-600;
-    accent-color: #00BCFF;
+    appearance: none;
+    -webkit-appearance: none;
+    @apply relative inline-grid h-4 w-4 shrink-0 cursor-pointer place-items-center rounded border border-sky-200 bg-white;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 0.7rem 0.7rem;
+    transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+  }
+
+  .ui-checkbox:hover {
+    border-color: #7DD8FF;
+  }
+
+  .ui-checkbox:checked {
+    border-color: #00BCFF;
+    background-color: #00BCFF;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M3.25 8.25 6.5 11.4 12.75 4.6' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  }
+
+  .ui-checkbox:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(0, 188, 255, 0.28);
   }
 
   /* ---------------------------------------------------------------- tables */
   .ui-table-shell {
-    @apply overflow-hidden rounded-[18px] border border-hairline bg-surface shadow-hair;
+    @apply flex min-h-0 flex-col overflow-hidden rounded-[18px] border border-hairline bg-surface shadow-hair;
+  }
+
+  .ui-table-scroll {
+    min-height: 0;
+    overflow: auto;
+  }
+
+  .admin-fill > .ui-table-shell,
+  .admin-fill .ui-table-shell {
+    flex: 1 1 0%;
+    min-height: 0;
+  }
+
+  .admin-fill > .ui-table-shell .ui-table-scroll,
+  .admin-fill .ui-table-shell .ui-table-scroll {
+    flex: 1 1 0%;
   }
 
   /*
@@ -1118,7 +1172,7 @@
    * 11px semibold with light tracking survives the tint at small sizes.
    */
   .ui-badge {
-    @apply inline-flex h-[22px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2 text-micro font-semibold tracking-[0.01em];
+    @apply inline-flex h-[22px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 text-xs font-medium tracking-[0.01em];
   }
 
   /* Roomier chip for standalone use (headers, filter summaries) rather than rows. */
@@ -1127,16 +1181,19 @@
   }
 
   .ui-badge-neutral {
-    @apply border-hairline bg-surface-muted text-ink-muted;
+    @apply border-transparent bg-slate-100 text-slate-700;
   }
 
-  /* Soft tag pill: the tint fill carries tier-1 ink, which is 6.4:1 on it. */
   .ui-badge-accent {
-    @apply border border-[#00BCFF]/35 bg-[#E6F4FA] text-[#00BCFF];
+    @apply border-transparent bg-sky-50 text-sky-700;
+  }
+
+  .ui-badge-violet {
+    @apply border-transparent bg-violet-50 text-violet-700;
   }
 
   .ui-badge-success {
-    @apply border-success-border bg-success-surface text-success-ink;
+    @apply border-transparent bg-emerald-50 text-emerald-700;
   }
 
   .ui-badge-warning {
@@ -1154,8 +1211,7 @@
    * item's tint reads as a contained row rather than a full-bleed band.
    */
   .ui-menu {
-    @apply overflow-hidden rounded-xl border border-hairline bg-white p-1 shadow-pop;
-    animation: menuIn var(--motion-fast) var(--ease-out);
+    @apply z-50 min-w-[150px] overflow-hidden rounded-2xl border border-sky-100/80 bg-white p-1.5 shadow-[0_10px_25px_-5px_rgba(0,163,255,0.1),0_8px_10px_-6px_rgba(0,0,0,0.04)] backdrop-blur-md;
   }
 
   .ui-menu-item {
@@ -1169,6 +1225,10 @@
   /* Keyboard cursor: arrow keys move this, so it must read as strongly as hover. */
   .ui-menu-item-active {
     @apply bg-[#E6F4FA] text-[#00BCFF];
+  }
+
+  .ui-menu-item-selected {
+    @apply bg-sky-500/10 font-semibold text-[#00A3FF] hover:bg-sky-500/10 hover:text-[#00A3FF] focus:bg-sky-500/10 focus:text-[#00A3FF];
   }
 
   .ui-menu-item-danger {
@@ -1397,7 +1457,11 @@ select option:hover {
   background-color: var(--accent-100);
 }
 
-.chart-content { min-height: 300px; }
+.chart-content {
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+}
 
 .chart-panel:focus-within .chart-surface {
   outline: 2px solid rgba(0,188,255, 0.4);
@@ -1852,4 +1916,1242 @@ select option:hover {
   top: 0;
   z-index: 1;
   box-shadow: inset 0 -1px 0 var(--hairline);
+}
+
+.users-directory .ui-table-shell {
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.users-directory .ui-table-head {
+  background: #F8FAFC;
+}
+
+.users-directory .ui-table-head th {
+  box-shadow: none;
+}
+
+.users-directory .ui-th,
+.users-directory .ui-th-sortable {
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.users-directory .ui-table-row {
+  border-bottom-color: #F1F5F9;
+}
+
+.users-directory .ui-table-row:hover {
+  background-color: #F8FAFC;
+}
+
+.users-directory .ui-table-row-selected:hover {
+  background-color: rgb(240 249 255 / 0.9);
+}
+
+.users-directory .ui-pager-btn:hover {
+  background-color: #f1f5f9;
+}
+
+.departments-directory .ui-table-shell {
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.departments-directory .ui-table-head {
+  background: #F8FAFC;
+}
+
+.departments-directory .ui-table-head th {
+  box-shadow: none;
+}
+
+.departments-directory .ui-th,
+.departments-directory .ui-th-sortable {
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.departments-directory .ui-table-row {
+  border-bottom-color: #F1F5F9;
+}
+
+.departments-directory .ui-table-row:hover {
+  background-color: #F8FAFC;
+}
+
+.app-admin-surface .admin-main .departments-directory h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+  color: #0f172a;
+}
+
+.attendance-directory .ui-table-shell {
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.attendance-directory .ui-table-head {
+  background: #F8FAFC;
+}
+
+.attendance-directory .ui-table-head th {
+  box-shadow: none;
+}
+
+.attendance-directory .ui-th,
+.attendance-directory .ui-th-sortable {
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.attendance-directory .ui-table-row {
+  border-bottom-color: #F1F5F9;
+}
+
+.attendance-directory .ui-table-row:hover {
+  background-color: #F8FAFC;
+}
+
+.attendance-directory .ui-pager-btn:hover {
+  background-color: #f1f5f9;
+}
+
+.attendance-directory .ui-segment {
+  border-color: #e2e8f0;
+  background: transparent;
+  box-shadow: none;
+  padding: 2px;
+}
+
+.attendance-directory .ui-segment-item {
+  font-size: 12px;
+  padding: 0.25rem 0.65rem;
+  color: #94a3b8;
+}
+
+.attendance-directory .ui-segment-item-active {
+  background: #f1f5f9;
+  color: #0f172a;
+  box-shadow: none;
+}
+
+.app-admin-surface .admin-main .attendance-directory h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+  color: #0f172a;
+}
+
+.work-modes-directory .ui-table-shell {
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.work-modes-directory .ui-table-head {
+  background: #F8FAFC;
+}
+
+.work-modes-directory .ui-table-head th {
+  box-shadow: none;
+}
+
+.work-modes-directory .ui-th,
+.work-modes-directory .ui-th-sortable {
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.work-modes-directory .ui-table-row {
+  border-bottom-color: #F1F5F9;
+}
+
+.work-modes-directory .ui-table-row:hover {
+  background-color: #F8FAFC;
+}
+
+.work-modes-directory .ui-segment {
+  border-color: #e2e8f0;
+  background: transparent;
+  box-shadow: none;
+  padding: 2px;
+}
+
+.work-modes-directory .ui-segment-item {
+  font-size: 12px;
+  padding: 0.25rem 0.65rem;
+  color: #94a3b8;
+}
+
+.work-modes-directory .ui-segment-item-active {
+  background: #f1f5f9;
+  color: #0f172a;
+  box-shadow: none;
+}
+
+.work-modes-directory .work-mode-advanced {
+  border-top: 1px solid #f1f5f9;
+  padding-top: 1rem;
+}
+
+.work-modes-directory .work-mode-advanced summary {
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.work-modes-directory .work-mode-advanced summary::-webkit-details-marker {
+  display: none;
+}
+
+.work-modes-directory .work-mode-advanced summary::after {
+  content: "Show";
+  float: right;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #94a3b8;
+}
+
+.work-modes-directory .work-mode-advanced[open] summary::after {
+  content: "Hide";
+}
+
+.app-admin-surface .admin-main .work-modes-directory h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+  color: #0f172a;
+}
+
+.geofencing-directory .geofence-map {
+  cursor: grab;
+}
+
+.geofencing-directory .geofence-map:active {
+  cursor: grabbing;
+}
+
+.geofencing-directory .geofence-advanced {
+  border-top: 1px solid #f1f5f9;
+  padding-top: 0.75rem;
+}
+
+.geofencing-directory .geofence-advanced summary {
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.geofencing-directory .geofence-advanced summary::-webkit-details-marker {
+  display: none;
+}
+
+.geofencing-directory .geofence-advanced summary::after {
+  content: "Show";
+  float: right;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #94a3b8;
+}
+
+.geofencing-directory .geofence-advanced[open] summary::after {
+  content: "Hide";
+}
+
+.app-admin-surface .admin-main .geofencing-directory h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+  color: #0f172a;
+}
+
+.leaves-directory .ui-table-shell {
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.leaves-directory .ui-table-head {
+  background: #F8FAFC;
+}
+
+.leaves-directory .ui-table-head th {
+  box-shadow: none;
+}
+
+.leaves-directory .ui-th,
+.leaves-directory .ui-th-sortable {
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.leaves-directory .ui-table-row {
+  border-bottom-color: #F1F5F9;
+}
+
+.leaves-directory .ui-table-row:hover {
+  background-color: #F8FAFC;
+}
+
+.leaves-directory .leave-row-pending {
+  box-shadow: inset 2px 0 0 #F59E0B;
+}
+
+.leaves-directory .ui-segment {
+  border-color: #e2e8f0;
+  background: transparent;
+  box-shadow: none;
+  padding: 2px;
+}
+
+.leaves-directory .ui-segment-item {
+  font-size: 12px;
+  padding: 0.25rem 0.65rem;
+  color: #94a3b8;
+}
+
+.leaves-directory .ui-segment-item-active {
+  background: #f1f5f9;
+  color: #0f172a;
+  box-shadow: none;
+}
+
+.app-admin-surface .admin-main .leaves-directory h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+  color: #0f172a;
+}
+
+.approvals-directory .ui-table-shell {
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.approvals-directory .ui-table-head {
+  background: #F8FAFC;
+}
+
+.approvals-directory .ui-table-head th {
+  box-shadow: none;
+}
+
+.approvals-directory .ui-th,
+.approvals-directory .ui-th-sortable {
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.approvals-directory .ui-table-row {
+  border-bottom-color: #F1F5F9;
+}
+
+.approvals-directory .ui-table-row:hover {
+  background-color: #F8FAFC;
+}
+
+.approvals-directory .approval-row-pending {
+  box-shadow: inset 2px 0 0 #F59E0B;
+}
+
+.approvals-directory .ui-segment {
+  border-color: #e2e8f0;
+  background: transparent;
+  box-shadow: none;
+  padding: 2px;
+}
+
+.approvals-directory .ui-segment-item {
+  font-size: 12px;
+  padding: 0.25rem 0.65rem;
+  color: #94a3b8;
+}
+
+.approvals-directory .ui-segment-item-active {
+  background: #f1f5f9;
+  color: #0f172a;
+  box-shadow: none;
+}
+
+.approvals-directory .approvals-chains summary {
+  list-style: none;
+}
+
+.approvals-directory .approvals-chains summary::-webkit-details-marker {
+  display: none;
+}
+
+.approvals-directory .approvals-chains summary::after {
+  content: "Show";
+  float: right;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #94a3b8;
+}
+
+.approvals-directory .approvals-chains[open] summary::after {
+  content: "Hide";
+}
+
+.app-admin-surface .admin-main .approvals-directory h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+  color: #0f172a;
+}
+
+.permissions-directory .ui-table-shell {
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.permissions-directory .ui-table-head {
+  background: #F8FAFC;
+}
+
+.permissions-directory .ui-table-head th {
+  box-shadow: none;
+}
+
+.permissions-directory .ui-th,
+.permissions-directory .ui-th-sortable {
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.permissions-directory .ui-table-row {
+  border-bottom-color: #F1F5F9;
+}
+
+.permissions-directory .ui-table-row:hover {
+  background-color: #F8FAFC;
+}
+
+.permissions-directory .ui-segment {
+  border-color: #e2e8f0;
+  background: transparent;
+  box-shadow: none;
+  padding: 2px;
+}
+
+.permissions-directory .ui-segment-item {
+  font-size: 12px;
+  padding: 0.25rem 0.65rem;
+  color: #94a3b8;
+}
+
+.permissions-directory .ui-segment-item-active {
+  background: #f1f5f9;
+  color: #0f172a;
+  box-shadow: none;
+}
+
+.app-admin-surface .admin-main .permissions-directory h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+  color: #0f172a;
+}
+
+.permissions-directory .permissions-rail-item {
+  border-bottom: 1px solid #f1f5f9;
+  padding: 0.75rem 1rem;
+}
+
+.permissions-directory .permissions-rail-item:hover {
+  background: #f8fafc;
+}
+
+.permissions-directory .permissions-rail-item.is-active {
+  background: #f8fafc;
+  box-shadow: inset 2px 0 0 #cbd5e1;
+}
+
+.permissions-directory .permissions-section-label {
+  margin-top: 1.5rem;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.permissions-directory .permissions-user-list {
+  max-height: 14rem;
+  overflow-y: auto;
+  border: 1px solid #f1f5f9;
+  border-radius: 0.75rem;
+}
+
+.permissions-directory .permissions-user-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #f8fafc;
+}
+
+.permissions-directory .permissions-user-list li:last-child .permissions-user-row {
+  border-bottom: 0;
+}
+
+.permissions-directory .permissions-user-row:hover {
+  background: #f8fafc;
+}
+
+.permissions-directory .permissions-matrix-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  border-bottom: 1px solid #e2e8f0;
+  background: #fff;
+  padding: 1rem 1.25rem;
+}
+
+@media (min-width: 1024px) {
+  .permissions-directory .permissions-matrix-toolbar {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.permissions-directory .permission-matrix {
+  min-height: 0;
+  flex: 1 1 0%;
+  overflow: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+}
+
+.permissions-directory .permission-matrix-head,
+.permissions-directory .permission-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 4.5rem;
+  align-items: center;
+  column-gap: 0.75rem;
+}
+
+.permissions-directory .permission-matrix-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 0.5rem 0.75rem;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.permissions-directory .permission-matrix-head span:last-child,
+.permissions-directory .permission-row .permission-check {
+  justify-self: end;
+  text-align: right;
+}
+
+.permissions-directory .permission-group {
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.permissions-directory .permission-group:last-child {
+  border-bottom: 0;
+}
+
+.permissions-directory .permission-group > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  list-style: none;
+  cursor: pointer;
+  padding: 0.625rem 0.75rem;
+  background: #f8fafc;
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.permissions-directory .permission-group > summary::-webkit-details-marker {
+  display: none;
+}
+
+.permissions-directory .permission-group > summary::before {
+  content: "";
+  width: 0.35rem;
+  height: 0.35rem;
+  margin-right: 0.55rem;
+  border-right: 1px solid #94a3b8;
+  border-bottom: 1px solid #94a3b8;
+  transform: rotate(-45deg);
+}
+
+.permissions-directory .permission-group[open] > summary::before {
+  transform: rotate(45deg);
+}
+
+.permissions-directory .permission-group-name {
+  min-width: 0;
+  flex: 1;
+}
+
+.permissions-directory .permission-group-count {
+  width: 4.5rem;
+  text-align: right;
+  font-weight: 500;
+  color: #94a3b8;
+  font-variant-numeric: tabular-nums;
+}
+
+.permissions-directory .permission-group-action {
+  font-size: 11px;
+  font-weight: 500;
+  color: #94a3b8;
+}
+
+.permissions-directory .permission-group-action:hover {
+  color: #334155;
+}
+
+.permissions-directory .permission-row {
+  padding: 0.625rem 0.75rem 0.625rem 1.75rem;
+  border-top: 1px solid #f8fafc;
+  font-size: 0.875rem;
+  color: #334155;
+}
+
+.permissions-directory .permission-check {
+  display: inline-flex;
+  cursor: pointer;
+}
+
+.permissions-directory .ui-checkbox:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+
+.permissions-directory .ui-checkbox:disabled:not(:checked) {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.permissions-directory .permissions-audit-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  cursor: pointer;
+  list-style: none;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.permissions-directory .permissions-audit-summary::-webkit-details-marker {
+  display: none;
+}
+
+.tickets-directory .ui-table-shell {
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.tickets-directory .ui-table-head {
+  background: #F8FAFC;
+}
+
+.tickets-directory .ui-table-head th {
+  box-shadow: none;
+}
+
+.tickets-directory .ui-th,
+.tickets-directory .ui-th-sortable {
+  padding-top: 0.55rem;
+  padding-bottom: 0.55rem;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.tickets-directory .ui-table-cell {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+.tickets-directory .ui-table-row {
+  border-bottom-color: #F1F5F9;
+}
+
+.tickets-directory .ui-table-row:hover {
+  background-color: #F8FAFC;
+}
+
+.tickets-directory .ui-table-row-selected {
+  background: #f8fafc;
+  box-shadow: inset 2px 0 0 #cbd5e1;
+}
+
+.tickets-directory .ui-table-row-selected:hover {
+  background: #f8fafc;
+}
+
+.tickets-directory .ticket-row-urgent {
+  box-shadow: inset 2px 0 0 #F43F5E;
+}
+
+.tickets-directory .ui-table-row-selected.ticket-row-urgent {
+  box-shadow: inset 2px 0 0 #F43F5E;
+}
+
+.tickets-directory .ui-segment {
+  border-color: #e2e8f0;
+  background: transparent;
+  box-shadow: none;
+  padding: 2px;
+}
+
+.tickets-directory .ui-segment-item {
+  font-size: 12px;
+  padding: 0.25rem 0.65rem;
+  color: #94a3b8;
+}
+
+.tickets-directory .ui-segment-item-active {
+  background: #f1f5f9;
+  color: #0f172a;
+  box-shadow: none;
+}
+
+.app-admin-surface .admin-main .tickets-directory h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+  color: #0f172a;
+}
+
+.tickets-directory .tickets-pane {
+  min-height: 0;
+  height: 100%;
+}
+
+.tickets-directory .tickets-avatar {
+  display: inline-flex;
+  height: 2.25rem;
+  width: 2.25rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #f1f5f9;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #64748b;
+}
+
+.tickets-directory .tickets-bubble {
+  border: 1px solid #f1f5f9;
+  background: #f8fafc;
+  border-radius: 1rem 1rem 1rem 0.35rem;
+  padding: 0.85rem 1rem;
+}
+
+.tickets-directory .tickets-bubble.is-mine {
+  background: #fff;
+  border-color: #e2e8f0;
+  border-radius: 1rem 1rem 0.35rem 1rem;
+}
+
+.tickets-directory .tickets-event {
+  font-size: 12px;
+  color: #94a3b8;
+  text-align: center;
+}
+
+.tickets-directory .tickets-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  border-top: 1px solid #f1f5f9;
+  background: #fff;
+  padding: 1rem 1.25rem;
+}
+
+.notifications-directory .ui-segment {
+  border-color: #e2e8f0;
+  background: transparent;
+  box-shadow: none;
+  padding: 2px;
+}
+
+.notifications-directory .ui-segment-item {
+  font-size: 12px;
+  padding: 0.25rem 0.65rem;
+  color: #94a3b8;
+}
+
+.notifications-directory .ui-segment-item-active {
+  background: #f1f5f9;
+  color: #0f172a;
+  box-shadow: none;
+}
+
+.app-admin-surface .admin-main .notifications-directory h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+  color: #0f172a;
+}
+
+.notifications-directory .notifications-inbox {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 0%;
+  flex-direction: column;
+  overflow: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background: #fff;
+}
+
+.notifications-directory .notifications-group + .notifications-group {
+  border-top: 1px solid #e2e8f0;
+}
+
+.notifications-directory .notifications-group-label {
+  padding: 0.75rem 1rem 0.35rem;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.notifications-directory .notifications-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+.notifications-directory .notifications-group ul li:first-child .notifications-row {
+  border-top: 0;
+}
+
+.notifications-directory .notifications-row.is-unread {
+  background: #f8fafc;
+}
+
+.notifications-directory .notifications-row:hover {
+  background: #f8fafc;
+}
+
+.notifications-directory .notifications-row-main {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem 0.25rem 0.75rem 1rem;
+  text-align: left;
+}
+
+.notifications-directory .notifications-icon {
+  display: inline-flex;
+  height: 2rem;
+  width: 2rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.notifications-directory .notifications-icon.is-unread {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.notifications-directory .notifications-unread-dot {
+  display: inline-block;
+  height: 6px;
+  width: 6px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: #00B0FF;
+}
+
+.notifications-directory .notifications-row-aside {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.75rem 0.75rem 0.75rem 0;
+}
+
+.notifications-directory .notifications-action {
+  padding: 0.25rem 0.35rem;
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.notifications-directory .notifications-action:hover {
+  color: #0f172a;
+}
+
+.notifications-directory .notifications-dismiss {
+  display: inline-flex;
+  height: 1.75rem;
+  width: 1.75rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.375rem;
+  color: #94a3b8;
+}
+
+.notifications-directory .notifications-dismiss:hover {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.settings-directory .settings-nav {
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background: #fff;
+  padding: 0.5rem 0;
+}
+
+.settings-directory .settings-nav-group + .settings-nav-group {
+  margin-top: 0.75rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+.settings-directory .settings-nav-heading {
+  padding: 0.5rem 1rem 0.2rem;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.settings-directory .settings-nav-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.45rem 1rem;
+  text-align: left;
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.settings-directory .settings-nav-item:hover {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.settings-directory .settings-nav-item.is-active {
+  background: #f8fafc;
+  color: #0f172a;
+  font-weight: 600;
+  box-shadow: inset 2px 0 0 #cbd5e1;
+}
+
+.settings-directory .settings-nav-dot {
+  height: 6px;
+  width: 6px;
+  border-radius: 999px;
+  background: #00B0FF;
+}
+
+.settings-directory .settings-panel {
+  display: flex;
+  min-height: 0;
+  height: 100%;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background: #fff;
+}
+
+.settings-directory .settings-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 1.1rem 1.25rem;
+}
+
+.settings-directory .settings-unsaved {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: #0284c7;
+}
+
+.settings-directory .settings-panel-body {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow: auto;
+  padding: 0.25rem 0;
+}
+
+.settings-directory .settings-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(12rem, 16rem);
+  align-items: center;
+  gap: 1rem;
+  border-bottom: 1px solid #f1f5f9;
+  padding: 1rem 1.25rem;
+}
+
+.settings-directory .settings-row:last-child {
+  border-bottom: 0;
+}
+
+.settings-directory .settings-row-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.settings-directory .settings-row-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.settings-directory .settings-row-hint {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: #64748b;
+}
+
+.settings-directory .settings-row-error {
+  font-size: 0.75rem;
+  color: #be123c;
+}
+
+.settings-directory .settings-control {
+  width: 100%;
+  max-width: 16rem;
+  justify-self: end;
+}
+
+.settings-directory .settings-control-wrap {
+  display: flex;
+  width: 100%;
+  max-width: 16rem;
+  justify-self: end;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.settings-directory .settings-suffix {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.settings-directory .settings-control-error {
+  border-color: #fecdd3;
+}
+
+.settings-directory .settings-row-toggle .ui-checkbox {
+  justify-self: end;
+}
+
+.settings-directory .settings-panel-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-top: 1px solid #e2e8f0;
+  padding: 0.9rem 1.25rem;
+}
+
+.settings-directory .settings-danger {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  border-top: 1px solid #fecdd3;
+  background: #fffafb;
+  padding: 1rem 1.25rem;
+}
+
+.app-admin-surface .admin-main .settings-directory h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+  color: #0f172a;
+}
+
+@media (max-width: 639px) {
+  .settings-directory .settings-row {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-directory .settings-control,
+  .settings-directory .settings-control-wrap {
+    max-width: none;
+    justify-self: stretch;
+  }
+}
+
+.admin-page {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.admin-page > * {
+  flex-shrink: 0;
+}
+
+.admin-fill {
+  min-height: 0;
+  min-width: 0;
+  flex: 1 1 0%;
+  overflow: hidden;
+}
+
+.admin-page > .admin-fill,
+.admin-page > .admin-fill-scroll {
+  flex-shrink: 1;
+}
+
+.admin-fill:not(.grid) {
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-fill:not(.grid) > * {
+  flex-shrink: 0;
+}
+
+.admin-fill:not(.grid) > .admin-fill,
+.admin-fill:not(.grid) > .ui-table-shell {
+  flex-shrink: 1;
+}
+
+.admin-fill-scroll {
+  min-height: 0;
+  min-width: 0;
+  flex: 1 1 0%;
+  overflow: auto;
+}
+
+.landing-page {
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.auth-page {
+  height: 100%;
+  min-height: 0;
+}
+
+@media (max-height: 800px) {
+  .app-admin-surface .admin-main {
+    padding-top: 0.9rem;
+    padding-bottom: 0.9rem;
+  }
+
+  .admin-page.gap-4,
+  .dash-viewport {
+    gap: 0.75rem;
+  }
+}
+
+@media (max-height: 700px) {
+  .app-admin-surface .admin-main {
+    padding-top: 0.7rem;
+    padding-bottom: 0.7rem;
+  }
+
+  .admin-page.gap-4,
+  .dash-viewport {
+    gap: 0.5rem;
+  }
 }

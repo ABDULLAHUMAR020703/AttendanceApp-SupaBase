@@ -727,7 +727,7 @@ export function LandingPage() {
   const user = useAuthStore((s) => s.user);
   const onSignInClick = () => navigate(user ? '/dashboard' : '/login');
   return (
-    <div className="landing-page min-h-screen scroll-smooth bg-[#F8FCFD] text-[#0F172A] antialiased [font-family:'Plus_Jakarta_Sans',Inter,system-ui,sans-serif]">
+    <div className="landing-page scroll-smooth bg-[#F8FCFD] text-[#0F172A] antialiased [font-family:'Plus_Jakarta_Sans',Inter,system-ui,sans-serif]">
       <ScrollProgressBar />
       <LandingNav onSignInClick={onSignInClick} />
       <main>

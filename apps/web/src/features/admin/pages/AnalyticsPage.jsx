@@ -64,7 +64,11 @@ function buildDistributionFromUsers(users, departments) {
 }
 
 function ChartSuspense({ children }) {
-  return <Suspense fallback={<ChartSkeleton height={300} />}>{children}</Suspense>;
+  return (
+    <div className="h-full min-h-0 w-full">
+      <Suspense fallback={<ChartSkeleton />}>{children}</Suspense>
+    </div>
+  );
 }
 
 export function AnalyticsPage() {
@@ -238,23 +242,12 @@ export function AnalyticsPage() {
     : 'Check-in and check-out events per period';
 
   return (
-    <div className="analytics-page space-y-6 animate-fade-up print:text-slate-900">
-      <section className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between print:hidden">
-        <div>
-          <h1 className="page-title">Analytics</h1>
-          <p className="mt-1 text-sm text-ink-muted">
-            Department headcount and attendance activity for your company.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={load}
-          disabled={loading}
-          aria-busy={loading}
-          className="ui-btn-secondary ui-btn-sm"
-        >
-          {loading ? 'Loading…' : 'Refresh'}
-        </button>
+    <div className="analytics-page admin-page gap-4 animate-fade-up print:overflow-visible print:text-slate-900">
+      <section className="print:hidden">
+        <h1 className="page-title">Analytics</h1>
+        <p className="mt-1 text-sm text-ink-muted">
+          Department headcount and attendance activity for your company.
+        </p>
       </section>
 
       {error && (
@@ -263,7 +256,7 @@ export function AnalyticsPage() {
         </GlassCard>
       )}
 
-      <GlassCard className="p-5 print:hidden">
+      <GlassCard className="shrink-0 p-5 print:hidden">
         <DateRangeSelector
           preset={datePreset}
           customFrom={customFrom}
@@ -276,10 +269,11 @@ export function AnalyticsPage() {
         />
       </GlassCard>
 
-      <AnalyticsKpiGrid items={kpiItems} loading={loading || recalculating} className="print:grid-cols-3" />
+      <AnalyticsKpiGrid items={kpiItems} loading={loading || recalculating} className="shrink-0 print:grid-cols-3" />
 
-      <div className="grid gap-6 xl:grid-cols-2">
-        <GlassCard className="flex h-full flex-col p-5">
+      <div className="admin-fill flex min-h-0 flex-col gap-4">
+      <div className="admin-fill grid min-h-0 flex-1 gap-4 xl:grid-cols-2">
+        <GlassCard className="flex h-full min-h-0 flex-col overflow-hidden p-5">
           <ChartPanel
             exportId="chart-department-distribution"
             title="Department Size Distribution"
@@ -307,7 +301,7 @@ export function AnalyticsPage() {
           </ChartPanel>
         </GlassCard>
 
-        <GlassCard className="flex h-full flex-col p-5">
+        <GlassCard className="flex h-full min-h-0 flex-col overflow-hidden p-5">
           <ChartPanel
             exportId="chart-attendance-activity"
             title="Attendance Activity"
@@ -344,7 +338,7 @@ export function AnalyticsPage() {
         </GlassCard>
       </div>
 
-      <GlassCard className="p-5">
+      <GlassCard className="max-h-[9rem] shrink-0 overflow-y-auto p-5">
         <h2 className="card-title mb-1">Organization insights</h2>
         <p className="mb-4 text-xs text-ink-muted">
           Account and structure metrics alongside your filtered attendance period
@@ -377,6 +371,7 @@ export function AnalyticsPage() {
           <p className="text-sm text-ink-muted">Select a valid date range to view insights.</p>
         )}
       </GlassCard>
+      </div>
     </div>
   );
 }

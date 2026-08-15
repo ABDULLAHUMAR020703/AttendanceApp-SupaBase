@@ -3,6 +3,7 @@ import { Download, Eye, FileText, Send, Trash2, X } from 'lucide-react';
 import { GlassCard } from '../../../shared/components/GlassCard';
 import { GlassTable, TableActions, TableCell, TableRow } from '../../../shared/components/GlassTable';
 import { Button } from '../../../shared/components/ui/Button';
+import { Select } from '../../../shared/components/ui/Select';
 import { StatusBadge } from '../../../shared/components/ui/Badge';
 import { EmptyStateBody } from '../../../shared/components/ui/EmptyState';
 import { SkeletonFeed, SkeletonForm } from '../../../shared/components/ui/Skeleton';
@@ -316,14 +317,14 @@ export function ReportsPage() {
   const busy = generating || emailing;
 
   return (
-    <div className="space-y-6 animate-fade-up">
-      <div>
+    <div className="admin-page gap-4 animate-fade-up">
+      <div className="shrink-0">
         <h1 className="page-title">Reports</h1>
         <p className="mt-1 text-sm text-ink-muted">Generate, preview, download, and schedule attendance reports.</p>
       </div>
 
       <PermissionGate permission={PERMISSIONS.EXPORT_REPORTS}>
-        {/* Generate Reports */}
+        <div className="admin-fill-scroll space-y-4">
         <GlassCard className="p-5 space-y-4">
           <div>
             <h2 className="card-title">Generate Reports</h2>
@@ -333,15 +334,14 @@ export function ReportsPage() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <div className="flex flex-col gap-1">
               <label className="text-xs text-ink-muted">Report type</label>
-              <select
+              <Select
                 value={reportRange}
                 onChange={(e) => setReportRange(e.target.value)}
-                className="ui-select"
               >
                 {RANGE_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             {reportRange === 'custom' && (
@@ -422,29 +422,27 @@ export function ReportsPage() {
               <div className={`grid gap-4 sm:grid-cols-2 ${autoSend ? '' : 'opacity-40 pointer-events-none'}`}>
                 <div className="flex flex-col gap-1 min-w-0">
                   <label className="text-xs text-ink-muted">Frequency</label>
-                  <select
+                  <Select
                     value={frequency}
                     onChange={(e) => setFrequency(e.target.value)}
-                    className="ui-select w-full"
                   >
                     {FREQUENCY_OPTIONS.map((f) => (
                       <option key={f.value} value={f.value}>{f.label}</option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
 
                 {frequency === 'monthly' && (
                   <div className="flex flex-col gap-1 min-w-0">
                     <label className="text-xs text-ink-muted">Day of month (1–28)</label>
-                    <select
+                    <Select
                       value={scheduleDay}
                       onChange={(e) => setScheduleDay(Number(e.target.value))}
-                      className="ui-select w-full"
                     >
                       {DAY_OPTIONS.map((d) => (
                         <option key={d} value={d}>{ordinal(d)}</option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
                 )}
               </div>
@@ -546,15 +544,9 @@ export function ReportsPage() {
 
         {/* Delivery status */}
         <GlassCard className="p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="card-title">Delivery Status</h2>
-              <p className="text-xs text-ink-muted mt-1">Recent scheduled and manual email deliveries.</p>
-            </div>
-            <button onClick={loadDeliveryLogs} disabled={deliveryLogsLoading}
-              className="ui-btn-secondary ui-btn-sm">
-              Refresh
-            </button>
+          <div>
+            <h2 className="card-title">Delivery Status</h2>
+            <p className="text-xs text-ink-muted mt-1">Recent scheduled and manual email deliveries.</p>
           </div>
 
           {deliveryLogsLoading ? (
@@ -592,15 +584,9 @@ export function ReportsPage() {
 
         {/* Report History */}
         <GlassCard className="p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="card-title">Report History</h2>
-              <p className="text-xs text-ink-muted mt-1">Previously generated reports for your company.</p>
-            </div>
-            <button onClick={loadHistory} disabled={historyLoading}
-              className="ui-btn-secondary ui-btn-sm">
-              Refresh
-            </button>
+          <div>
+            <h2 className="card-title">Report History</h2>
+            <p className="text-xs text-ink-muted mt-1">Previously generated reports for your company.</p>
           </div>
 
           <GlassTable
@@ -655,6 +641,7 @@ export function ReportsPage() {
             ))}
           </GlassTable>
         </GlassCard>
+        </div>
       </PermissionGate>
     </div>
   );

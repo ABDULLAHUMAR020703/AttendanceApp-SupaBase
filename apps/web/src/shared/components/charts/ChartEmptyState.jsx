@@ -6,7 +6,7 @@ export function ChartEmptyState({
 }) {
   return (
     <div
-      className="flex h-full min-h-[220px] flex-col items-center justify-center gap-3 px-6 py-8 text-center"
+      className="flex h-full min-h-0 flex-col items-center justify-center gap-3 px-6 py-6 text-center"
       role="status"
       aria-live="polite"
     >

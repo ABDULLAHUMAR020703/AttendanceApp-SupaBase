@@ -16,6 +16,7 @@ export function AppShell() {
   const location = useLocation();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const isDashboard = location.pathname === '/dashboard';
+  const isGeofencing = location.pathname === '/sites';
 
   useEffect(() => {
     if (!user) return undefined;
@@ -52,7 +53,13 @@ export function AppShell() {
   return (
     <div className="app-admin-surface m-0 flex h-screen w-screen overflow-hidden bg-[#E8F3F8] p-0 text-ink md:p-4">
       <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden rounded-none md:rounded-3xl md:shadow-[0_24px_64px_-16px_rgba(15,23,42,0.18)]">
-        <Sidebar canSee={canSee} onLogout={logout} unreadCount={unreadCount} className="hidden rounded-l-3xl md:flex" />
+        <Sidebar
+          canSee={canSee}
+          onLogout={logout}
+          unreadCount={unreadCount}
+          layoutGroupId="admin-sidebar-desktop"
+          className="hidden rounded-l-3xl md:flex"
+        />
 
         <div className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#F8FAFC] md:rounded-r-3xl">
           <TopBar
@@ -62,21 +69,17 @@ export function AppShell() {
             unreadCount={unreadCount}
             onOpenMobileNav={() => setMobileNavOpen(true)}
             onLogout={logout}
-            onRefresh={async () => {
-              await refreshPermissions();
-              await refreshBadge();
-            }}
           />
 
           <main
             className={`admin-main flex min-h-0 flex-1 flex-col bg-[#F8FAFC] px-4 pb-24 pt-4 text-ink md:p-6 md:pb-6 ${
-              isDashboard ? 'overflow-y-auto lg:overflow-hidden' : 'overflow-y-auto'
+              isGeofencing ? 'overflow-hidden' : isDashboard ? 'overflow-y-auto lg:overflow-hidden' : 'overflow-y-auto'
             }`}
           >
             <div
               className={
-                isDashboard
-                  ? 'flex h-full min-h-0 w-full flex-1 flex-col lg:overflow-hidden'
+                isGeofencing
+                  ? 'flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden'
                   : 'mx-auto w-full max-w-[1600px]'
               }
             >
@@ -148,6 +151,7 @@ export function AppShell() {
             canSee={canSee}
             onLogout={logout}
             unreadCount={unreadCount}
+            layoutGroupId="admin-sidebar-mobile"
             className="flex h-full w-full"
           />
         </aside>
