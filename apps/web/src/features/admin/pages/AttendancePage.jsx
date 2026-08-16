@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CalendarClock } from 'lucide-react';
+import { CalendarClock, Clock, LogIn, UserCheck, UserX, Palmtree } from 'lucide-react';
 import { adminService } from '../services/adminService';
 import { SlideOverPanel } from '../../../shared/components/SlideOverPanel';
 import {
@@ -12,6 +12,7 @@ import {
 } from '../../../shared/components/GlassTable';
 import { Alert } from '../../../shared/components/ui/Alert';
 import { Select } from '../../../shared/components/ui/Select';
+import { KpiMetricCard, KpiMetricGrid } from '../../../shared/components/ui/KpiMetricCard';
 import { PermissionGate, useAnyPermission, usePermission } from '../../../shared/components/PermissionGate';
 import { PERMISSIONS } from '../permissions';
 import { useSilentPoll } from '../../../shared/hooks/useSilentPoll';
@@ -707,53 +708,60 @@ export function AttendancePage() {
       )}
 
       <PermissionGate anyOf={[PERMISSIONS.VIEW_ATTENDANCE, PERMISSIONS.MANUAL_ATTENDANCE]}>
-        <div className="admin-fill flex min-h-0 flex-col gap-4 overflow-hidden">
+        <div className="flex flex-col gap-4">
         {error && <Alert type="error">{error}</Alert>}
 
-        <section className="rounded-xl border border-slate-200 bg-white px-4 py-3 sm:px-5">
-          <p className="text-xs text-slate-400">{formatPeriodLabel(period, bounds.start, bounds.end)}</p>
-          <div className="mt-2 flex flex-wrap items-end gap-x-8 gap-y-3">
-            <SummaryMetric
+        <div>
+          <p className="mb-1 text-xs text-slate-400">{formatPeriodLabel(period, bounds.start, bounds.end)}</p>
+          <KpiMetricGrid>
+            <KpiMetricCard
               label="Present"
+              subtitle="Scheduled shift"
               value={loading ? '—' : summary.present}
-              emphasize
+              icon={UserCheck}
+              tone="success"
               active={statusFilter === 'present'}
               onClick={() => toggleStatus('present')}
             />
-            <span className="hidden h-10 w-px bg-slate-100 sm:block" aria-hidden />
-            <SummaryMetric
+            <KpiMetricCard
               label="Late"
+              subtitle="Shift delayed"
               value={loading ? '—' : summary.late}
-              tone="late"
+              icon={Clock}
+              tone="warning"
+              actionable={summary.late > 0}
               active={statusFilter === 'late'}
               onClick={() => toggleStatus('late')}
             />
-            <span className="hidden h-10 w-px bg-slate-100 sm:block" aria-hidden />
-            <SummaryMetric
+            <KpiMetricCard
               label="Absent"
+              subtitle="No check-in recorded"
               value={loading ? '—' : summary.absent}
-              tone="absent"
+              icon={UserX}
+              tone="warning"
+              actionable={summary.absent > 0}
               active={statusFilter === 'absent'}
               onClick={() => toggleStatus('absent')}
             />
-            <span className="hidden h-10 w-px bg-slate-100 sm:block" aria-hidden />
-            <SummaryMetric
+            <KpiMetricCard
               label="On leave"
+              subtitle="Approved off-time"
               value={loading ? '—' : summary.on_leave}
-              tone="leave"
+              icon={Palmtree}
               active={statusFilter === 'on_leave'}
               onClick={() => toggleStatus('on_leave')}
             />
-            <span className="hidden h-10 w-px bg-slate-100 sm:block" aria-hidden />
-            <SummaryMetric
+            <KpiMetricCard
               label="Working"
+              subtitle="Currently checked in"
               value={loading ? '—' : summary.working}
-              tone="working"
+              icon={LogIn}
+              tone="success"
               active={statusFilter === 'working'}
               onClick={() => toggleStatus('working')}
             />
-          </div>
-        </section>
+          </KpiMetricGrid>
+        </div>
 
         <div className="flex flex-col gap-2 border-b border-slate-200 pb-3 lg:flex-row lg:items-center">
           <input
@@ -793,7 +801,7 @@ export function AttendancePage() {
           </div>
         </div>
 
-        <div className="admin-fill overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white">
           <GlassTable
             className="rounded-none border-0 shadow-none"
             loading={loading}
@@ -1012,30 +1020,6 @@ export function AttendancePage() {
         )}
       </SlideOverPanel>
     </div>
-  );
-}
-
-function SummaryMetric({ label, value, emphasize = false, tone = 'default', active = false, onClick }) {
-  const valueTone = {
-    default: 'text-slate-900',
-    late: 'text-amber-700',
-    absent: 'text-slate-500',
-    leave: 'text-sky-800',
-    working: 'text-[#0284C7]',
-  }[tone];
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`min-w-0 rounded-lg px-1 py-0.5 text-left transition-colors ${
-        active ? 'bg-slate-50' : 'hover:bg-slate-50'
-      }`}
-    >
-      <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-400">{label}</p>
-      <p className={`mt-1 font-semibold tabular-nums tracking-tight ${valueTone} ${emphasize ? 'text-3xl' : 'text-xl'}`}>
-        {value}
-      </p>
-    </button>
   );
 }
 

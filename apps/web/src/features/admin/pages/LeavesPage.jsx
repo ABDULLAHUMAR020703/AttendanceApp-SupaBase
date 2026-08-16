@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { CalendarCheck, CalendarDays, Check, ChevronLeft, ChevronRight, Palmtree } from 'lucide-react';
 import { adminService } from '../services/adminService';
 import { useAuthStore } from '../../auth/store/authStore';
 import { SlideOverPanel } from '../../../shared/components/SlideOverPanel';
@@ -13,7 +13,9 @@ import {
   TableRow,
 } from '../../../shared/components/GlassTable';
 import { Alert } from '../../../shared/components/ui/Alert';
+import { EmptyStateBody } from '../../../shared/components/ui/EmptyState';
 import { Dialog } from '../../../shared/components/ui/Dialog';
+import { KpiMetricCard, KpiMetricGrid } from '../../../shared/components/ui/KpiMetricCard';
 import { canAccessFeature, hasPermission, PERMISSIONS } from '../permissions';
 import {
   formatEmployeeDisplay,
@@ -327,44 +329,46 @@ export function LeavesPage() {
         </Alert>
       )}
 
-      <section className="rounded-xl border border-slate-200 bg-white px-4 py-3 sm:px-5">
-        <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
-          <SummaryMetric
-            label="Pending"
-            value={loading ? '—' : summary.pending}
-            emphasize
-            tone="pending"
-            active={statusFilter === 'pending'}
-            onClick={() => toggleFilter('pending')}
-          />
-          <span className="hidden h-10 w-px bg-slate-100 sm:block" aria-hidden />
-          <SummaryMetric
-            label="Approved"
-            value={loading ? '—' : summary.approved}
-            tone="approved"
-            active={statusFilter === 'approved'}
-            onClick={() => toggleFilter('approved')}
-          />
-          <span className="hidden h-10 w-px bg-slate-100 sm:block" aria-hidden />
-          <SummaryMetric
-            label="Upcoming"
-            value={loading ? '—' : summary.upcoming}
-            active={statusFilter === 'upcoming'}
-            onClick={() => toggleFilter('upcoming')}
-          />
-          <span className="hidden h-10 w-px bg-slate-100 sm:block" aria-hidden />
-          <SummaryMetric
-            label="On leave"
-            value={loading ? '—' : summary.on_leave}
-            tone="away"
-            active={statusFilter === 'on_leave'}
-            onClick={() => toggleFilter('on_leave')}
-          />
-        </div>
-      </section>
+      <KpiMetricGrid columns={4}>
+        <KpiMetricCard
+          label="Pending"
+          subtitle="Needs approval"
+          value={loading ? '—' : summary.pending}
+          icon={CalendarCheck}
+          tone="warning"
+          actionable={summary.pending > 0}
+          active={statusFilter === 'pending'}
+          onClick={() => toggleFilter('pending')}
+        />
+        <KpiMetricCard
+          label="Approved"
+          subtitle="Confirmed leave"
+          value={loading ? '—' : summary.approved}
+          icon={Check}
+          tone="success"
+          active={statusFilter === 'approved'}
+          onClick={() => toggleFilter('approved')}
+        />
+        <KpiMetricCard
+          label="Upcoming"
+          subtitle="Future requests"
+          value={loading ? '—' : summary.upcoming}
+          icon={CalendarDays}
+          active={statusFilter === 'upcoming'}
+          onClick={() => toggleFilter('upcoming')}
+        />
+        <KpiMetricCard
+          label="On leave"
+          subtitle="Away today"
+          value={loading ? '—' : summary.on_leave}
+          icon={Palmtree}
+          active={statusFilter === 'on_leave'}
+          onClick={() => toggleFilter('on_leave')}
+        />
+      </KpiMetricGrid>
 
-      <div className="admin-fill grid min-h-0 grid-rows-[minmax(12rem,1fr)_auto] gap-4 lg:grid-rows-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_18.5rem]">
-        <section className="flex min-h-0 min-w-0 flex-col overflow-hidden">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18.5rem]">
+        <section className="min-w-0">
           <div className="mb-3 flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
             <input
               value={query}
@@ -400,21 +404,23 @@ export function LeavesPage() {
             </p>
           </div>
 
-          <div className="admin-fill overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white">
             {directoryEmpty ? (
-              <div className="px-4 py-10 text-center">
-                <p className="text-sm font-medium text-slate-800">No leave requests</p>
-                <p className="mx-auto mt-1 max-w-sm text-sm text-slate-500">
-                  When employees submit leave requests, they land here for review with their approval chain attached.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => navigate('/approvals')}
-                  className="mt-3 text-sm font-medium text-[#00B0FF] hover:underline"
-                >
-                  Configure approval steps
-                </button>
-              </div>
+              <EmptyStateBody
+                icon={Palmtree}
+                title="No leave requests"
+                description="When employees submit leave requests, they land here for review with their approval chain attached."
+                action={
+                  <button
+                    type="button"
+                    onClick={() => navigate('/approval-workflows')}
+                    className="ui-btn-primary ui-btn-sm"
+                  >
+                    Configure approval steps
+                  </button>
+                }
+                className="py-12"
+              />
             ) : (
               <>
                 <GlassTable
@@ -501,7 +507,7 @@ export function LeavesPage() {
           </div>
         </section>
 
-        <aside className="min-h-0 overflow-auto rounded-xl border border-slate-200 bg-white p-4 lg:max-h-none">
+        <aside className="rounded-xl border border-slate-200/80 bg-white p-4">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-slate-900">
               {monthDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
@@ -646,7 +652,7 @@ export function LeavesPage() {
                 {canReject && (
                   <button
                     type="button"
-                    className="ui-btn-danger-soft ui-btn-sm"
+                    className="ui-btn-danger ui-btn-sm"
                     disabled={busyId === activeLeave.id}
                     onClick={() => {
                       setRejectTarget(activeLeave);
@@ -684,7 +690,7 @@ export function LeavesPage() {
             </button>
             <button
               type="button"
-              className="ui-btn-danger-soft ui-btn-sm"
+              className="ui-btn-danger ui-btn-sm"
               disabled={Boolean(busyId)}
               onClick={() => processLeave(rejectTarget.id, 'rejected', rejectNote.trim())}
             >
@@ -704,27 +710,6 @@ export function LeavesPage() {
         </label>
       </Dialog>
     </div>
-  );
-}
-
-function SummaryMetric({ label, value, emphasize = false, tone = 'default', active = false, onClick }) {
-  const valueTone = {
-    default: 'text-slate-900',
-    pending: 'text-amber-700',
-    approved: 'text-slate-900',
-    away: 'text-[#0284C7]',
-  }[tone];
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`min-w-0 rounded-lg px-1 py-0.5 text-left transition-colors ${active ? 'bg-slate-50' : 'hover:bg-slate-50'}`}
-    >
-      <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-400">{label}</p>
-      <p className={`mt-1 font-semibold tabular-nums tracking-tight ${valueTone} ${emphasize ? 'text-3xl' : 'text-xl'}`}>
-        {value}
-      </p>
-    </button>
   );
 }
 

@@ -34,6 +34,7 @@ import { useDismiss } from '../../../shared/lib/useDismiss';
 import { EmptyStateBody } from '../../../shared/components/ui/EmptyState';
 import { StatusBadge } from '../../../shared/components/ui/Badge';
 import { MenuItem, MenuPanel, useMenuNavigation } from '../../../shared/components/ui/Menu';
+import { KpiMetricCard, KpiMetricGrid } from '../../../shared/components/ui/KpiMetricCard';
 import { rankColor } from '../../../shared/components/charts/chartTheme';
 import { buildDashboardMock, shouldSeedDashboardMock } from '../utils/dashboardMock';
 
@@ -110,7 +111,7 @@ const BTN_SM = 'px-2.5 py-1.5 text-caption';
 const BTN_SOFT_BASE =
   'inline-flex w-full items-center justify-center gap-1.5 rounded-xl py-2 text-caption font-semibold transition-all duration-200 ease-premium active:scale-[0.98] disabled:cursor-not-allowed';
 const BTN_SOFT_APPROVE = `${BTN_SOFT_BASE} bg-[#00B0FF] text-white shadow-[0_1px_3px_rgba(0,176,255,0.22)] hover:-translate-y-px hover:bg-[#0099E6] hover:shadow-[0_8px_18px_rgba(0,176,255,0.28)]`;
-const BTN_SOFT_DANGER = `${BTN_SOFT_BASE} border border-[#FECACA] bg-white text-[#DC2626] hover:border-[#F87171] hover:bg-[#FEF2F2]`;
+const BTN_SOFT_DANGER = `${BTN_SOFT_BASE} bg-[#EF4444] text-white shadow-[0_1px_3px_rgba(239,68,68,0.22)] hover:-translate-y-px hover:bg-[#DC2626] hover:shadow-[0_8px_18px_rgba(239,68,68,0.28)]`;
 const ICON_BTN =
   'grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline bg-white text-ink-muted transition-all duration-200 hover:border-[#70C9EF] hover:bg-[#E6F4FA] hover:text-[#00BCFF]';
 const HEALTH_FILTERS = [
@@ -260,6 +261,11 @@ const buildDailyTrend = (attendance, days) => {
         days <= 7
           ? start.toLocaleDateString(undefined, { weekday: 'short' })
           : start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+      fullLabel: start.toLocaleDateString(undefined, {
+        weekday: 'long',
+        month: 'short',
+        day: 'numeric',
+      }),
       checkins: 0,
       previous: 0,
     };
@@ -290,7 +296,7 @@ const buildDailyTrend = (attendance, days) => {
     currentTotal,
     previousTotal: hasPrevious ? previousTotal : null,
     delta: hasPrevious ? Math.round(((currentTotal - previousTotal) / previousTotal) * 100) : null,
-    compareLabel: `vs prior ${days} days`,
+    compareLabel: days === 7 ? 'vs last week' : `vs prior ${days} days`,
   };
 };
 
@@ -298,35 +304,43 @@ const buildMonthlyTrend = (attendance, months) => {
   const now = new Date();
   const buckets = [];
   const index = new Map();
+  const previousIndex = new Map();
   for (let i = months - 1; i >= 0; i -= 1) {
     const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const bucket = {
       key: `${start.getFullYear()}-${start.getMonth()}`,
       label: start.toLocaleDateString(undefined, { month: 'short' }),
+      fullLabel: start.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
       checkins: 0,
+      previous: 0,
     };
     buckets.push(bucket);
     index.set(bucket.key, bucket);
+    const prior = new Date(now.getFullYear(), now.getMonth() - i - months, 1);
+    previousIndex.set(`${prior.getFullYear()}-${prior.getMonth()}`, bucket);
   }
 
   for (const row of attendance) {
     if (!row.timestamp || normalizeAttendanceType(row.type) !== 'checkin') continue;
     const date = new Date(row.timestamp);
     if (Number.isNaN(date.getTime())) continue;
-    const bucket = index.get(`${date.getFullYear()}-${date.getMonth()}`);
-    if (bucket) bucket.checkins += 1;
+    const key = `${date.getFullYear()}-${date.getMonth()}`;
+    const current = index.get(key);
+    if (current) current.checkins += 1;
+    const previous = previousIndex.get(key);
+    if (previous) previous.previous += 1;
   }
 
   const latest = buckets[buckets.length - 1];
   const prior = buckets[buckets.length - 2];
   const previousTotal = prior?.checkins || 0;
-  const hasPrevious = previousTotal > 0;
+  const hasPrevious = buckets.some((row) => row.previous > 0);
 
   return {
-    data: buckets,
+    data: buckets.map((row) => ({ ...row, previous: hasPrevious ? row.previous : undefined })),
     currentTotal: buckets.reduce((sum, row) => sum + row.checkins, 0),
-    previousTotal: hasPrevious ? previousTotal : null,
-    delta: hasPrevious ? Math.round((((latest?.checkins || 0) - previousTotal) / previousTotal) * 100) : null,
+    previousTotal: previousTotal > 0 ? previousTotal : null,
+    delta: previousTotal > 0 ? Math.round((((latest?.checkins || 0) - previousTotal) / previousTotal) * 100) : null,
     compareLabel: 'vs last month',
   };
 };
@@ -442,7 +456,7 @@ const dashStagger = {
 };
 
 const dashFadeUp = {
-  hidden: { opacity: 0, y: 8 },
+  hidden: { y: 8 },
   show: {
     opacity: 1,
     y: 0,
@@ -451,7 +465,7 @@ const dashFadeUp = {
 };
 
 const SHELL =
-  'flex h-full min-h-0 flex-col rounded-xl border border-slate-200 bg-white p-4';
+  'flex h-full min-h-0 flex-col rounded-xl border border-slate-200/80 bg-white p-4';
 
 /**
  * Eases a metric from its previous value to the next one so refreshed numbers
@@ -513,7 +527,7 @@ function DeltaChip({ delta, suffix = '' }) {
       ) : (
         <>
           {rising ? '+' : ''}
-          {delta}
+          {delta}%
           {suffix}
         </>
       )}
@@ -723,85 +737,92 @@ function CommandHeader({ greeting, name, dateLabel, context, action, onAction })
   );
 }
 
-function SnapshotMetric({ label, value, loading, emphasize = false, onClick }) {
-  const animated = useCountUp(loading ? Number.NaN : value, 360);
-  const Tag = onClick ? 'button' : 'div';
-
-  return (
-    <Tag
-      {...(onClick ? { type: 'button', onClick } : {})}
-      className={`min-w-0 text-left transition-colors duration-150 ${
-        onClick ? `rounded-lg hover:bg-slate-50 ${FOCUS_RING}` : ''
-      } ${emphasize ? 'px-1 py-0.5 sm:px-2' : 'px-1 py-0.5'}`}
-    >
-      <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-400">{label}</p>
-      {loading ? (
-        <span className="mt-1 block h-7 w-12 animate-pulse rounded bg-slate-100" aria-hidden />
-      ) : (
-        <p
-          className={`mt-1 font-semibold tabular-nums tracking-tight text-slate-900 ${
-            emphasize ? 'text-3xl' : 'text-xl'
-          }`}
-        >
-          {formatNumber(animated)}
-        </p>
-      )}
-    </Tag>
-  );
-}
-
 function WorkforceSnapshot({ metrics, loading }) {
   return (
-    <section className="shrink-0 rounded-xl border border-slate-200 bg-white px-4 py-3 sm:px-5">
-      <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
-        {metrics.map((metric, index) => (
-          <Fragment key={metric.label}>
-            {index > 0 && <span className="hidden h-10 w-px bg-slate-100 sm:block" aria-hidden />}
-            <SnapshotMetric {...metric} loading={loading} emphasize={index === 0} />
-          </Fragment>
-        ))}
-      </div>
-    </section>
+    <KpiMetricGrid>
+      {metrics.map((metric) => (
+        <KpiMetricCard
+          key={metric.label}
+          value={typeof metric.value === 'string' ? metric.value : formatNumber(metric.value)}
+          label={metric.label}
+          subtitle={metric.subtitle}
+          icon={metric.icon}
+          tone={metric.tone}
+          progress={metric.progress}
+          actionable={metric.actionable}
+          active={metric.active}
+          loading={loading}
+          onClick={metric.onClick}
+        />
+      ))}
+    </KpiMetricGrid>
   );
 }
 
+const ATTENTION_TONE = {
+  late: '#00A7D6',
+  'open-shifts': '#70C8F4',
+  leaves: '#00B0FF',
+  'work-modes': '#70C8F4',
+  corrections: '#8898AA',
+  tickets: '#8898AA',
+};
+
 function NeedsAttention({ items, loading }) {
+  const queueTotal = items.reduce((sum, item) => sum + (Number(item.count) || 0), 0);
+
   return (
-    <section className="flex h-full min-h-0 flex-col rounded-xl border border-slate-200 border-l-[3px] border-l-[#00B0FF] bg-white p-4">
-      <div className="flex items-baseline justify-between gap-3">
+    <section className="flex h-full min-h-0 flex-col rounded-xl border border-slate-200/80 bg-white p-4">
+      <div className="flex shrink-0 items-baseline justify-between gap-3">
         <h2 className="text-sm font-semibold text-slate-900">Needs attention</h2>
         {!loading && items.length > 0 && (
           <span className="text-xs font-medium tabular-nums text-[#00B0FF]">{items.length}</span>
         )}
       </div>
-      <div className="mt-2 min-h-0 flex-1 overflow-y-auto">
+      <div className="mt-2 flex min-h-0 flex-1 flex-col">
         {loading ? (
-          <div className="space-y-2" aria-hidden>
+          <div className="flex flex-1 flex-col justify-evenly gap-2" aria-hidden>
             {Array.from({ length: 4 }).map((_, index) => (
-              <div key={index} className="h-10 animate-pulse rounded-lg bg-slate-100" />
+              <div key={index} className="h-10 flex-1 animate-pulse rounded-lg bg-slate-100" />
             ))}
           </div>
         ) : items.length === 0 ? (
-          <p className="py-6 text-sm text-slate-500">Nothing queued this morning.</p>
+          <p className="flex flex-1 items-center text-sm text-slate-500">Nothing queued this morning.</p>
         ) : (
-          <ul className="divide-y divide-slate-100">
-            {items.map((item) => (
-              <li key={item.id}>
-                <button
-                  type="button"
-                  onClick={item.onClick}
-                  className={`flex w-full items-center justify-between gap-4 py-2.5 text-left transition-colors duration-150 hover:bg-slate-50 ${FOCUS_RING}`}
-                >
-                  <span className="min-w-0 text-sm text-slate-700">
-                    <span className="font-semibold tabular-nums text-slate-900">{formatNumber(item.count)}</span>
-                    {' '}
-                    {item.label}
-                  </span>
-                  <span className="shrink-0 text-xs font-semibold text-[#00B0FF]">{item.action}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
+          <>
+            <ul className="flex min-h-0 flex-1 flex-col divide-y divide-slate-100">
+              {items.map((item) => (
+                <li key={item.id} className="flex min-h-0 flex-1">
+                  <button
+                    type="button"
+                    onClick={item.onClick}
+                    className={`flex w-full items-center justify-between gap-4 rounded-lg px-2 text-left transition-colors duration-150 hover:bg-[#70C8F4]/30 ${FOCUS_RING}`}
+                  >
+                    <span className="min-w-0 text-sm text-slate-700">
+                      <span className="font-semibold tabular-nums text-slate-900">{formatNumber(item.count)}</span>
+                      {' '}
+                      {item.label}
+                    </span>
+                    <span className="shrink-0 text-xs font-semibold text-[#00B0FF]">{item.action}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            {queueTotal > 0 && (
+              <div className="mt-3 flex h-1.5 shrink-0 overflow-hidden rounded-full bg-slate-100" aria-hidden>
+                {items.map((item) => (
+                  <div
+                    key={item.id}
+                    className="h-full"
+                    style={{
+                      width: `${(item.count / queueTotal) * 100}%`,
+                      backgroundColor: ATTENTION_TONE[item.id] || '#00A7D6',
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
     </section>
@@ -1299,7 +1320,7 @@ function ActionQueueCard({ items, approvableCount, busyId, batching, onBatchAppr
       />
 
       <div
-        className={`no-scrollbar ${CARD_TIERS.secondary.gap} flex ${CARD_TIERS.secondary.body} min-h-0 flex-col gap-2.5 overflow-y-auto pr-0.5`}
+        className={`${CARD_TIERS.secondary.gap} flex ${CARD_TIERS.secondary.body} flex-col gap-2.5`}
       >
         {items.length === 0 ? (
           <CardEmpty
@@ -1375,6 +1396,7 @@ function ActionQueueCard({ items, approvableCount, busyId, batching, onBatchAppr
                           type="button"
                           disabled={busy}
                           onClick={item.onReject}
+                          data-on-dark
                           className={`${BTN_SOFT_DANGER} min-h-[40px] ${FOCUS_RING}`}
                         >
                           <X className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden />
@@ -1503,7 +1525,7 @@ function DirectorySnapshotCard({ loading, directoryRows, onLeaveKeys, checkedInK
       )}
 
       <div
-        className={`no-scrollbar ${CARD_TIERS.utility.gap} ${CARD_TIERS.utility.body} space-y-0.5 overflow-y-auto`}
+        className={`${CARD_TIERS.utility.gap} ${CARD_TIERS.utility.body} space-y-0.5`}
         aria-busy={loading}
       >
           {loading &&
@@ -1751,7 +1773,7 @@ function ActivityTimelineCard({ loading, items, lastEventLabel, onOpen }) {
       )}
 
       <div
-        className={`no-scrollbar ${CARD_TIERS.utility.gap} min-h-0 flex-1 overflow-y-auto pr-0.5`}
+        className={`${CARD_TIERS.utility.gap}`}
         aria-busy={loading}
       >
         {loading && (
@@ -1961,9 +1983,11 @@ function ViewportTrendCard({ loading, series, range, onRangeChange, onViewAttend
         <div className="min-w-0">
           <h2 className="text-sm font-semibold text-slate-900">Attendance trend</h2>
           {!loading && !isEmpty && (
-            <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-              <span className="font-semibold tabular-nums text-slate-900">{formatNumber(series.currentTotal)}</span>
-              check-ins
+            <p className="mt-1 flex flex-wrap items-center gap-2">
+              <span className="text-2xl font-bold tabular-nums leading-none text-slate-900">
+                {formatNumber(series.currentTotal)}
+              </span>
+              <span className="text-xs font-medium text-[#8898AA]">check-ins</span>
               {series.delta != null && <DeltaChip delta={series.delta} suffix={` ${series.compareLabel}`} />}
             </p>
           )}
@@ -1987,7 +2011,7 @@ function ViewportTrendCard({ loading, series, range, onRangeChange, onViewAttend
         </div>
       </div>
 
-      <div className="mt-3 min-h-0 w-full flex-1" aria-busy={loading}>
+      <div className="mt-3 min-h-[12rem] w-full" aria-busy={loading}>
         {loading ? (
           <div className="h-full min-h-0 animate-pulse rounded-lg bg-slate-100" aria-hidden />
         ) : isEmpty ? (
@@ -1998,7 +2022,7 @@ function ViewportTrendCard({ loading, series, range, onRangeChange, onViewAttend
           />
         ) : (
           <motion.div
-            className="h-full min-h-0 w-full"
+            className="h-[12rem] w-full"
             initial={reduceMotion ? false : { opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.35, ease: DASH_EASE }}
@@ -2015,51 +2039,37 @@ function ViewportTrendCard({ loading, series, range, onRangeChange, onViewAttend
 
 function ViewportAttendancePie({ loading, onSite, remote, notIn, coverage }) {
   const total = onSite + remote + notIn;
-  const ranked = [
+  const slices = [
     { name: 'On-site', value: onSite, color: '#00B0FF' },
     { name: 'Remote', value: remote, color: '#70C8F4' },
-    { name: 'Not in', value: notIn, color: '#D7EAF3' },
-  ]
-    .map((row) => ({
-      ...row,
-      share: total ? Math.round((row.value / total) * 100) : 0,
-    }))
-    .sort((a, b) => b.value - a.value);
+    { name: 'Not in', value: notIn, color: '#8898AA' },
+  ].map((row) => ({
+    ...row,
+    share: total ? Math.round((row.value / total) * 100) : 0,
+  }));
 
   return (
     <article className={SHELL}>
-      <div className="flex shrink-0 items-baseline justify-between gap-3">
-        <h2 className="text-sm font-semibold text-slate-900">Today’s mix</h2>
-        <p className="text-xs text-slate-500">
-          <span className="font-semibold tabular-nums text-slate-900">{coverage}%</span> in
-        </p>
-      </div>
-      <div className="mt-2 flex min-h-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="mx-auto aspect-square h-full max-h-full w-auto max-w-[11rem] min-h-0 shrink-0">
-          {loading ? (
-            <div className="h-full w-full animate-pulse rounded-full bg-slate-100" aria-hidden />
-          ) : (
-            <Suspense fallback={<div className="h-full w-full animate-pulse rounded-full bg-slate-100" aria-hidden />}>
-              <AttendanceMixPieChart data={ranked} centerLabel={`${coverage}%`} centerHint="in today" />
-            </Suspense>
-          )}
-        </div>
-        <ul className="flex min-w-0 flex-1 flex-col justify-center gap-2">
-          {ranked.map((row, index) => (
-            <li key={row.name} className="flex items-baseline justify-between gap-3">
-              <span className="flex min-w-0 items-center gap-2">
-                <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: row.color }} aria-hidden />
-                <span className={`truncate ${index === 0 ? 'text-sm font-semibold text-slate-800' : 'text-sm text-slate-600'}`}>
-                  {row.name}
-                </span>
-              </span>
-              <span className="shrink-0 text-sm tabular-nums text-slate-900">
-                {formatNumber(row.value)}
-                <span className="ml-1.5 text-xs text-slate-400">{row.share}%</span>
-              </span>
-            </li>
-          ))}
-        </ul>
+      <h2 className="shrink-0 text-sm font-semibold text-slate-900">Today’s mix</h2>
+      <div className="mt-3 flex min-h-[9.5rem] w-full flex-1" aria-busy={loading}>
+        {loading ? (
+          <div className="flex h-full w-full flex-col gap-4 sm:flex-row sm:items-stretch">
+            <div className="mx-auto h-[9.5rem] w-[9.5rem] shrink-0 animate-pulse rounded-full bg-slate-100 sm:mx-0" aria-hidden />
+            <div className="grid min-w-0 flex-1 grid-rows-3 gap-2">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div key={index} className="h-full animate-pulse rounded-xl bg-slate-100" aria-hidden />
+              ))}
+            </div>
+          </div>
+        ) : (
+          <Suspense
+            fallback={
+              <div className="h-[9.5rem] w-[9.5rem] animate-pulse rounded-full bg-slate-100" aria-hidden />
+            }
+          >
+            <AttendanceMixPieChart data={slices} coverage={coverage} />
+          </Suspense>
+        )}
       </div>
     </article>
   );
@@ -2072,7 +2082,7 @@ function ViewportActivityCard({ loading, items }) {
   return (
     <article className={SHELL}>
       <h2 className="mb-1 shrink-0 text-sm font-semibold text-slate-900">Recent activity</h2>
-      <div className="min-h-0 flex-1 overflow-y-auto" aria-busy={loading}>
+      <div className="min-h-0 flex-1" aria-busy={loading}>
         {loading && (
           <div className="space-y-2">
             {Array.from({ length: 5 }).map((_, index) => (
@@ -2788,35 +2798,6 @@ export function DashboardPage() {
 
   const presentToday = attendanceToday.uniqueCheckins;
   const onLeaveToday = onLeaveKeys.size;
-  const absentToday = Math.max(activeUsers - presentToday - onLeaveToday, 0);
-
-  const snapshotMetrics = [
-    {
-      label: 'Present',
-      value: presentToday,
-      onClick: canViewAttendance ? () => navigate('/attendance') : undefined,
-    },
-    {
-      label: 'Late',
-      value: todayIssues.late,
-      onClick: canViewAttendance ? () => navigate('/attendance') : undefined,
-    },
-    {
-      label: 'Absent',
-      value: absentToday,
-      onClick: canViewAttendance ? () => navigate('/attendance') : undefined,
-    },
-    {
-      label: 'On leave',
-      value: onLeaveToday,
-      onClick: canViewLeaves ? () => navigate('/leaves') : undefined,
-    },
-    attendanceToday.remote >= 0 && {
-      label: 'Remote',
-      value: attendanceToday.remote,
-      onClick: canViewWorkModes ? () => navigate('/work-mode-requests') : undefined,
-    },
-  ].filter(Boolean);
 
   const attentionItems = [
     canViewAttendance &&
@@ -2871,6 +2852,62 @@ export function DashboardPage() {
 
   const now = new Date();
   const attentionTotal = attentionItems.reduce((sum, item) => sum + item.count, 0);
+  const queueDestination = attentionItems[0]?.onClick
+    || (canViewAttendance ? () => navigate('/attendance') : undefined);
+  const pendingLeaveMetric = canViewLeaves
+    ? {
+        label: 'Pending leave',
+        value: pendingCounts.leaves,
+        subtitle: 'Awaiting approval',
+        icon: CalendarCheck,
+        tone: 'warning',
+        actionable: pendingCounts.leaves > 0,
+        onClick: () => navigate('/leaves'),
+      }
+    : {
+        label: 'Work modes',
+        value: pendingCounts.workModes,
+        subtitle: 'Awaiting approval',
+        icon: CalendarCheck,
+        tone: 'warning',
+        actionable: pendingCounts.workModes > 0,
+        onClick: canViewWorkModes ? () => navigate('/work-mode-requests') : undefined,
+      };
+  const snapshotMetrics = [
+    {
+      label: 'Coverage',
+      value: `${attendanceRate}%`,
+      subtitle: `${formatNumber(presentToday)} of ${formatNumber(activeUsers)} active today`,
+      icon: TrendingUp,
+      progress: attendanceRate,
+      onClick: canViewAttendance ? () => navigate('/attendance') : undefined,
+    },
+    {
+      label: 'On site',
+      value: attendanceToday.onSite,
+      subtitle: 'Checked in at a site',
+      icon: Building2,
+      tone: 'success',
+      onClick: canViewAttendance ? () => navigate('/attendance') : undefined,
+    },
+    {
+      label: 'On leave',
+      value: onLeaveToday,
+      subtitle: 'Approved off today',
+      icon: CalendarDays,
+      onClick: canViewLeaves ? () => navigate('/leaves') : undefined,
+    },
+    {
+      label: 'In queue',
+      value: attentionTotal,
+      subtitle: 'Needs a decision',
+      icon: AlertCircle,
+      tone: 'warning',
+      actionable: attentionTotal > 0,
+      onClick: queueDestination,
+    },
+    pendingLeaveMetric,
+  ];
   const headerContext = attentionTotal
     ? `${formatNumber(attentionTotal)} ${attentionTotal === 1 ? 'item needs' : 'items need'} a decision this morning.`
     : presentToday
@@ -2892,7 +2929,7 @@ export function DashboardPage() {
 
   return (
     <motion.div
-      className="dash-viewport flex h-full min-h-0 flex-1 flex-col gap-4 overflow-y-auto lg:overflow-hidden"
+      className="dash-viewport flex flex-col gap-4"
       variants={dashStagger}
       initial={reduceMotion ? false : 'hidden'}
       animate="show"
@@ -2924,15 +2961,15 @@ export function DashboardPage() {
 
       <motion.div
         variants={dashStagger}
-        className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-hidden lg:grid-cols-12 lg:grid-rows-2"
+        className="grid grid-cols-1 gap-4 lg:grid-cols-12"
       >
-        <motion.div variants={dashFadeUp} className="min-h-0 lg:col-span-5 lg:h-full">
+        <motion.div variants={dashFadeUp} className="lg:col-span-5">
           <NeedsAttention items={attentionItems} loading={loading} />
         </motion.div>
-        <motion.div variants={dashFadeUp} className="min-h-0 lg:col-span-7 lg:h-full">
+        <motion.div variants={dashFadeUp} className="lg:col-span-7">
           <ViewportActivityCard loading={loading} items={activityItems} />
         </motion.div>
-        <motion.div variants={dashFadeUp} className="min-h-0 lg:col-span-7 lg:h-full">
+        <motion.div variants={dashFadeUp} className="lg:col-span-7">
           <ViewportTrendCard
             loading={loading}
             series={liveTrendSeries}
@@ -2941,7 +2978,7 @@ export function DashboardPage() {
             onViewAttendance={() => navigate('/attendance')}
           />
         </motion.div>
-        <motion.div variants={dashFadeUp} className="min-h-0 lg:col-span-5 lg:h-full">
+        <motion.div variants={dashFadeUp} className="lg:col-span-5">
           <ViewportAttendancePie
             loading={loading}
             onSite={attendanceToday.onSite}
