@@ -9,7 +9,9 @@ export const useNotificationStore = create((set, get) => ({
     set({ loading: true });
     try {
       const count = await adminService.getUnreadNotificationCount();
-      set({ unreadCount: count || 0 });
+      const next = count || 0;
+      // Skip identity churn when the badge value is unchanged.
+      if (next !== get().unreadCount) set({ unreadCount: next });
     } catch {
       /* keep last count */
     } finally {

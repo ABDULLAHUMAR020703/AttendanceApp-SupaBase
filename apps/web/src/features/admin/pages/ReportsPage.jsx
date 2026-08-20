@@ -3,7 +3,6 @@ import { Download, Eye, FileText, Send, Trash2, X } from 'lucide-react';
 import { GlassCard } from '../../../shared/components/GlassCard';
 import { GlassTable, TableActions, TableCell, TableRow } from '../../../shared/components/GlassTable';
 import { Button } from '../../../shared/components/ui/Button';
-import { StatusBadge } from '../../../shared/components/ui/Badge';
 import { EmptyStateBody } from '../../../shared/components/ui/EmptyState';
 import { SkeletonFeed, SkeletonForm } from '../../../shared/components/ui/Skeleton';
 import { PermissionGate } from '../../../shared/components/PermissionGate';
@@ -55,6 +54,25 @@ function formatFileSize(bytes) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function ReportStatus({ value }) {
+  const normalized = String(value || '').toLowerCase().replace(/_/g, ' ');
+  const tone = ['sent', 'complete', 'completed', 'success', 'delivered', 'ready'].includes(normalized)
+    ? 'bg-emerald-500'
+    : ['failed', 'error', 'rejected'].includes(normalized)
+      ? 'bg-rose-500'
+      : ['pending', 'queued', 'processing', 'in progress'].includes(normalized)
+        ? 'bg-amber-400'
+        : 'bg-slate-400';
+  const label = normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : '—';
+
+  return (
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-caption text-ink-muted">
+      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${tone}`} aria-hidden />
+      {label}
+    </span>
+  );
 }
 
 
@@ -568,21 +586,21 @@ export function ReportsPage() {
               className="py-8"
             />
           ) : (
-            <div className="max-h-64 space-y-2 overflow-y-auto">
+            <div className="max-h-64 divide-y divide-hairline-soft overflow-y-auto">
               {deliveryLogs.map((log) => (
-                <div key={log.id} className="rounded-xl border border-hairline bg-surface-subtle px-4 py-3">
+                <div key={log.id} className="px-1 py-2.5 first:pt-0 last:pb-0">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <StatusBadge status={log.status} />
+                    <ReportStatus value={log.status} />
                     <span className="text-caption text-ink-muted">{formatDateTime(log.created_at)}</span>
                   </div>
-                  {log.report_period && <p className="mt-1.5 text-caption text-ink">{log.report_period}</p>}
+                  {log.report_period && <p className="mt-1 text-caption text-ink">{log.report_period}</p>}
                   {log.recipients?.length > 0 && (
                     <p className="mt-1 break-words text-caption text-ink-muted">
                       To: {Array.isArray(log.recipients) ? log.recipients.join(', ') : log.recipients}
                     </p>
                   )}
                   {log.error_message && (
-                    <p className="mt-1.5 text-caption font-medium text-danger-ink">{log.error_message}</p>
+                    <p className="mt-1 text-caption font-medium text-danger-ink">{log.error_message}</p>
                   )}
                 </div>
               ))}
@@ -631,9 +649,9 @@ export function ReportsPage() {
                   {formatDateTime(r.generatedAt)}
                 </TableCell>
                 <TableCell className="capitalize">{r.reportType}</TableCell>
-                <TableCell><StatusBadge status={r.generationStatus} /></TableCell>
+                <TableCell><ReportStatus value={r.generationStatus} /></TableCell>
                 <TableCell className="text-ink-muted">{formatFileSize(r.fileSize)}</TableCell>
-                <TableCell><StatusBadge status={r.emailStatus} /></TableCell>
+                <TableCell><ReportStatus value={r.emailStatus} /></TableCell>
                 <TableCell>
                   <TableActions
                     label={`Actions for report ${r.reportId.slice(0, 8)}`}

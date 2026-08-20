@@ -225,14 +225,30 @@ export const useAuthStore = create((set) => ({
   refreshPermissions: async () => {
     const state = useAuthStore.getState();
     if (!state.user?.uid) return;
+
+    const samePermissions = (nextPermissions = [], nextRole = state.user.role) => {
+      const current = state.user.permissions || [];
+      if ((nextRole || state.user.role) !== state.user.role) return false;
+      if (current.length !== nextPermissions.length) return false;
+      for (let i = 0; i < current.length; i += 1) {
+        if (current[i] !== nextPermissions[i]) return false;
+      }
+      return true;
+    };
+
     try {
       const { data } = await api.get(apiUrl('/api/auth/me/permissions'));
       if (data?.success && data?.data) {
+        const permissions = data.data.permissions || [];
+        const role = data.data.role || state.user.role;
+        // Avoid a new user object when nothing changed — DashboardPage keys
+        // loadDashboard off `user`, and a noop refresh was forcing a full reload.
+        if (samePermissions(permissions, role)) return;
         set({
           user: {
             ...state.user,
-            permissions: data.data.permissions || [],
-            role: data.data.role || state.user.role,
+            permissions,
+            role,
           },
         });
         return;
@@ -241,6 +257,7 @@ export const useAuthStore = create((set) => ({
       /* fallback below */
     }
     const permissions = await fetchUserPermissions(state.user.uid, state.user.role);
+    if (samePermissions(permissions)) return;
     set({ user: { ...state.user, permissions } });
   },
 }));

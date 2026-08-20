@@ -76,7 +76,7 @@ export function Sidebar({ canSee, onLogout, unreadCount = 0 }) {
 
   return (
     <aside
-      className="nav-surface relative z-40 m-0 hidden h-full w-64 shrink-0 flex-col justify-between overflow-hidden rounded-l-3xl p-0 md:flex"
+      className="nav-surface relative z-40 m-0 hidden h-full w-64 shrink-0 flex-col justify-start overflow-y-auto rounded-l-3xl p-0 md:flex"
       aria-label="Sidebar"
     >
       <div className="relative flex h-16 shrink-0 items-center gap-3 px-5">
@@ -94,7 +94,7 @@ export function Sidebar({ canSee, onLogout, unreadCount = 0 }) {
       </div>
 
       <nav
-        className="no-scrollbar relative min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain py-4 pb-8"
+        className="relative flex-none space-y-1 py-4 pb-1"
         aria-label="Main navigation"
       >
         {sections.map((section, index) => (
@@ -110,7 +110,7 @@ export function Sidebar({ canSee, onLogout, unreadCount = 0 }) {
         ))}
       </nav>
 
-      <div className="relative z-20 shrink-0 space-y-1 border-t border-white/20 bg-transparent py-3">
+      <div className="relative z-20 mt-2 shrink-0 space-y-1 border-t border-white/20 bg-transparent py-3">
         {footerItems.map((item) => (
           <NavRow key={item.to} item={item} />
         ))}

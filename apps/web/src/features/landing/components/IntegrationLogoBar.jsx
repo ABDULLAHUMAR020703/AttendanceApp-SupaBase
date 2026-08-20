@@ -163,7 +163,7 @@ export function IntegrationLogoBar() {
       />
 
       <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <p className="text-center text-[11px] font-semibold uppercase tracking-[0.24em] text-[#00bcff]">
+        <p className="mx-auto max-w-[21rem] text-center font-display text-[10px] font-bold leading-[1.5] uppercase tracking-[0.13em] text-[#00bcff] sm:max-w-xl sm:text-[11px] sm:tracking-[0.16em] md:text-xs md:tracking-[0.18em]">
           Integrates seamlessly with your existing enterprise stack
         </p>
       </div>

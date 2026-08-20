@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { CalendarPlus } from 'lucide-react';
+import { CalendarDays, CalendarPlus, Clock3 } from 'lucide-react';
 import { GlassCard } from '../../../shared/components/GlassCard';
 import { PermissionGate } from '../../../shared/components/PermissionGate';
 import { adminService } from '../services/adminService';
@@ -146,16 +146,32 @@ export function CalendarPage() {
             <form onSubmit={handleSubmit} className="space-y-3">
               <h2 className="text-sm font-medium text-white">{mode === 'edit' ? 'Edit Event' : 'Create Event'}</h2>
               <input required placeholder="Title" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} className="ui-input" />
-              <textarea rows={2} placeholder="Description" value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} className="ui-textarea" />
-              <div className="grid gap-3 sm:grid-cols-3">
-                <input required type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} className="ui-input" />
-                <input type="time" value={form.time} onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))} className="ui-input" />
-                <select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))} className="ui-select">
+              <label className="block space-y-1">
+                <span className="text-micro font-semibold uppercase tracking-[0.08em] text-slate-300">Date</span>
+                <span className="relative block">
+                  <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
+                  <input required type="date" aria-label="Select date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} className="ui-input pl-10" />
+                </span>
+              </label>
+              <label className="block space-y-1">
+                <span className="text-micro font-semibold uppercase tracking-[0.08em] text-slate-300">Time</span>
+                <span className="relative block">
+                  <Clock3 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
+                  <input type="time" aria-label="Select time" value={form.time} onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))} className="ui-input pl-10" />
+                </span>
+              </label>
+              <label className="block space-y-1">
+                <span className="text-micro font-semibold uppercase tracking-[0.08em] text-slate-300">Event type</span>
+                <select aria-label="Event type" value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))} className="ui-select">
                   {EVENT_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
-              </div>
+              </label>
+              <label className="block space-y-1">
+                <span className="text-micro font-semibold uppercase tracking-[0.08em] text-slate-300">Invite / Notes</span>
+                <textarea rows={2} placeholder="Add people, location, or agenda" aria-label="Invite or notes" value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} className="ui-textarea" />
+              </label>
               <div className="flex gap-2">
-                <button type="submit" disabled={busy} className="ui-btn-primary ui-btn-sm">{mode === 'edit' ? 'Save' : 'Create'}</button>
+                <button type="submit" disabled={busy} className="ui-btn-primary ui-btn-sm">{mode === 'edit' ? 'Save' : 'Add event'}</button>
                 <button type="button" onClick={() => setMode('list')} className="ui-btn-secondary ui-btn-sm">Cancel</button>
                 {mode === 'edit' && (
                   <PermissionGate permission={PERMISSIONS.DELETE_EVENTS}>

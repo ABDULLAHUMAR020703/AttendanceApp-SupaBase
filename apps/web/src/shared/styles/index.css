@@ -730,7 +730,7 @@
   }
 
   .ui-track-fill {
-    @apply h-full rounded-full transition-[width] duration-700 ease-out;
+    @apply h-full rounded-full transition-[width] duration-200 ease-out;
   }
 
   /*

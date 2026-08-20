@@ -9,15 +9,14 @@ import { ArrowRight } from 'lucide-react';
  * - Backend: POST /api/auth/onboard-company
  *
  * Book Demo (hero + contact CTA):
- * - Demo intake mailbox (swap for Calendly/CRM when available)
+ * - Scrolls to the landing-page demo form
  * - Sign-in: /login → POST /api/auth/login
  */
 export const ONBOARD_URL = 'https://hadir.techdotglobal.com/onboard';
 export const LOGIN_PATH = '/login';
 
-/** Demo booking intake — replace with Calendly/CRM URL when provisioned. */
-export const DEMO_BOOKING_URL =
-  'mailto:demo@hadir.ai?subject=Book%20a%20Hadir.ai%20Demo&body=Hi%20Hadir%20team%2C%0A%0AI%27d%20like%20to%20book%20a%20product%20demo.%0A%0ACompany%3A%20%0AName%3A%20%0APreferred%20time%3A%20';
+/** The existing demo form lives in the landing page's contact section. */
+export const DEMO_BOOKING_URL = '#contact';
 
 export const resolveOnboardHref = () =>
   import.meta.env.DEV ? '/onboard' : ONBOARD_URL;
@@ -28,7 +27,7 @@ const CTA_CLASS =
   'group inline-flex items-center justify-center gap-2 rounded-[15px] bg-[#00BFFF] px-6 py-3.5 text-[15px] font-bold tracking-[-0.01em] text-white shadow-[0_12px_28px_rgba(0,191,255,0.32)] transition-all duration-200 ease-out hover:-translate-y-1 hover:bg-[#00A8E6] hover:shadow-[0_18px_40px_rgba(0,168,230,0.38)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00BFFF]/55 focus-visible:ring-offset-4 active:translate-y-0 active:scale-[0.98] active:bg-[#0090C4]';
 
 /**
- * Hero primary CTA — Book Demo → demo intake backend.
+ * Hero primary CTA — Book Demo → landing-page demo form.
  */
 export function HeroCtaButton({
   href = resolveDemoHref(),

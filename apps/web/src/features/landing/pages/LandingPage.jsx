@@ -6,7 +6,6 @@ import {
   BadgeCheck,
   BellRing,
   BrainCircuit,
-  Building2,
   CalendarClock,
   ChevronRight,
   Clock3,
@@ -17,19 +16,17 @@ import {
   KeyRound,
   Layers3,
   LockKeyhole,
-  Mail,
   MapPin,
   Radar,
   ShieldCheck,
   UserCheck,
   Users,
 } from 'lucide-react';
-import { useAuthStore } from '../../auth/store/authStore';
 import { HalftoneAura } from '../../../shared/components/HalftoneAura';
 import { LandingNav } from '../components/LandingNav';
 import { IntegrationLogoBar } from '../components/IntegrationLogoBar';
 import { FeatureHighlightsChecklist } from '../components/FeatureHighlightsChecklist';
-import { HeroCtaButton, ONBOARD_URL } from '../components/HeroCtaButton';
+import { DEMO_BOOKING_URL, HeroCtaButton, LOGIN_PATH } from '../components/HeroCtaButton';
 
 const spring = { type: 'spring', stiffness: 260, damping: 24, mass: 0.8 };
 const fadeUp = {
@@ -232,12 +229,11 @@ function AttendanceOverview() {
   const metricsOpacity = useTransform(scrollYProgress, [0, 0.65], [0.35, 1]);
 
   return (
-    <section ref={sectionRef} id="product" aria-label="Attendance Overview" data-section="Attendance Overview" className="relative overflow-hidden px-4 pb-28 pt-20 sm:px-6 lg:px-8">
+    <section ref={sectionRef} id="product" aria-label="Product metrics" data-section="Product metrics" className="relative overflow-hidden px-4 pb-28 pt-20 sm:px-6 lg:px-8">
       <HalftoneAura />
-      <div className="relative z-10 mx-auto max-w-[1400px]">
+      <div className="relative z-10 mx-auto max-w-7xl">
         <motion.div className="max-w-3xl" variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: false, amount: 0.35 }}>
-          <p className="text-sm font-medium uppercase tracking-[0.20em] text-[#00BFFF]">Attendance Overview</p>
-          <h2 className="mt-4 text-4xl font-bold tracking-tight text-[#0F172A] sm:text-5xl">Live operations, summarized into decisions.</h2>
+          <h2 className="text-4xl font-bold tracking-tight text-[#0F172A] sm:text-5xl">Live operations, summarized into decisions.</h2>
         </motion.div>
         <motion.div className="mt-16 grid grid-cols-2 gap-8 md:grid-cols-5" style={{ x: metricsX, opacity: metricsOpacity }}>
           {OVERVIEW_METRICS.map(([label, value], index) => (
@@ -289,8 +285,10 @@ function AnalyticsShowcaseMockup() {
       <div className="absolute -inset-8 rounded-[2.5rem] bg-white/10 blur-3xl" />
 
       <svg className="pointer-events-none absolute inset-0 z-30 hidden h-full w-full overflow-visible lg:block" viewBox="0 0 760 700" fill="none" aria-hidden="true">
-        <path d="M510 86C474 94 454 112 444 142" stroke="white" strokeWidth="2.3" strokeLinecap="round" />
-        <path d="M438 130l5 16 13-11" stroke="white" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" />
+        <g transform="translate(0 -28)">
+          <path d="M510 86C474 94 454 112 444 142" stroke="white" strokeWidth="2.3" strokeLinecap="round" />
+          <path d="M438 130l5 16 13-11" stroke="white" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" />
+        </g>
         <path d="M710 268C736 304 734 346 704 386" stroke="white" strokeWidth="2.3" strokeLinecap="round" />
         <path d="M717 376l-15 12-1-18" stroke="white" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" />
         <path d="M264 548C264 590 290 616 334 616" stroke="white" strokeWidth="2.3" strokeLinecap="round" />
@@ -386,7 +384,7 @@ function AnalyticsShowcaseMockup() {
           {profileEvents.map(([event, tone]) => <div key={event} className="flex gap-3 text-[10px] font-semibold leading-4 text-[#64748B]"><span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${tone === 'green' ? 'bg-emerald-500' : 'bg-rose-500'}`} /><span>{event}<br /><span className="text-[#94A3B8]">Confidence: 97% High</span></span></div>)}
         </div>
         <div className="mt-5 grid grid-cols-3 gap-2">
-          {['Print', 'PDF', 'Excel'].map((item) => <button key={item} type="button" className="rounded-lg border border-[#DCEFF7] bg-white px-2 py-2 text-[10px] font-bold text-[#64748B]">{item}</button>)}
+          {['Print', 'PDF', 'Excel'].map((item) => <span key={item} className="rounded-lg border border-[#DCEFF7] bg-white px-2 py-2 text-[10px] font-bold text-[#64748B]">{item}</span>)}
         </div>
       </motion.div>
     </motion.div>
@@ -399,7 +397,7 @@ function ProductShowcase() {
   ];
   // Showcase band: solid cyan (#00bcff) with soft ambient glow + curved process path.
   return (
-    <section id="solutions" aria-label="Product Showcase" data-section="Product Showcase" className="relative overflow-hidden bg-[#00bcff] px-4 py-24 text-white sm:px-6 lg:px-8">
+    <section id="solutions" aria-label="Product solutions" data-section="Product solutions" className="relative overflow-hidden bg-[#00bcff] px-4 py-24 text-white sm:px-6 lg:px-8">
       <div className="pointer-events-none absolute inset-0" aria-hidden="true">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_28%_48%,rgba(255,255,255,0.28),transparent_34%),radial-gradient(circle_at_78%_18%,rgba(112,201,239,0.35),transparent_30%),linear-gradient(160deg,#00bcff_0%,#00B2EE_52%,#0096e0_100%)]" />
         <div className="absolute left-[18%] top-[20%] h-80 w-80 rounded-full bg-white/15 blur-[90px]" />
@@ -409,8 +407,7 @@ function ProductShowcase() {
         {stories.map(([title, copy], index) => (
           <div key={title} className="grid gap-12 lg:grid-cols-[0.88fr_1.12fr] lg:items-center">
             <motion.div className={index % 2 ? 'lg:order-2' : ''} variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true, amount: 0.25 }}>
-              <p className="text-sm font-semibold uppercase tracking-[0.20em] text-white/78">Product Showcase</p>
-              <h2 className="mt-4 max-w-xl text-4xl font-bold tracking-[-0.02em] text-white sm:text-5xl">{title}</h2>
+              <h2 className="max-w-xl text-4xl font-bold tracking-[-0.02em] text-white sm:text-5xl">{title}</h2>
               <p className="mt-5 max-w-2xl text-lg leading-8 text-white/78">{copy}</p>
             </motion.div>
             <AnalyticsShowcaseMockup />
@@ -530,6 +527,18 @@ function ContactUsForm() {
       <p className="mt-2 text-sm leading-relaxed text-slate-500">
         We are deeply committed to delivering unparalleled service and unwavering support to ensure your experience exceeds expectations.
       </p>
+      <p className="mt-3 text-xs leading-relaxed text-slate-500">
+        A product by{' '}
+        <a
+          href="https://techdotglobal.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-semibold text-[#008ec1] underline decoration-[#00bcff]/35 underline-offset-2 transition-colors hover:text-[#00bcff] focus:outline-none focus-visible:rounded focus-visible:ring-2 focus-visible:ring-[#00bcff]/35"
+        >
+          TechDotGlobal
+          <ArrowRight className="ml-1 inline-block h-3 w-3" aria-hidden />
+        </a>
+      </p>
 
       <div className="mt-6 space-y-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -634,49 +643,21 @@ function FinalCTA() {
       <div className="relative z-10 mx-auto grid max-w-6xl grid-cols-1 items-start gap-6 lg:grid-cols-2 lg:gap-8">
         <ContactUsForm />
 
-        <div className="flex flex-col gap-4">
+        <div>
           <div className="rounded-2xl bg-[#00bcff] p-6 text-white shadow-[0_18px_40px_rgba(0,188,255,0.28)]">
-            <p className="text-xs font-semibold uppercase tracking-wider text-white/80">Request Demo</p>
-            <h3 className="mt-2 text-xl font-bold leading-snug sm:text-2xl">
+            <h3 className="text-xl font-bold leading-snug text-white sm:text-2xl">
               See attendance automation operating live.
             </h3>
             <p className="mt-3 text-sm leading-relaxed text-white/90">
               Explore how AI attendance, geofencing, analytics, integrations, and enterprise controls work together.
             </p>
             <a
-              href={ONBOARD_URL}
-              className="mt-5 inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-[#00bcff] transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#00bcff]"
+              href={DEMO_BOOKING_URL}
+              className="mt-6 inline-flex items-center gap-2 rounded-xl border border-white/45 bg-white px-6 py-3 text-sm font-bold tracking-[-0.01em] text-[#008ec1] shadow-[0_10px_24px_rgba(0,105,150,0.18)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#F0FBFE] hover:shadow-[0_14px_30px_rgba(0,105,150,0.24)] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-[#00bcff] active:translate-y-0 active:scale-[0.98]"
             >
               Book Demo
               <ArrowRight className="h-4 w-4" aria-hidden />
             </a>
-          </div>
-
-          <a
-            href="https://techdotglobal.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-start gap-4 rounded-2xl border border-cyan-100 bg-cyan-50/50 p-5 transition hover:border-[#00bcff]/40 hover:bg-cyan-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00bcff]/35"
-          >
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white text-[#00bcff] shadow-sm">
-              <Building2 className="h-5 w-5" aria-hidden />
-            </span>
-            <span>
-              <span className="block text-sm font-bold text-slate-900">Parent Company</span>
-              <span className="mt-1 block text-sm text-slate-600">
-                A product proudly backed by TechDotGlobal
-              </span>
-            </span>
-          </a>
-
-          <div className="flex items-start gap-4 rounded-2xl border border-slate-100 bg-slate-50 p-5">
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white text-[#00bcff] shadow-sm">
-              <Mail className="h-5 w-5" aria-hidden />
-            </span>
-            <div>
-              <p className="text-sm font-bold text-slate-900">Direct Inquiries</p>
-              <p className="mt-1 text-sm text-slate-600">We usually respond within 24 hours</p>
-            </div>
           </div>
         </div>
       </div>
@@ -686,27 +667,27 @@ function FinalCTA() {
 
 function Footer() {
   const columns = [
-    ['Product', 'AI Attendance', 'Dashboard', 'Automation', 'Analytics'],
-    ['Solutions', 'Enterprise HR', 'Operations', 'Hybrid Teams', 'Compliance'],
-    ['Resources', 'Guides', 'API Docs', 'Help Center', 'Security'],
-    ['Company', 'About', 'Contact', 'Careers', 'Partners'],
-    ['Legal', 'Privacy', 'Terms', 'DPA', 'Status'],
+    ['Product', [['AI Attendance', '#product'], ['Dashboard', '#product'], ['Automation', '#solutions'], ['Analytics', '#product']]],
+    ['Solutions', [['Enterprise HR', '#solutions'], ['Operations', '#solutions'], ['Hybrid Teams', '#solutions'], ['Compliance', '#security']]],
+    ['Resources', [['Guides', '#product'], ['API Docs', '#contact'], ['Help Center', '#contact'], ['Security', '#security']]],
+    ['Company', [['About', '#top'], ['Contact', '#contact'], ['Careers', '#contact'], ['Partners', '#company']]],
+    ['Legal', [['Privacy', '#security'], ['Terms', '#security'], ['DPA', '#security'], ['Status', '#top']]],
   ];
   return (
     <footer className="border-t border-white/10 bg-black px-4 py-20 text-white/55 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-[1400px]">
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-5">
-          {columns.map(([title, ...links]) => (
+          {columns.map(([title, links]) => (
             <div key={title}>
               <h3 className="text-sm font-bold text-white">{title}</h3>
               <div className="mt-4 space-y-3">
-                {links.map((link) => (
+                {links.map(([label, href]) => (
                   <a
-                    key={link}
-                    href="#top"
+                    key={label}
+                    href={href}
                     className="block text-sm text-white/55 transition hover:text-[#00BFFF]"
                   >
-                    {link}
+                    {label}
                   </a>
                 ))}
               </div>
@@ -724,8 +705,7 @@ function Footer() {
 
 export function LandingPage() {
   const navigate = useNavigate();
-  const user = useAuthStore((s) => s.user);
-  const onSignInClick = () => navigate(user ? '/dashboard' : '/login');
+  const onSignInClick = () => navigate(LOGIN_PATH);
   return (
     <div className="landing-page min-h-screen scroll-smooth bg-[#F8FCFD] text-[#0F172A] antialiased [font-family:'Plus_Jakarta_Sans',Inter,system-ui,sans-serif]">
       <ScrollProgressBar />

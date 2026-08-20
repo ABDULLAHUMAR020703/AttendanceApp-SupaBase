@@ -102,17 +102,8 @@ export function CompanyOnboardingPage() {
     <div className="relative min-h-screen overflow-hidden bg-page">
       <HalftoneAura />
 
-      <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-10">
-        <div className="w-full max-w-md animate-fade-up">
-          <Link to="/" className="mb-6 flex items-center justify-center gap-2 text-ink">
-            <img
-              src={LOGO_PATH}
-              alt="Hadir.ai logo"
-              className="h-8 w-8 rounded-2xl object-cover shadow-hair"
-            />
-            <span className="text-subheading font-semibold tracking-[-0.02em]">Hadir.ai</span>
-          </Link>
-
+      <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-6 sm:px-6 sm:py-8">
+        <div className="w-full max-w-[26.5rem] animate-fade-up">
           {!logoFailed && (
             <div className="mb-5 flex justify-center">
               <img
@@ -142,10 +133,10 @@ export function CompanyOnboardingPage() {
             </div>
           ) : (
             <form
-              className="space-y-5 rounded-3xl border border-hairline bg-white p-8 shadow-pop"
+              className="space-y-3 rounded-[2rem] border border-hairline bg-white p-6 shadow-pop sm:p-8"
               onSubmit={onSubmit}
             >
-              <div className="space-y-1">
+              <div className="space-y-0.5">
                 <h1 className="text-title font-semibold text-ink">Create company</h1>
                 <p className="text-label text-ink-muted">
                   Register a new tenant with a Management department and super admin.
@@ -153,15 +144,16 @@ export function CompanyOnboardingPage() {
               </div>
 
               {statusLoading && <p className="text-label text-ink-muted">Checking onboarding…</p>}
-              {statusError && <Alert type="error">{statusError}</Alert>}
+              {statusError && <Alert type="error" className="px-3 py-2 text-xs">{statusError}</Alert>}
               {!statusLoading && !requiresKey && (
-                <Alert type="info">
+                <Alert type="info" className="px-3 py-2 text-xs">
                   First company: no server key required. For additional companies, configure{' '}
                   <code className="font-semibold">COMPANY_ONBOARDING_SECRET</code> and enter it below.
                 </Alert>
               )}
               {!statusLoading && requiresKey && (
                 <Input
+                  size="sm"
                   label="Onboarding key"
                   placeholder="Server secret from COMPANY_ONBOARDING_SECRET"
                   value={onboardingKey}
@@ -171,6 +163,7 @@ export function CompanyOnboardingPage() {
               )}
 
               <Input
+                size="sm"
                 label="Company name"
                 required
                 placeholder="Acme Inc."
@@ -179,6 +172,7 @@ export function CompanyOnboardingPage() {
               />
 
               <Input
+                size="sm"
                 label="Super admin full name"
                 required
                 placeholder="Jane Doe"
@@ -187,6 +181,7 @@ export function CompanyOnboardingPage() {
               />
 
               <Input
+                size="sm"
                 label="Username"
                 required
                 autoCapitalize="none"
@@ -196,6 +191,7 @@ export function CompanyOnboardingPage() {
               />
 
               <Input
+                size="sm"
                 label="Email"
                 required
                 type="email"
@@ -207,6 +203,7 @@ export function CompanyOnboardingPage() {
               <Field id="onboard-password" label="Password" hint="At least 8 characters.">
                 <PasswordInput
                   id="onboard-password"
+                  className="ui-input-sm"
                   required
                   minLength={8}
                   value={password}
@@ -214,7 +211,7 @@ export function CompanyOnboardingPage() {
                 />
               </Field>
 
-              {formError && <Alert type="error">{formError}</Alert>}
+              {formError && <Alert type="error" className="px-3 py-2 text-xs">{formError}</Alert>}
 
               <Button
                 type="submit"
@@ -226,16 +223,26 @@ export function CompanyOnboardingPage() {
                 Create company &amp; super admin
               </Button>
 
-              <p className="text-center text-label text-ink-muted">
+              <p className="pt-1 text-center text-label text-ink-muted">
+                Already have an account?{' '}
                 <Link
                   to="/login"
                   className="font-semibold text-accent-600 transition-colors duration-fast hover:text-accent-700 hover:underline"
                 >
-                  Back to sign in
+                  Sign in
                 </Link>
               </p>
             </form>
           )}
+
+          <p className="mt-4 text-center">
+            <Link
+              to="/"
+              className="text-[13px] font-semibold text-[#64748B] transition hover:text-[#0F172A]"
+            >
+              Back to Home
+            </Link>
+          </p>
         </div>
       </div>
     </div>

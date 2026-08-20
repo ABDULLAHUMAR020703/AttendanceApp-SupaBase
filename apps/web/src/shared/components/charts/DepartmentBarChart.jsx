@@ -3,6 +3,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  LabelList,
   Legend,
   ResponsiveContainer,
   Tooltip,
@@ -40,11 +41,18 @@ export const DepartmentBarChart = memo(function DepartmentBarChart({
 
   return (
     <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
-      <BarChart data={data} margin={{ ...CHART_MARGINS.bar, bottom: xAxisHeight > 32 ? 8 : CHART_MARGINS.bar.bottom }}>
-        <CartesianGrid {...CHART_GRID} />
+      <BarChart
+        data={data}
+        barCategoryGap={data.length > 5 ? '18%' : '26%'}
+        barGap={4}
+        margin={{ top: 22, right: 12, left: 0, bottom: xAxisHeight > 32 ? 8 : 20 }}
+      >
+        <CartesianGrid {...CHART_GRID} horizontal vertical={false} />
         <XAxis
           dataKey="label"
           tick={CHART_AXIS.tick}
+          axisLine={{ stroke: CHART_AXIS.stroke }}
+          tickLine={false}
           stroke={CHART_AXIS.stroke}
           interval={0}
           angle={xAxisAngle}
@@ -54,15 +62,10 @@ export const DepartmentBarChart = memo(function DepartmentBarChart({
         />
         <YAxis
           tick={CHART_AXIS.tick}
+          axisLine={false}
+          tickLine={false}
           stroke={CHART_AXIS.stroke}
           allowDecimals={false}
-          label={{
-            value: 'Users',
-            angle: -90,
-            position: 'insideLeft',
-            fill: CHART_AXIS.tick.fill,
-            style: { textAnchor: 'middle', fontSize: 11 },
-          }}
         />
         <Tooltip
           content={<DepartmentTooltipContent />}
@@ -77,17 +80,28 @@ export const DepartmentBarChart = memo(function DepartmentBarChart({
           dataKey="total"
           name="total"
           fill={CHART_COLORS.primary}
-          radius={[6, 6, 0, 0]}
+          radius={[5, 5, 0, 0]}
+          maxBarSize={28}
           animationDuration={CHART_ANIMATION.duration}
           animationEasing={CHART_ANIMATION.easing}
           onClick={handleBarClick}
           style={{ cursor: enableDrillDown && onDrillDown ? 'pointer' : 'default' }}
-        />
+        >
+          <LabelList
+            dataKey="total"
+            position="top"
+            offset={8}
+            fill="#0F172A"
+            fontSize={11}
+            fontWeight={700}
+          />
+        </Bar>
         <Bar
           dataKey="active"
           name="active"
           fill={CHART_COLORS.secondary}
-          radius={[6, 6, 0, 0]}
+          radius={[5, 5, 0, 0]}
+          maxBarSize={28}
           animationDuration={CHART_ANIMATION.duration}
           animationEasing={CHART_ANIMATION.easing}
           onClick={handleBarClick}

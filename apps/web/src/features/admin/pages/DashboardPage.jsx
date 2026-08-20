@@ -285,9 +285,10 @@ const prefersReducedMotion = () =>
 
 /**
  * Eases a metric from its previous value to the next one so refreshed numbers
- * register as a change instead of silently swapping.
+ * register as a change instead of silently swapping. Keep short — long count-ups
+ * on every 30s poll make the KPI row feel like it is reloading.
  */
-function useCountUp(value, duration = 600) {
+function useCountUp(value, duration = 220) {
   const target = Number.isFinite(value) ? value : 0;
   const [display, setDisplay] = useState(target);
   const fromRef = useRef(target);
@@ -361,18 +362,27 @@ function LayeredAttendanceViz({
   activeKey,
   onHoverKey,
 }) {
-  const animatedCoverage = useCountUp(coverage, 820);
+  const animatedCoverage = useCountUp(coverage, 220);
   const [progress, setProgress] = useState(prefersReducedMotion() ? 1 : 0);
+  const ringMountedRef = useRef(false);
 
+  /* Entrance animation once. Data refreshes must not rewind the ring to 0 —
+   * that read as a full-card flicker every silent poll. */
   useEffect(() => {
     if (prefersReducedMotion()) {
       setProgress(1);
+      ringMountedRef.current = true;
       return undefined;
     }
+    if (ringMountedRef.current) {
+      setProgress(1);
+      return undefined;
+    }
+    ringMountedRef.current = true;
     setProgress(0);
     let frame;
     const started = performance.now();
-    const duration = 900;
+    const duration = 280;
     const step = (now) => {
       const t = Math.min(1, (now - started) / duration);
       setProgress(1 - (1 - t) ** 3);
@@ -556,7 +566,7 @@ function IconAction({ onClick, label }) {
 }
 
 /**
- * Command-center header + KPI row — hierarchy, not four equal widgets.
+ * Command-center header + KPI row — hierarchy, not generic widgets.
  */
 function OverviewBanner({ adminName, stats, loading, statusPills = [] }) {
   return (
@@ -584,8 +594,8 @@ function OverviewBanner({ adminName, stats, loading, statusPills = [] }) {
         )}
       </div>
 
-      {/* Mobile stack → tablet 2-up → desktop 4 compact tiles. Never horizontal-scroll. */}
-      <div className="grid grid-cols-1 gap-4 py-1 sm:grid-cols-2 lg:grid-cols-4 lg:gap-5">
+      {/* Mobile stack → tablet 2-up → desktop 5 compact tiles. Never horizontal-scroll. */}
+      <div className="grid grid-cols-1 gap-4 py-1 sm:grid-cols-2 lg:grid-cols-5 lg:gap-5">
         {stats.map((stat, index) => (
           <div key={stat.label} className="min-w-0 h-full">
             <KpiStat {...stat} hero={index === 0} loading={loading} />
@@ -928,12 +938,12 @@ function CheckinHeatmap({ matrix, onOpen, onRefresh }) {
             className="grid min-w-0 flex-1 gap-1.5"
             style={{ gridTemplateColumns: `auto repeat(${HEATMAP_DAYS}, minmax(0, 1fr))` }}
           >
-            {rows.map((row, rowIndex) => (
+            {rows.map((row) => (
               <Fragment key={row.label}>
                 <span className="pr-1.5 text-right text-micro font-medium leading-8 text-ink-muted">
                   {row.label}
                 </span>
-                {row.cells.map((cell, dayIndex) => {
+                {row.cells.map((cell) => {
                   const tone = HEATMAP_LEVELS[cell.level] || HEATMAP_LEVELS[0];
                   return (
                     <motion.span
@@ -945,26 +955,25 @@ function CheckinHeatmap({ matrix, onOpen, onRefresh }) {
                         border: tone.border,
                         backgroundSize: tone.pulse ? '200% 200%' : undefined,
                       }}
-                      initial={reduceMotion ? false : { opacity: 0, scale: 0.9 }}
+                      initial={false}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={
                         reduceMotion
                           ? { duration: 0 }
                           : {
-                              type: 'spring',
-                              stiffness: 420,
-                              damping: 28,
-                              delay: dayIndex * 0.045 + rowIndex * 0.03,
+                              type: 'tween',
+                              duration: 0.18,
+                              ease: [0.32, 0.72, 0, 1],
                             }
                       }
                       whileHover={
                         reduceMotion
                           ? undefined
                           : {
-                              scale: 1.08,
-                              y: -2,
+                              scale: 1.06,
+                              y: -1,
                               boxShadow: tone.glow,
-                              transition: { duration: 0.25, ease: [0.4, 0, 0.2, 1] },
+                              transition: { duration: 0.15, ease: [0.32, 0.72, 0, 1] },
                             }
                       }
                     />
@@ -1490,8 +1499,8 @@ function AttendanceTrendCard({ loading, data, isEmpty, monthDelta, onViewAttenda
       )}
 
       {/* Negative left margin on the chart is offset here so it never touches the edge. */}
-      <div className={`${CARD_TIERS.secondary.gap} ${CARD_TIERS.secondary.body} w-full pr-1`} aria-busy={loading}>
-        {loading ? (
+      <div className={`${CARD_TIERS.secondary.gap} ${CARD_TIERS.secondary.body} w-full pr-1`} aria-busy={loading && !data?.length}>
+        {loading && !data?.length ? (
           <div className="skeleton h-full w-full rounded-xl" aria-hidden />
         ) : isEmpty ? (
           <CardEmpty
@@ -1500,7 +1509,7 @@ function AttendanceTrendCard({ loading, data, isEmpty, monthDelta, onViewAttenda
             description="Once your team starts checking in, six months of trend data builds up here."
           />
         ) : (
-          <div className="h-full w-full animate-fade-in">
+          <div className="h-full w-full">
             <Suspense fallback={<div className="skeleton h-full w-full rounded-xl" aria-hidden />}>
               <AttendanceTrendAreaChart data={data} />
             </Suspense>
@@ -1592,11 +1601,11 @@ function ActivityTimelineCard({ loading, items, lastEventLabel, onOpen }) {
       <CardHeader
         tier="utility"
         title="Live activity"
-        meta={loading ? undefined : `Last event ${lastEventLabel}`}
+        meta={items.length > 0 ? `Last event ${lastEventLabel}` : undefined}
         action={onOpen ? <IconAction onClick={onOpen} label="Open attendance log" /> : null}
       />
 
-      {!loading && items.length > 0 && (
+      {items.length > 0 && (
         <div className={`${CARD_TIERS.utility.gap} grid grid-cols-3 gap-2`}>
           {summary.map((entry) => {
             const meta = ACTIVITY_STYLES[entry.key];
@@ -1618,9 +1627,9 @@ function ActivityTimelineCard({ loading, items, lastEventLabel, onOpen }) {
 
       <div
         className={`no-scrollbar ${CARD_TIERS.utility.gap} min-h-[16rem] flex-1 overflow-y-auto pr-0.5 lg:min-h-[20rem]`}
-        aria-busy={loading}
+        aria-busy={loading && items.length === 0}
       >
-        {loading && (
+        {loading && items.length === 0 && (
           <div className="space-y-2" aria-hidden>
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="skeleton h-10 rounded-lg" />
@@ -1636,7 +1645,7 @@ function ActivityTimelineCard({ loading, items, lastEventLabel, onOpen }) {
           />
         )}
 
-        {!loading &&
+        {items.length > 0 &&
           groups.map((group) => (
             <div key={group.label} className="mb-2 last:mb-0">
               <p className="sticky top-0 z-10 flex items-center gap-2 bg-white/95 py-1.5 text-micro font-semibold uppercase tracking-[0.07em] text-ink-muted backdrop-blur">
@@ -1737,8 +1746,8 @@ function DepartmentBreakdownCard({ rows, loading, navigate, canManage }) {
         action={canManage ? <IconAction onClick={() => navigate('/departments')} label="Manage departments" /> : null}
       />
 
-      <div className={`${CARD_TIERS.secondary.gap} ${CARD_TIERS.secondary.body}`} aria-busy={loading}>
-        {loading ? (
+      <div className={`${CARD_TIERS.secondary.gap} ${CARD_TIERS.secondary.body}`} aria-busy={loading && bars.length === 0}>
+        {loading && bars.length === 0 ? (
           <div className="space-y-2" aria-hidden>
             {Array.from({ length: 3 }).map((_, index) => (
               <div key={index} className="skeleton h-[6.25rem] rounded-xl" />
@@ -1795,7 +1804,7 @@ function DepartmentBreakdownCard({ rows, loading, navigate, canManage }) {
 
                 <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[#E6F4FA]" aria-hidden>
                   <div
-                    className="h-full rounded-full bg-[#00B2EE] transition-[width] duration-500 ease-out"
+                    className="h-full rounded-full bg-[#00B2EE] transition-[width] duration-200 ease-out"
                     style={{ width: `${Math.min(100, Math.max(0, bar.attendance))}%` }}
                   />
                 </div>
@@ -1853,10 +1862,11 @@ export function DashboardPage() {
   const canViewTickets = canAccessFeature(user, 'tickets');
 
   const loadDashboard = useCallback(async (silent = false) => {
-    setError('');
+    const currentUser = useAuthStore.getState().user;
+    if (!silent) setError('');
     if (!silent) setLoading(true);
     try {
-      const canViewStats = hasPermission(user, PERMISSIONS.VIEW_HR_DASHBOARD);
+      const canViewStats = hasPermission(currentUser, PERMISSIONS.VIEW_HR_DASHBOARD);
 
       const [statsData, users, attendanceRows, leaveRows, ticketRows, workModeRows] = await Promise.all([
         canViewStats ? adminService.getStats() : Promise.resolve(null),
@@ -1957,18 +1967,31 @@ export function DashboardPage() {
             group: dayGroupLabel(item.ts),
           }))
       );
+      setError('');
     } catch (err) {
-      setError(err?.response?.data?.error || err?.message || 'Failed to load dashboard data');
+      if (!silent) {
+        setError(err?.response?.data?.error || err?.message || 'Failed to load dashboard data');
+      }
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [user, canViewUsers, canViewAttendance, canViewLeaves, canViewTickets, canViewWorkModes]);
+  }, [user?.uid, user?.role, canViewUsers, canViewAttendance, canViewLeaves, canViewTickets, canViewWorkModes]);
+
+  const hasLoadedRef = useRef(false);
 
   useEffect(() => {
-    loadDashboard();
+    const silent = hasLoadedRef.current;
+    let cancelled = false;
+    (async () => {
+      await loadDashboard(silent);
+      if (!cancelled) hasLoadedRef.current = true;
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [loadDashboard]);
 
-  useSilentPoll(loadDashboard, 30000, [user]);
+  useSilentPoll(loadDashboard, 30000, [user?.uid]);
 
   const processLeave = useCallback(
     async (id, status) => {
@@ -2546,9 +2569,7 @@ export function DashboardPage() {
     [attendanceTrend]
   );
 
-  const totalUsers = stats?.totalEmployees ?? cachedUsers.length;
   const activeUsers = stats?.activeUsers ?? cachedUsers.filter((row) => row.is_active).length;
-  const pendingApprovals = stats?.pendingLeaves ?? pendingLeaves.length;
   const attendanceRate = activeUsers
     ? Math.min(100, Math.round((attendanceToday.uniqueCheckins / activeUsers) * 100))
     : 0;
@@ -2573,21 +2594,6 @@ export function DashboardPage() {
     };
   }, [pendingLeaves, pendingWorkModes]);
 
-  const remoteShare = attendanceToday.uniqueCheckins
-    ? Math.round((attendanceToday.remote / attendanceToday.uniqueCheckins) * 100)
-    : 0;
-
-  const deactivated = Math.max(totalUsers - activeUsers, 0);
-  const roster = useMemo(() => {
-    const departments = new Set();
-    let unassigned = 0;
-    for (const row of cachedUsers) {
-      if (row.department) departments.add(row.department);
-      else unassigned += 1;
-    }
-    return { departmentCount: departments.size, unassigned };
-  }, [cachedUsers]);
-
   /*
    * The queue lists are capped for rendering, so the KPI counts come from the raw
    * collections — otherwise a busy queue would report "8 leave" next to a total of 12.
@@ -2599,11 +2605,9 @@ export function DashboardPage() {
     }),
     [leaves, workModes]
   );
-  const mean = (series) =>
-    series.length ? Math.round(series.reduce((sum, entry) => sum + entry, 0) / series.length) : 0;
-  const remoteWeekAvg = mean(dailyTrend.remote);
-  const requestsThisWeek = dailyTrend.requests.reduce((sum, entry) => sum + entry, 0);
   const plural = (count, word) => `${formatNumber(count)} ${word}${count === 1 ? '' : 's'}`;
+  const presentToday = onShiftKeys.size;
+  const absentToday = Math.max(activeUsers - attendanceToday.uniqueCheckins, 0);
 
   /*
    * Each KPI answers three things in a fixed order: the number, what it is made of
@@ -2613,76 +2617,64 @@ export function DashboardPage() {
    */
   const overviewStats = [
     {
-      icon: KpiIconWorkforce,
-      label: 'Total workforce',
-      count: totalUsers,
-      context: `${plural(activeUsers, 'active employee')} · ${formatNumber(deactivated)} deactivated`,
-      detail: `${formatNumber(onShiftKeys.size)} on shift now · ${plural(roster.departmentCount, 'department')}`,
-      insight:
-        deactivated > 0
-          ? `${plural(deactivated, 'account')} deactivated — review access`
-          : roster.unassigned > 0
-            ? `${plural(roster.unassigned, 'employee')} without a department`
-            : `Every employee assigned across ${plural(roster.departmentCount, 'department')}`,
-      insightTone: deactivated > 0 || roster.unassigned > 0 ? 'watch' : 'good',
-      onClick: canViewUsers ? () => navigate('/users') : undefined,
-    },
-    {
       icon: KpiIconCalendar,
       label: 'Attendance rate',
       count: attendanceRate,
       suffix: '%',
-      context: `${formatNumber(attendanceToday.uniqueCheckins)} of ${formatNumber(activeUsers)} checked in today`,
+      context: 'Attendance rate today',
+      detail: `${formatNumber(attendanceToday.uniqueCheckins)} of ${formatNumber(activeUsers)} employees attended`,
       progress: attendanceRate,
       insight:
         attendanceToday.uniqueCheckins === 0
           ? 'No check-ins recorded yet today'
           : todayOps.late > 0
-            ? `${plural(todayOps.late, 'arrival')} after ${LATE_LABEL}`
-            : todayOps.openShifts > 0
-              ? `${plural(todayOps.openShifts, 'shift')} left open this week`
-              : 'Everyone in on time today',
-      insightTone:
-        attendanceToday.uniqueCheckins === 0
-          ? 'neutral'
-          : todayOps.late > 0 || todayOps.openShifts > 0
-            ? 'watch'
-            : 'good',
+            ? `${plural(todayOps.late, 'late arrival')} needs attention`
+            : 'Attendance is on track today',
+      insightTone: attendanceToday.uniqueCheckins === 0 ? 'neutral' : todayOps.late > 0 ? 'watch' : 'good',
+      onClick: canViewAttendance ? () => navigate('/attendance') : undefined,
+    },
+    {
+      icon: KpiIconWorkforce,
+      label: 'Present today',
+      count: presentToday,
+      context: 'Employees present',
+      detail: `${formatNumber(attendanceToday.uniqueCheckins)} checked in today`,
+      insight:
+        presentToday === 0 ? 'No one currently on shift' : `${plural(presentToday, 'employee')} currently on shift`,
+      insightTone: presentToday === 0 ? 'neutral' : 'good',
+      onClick: canViewAttendance ? () => navigate('/attendance') : undefined,
+    },
+    {
+      icon: KpiIconClock,
+      label: 'Late arrivals',
+      count: todayOps.late,
+      context: 'Late arrivals today',
+      insight:
+        todayOps.late === 0 ? 'No late arrivals recorded' : 'Review attendance exceptions',
+      insightTone: todayOps.late === 0 ? 'good' : 'watch',
       onClick: canViewAttendance ? () => navigate('/attendance') : undefined,
     },
     {
       icon: KpiIconWifi,
-      label: 'Remote / hybrid',
-      count: attendanceToday.remote,
-      context: `${formatNumber(attendanceToday.onSite)} on-site · ${remoteShare}% of today's check-ins`,
+      label: 'Absent today',
+      count: absentToday,
+      context: 'Employees absent',
+      detail: `${formatNumber(activeUsers)} active employees in scope`,
       insight:
-        attendanceToday.uniqueCheckins === 0
-          ? 'Waiting on today’s first check-in'
-          : attendanceToday.remote === 0
-            ? 'Whole team on-site today'
-            : `Averaging ${formatNumber(remoteWeekAvg)} remote per day this week`,
-      insightTone: 'neutral',
-      onClick: canViewWorkModes ? () => navigate('/work-mode-requests') : undefined,
+        absentToday === 0 ? 'Everyone has checked in today' : 'Follow up on missing attendance',
+      insightTone: absentToday === 0 ? 'good' : 'watch',
+      onClick: canViewAttendance ? () => navigate('/attendance') : undefined,
     },
     {
-      icon: KpiIconClock,
-      label: 'Pending approvals',
-      count: pendingApprovals,
-      context: `${formatNumber(pendingCounts.leaves)} leave · ${formatNumber(pendingCounts.workModes)} work-mode`,
+      icon: KpiIconCalendar,
+      label: 'Pending leave requests',
+      count: pendingCounts.leaves,
+      context: 'Awaiting approval',
       insight:
-        pendingApprovals === 0
-          ? 'Queue is clear — nothing waiting on a decision'
-          : oldestPending.days != null && oldestPending.days >= 2
-            ? `${oldestPending.label} — decide today`
-            : requestsThisWeek > 0
-              ? `${plural(requestsThisWeek, 'request')} arrived this week`
-              : `${plural(pendingApprovals, 'request')} waiting on review`,
-      insightTone:
-        pendingApprovals === 0
-          ? 'good'
-          : oldestPending.days != null && oldestPending.days >= 3
-            ? 'urgent'
-            : 'watch',
+        pendingCounts.leaves === 0
+          ? 'No leave requests waiting'
+          : `${plural(pendingCounts.leaves, 'leave request')} awaiting review`,
+      insightTone: pendingCounts.leaves === 0 ? 'good' : 'watch',
       onClick: canViewLeaves ? () => navigate('/leaves') : undefined,
     },
   ];
@@ -2710,7 +2702,7 @@ export function DashboardPage() {
         → analytics trend (7) + directory (5).
       */}
       <div className="grid grid-cols-1 items-stretch gap-5 sm:gap-6 lg:grid-cols-12">
-        {loading ? (
+        {loading && !stats ? (
           <div className={`${CARD} skeleton h-[32rem] lg:col-span-8`} aria-hidden />
         ) : (
           <div className="lg:col-span-8">
