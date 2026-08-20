@@ -10,11 +10,8 @@ import {
 import { useAnalyticsMetrics } from '../../../shared/components/charts/useAnalyticsMetrics';
 import { Skeleton, SkeletonGroup } from '../../../shared/components/ui/Skeleton';
 import { adminService } from '../services/adminService';
-import {
-  formatRangeLabel,
-  getAggregationLabel,
-  hasSeriesData,
-} from '../utils/analyticsCharts';
+import { formatRangeLabel, getAggregationLabel, hasSeriesData } from '../utils/analyticsCharts';
+import { PageActions } from '../../../shared/components/pageChrome';
 
 const DepartmentBarChart = lazy(() =>
   import('../../../shared/components/charts/DepartmentBarChart').then((m) => ({
@@ -64,7 +61,11 @@ function buildDistributionFromUsers(users, departments) {
 }
 
 function ChartSuspense({ children }) {
-  return <Suspense fallback={<ChartSkeleton height={300} />}>{children}</Suspense>;
+  return (
+    <div className="h-full min-h-0 w-full">
+      <Suspense fallback={<ChartSkeleton />}>{children}</Suspense>
+    </div>
+  );
 }
 
 export function AnalyticsPage() {
@@ -181,42 +182,26 @@ export function AnalyticsPage() {
         label: 'Attendance events',
         value: kpis.attendanceEvents,
         hint: selectedRange ? formatRangeLabel(selectedRange.start, selectedRange.end) : 'Select a range',
-        accent: 'blue',
       },
-      {
-        id: 'checkins',
-        label: 'Check-ins',
-        value: kpis.checkins,
-        hint: 'In selected period',
-        accent: 'green',
-      },
-      {
-        id: 'checkouts',
-        label: 'Check-outs',
-        value: kpis.checkouts,
-        hint: 'In selected period',
-        accent: 'green',
-      },
+      { id: 'checkins', label: 'Check-ins', value: kpis.checkins, hint: 'In selected period' },
+      { id: 'checkouts', label: 'Check-outs', value: kpis.checkouts, hint: 'In selected period' },
       {
         id: 'unique-attendees',
         label: 'Unique attendees',
         value: kpis.uniqueAttendees,
         hint: 'Users with activity in range',
-        accent: 'purple',
       },
       {
         id: 'new-registrations',
         label: 'New registrations',
         value: kpis.newRegistrations,
         hint: 'Users created in range',
-        accent: 'amber',
       },
       {
         id: 'avg-events',
         label: 'Avg events / attendee',
         value: kpis.avgEventsPerAttendee.toFixed(2),
         hint: 'Per unique attendee',
-        accent: 'blue',
       },
     ],
     [kpis, selectedRange]
@@ -238,33 +223,10 @@ export function AnalyticsPage() {
     : 'Check-in and check-out events per period';
 
   return (
-    <div className="analytics-page space-y-6 animate-fade-up print:text-slate-900">
-      <section className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between print:hidden">
-        <div>
-          <h1 className="text-2xl font-semibold text-white">Analytics</h1>
-          <p className="mt-1 text-sm text-slate-200">
-            Department headcount and attendance activity for your company.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={load}
-          disabled={loading}
-          aria-busy={loading}
-          className="ui-btn-secondary ui-btn-sm"
-        >
-          {loading ? 'Loading…' : 'Refresh'}
-        </button>
-      </section>
-
-      {error && (
-        <GlassCard className="p-4" role="alert">
-          <p className="text-sm text-red-100">{error}</p>
-        </GlassCard>
-      )}
-
-      <GlassCard className="p-5 print:hidden">
+    <div className="analytics-page admin-page gap-4 animate-fade-up print:overflow-visible print:text-slate-900">
+      <PageActions>
         <DateRangeSelector
+          compact
           preset={datePreset}
           customFrom={customFrom}
           customTo={customTo}
@@ -274,12 +236,21 @@ export function AnalyticsPage() {
           onCustomFromChange={handleCustomFromChange}
           onCustomToChange={handleCustomToChange}
         />
-      </GlassCard>
+        <button type="button" onClick={() => window.print()} className="ui-btn-secondary ui-btn-sm print:hidden">
+          Export
+        </button>
+      </PageActions>
 
-      <AnalyticsKpiGrid items={kpiItems} loading={loading || recalculating} className="print:grid-cols-3" />
+      {error && (
+        <GlassCard className="p-4" role="alert">
+          <p className="text-sm text-danger-ink">{error}</p>
+        </GlassCard>
+      )}
 
-      <div className="grid gap-6 xl:grid-cols-2">
-        <GlassCard className="flex h-full flex-col p-5">
+      <AnalyticsKpiGrid items={kpiItems} loading={loading || recalculating} className="shrink-0 print:grid-cols-3" />
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <GlassCard hover={false} className="flex min-h-[22rem] flex-col p-5">
           <ChartPanel
             exportId="chart-department-distribution"
             title="Department Size Distribution"
@@ -287,6 +258,7 @@ export function AnalyticsPage() {
             loading={loading}
             recalculating={recalculating}
             isEmpty={!hasDepartmentData}
+            surfaceClassName="border-0 bg-white"
             emptyState={{
               title: 'No department data yet',
               description:
@@ -301,13 +273,10 @@ export function AnalyticsPage() {
                 enableDrillDown
               />
             </ChartSuspense>
-            <p className="mt-2 text-center text-[11px] text-slate-400" aria-hidden="true">
-              Department
-            </p>
           </ChartPanel>
         </GlassCard>
 
-        <GlassCard className="flex h-full flex-col p-5">
+        <GlassCard hover={false} className="flex min-h-[22rem] flex-col p-5">
           <ChartPanel
             exportId="chart-attendance-activity"
             title="Attendance Activity"
@@ -315,6 +284,8 @@ export function AnalyticsPage() {
             loading={loading}
             recalculating={recalculating}
             isEmpty={rangeInvalid || !hasAttendanceData}
+            surfaceClassName="border-0 bg-white"
+            flush={!rangeInvalid && hasAttendanceData}
             emptyState={
               rangeInvalid
                 ? {
@@ -344,9 +315,9 @@ export function AnalyticsPage() {
         </GlassCard>
       </div>
 
-      <GlassCard className="p-5">
-        <h2 className="mb-1 text-sm font-medium text-white">Organization insights</h2>
-        <p className="mb-4 text-xs text-slate-400">
+      <GlassCard hover={false} className="p-5">
+        <h2 className="card-title mb-1">Organization insights</h2>
+        <p className="mb-4 text-xs text-ink-muted">
           Account and structure metrics alongside your filtered attendance period
         </p>
         {/* Two columns per row, matching the label/value pairs that replace them. */}
@@ -361,20 +332,20 @@ export function AnalyticsPage() {
           </SkeletonGroup>
         )}
         {!loading && insightRows.length > 0 && (
-          <ul className="space-y-3 text-sm text-slate-200">
+          <ul className="space-y-3 text-sm text-ink">
             {insightRows.map((row) => (
               <li
                 key={row.label}
-                className="flex items-center justify-between gap-4 border-b border-white/5 pb-2 last:border-0"
+                className="flex items-center justify-between gap-4 border-b border-hairline pb-2 last:border-0"
               >
-                <span className="text-slate-300">{row.label}</span>
-                <span className="font-semibold tabular-nums text-white">{row.value}</span>
+                <span className="text-ink-muted">{row.label}</span>
+                <span className="font-semibold tabular-nums text-ink">{row.value}</span>
               </li>
             ))}
           </ul>
         )}
         {!loading && !insightRows.length && (
-          <p className="text-sm text-slate-300">Select a valid date range to view insights.</p>
+          <p className="text-sm text-ink-muted">Select a valid date range to view insights.</p>
         )}
       </GlassCard>
     </div>

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { adminService } from '../../admin/services/adminService';
+import { countMockUnread, isMockFallbackActive } from '../mockNotifications';
 
 export const useNotificationStore = create((set, get) => ({
   unreadCount: 0,
@@ -9,11 +10,9 @@ export const useNotificationStore = create((set, get) => ({
     set({ loading: true });
     try {
       const count = await adminService.getUnreadNotificationCount();
-      const next = count || 0;
-      // Skip identity churn when the badge value is unchanged.
-      if (next !== get().unreadCount) set({ unreadCount: next });
+      set({ unreadCount: count || (isMockFallbackActive() ? countMockUnread() : 0) });
     } catch {
-      /* keep last count */
+      if (isMockFallbackActive()) set({ unreadCount: countMockUnread() });
     } finally {
       set({ loading: false });
     }

@@ -70,6 +70,21 @@ async function requireAnyPerm(requester, keys, res) {
   return true;
 }
 
+function applyNotificationScope(query, requester, companyId) {
+  const uid = String(requester.uid || '');
+  const username = String(requester.username || '').replace(/"/g, '');
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uid);
+  const recipientParts = [];
+  if (isUuid) recipientParts.push(`recipient_uid.eq.${uid}`);
+  if (username) recipientParts.push(`recipient_username.eq."${username}"`);
+  if (!recipientParts.length) recipientParts.push(`recipient_uid.eq.${uid}`);
+  query = query.or(recipientParts.join(','));
+  if (companyId) {
+    query = query.or(`company_id.eq.${companyId},company_id.is.null`);
+  }
+  return query;
+}
+
 function mergeSettings(raw) {
   const base = JSON.parse(JSON.stringify(DEFAULT_APP_SETTINGS));
   if (!raw || typeof raw !== 'object') return base;
@@ -256,6 +271,40 @@ router.patch('/tickets/:id/close', async (req, res) => {
   }
 });
 
+router.patch('/tickets/:id/reopen', async (req, res) => {
+  const ctx = await withTenantContext(req, res);
+  if (!ctx) return;
+  const { requester, companyId } = ctx;
+  if (!(await requirePerm(requester, 'close_tickets', res))) return;
+  try {
+    const { data: existing } = await supabase
+      .from('tickets')
+      .select('*')
+      .eq('id', req.params.id)
+      .eq('company_id', companyId)
+      .maybeSingle();
+    if (!existing) return res.status(404).json({ success: false, error: 'Ticket not found' });
+
+    const nextStatus = existing.assigned_to ? 'in_progress' : 'open';
+    const { data, error } = await supabase
+      .from('tickets')
+      .update({
+        status: nextStatus,
+        closed_at: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', req.params.id)
+      .eq('company_id', companyId)
+      .select()
+      .single();
+    if (error) throw error;
+
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ── Calendar ──────────────────────────────────────────────────────────────────
 
 router.get('/calendar-events', async (req, res) => {
@@ -379,12 +428,11 @@ router.get('/notifications/unread-count', async (req, res) => {
   if (!ctx) return;
   const { requester, companyId } = ctx;
   try {
-    const { count, error } = await supabase
-      .from('notifications')
-      .select('id', { count: 'exact', head: true })
-      .eq('company_id', companyId)
-      .eq('recipient_uid', requester.uid)
-      .eq('read', false);
+    const { count, error } = await applyNotificationScope(
+      supabase.from('notifications').select('id', { count: 'exact', head: true }),
+      requester,
+      companyId,
+    ).eq('read', false);
     if (error) throw error;
     res.json({ success: true, count: count || 0 });
   } catch (err) {
@@ -403,11 +451,11 @@ router.get('/notifications', async (req, res) => {
   const from = (page - 1) * limit;
   const to = from + limit - 1;
   try {
-    let query = supabase
-      .from('notifications')
-      .select('*', { count: 'exact' })
-      .eq('company_id', companyId)
-      .eq('recipient_uid', requester.uid)
+    let query = applyNotificationScope(
+      supabase.from('notifications').select('*', { count: 'exact' }),
+      requester,
+      companyId,
+    )
       .order('created_at', { ascending: false })
       .range(from, to);
     if (readFilter === 'true') query = query.eq('read', true);
@@ -430,7 +478,6 @@ router.patch('/notifications/:id/read', async (req, res) => {
       .from('notifications')
       .update({ read: true, read_at: new Date().toISOString() })
       .eq('id', req.params.id)
-      .eq('company_id', companyId)
       .eq('recipient_uid', requester.uid)
       .select()
       .single();
@@ -446,12 +493,11 @@ router.post('/notifications/mark-all-read', async (req, res) => {
   if (!ctx) return;
   const { requester, companyId } = ctx;
   try {
-    const { error } = await supabase
-      .from('notifications')
-      .update({ read: true, read_at: new Date().toISOString() })
-      .eq('company_id', companyId)
-      .eq('recipient_uid', requester.uid)
-      .eq('read', false);
+    const { error } = await applyNotificationScope(
+      supabase.from('notifications').update({ read: true, read_at: new Date().toISOString() }),
+      requester,
+      companyId,
+    ).eq('read', false);
     if (error) throw error;
     res.json({ success: true });
   } catch (err) {
@@ -468,7 +514,6 @@ router.delete('/notifications/:id', async (req, res) => {
       .from('notifications')
       .delete()
       .eq('id', req.params.id)
-      .eq('company_id', companyId)
       .eq('recipient_uid', requester.uid);
     if (error) throw error;
     res.json({ success: true });

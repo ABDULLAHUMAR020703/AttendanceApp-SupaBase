@@ -5,3 +5,5 @@ export { DateRangeSelector } from './DateRangeSelector';
 export { AnalyticsKpiCard, AnalyticsKpiGrid } from './AnalyticsKpiCard';
 export * from './chartTheme';
 export * from './ChartTooltips';
+export { DepartmentDonutChart } from './DepartmentDonutChart';
+export { DepartmentBarChart } from './DepartmentBarChart';

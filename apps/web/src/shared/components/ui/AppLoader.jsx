@@ -8,7 +8,7 @@ import { Skeleton } from './Skeleton';
  */
 export function AppLoader({ label = 'Loading workspace' }) {
   return (
-    <div className="page-wash flex h-screen w-full overflow-hidden" role="status" aria-busy="true" aria-live="polite">
+    <div className="page-wash flex min-h-dvh w-full" role="status" aria-busy="true" aria-live="polite">
       <span className="sr-only">{label}</span>
 
       {/* Collapsed nav rail: same 64px footprint the real sidebar occupies at rest. */}
@@ -26,19 +26,13 @@ export function AppLoader({ label = 'Loading workspace' }) {
         <div className="flex h-14 shrink-0 items-center gap-4 border-b border-hairline bg-white/85 px-4 md:px-6">
           <Skeleton className="h-3.5 w-32" />
           <div className="ml-auto flex items-center gap-2">
-            <Skeleton className="h-8 w-52 max-w-[30vw]" rounded="rounded-lg" />
+            <Skeleton className="h-8 w-16" rounded="rounded-lg" />
             <Skeleton className="h-8 w-8" rounded="rounded-lg" />
-            <Skeleton className="h-8 w-8" rounded="rounded-full" />
           </div>
         </div>
 
         <div className="flex-1 overflow-hidden p-4 md:p-6">
           <div className="mx-auto w-full max-w-[1400px] space-y-6">
-            <div className="space-y-2.5">
-              <Skeleton className="h-7 w-64 max-w-[60%]" />
-              <Skeleton className="h-3.5 w-96 max-w-[80%]" />
-            </div>
-
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               {Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className="ui-card space-y-4 p-5">

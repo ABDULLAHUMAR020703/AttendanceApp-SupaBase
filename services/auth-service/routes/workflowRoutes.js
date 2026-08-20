@@ -304,19 +304,41 @@ router.get('/employee-sites', async (req, res) => {
     if (error) throw error;
 
     const filtered = (data || []).filter((row) => row.sites?.company_id === companyId);
-    if (requester.role === ROLES.MANAGER) {
-      const { data: deptUsers } = await supabase
+    const scoped = requester.role === ROLES.MANAGER
+      ? await (async () => {
+          const { data: deptUsers } = await supabase
+            .from('users')
+            .select('uid')
+            .eq('company_id', companyId)
+            .eq('department', requester.department);
+          const uidSet = new Set((deptUsers || []).map((u) => u.uid));
+          return filtered.filter((r) => uidSet.has(String(r.employee_uid)));
+        })()
+      : filtered;
+
+    const uids = [...new Set(scoped.map((row) => row.employee_uid).filter(Boolean))];
+    let peopleByUid = new Map();
+    if (uids.length) {
+      const { data: people } = await supabase
         .from('users')
-        .select('uid')
+        .select('uid, name, username, department, department_id')
         .eq('company_id', companyId)
-        .eq('department', requester.department);
-      const uidSet = new Set((deptUsers || []).map((u) => u.uid));
-      return res.json({
-        success: true,
-        data: filtered.filter((r) => uidSet.has(String(r.employee_uid))),
-      });
+        .in('uid', uids);
+      peopleByUid = new Map((people || []).map((person) => [String(person.uid), person]));
     }
-    res.json({ success: true, data: filtered });
+
+    const payload = scoped.map((row) => {
+      const person = peopleByUid.get(String(row.employee_uid));
+      return {
+        ...row,
+        employee_name: person?.name || person?.username || null,
+        employee_username: person?.username || null,
+        employee_department: person?.department || null,
+        employee_department_id: person?.department_id || null,
+      };
+    });
+
+    res.json({ success: true, data: payload });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

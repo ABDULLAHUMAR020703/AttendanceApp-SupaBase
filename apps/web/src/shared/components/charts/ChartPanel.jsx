@@ -15,6 +15,8 @@ export const ChartPanel = forwardRef(function ChartPanel(
     children,
     className = '',
     exportId,
+    surfaceClassName = 'border-hairline bg-accent-50',
+    flush = false,
   },
   ref
 ) {
@@ -26,7 +28,7 @@ export const ChartPanel = forwardRef(function ChartPanel(
       ref={ref}
       id={exportId}
       data-chart-export={exportId || undefined}
-      className={`chart-panel flex h-full flex-col space-y-3 rounded-2xl border border-hairline bg-white p-4 shadow-[0_12px_32px_rgba(15,23,42,0.06)] print:break-inside-avoid ${className}`}
+      className={`chart-panel flex h-full min-h-0 flex-col space-y-3 rounded-2xl border border-hairline bg-white p-4 shadow-[0_12px_32px_rgba(15,23,42,0.06)] print:break-inside-avoid ${className}`}
       aria-labelledby={panelId ? `${panelId}-title` : undefined}
     >
       <header>
@@ -37,7 +39,9 @@ export const ChartPanel = forwardRef(function ChartPanel(
       </header>
 
       <div
-        className="chart-surface flex flex-1 flex-col rounded-2xl border border-hairline bg-accent-50 p-3 transition-opacity duration-200 sm:p-4"
+        className={`chart-surface flex min-h-0 flex-1 flex-col rounded-2xl border-0 transition-opacity duration-200 ${
+          flush ? 'overflow-hidden p-0' : 'p-3 sm:p-4'
+        } ${surfaceClassName}`}
         style={{ minHeight: height }}
         role="img"
         aria-label={`${title} chart`}

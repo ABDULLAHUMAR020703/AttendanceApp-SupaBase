@@ -23,7 +23,7 @@ export function Alert({ type = 'info', title, children, onDismiss, className = '
       role={type === 'error' ? 'alert' : 'status'}
       className={cn('flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm', STYLES[type], className)}
     >
-      <Icon className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
+      <Icon className="mt-0.5 h-[18px] w-[18px] shrink-0" aria-hidden />
       <div className="min-w-0 flex-1">
         {title && <p className="font-semibold">{title}</p>}
         <div className={cn('leading-relaxed', title && 'mt-0.5 opacity-90')}>{children}</div>

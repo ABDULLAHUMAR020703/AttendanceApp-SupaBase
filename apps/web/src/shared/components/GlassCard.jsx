@@ -7,9 +7,12 @@ import { cn } from '../lib/cn';
  * Remaining props land on the element, so a card can also be a click target
  * without a wrapper element swallowing the handler.
  */
-export function GlassCard({ children, className = '', hover = true, ...props }) {
+export function GlassCard({ children, className = '', hover = true, brand = false, ...props }) {
   return (
-    <div className={cn('ui-card', hover && 'ui-card-interactive', className)} {...props}>
+    <div
+      className={cn('ui-card', brand && 'ui-card-brand', hover && 'ui-card-interactive', className)}
+      {...props}
+    >
       {children}
     </div>
   );

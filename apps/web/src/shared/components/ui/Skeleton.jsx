@@ -68,13 +68,54 @@ export function SkeletonForm({ fields = 4, className = '' }) {
   );
 }
 
+/**
+ * Directory-page stand-in: title block, optional KPI strip, then a table of rows.
+ * Used as the Suspense fallback so Leaves / Approvals never flash an empty canvas.
+ */
+export function DirectorySkeleton({ kpis = 0, className = '' }) {
+  return (
+    <SkeletonGroup label="Loading page" className={cn('flex flex-col gap-4', className)}>
+      <div className="space-y-2">
+        <Skeleton className="h-8 w-44" />
+        <Skeleton className="h-4 w-72 max-w-full" />
+      </div>
+      {kpis > 0 && (
+        <div className="rounded-xl border border-slate-200/80 bg-white px-4 py-3 sm:px-5">
+          <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
+            {Array.from({ length: kpis }).map((_, index) => (
+              <div key={index} className="space-y-2">
+                <Skeleton className="h-3 w-16" />
+                <Skeleton className="h-7 w-12" />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white">
+        <div className="flex gap-2 border-b border-slate-100 px-4 py-3">
+          <Skeleton className="h-8 w-56 max-w-[55%]" rounded="rounded-lg" />
+          <Skeleton className="h-8 w-36" rounded="rounded-lg" />
+        </div>
+        {Array.from({ length: 7 }).map((_, index) => (
+          <div key={index} className="flex h-[52px] items-center gap-3 border-b border-slate-100 px-4 last:border-b-0">
+            <Skeleton className="h-8 w-8 shrink-0" rounded="rounded-full" />
+            <Skeleton className="h-3.5 w-40 max-w-[40%]" />
+            <Skeleton className="h-3 w-24 max-w-[20%]" />
+            <Skeleton className="ml-auto h-[22px] w-16" rounded="rounded-full" />
+          </div>
+        ))}
+      </div>
+    </SkeletonGroup>
+  );
+}
+
 /** Stand-in for a stacked feed of short entries (logs, activity, notifications). */
 export function SkeletonFeed({ count = 4, className = '' }) {
   return (
     <SkeletonGroup className={cn('space-y-2.5', className)}>
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} className="flex items-start gap-3">
-          <Skeleton className="mt-0.5 h-7 w-7 shrink-0" rounded="rounded-full" />
+          <Skeleton className="mt-0.5 h-8 w-8 shrink-0" rounded="rounded-lg" />
           <div className="min-w-0 flex-1 space-y-1.5">
             <Skeleton className="h-3 w-1/3" />
             <Skeleton className="h-3 w-2/3" />

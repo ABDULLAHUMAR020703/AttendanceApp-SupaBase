@@ -84,6 +84,7 @@ router.get('/tickets', (req, res) => forward(req, res, 'get', '/api/admin/ticket
 router.post('/tickets', (req, res) => forward(req, res, 'post', '/api/admin/tickets'));
 router.patch('/tickets/:id/assign', (req, res) => forward(req, res, 'patch', `/api/admin/tickets/${req.params.id}/assign`));
 router.patch('/tickets/:id/close', (req, res) => forward(req, res, 'patch', `/api/admin/tickets/${req.params.id}/close`));
+router.patch('/tickets/:id/reopen', (req, res) => forward(req, res, 'patch', `/api/admin/tickets/${req.params.id}/reopen`));
 
 router.get('/calendar-events', (req, res) => forward(req, res, 'get', '/api/admin/calendar-events'));
 router.post('/calendar-events', (req, res) => forward(req, res, 'post', '/api/admin/calendar-events'));

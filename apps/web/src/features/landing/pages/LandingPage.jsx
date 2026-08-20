@@ -707,7 +707,7 @@ export function LandingPage() {
   const navigate = useNavigate();
   const onSignInClick = () => navigate(LOGIN_PATH);
   return (
-    <div className="landing-page min-h-screen scroll-smooth bg-[#F8FCFD] text-[#0F172A] antialiased [font-family:'Plus_Jakarta_Sans',Inter,system-ui,sans-serif]">
+    <div className="landing-page bg-[#F8FCFD] text-[#0F172A] antialiased [font-family:'Plus_Jakarta_Sans',Inter,system-ui,sans-serif]">
       <ScrollProgressBar />
       <LandingNav onSignInClick={onSignInClick} />
       <main>

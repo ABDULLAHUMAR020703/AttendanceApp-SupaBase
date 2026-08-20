@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { createLenis, destroyLenis, resetScrollPosition } from '../../shared/lib/smoothScroll';
 import { LucideProvider } from 'lucide-react';
 import { useAuthStore } from '../../features/auth/store/authStore';
 import { canAccessFeature, isSuperAdmin } from '../../features/admin/permissions';
@@ -39,12 +40,15 @@ function Unauthorized() {
 /**
  * House glyph weight for the portal. Lucide's 2px default reads heavy next to the
  * system font at 14-16px; SF Symbols sit nearer 1.75 at those sizes, and a single
- * weight everywhere is what makes an icon set look drawn as one family. Individual
- * icons can still pass `strokeWidth` to take emphasis, which is how the selected
- * sidebar row gains weight. The landing page is outside this and keeps its own voice.
+ * absolute 1.75px stroke at 18px is what makes an icon set look drawn as one family.
+ * The landing page is outside this and keeps its own voice.
  */
 function PortalIcons({ children }) {
-  return <LucideProvider strokeWidth={1.75}>{children}</LucideProvider>;
+  return (
+    <LucideProvider size={18} strokeWidth={1.75} absoluteStrokeWidth>
+      {children}
+    </LucideProvider>
+  );
 }
 
 function PermissionRoute({ feature, superAdminOnly = false, children }) {
@@ -54,12 +58,34 @@ function PermissionRoute({ feature, superAdminOnly = false, children }) {
   return children;
 }
 
+const WINDOW_SCROLL_ROUTES = new Set(['/', '/login', '/onboard', '/unauthorized']);
+
+function WindowSmoothScroll() {
+  const { pathname } = useLocation();
+  const usesWindowScroll = WINDOW_SCROLL_ROUTES.has(pathname);
+
+  useEffect(() => {
+    if (!usesWindowScroll) return undefined;
+    createLenis();
+    return () => destroyLenis();
+  }, [usesWindowScroll]);
+
+  useEffect(() => {
+    if (!usesWindowScroll) return;
+    resetScrollPosition();
+  }, [pathname, usesWindowScroll]);
+
+  return null;
+}
+
 export function AppRouter() {
   const { bootstrap } = useAuthStore();
   useEffect(() => { bootstrap(); }, [bootstrap]);
 
   return (
-    <Routes>
+    <>
+      <WindowSmoothScroll />
+      <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/onboard" element={<CompanyOnboardingPage />} />
@@ -83,6 +109,7 @@ export function AppRouter() {
         <Route path="notifications" element={<PermissionRoute feature="notifications"><NotificationsPage /></PermissionRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+      </Routes>
+    </>
   );
 }

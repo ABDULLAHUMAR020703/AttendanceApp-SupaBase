@@ -1020,6 +1020,42 @@ router.post('/sites', async (req, res) => {
       }
     }
     payload.company_id = companyId;
+    const name = String(payload.name || '').trim();
+    if (!name) {
+      return res.status(400).json({ success: false, error: 'Location name is required' });
+    }
+    const latitude = Number(payload.latitude);
+    const longitude = Number(payload.longitude);
+    const radius = Number(payload.radius);
+    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
+      return res.status(400).json({ success: false, error: 'Latitude must be between -90 and 90' });
+    }
+    if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+      return res.status(400).json({ success: false, error: 'Longitude must be between -180 and 180' });
+    }
+    if (!Number.isFinite(radius) || radius <= 0) {
+      return res.status(400).json({ success: false, error: 'Radius must be greater than 0' });
+    }
+    const { data: existing, error: existingError } = await supabase
+      .from('sites')
+      .select('id, name, department_id')
+      .eq('company_id', companyId);
+    if (existingError) throw existingError;
+    const nameKey = name.toLowerCase();
+    const clash = (existing || []).find((row) => String(row.name || '').trim().toLowerCase() === nameKey);
+    if (clash) {
+      const sameDept = payload.department_id && String(clash.department_id) === String(payload.department_id);
+      return res.status(400).json({
+        success: false,
+        error: sameDept
+          ? 'An active location with this name already exists in this department'
+          : 'An active location with this name already exists in this account',
+      });
+    }
+    payload.name = name;
+    payload.latitude = latitude;
+    payload.longitude = longitude;
+    payload.radius = radius;
     const { data, error } = await supabase.from('sites').insert(payload).select().single();
     if (error) throw error;
     res.status(201).json({ success: true, data });

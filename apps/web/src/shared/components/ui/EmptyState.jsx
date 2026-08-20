@@ -2,10 +2,11 @@ import { Inbox } from 'lucide-react';
 import { cn } from '../../lib/cn';
 import { GlassCard } from '../GlassCard';
 import { Button } from './Button';
+import { AppIcon } from '../AppIcon';
 
 const GLYPH_SIZES = {
-  sm: { halo: 'h-14 w-14', inner: 'inset-2', tile: 'h-8 w-8 rounded-xl', icon: 'h-4 w-4' },
-  md: { halo: 'h-20 w-20', inner: 'inset-2.5', tile: 'h-11 w-11 rounded-2xl', icon: 'h-5 w-5' },
+  sm: { halo: 'h-14 w-14', inner: 'inset-2', tile: 'h-8 w-8 rounded-xl', icon: 18 },
+  md: { halo: 'h-20 w-20', inner: 'inset-2.5', tile: 'h-11 w-11 rounded-2xl', icon: 20 },
 };
 
 /**
@@ -18,8 +19,8 @@ export function EmptyGlyph({ icon: Icon = Inbox, size = 'md', className = '' }) 
     <span className={cn('relative grid place-items-center', s.halo, className)}>
       <span className="absolute inset-0 rounded-full bg-accent-50" aria-hidden />
       <span className={cn('absolute rounded-full bg-accent-100', s.inner)} aria-hidden />
-      <span className={cn('relative grid place-items-center bg-[#E6F4FA] text-[#00BFFF] shadow-hair', s.tile)}>
-        <Icon className={s.icon} aria-hidden />
+      <span className={cn('relative grid place-items-center bg-[#E6F4FA] text-[#00BCFF] shadow-hair', s.tile)}>
+        <AppIcon icon={Icon} size={s.icon} />
       </span>
     </span>
   );

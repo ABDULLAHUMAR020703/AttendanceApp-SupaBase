@@ -1,18 +1,18 @@
 import {
   BarChart3,
   Building2,
-  CalendarCheck,
+  CalendarCheck2,
+  CalendarClock,
   CalendarDays,
   FileBarChart,
-  FileText,
-  Laptop,
-  LayoutDashboard,
+  Laptop2,
+  LayoutGrid,
   ListChecks,
   MapPin,
-  Settings,
+  Settings2,
   ShieldCheck,
   Ticket,
-  Users,
+  UsersRound,
   Bell,
 } from 'lucide-react';
 
@@ -26,16 +26,16 @@ export const NAV_SECTIONS = [
     label: 'Main',
     // Notifications joins this group in the sidebar; it lives on its own export
     // because the header bell and the mobile tab bar both reach for it directly.
-    items: [{ to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard }],
+    items: [{ to: '/dashboard', label: 'Dashboard', icon: LayoutGrid }],
   },
   {
     id: 'workforce',
     label: 'Workforce',
     items: [
-      { to: '/users', label: 'Users', feature: 'users', icon: Users },
+      { to: '/users', label: 'Users', feature: 'users', icon: UsersRound },
       { to: '/departments', label: 'Departments', feature: 'departments', icon: Building2 },
-      { to: '/attendance', label: 'Attendance', feature: 'attendance', icon: CalendarCheck },
-      { to: '/work-mode-requests', label: 'Work modes', feature: 'workModeRequests', icon: Laptop },
+      { to: '/attendance', label: 'Attendance', feature: 'attendance', icon: CalendarCheck2 },
+      { to: '/work-mode-requests', label: 'Work modes', feature: 'workModeRequests', icon: Laptop2 },
       { to: '/sites', label: 'Geofencing', feature: 'sites', icon: MapPin },
       { to: '/calendar', label: 'Calendar', feature: 'calendar', icon: CalendarDays },
     ],
@@ -44,7 +44,7 @@ export const NAV_SECTIONS = [
     id: 'hr',
     label: 'HR Management',
     items: [
-      { to: '/leaves', label: 'Leaves', feature: 'leaves', icon: FileText },
+      { to: '/leaves', label: 'Leaves', feature: 'leaves', icon: CalendarClock },
       {
         to: '/approval-workflows',
         label: 'Approvals',
@@ -74,7 +74,7 @@ export const NAV_SECTIONS = [
 
 /** Pinned bottom section (Logout is rendered as a button, not a route). */
 export const NAV_FOOTER_ITEMS = [
-  { to: '/settings', label: 'Settings', feature: 'settings', icon: Settings },
+  { to: '/settings', label: 'Settings', feature: 'settings', icon: Settings2 },
 ];
 
 /** Reachable from the header bell; kept here for mobile nav + page titles. */

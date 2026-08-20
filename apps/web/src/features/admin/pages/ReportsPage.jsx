@@ -3,11 +3,23 @@ import { Download, Eye, FileText, Send, Trash2, X } from 'lucide-react';
 import { GlassCard } from '../../../shared/components/GlassCard';
 import { GlassTable, TableActions, TableCell, TableRow } from '../../../shared/components/GlassTable';
 import { Button } from '../../../shared/components/ui/Button';
+import { Select } from '../../../shared/components/ui/Select';
+import { DatePickerField } from './calendarPickers';
+import { StatusBadge } from '../../../shared/components/ui/Badge';
 import { EmptyStateBody } from '../../../shared/components/ui/EmptyState';
 import { SkeletonFeed, SkeletonForm } from '../../../shared/components/ui/Skeleton';
-import { PermissionGate } from '../../../shared/components/PermissionGate';
+import { PermissionGate, usePermission } from '../../../shared/components/PermissionGate';
 import { adminService } from '../services/adminService';
 import { PERMISSIONS } from '../permissions';
+import { PageActions } from '../../../shared/components/pageChrome';
+import {
+  buildMockGeneratedReport,
+  isMockReportId,
+  isReportingUnavailable,
+  withDeliveryLogsFallback,
+  withReportHistoryFallback,
+  withScheduleMetaFallback,
+} from '../utils/reportsMock';
 
 const RANGE_OPTIONS = [
   { value: 'daily', label: 'Daily (today)' },
@@ -56,25 +68,6 @@ function formatFileSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function ReportStatus({ value }) {
-  const normalized = String(value || '').toLowerCase().replace(/_/g, ' ');
-  const tone = ['sent', 'complete', 'completed', 'success', 'delivered', 'ready'].includes(normalized)
-    ? 'bg-emerald-500'
-    : ['failed', 'error', 'rejected'].includes(normalized)
-      ? 'bg-rose-500'
-      : ['pending', 'queued', 'processing', 'in progress'].includes(normalized)
-        ? 'bg-amber-400'
-        : 'bg-slate-400';
-  const label = normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : '—';
-
-  return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-caption text-ink-muted">
-      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${tone}`} aria-hidden />
-      {label}
-    </span>
-  );
-}
-
 
 function Spinner() {
   return (
@@ -87,7 +80,7 @@ function Spinner() {
 function Alert({ ok, message }) {
   if (!message) return null;
   return (
-    <div className={`rounded-lg border px-4 py-3 text-sm ${ok ? 'border-green-300/25 bg-green-500/15 text-green-100' : 'border-red-300/25 bg-red-500/15 text-red-100'}`}>
+    <div className={`rounded-lg border px-4 py-3 text-sm ${ok ? 'border-success-border bg-success-surface text-success-ink' : 'border-danger-border bg-danger-surface text-danger-ink'}`}>
       {message}
     </div>
   );
@@ -128,17 +121,31 @@ export function ReportsPage() {
     return payload;
   };
 
+const LOAD_TIMEOUT_MS = 4000;
+
+function withTimeout(promise, ms = LOAD_TIMEOUT_MS) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      window.setTimeout(() => reject(new Error('Reporting service unavailable')), ms);
+    }),
+  ]);
+}
+
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true);
     try {
       const [reports, latest] = await Promise.all([
-        adminService.getReportHistory().catch(() => []),
-        adminService.getLatestReport().catch(() => null),
+        withTimeout(adminService.getReportHistory()).catch(() => []),
+        withTimeout(adminService.getLatestReport()).catch(() => null),
       ]);
-      setHistory(reports || []);
-      setLatestReport(latest);
+      const seeded = withReportHistoryFallback(reports || [], latest);
+      setHistory(seeded.history);
+      setLatestReport(seeded.latest);
     } catch {
-      setHistory([]);
+      const seeded = withReportHistoryFallback([], null);
+      setHistory(seeded.history);
+      setLatestReport(seeded.latest);
     } finally {
       setHistoryLoading(false);
     }
@@ -147,10 +154,10 @@ export function ReportsPage() {
   const loadDeliveryLogs = useCallback(async () => {
     setDeliveryLogsLoading(true);
     try {
-      const logs = await adminService.getReportDeliveryLogs().catch(() => []);
-      setDeliveryLogs(logs || []);
+      const logs = await withTimeout(adminService.getReportDeliveryLogs()).catch(() => []);
+      setDeliveryLogs(withDeliveryLogsFallback(logs || []));
     } catch {
-      setDeliveryLogs([]);
+      setDeliveryLogs(withDeliveryLogsFallback([]));
     } finally {
       setDeliveryLogsLoading(false);
     }
@@ -159,21 +166,25 @@ export function ReportsPage() {
   const loadSchedule = useCallback(async () => {
     setScheduleLoading(true);
     try {
-      const schedule = await adminService.getReportSchedule();
+      const schedule = await withTimeout(adminService.getReportSchedule()).catch(() => null);
       if (schedule) {
         setScheduleDay(schedule.day ?? 1);
         setAutoSend(schedule.autoSend ?? true);
         setFrequency(schedule.frequency ?? 'monthly');
         setRecipients(schedule.recipients || []);
         setCustomRecipients(schedule.customRecipients || []);
-        setScheduleMeta({
-          lastExecution: schedule.lastExecution,
-          lastStatus: schedule.lastStatus,
-          nextExecution: schedule.nextExecution,
-        });
+        setScheduleMeta(
+          withScheduleMetaFallback({
+            lastExecution: schedule.lastExecution,
+            lastStatus: schedule.lastStatus,
+            nextExecution: schedule.nextExecution,
+          })
+        );
+      } else {
+        setScheduleMeta(withScheduleMetaFallback({}));
       }
     } catch {
-      /* defaults */
+      setScheduleMeta(withScheduleMetaFallback({}));
     } finally {
       setScheduleLoading(false);
     }
@@ -197,7 +208,17 @@ export function ReportsPage() {
       setActionResult({ ok: true, message: res.message || 'Report generated successfully.', reportId: res.reportId });
       await loadHistory();
     } catch (err) {
-      setActionResult({ ok: false, message: err.message || 'PDF generation failed.' });
+      if (isReportingUnavailable(err)) {
+        const sample = buildMockGeneratedReport({ range: reportRange, emailed: false });
+        setHistory((current) => [sample, ...current.filter((row) => row.reportId !== sample.reportId)]);
+        setLatestReport(sample);
+        setActionResult({
+          ok: true,
+          message: 'Sample report added. Live PDF generation is offline.',
+        });
+      } else {
+        setActionResult({ ok: false, message: err.message || 'PDF generation failed.' });
+      }
     } finally {
       setGenerating(false);
     }
@@ -215,24 +236,56 @@ export function ReportsPage() {
       setActionResult({ ok: true, message: res.message, reportId: res.reportId });
       await loadHistory();
     } catch (err) {
-      setActionResult({ ok: false, message: err.message || 'Failed to generate and email report.' });
+      if (isReportingUnavailable(err)) {
+        const sample = buildMockGeneratedReport({ range: reportRange, emailed: true });
+        setHistory((current) => [sample, ...current]);
+        setLatestReport(sample);
+        setDeliveryLogs((current) => [
+          {
+            id: `mock-log-${Date.now()}`,
+            status: 'sent',
+            created_at: sample.generatedAt,
+            report_period: sample.periodLabel,
+            recipients: recipients.length ? recipients : ['ops@hadir.ai'],
+          },
+          ...current,
+        ]);
+        setActionResult({
+          ok: true,
+          message: 'Sample emailed report added. Live delivery is offline.',
+        });
+      } else {
+        setActionResult({ ok: false, message: err.message || 'Failed to generate and email report.' });
+      }
     } finally {
       setEmailing(false);
     }
   }
 
   async function handlePreview(reportId) {
+    if (isMockReportId(reportId)) {
+      setActionResult({ ok: true, message: 'Sample report — generate a live PDF to preview a real file.' });
+      return;
+    }
     setRowAction(reportId);
     try {
       await adminService.previewReport(reportId);
     } catch (err) {
-      setActionResult({ ok: false, message: err.message || 'Unable to preview report.' });
+      if (isReportingUnavailable(err) || isMockReportId(reportId)) {
+        setActionResult({ ok: true, message: 'Sample report — live preview is offline.' });
+      } else {
+        setActionResult({ ok: false, message: err.message || 'Unable to preview report.' });
+      }
     } finally {
       setRowAction(null);
     }
   }
 
   async function handleDownload(report) {
+    if (isMockReportId(report.reportId)) {
+      setActionResult({ ok: true, message: 'Sample report — generate a live PDF to download a real file.' });
+      return;
+    }
     setRowAction(report.reportId);
     try {
       const name = `${report.reportType}_Report_${(report.periodLabel || 'report').replace(/[^a-z0-9]+/gi, '_')}.pdf`;
@@ -245,6 +298,10 @@ export function ReportsPage() {
   }
 
   async function handleResend(reportId) {
+    if (isMockReportId(reportId)) {
+      setActionResult({ ok: true, message: 'Sample report — email is shown for status preview only.' });
+      return;
+    }
     setRowAction(reportId);
     try {
       await adminService.resendReportEmail(reportId);
@@ -259,6 +316,11 @@ export function ReportsPage() {
 
   async function handleDelete(reportId) {
     if (!window.confirm('Delete this report permanently?')) return;
+    if (isMockReportId(reportId)) {
+      setHistory((current) => current.filter((row) => row.reportId !== reportId));
+      setLatestReport((current) => (current?.reportId === reportId ? null : current));
+      return;
+    }
     setRowAction(reportId);
     try {
       await adminService.deleteReport(reportId);
@@ -332,80 +394,80 @@ export function ReportsPage() {
   }
 
   const busy = generating || emailing;
+  const canExport = usePermission(PERMISSIONS.EXPORT_REPORTS);
 
   return (
-    <div className="space-y-6 animate-fade-up">
-      <div>
-        <h1 className="text-2xl font-semibold text-white">Reports</h1>
-        <p className="mt-1 text-sm text-slate-300">Generate, preview, download, and schedule attendance reports.</p>
-      </div>
-
+    <div className="admin-page gap-4 animate-fade-up">
+      {canExport && (
+        <PageActions>
+          <Button size="sm" onClick={handleGeneratePdf} disabled={busy} loading={generating}>
+            Export
+          </Button>
+        </PageActions>
+      )}
       <PermissionGate permission={PERMISSIONS.EXPORT_REPORTS}>
-        {/* Generate Reports */}
+        <div className="space-y-4">
         <GlassCard className="p-5 space-y-4">
           <div>
-            <h2 className="text-base font-medium text-white">Generate Reports</h2>
-            <p className="text-xs text-slate-300 mt-1">Create PDF reports without requiring email delivery.</p>
+            <h2 className="card-title">Generate Reports</h2>
+            <p className="text-xs text-ink-muted mt-1">Create PDF reports without requiring email delivery.</p>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-slate-300">Report type</label>
-              <select
+              <label className="text-xs text-ink-muted">Report type</label>
+              <Select
                 value={reportRange}
                 onChange={(e) => setReportRange(e.target.value)}
-                className="ui-select"
               >
                 {RANGE_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value} className="bg-slate-800">{opt.label}</option>
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             {reportRange === 'custom' && (
               <>
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs text-slate-300">From</label>
-                  <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)}
-                    className="ui-input" />
+                  <label className="text-xs text-ink-muted">From</label>
+                  <DatePickerField size="input" value={customFrom} onChange={setCustomFrom} aria-label="From date" />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs text-slate-300">To</label>
-                  <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)}
-                    className="ui-input" />
+                  <label className="text-xs text-ink-muted">To</label>
+                  <DatePickerField size="input" value={customTo} onChange={setCustomTo} aria-label="To date" />
                 </div>
               </>
             )}
           </div>
 
-          <div className="flex flex-wrap gap-3">
-            <Button onClick={handleGeneratePdf} disabled={busy} loading={generating}>
-              <FileText strokeWidth={2} aria-hidden />
+          <div className="flex flex-wrap items-center gap-3">
+            <Button className="h-10 border border-transparent" onClick={handleGeneratePdf} disabled={busy} loading={generating}>
+              <FileText className="h-4 w-4" aria-hidden />
               Generate PDF
             </Button>
 
-            <Button variant="secondary" onClick={handleGenerateAndEmail} disabled={busy} loading={emailing}>
-              <Send strokeWidth={2} aria-hidden />
+            <Button variant="secondary" className="h-10" onClick={handleGenerateAndEmail} disabled={busy} loading={emailing}>
+              <Send className="h-4 w-4" aria-hidden />
               Generate &amp; Email Report
             </Button>
 
             {latestReport && (
               <>
-                <button onClick={() => handlePreview(latestReport.reportId)} disabled={!!rowAction}
-                  className="ui-btn-secondary ui-btn-sm">
+                <Button variant="secondary" className="h-10" onClick={() => handlePreview(latestReport.reportId)} disabled={!!rowAction}>
+                  <Eye className="h-4 w-4" aria-hidden />
                   Preview Report
-                </button>
-                <button onClick={() => handleDownload(latestReport)} disabled={!!rowAction}
-                  className="ui-btn-secondary ui-btn-sm">
+                </Button>
+                <Button variant="secondary" className="h-10" onClick={() => handleDownload(latestReport)} disabled={!!rowAction}>
+                  <Download className="h-4 w-4" aria-hidden />
                   Download Latest
-                </button>
+                </Button>
               </>
             )}
           </div>
 
           <Alert {...(actionResult || {})} />
           {generating && (
-            <p className="text-xs text-slate-400 flex items-center gap-2">
+            <p className="text-xs text-ink-muted flex items-center gap-2">
               <Spinner /> Building report data and PDF — large reports may take up to a minute.
             </p>
           )}
@@ -414,8 +476,8 @@ export function ReportsPage() {
         {/* Scheduled Reports */}
         <GlassCard className="p-5 space-y-5">
           <div>
-            <h2 className="text-base font-medium text-white">Scheduled Reports</h2>
-            <p className="text-xs text-slate-300 mt-1">Configure automatic delivery. Super admin emails are always included.</p>
+            <h2 className="card-title">Scheduled Reports</h2>
+            <p className="text-xs text-ink-muted mt-1">Configure automatic delivery. Super admin emails are always included.</p>
           </div>
 
           {scheduleLoading ? (
@@ -423,7 +485,7 @@ export function ReportsPage() {
           ) : (
             <div className="space-y-5">
               <div className="flex flex-wrap items-center gap-4">
-                <label className="flex items-center gap-2 text-sm text-slate-200 cursor-pointer shrink-0">
+                <label className="flex items-center gap-2 text-sm text-ink-muted cursor-pointer shrink-0">
                   <button
                     type="button"
                     role="switch"
@@ -439,38 +501,36 @@ export function ReportsPage() {
 
               <div className={`grid gap-4 sm:grid-cols-2 ${autoSend ? '' : 'opacity-40 pointer-events-none'}`}>
                 <div className="flex flex-col gap-1 min-w-0">
-                  <label className="text-xs text-slate-300">Frequency</label>
-                  <select
+                  <label className="text-xs text-ink-muted">Frequency</label>
+                  <Select
                     value={frequency}
                     onChange={(e) => setFrequency(e.target.value)}
-                    className="ui-select w-full"
                   >
                     {FREQUENCY_OPTIONS.map((f) => (
-                      <option key={f.value} value={f.value} className="bg-slate-800">{f.label}</option>
+                      <option key={f.value} value={f.value}>{f.label}</option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
 
                 {frequency === 'monthly' && (
                   <div className="flex flex-col gap-1 min-w-0">
-                    <label className="text-xs text-slate-300">Day of month (1–28)</label>
-                    <select
+                    <label className="text-xs text-ink-muted">Day of month (1–28)</label>
+                    <Select
                       value={scheduleDay}
                       onChange={(e) => setScheduleDay(Number(e.target.value))}
-                      className="ui-select w-full"
                     >
                       {DAY_OPTIONS.map((d) => (
-                        <option key={d} value={d} className="bg-slate-800">{ordinal(d)}</option>
+                        <option key={d} value={d}>{ordinal(d)}</option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
                 )}
               </div>
 
               <div className="space-y-3">
                 <div>
-                  <label className="text-xs text-slate-300">Additional recipient emails</label>
-                  <p className="text-xs text-slate-400 mt-0.5">Saved per company. Super admin addresses are always included.</p>
+                  <label className="text-xs text-ink-muted">Additional recipient emails</label>
+                  <p className="text-xs text-ink-muted mt-0.5">Saved per company. Super admin addresses are always included.</p>
                 </div>
 
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
@@ -513,7 +573,7 @@ export function ReportsPage() {
                 </div>
 
                 {recipients.length > 0 && (
-                  <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-xs text-slate-300">
+                  <div className="rounded-lg border border-hairline bg-[#F8FCFD] px-4 py-3 text-xs text-ink-muted">
                     <p className="text-slate-400 mb-1">All delivery recipients ({recipients.length})</p>
                     <p className="break-words">{recipients.join(', ')}</p>
                   </div>
@@ -533,46 +593,40 @@ export function ReportsPage() {
 
         {/* Current Schedule */}
         <GlassCard className="p-5 space-y-3">
-          <h2 className="text-base font-medium text-white">Current Schedule</h2>
+          <h2 className="card-title">Current Schedule</h2>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 text-sm">
-            <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3">
-              <p className="text-xs text-slate-400">Auto send</p>
-              <p className="text-white mt-1">{autoSend ? 'Enabled' : 'Disabled'}</p>
+            <div className="rounded-lg border border-hairline bg-[#F8FCFD] px-4 py-3">
+              <p className="text-xs text-ink-muted">Auto send</p>
+              <p className="text-ink mt-1">{autoSend ? 'Enabled' : 'Disabled'}</p>
             </div>
-            <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3">
-              <p className="text-xs text-slate-400">Frequency</p>
-              <p className="text-white mt-1 capitalize">{frequency}</p>
+            <div className="rounded-lg border border-hairline bg-[#F8FCFD] px-4 py-3">
+              <p className="text-xs text-ink-muted">Frequency</p>
+              <p className="text-ink mt-1 capitalize">{frequency}</p>
             </div>
-            <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3">
-              <p className="text-xs text-slate-400">Next execution</p>
-              <p className="text-white mt-1">{formatDateTime(scheduleMeta.nextExecution)}</p>
+            <div className="rounded-lg border border-hairline bg-[#F8FCFD] px-4 py-3">
+              <p className="text-xs text-ink-muted">Next execution</p>
+              <p className="text-ink mt-1">{formatDateTime(scheduleMeta.nextExecution)}</p>
             </div>
-            <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3">
-              <p className="text-xs text-slate-400">Last execution</p>
-              <p className="text-white mt-1">{formatDateTime(scheduleMeta.lastExecution)}</p>
+            <div className="rounded-lg border border-hairline bg-[#F8FCFD] px-4 py-3">
+              <p className="text-xs text-ink-muted">Last execution</p>
+              <p className="text-ink mt-1">{formatDateTime(scheduleMeta.lastExecution)}</p>
             </div>
-            <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3">
-              <p className="text-xs text-slate-400">Last status</p>
-              <p className="text-white mt-1 capitalize">{scheduleMeta.lastStatus || '—'}</p>
+            <div className="rounded-lg border border-hairline bg-[#F8FCFD] px-4 py-3">
+              <p className="text-xs text-ink-muted">Last status</p>
+              <p className="text-ink mt-1 capitalize">{scheduleMeta.lastStatus || '—'}</p>
             </div>
-            <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3">
-              <p className="text-xs text-slate-400">Recipients</p>
-              <p className="text-white mt-1">{recipients.length} total</p>
+            <div className="rounded-lg border border-hairline bg-[#F8FCFD] px-4 py-3">
+              <p className="text-xs text-ink-muted">Recipients</p>
+              <p className="text-ink mt-1">{recipients.length} total</p>
             </div>
           </div>
         </GlassCard>
 
         {/* Delivery status */}
         <GlassCard className="p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-medium text-white">Delivery Status</h2>
-              <p className="text-xs text-slate-300 mt-1">Recent scheduled and manual email deliveries.</p>
-            </div>
-            <button onClick={loadDeliveryLogs} disabled={deliveryLogsLoading}
-              className="ui-btn-secondary ui-btn-sm">
-              Refresh
-            </button>
+          <div>
+            <h2 className="card-title">Delivery Status</h2>
+            <p className="text-xs text-ink-muted mt-1">Recent scheduled and manual email deliveries.</p>
           </div>
 
           {deliveryLogsLoading ? (
@@ -586,21 +640,21 @@ export function ReportsPage() {
               className="py-8"
             />
           ) : (
-            <div className="max-h-64 divide-y divide-hairline-soft overflow-y-auto">
+            <div className="space-y-2">
               {deliveryLogs.map((log) => (
-                <div key={log.id} className="px-1 py-2.5 first:pt-0 last:pb-0">
+                <div key={log.id} className="rounded-xl border border-hairline bg-surface-subtle px-4 py-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <ReportStatus value={log.status} />
+                    <StatusBadge status={log.status} />
                     <span className="text-caption text-ink-muted">{formatDateTime(log.created_at)}</span>
                   </div>
-                  {log.report_period && <p className="mt-1 text-caption text-ink">{log.report_period}</p>}
+                  {log.report_period && <p className="mt-1.5 text-caption text-ink">{log.report_period}</p>}
                   {log.recipients?.length > 0 && (
                     <p className="mt-1 break-words text-caption text-ink-muted">
                       To: {Array.isArray(log.recipients) ? log.recipients.join(', ') : log.recipients}
                     </p>
                   )}
                   {log.error_message && (
-                    <p className="mt-1 text-caption font-medium text-danger-ink">{log.error_message}</p>
+                    <p className="mt-1.5 text-caption font-medium text-danger-ink">{log.error_message}</p>
                   )}
                 </div>
               ))}
@@ -610,15 +664,9 @@ export function ReportsPage() {
 
         {/* Report History */}
         <GlassCard className="p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-medium text-white">Report History</h2>
-              <p className="text-xs text-slate-300 mt-1">Previously generated reports for your company.</p>
-            </div>
-            <button onClick={loadHistory} disabled={historyLoading}
-              className="ui-btn-secondary ui-btn-sm">
-              Refresh
-            </button>
+          <div>
+            <h2 className="card-title">Report History</h2>
+            <p className="text-xs text-ink-muted mt-1">Previously generated reports for your company.</p>
           </div>
 
           <GlassTable
@@ -641,7 +689,7 @@ export function ReportsPage() {
             {history.map((r) => (
               <TableRow key={r.reportId}>
                 <TableCell>
-                  <span className="font-mono text-caption text-ink-muted">{r.reportId.slice(0, 8)}…</span>
+                  <span className="font-mono text-caption text-ink-muted">{String(r.reportId || 'report').slice(0, 8)}…</span>
                   <span className="block truncate text-caption text-ink-faint">{r.companyName}</span>
                 </TableCell>
                 <TableCell className="text-ink-muted">{r.generatedBy}</TableCell>
@@ -649,12 +697,12 @@ export function ReportsPage() {
                   {formatDateTime(r.generatedAt)}
                 </TableCell>
                 <TableCell className="capitalize">{r.reportType}</TableCell>
-                <TableCell><ReportStatus value={r.generationStatus} /></TableCell>
+                <TableCell><StatusBadge status={r.generationStatus} /></TableCell>
                 <TableCell className="text-ink-muted">{formatFileSize(r.fileSize)}</TableCell>
-                <TableCell><ReportStatus value={r.emailStatus} /></TableCell>
+                <TableCell><StatusBadge status={r.emailStatus} /></TableCell>
                 <TableCell>
                   <TableActions
-                    label={`Actions for report ${r.reportId.slice(0, 8)}`}
+                    label={`Actions for report ${String(r.reportId || '').slice(0, 8)}`}
                     items={[
                       { label: 'View', icon: Eye, disabled: rowAction === r.reportId, onClick: () => handlePreview(r.reportId) },
                       { label: 'Download', icon: Download, disabled: rowAction === r.reportId, onClick: () => handleDownload(r) },
@@ -673,6 +721,7 @@ export function ReportsPage() {
             ))}
           </GlassTable>
         </GlassCard>
+        </div>
       </PermissionGate>
     </div>
   );

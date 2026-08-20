@@ -1,21 +1,31 @@
 import { NavLink } from 'react-router-dom';
+import { LayoutGroup, motion, useReducedMotion } from 'framer-motion';
 import { LogOut } from 'lucide-react';
+import { AppIcon } from './AppIcon';
 import { NAV_FOOTER_ITEMS, NAV_SECTIONS, NOTIFICATIONS_ITEM } from './navConfig';
 import { CountBadge } from './ui/CountBadge';
 
-/*
- * Cyan rail with concave active cutout (white pill → main canvas).
- * Palette: #00B2EE / white / soft sky — layout from the reference.
- */
 const ROW_BASE =
-  'group/row relative flex h-11 w-full items-center gap-3 pl-3.5 pr-4 text-left text-label tracking-[-0.01em] transition-colors duration-200 ease-premium';
-const ROW_ACTIVE =
-  'nav-item-active z-10 ml-3 mr-0 rounded-l-[20px] bg-white font-semibold text-[#00B2EE]';
-const ROW_IDLE =
-  'mx-3 rounded-xl font-semibold text-white/85 hover:bg-white/15 hover:text-white';
+  'nav-row group/row relative flex min-h-8 items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[13px] font-medium tracking-[-0.01em] transition-[background-color,color,opacity] duration-150 ease-out';
+const ROW_ACTIVE = 'z-10 mx-2.5 text-[#00B0FF]';
+const ROW_IDLE = 'mx-2.5 text-white/78 hover:bg-white/[0.12] hover:text-white';
+
+const PILL_TRANSITION = { type: 'tween', duration: 0.18, ease: [0.22, 1, 0.36, 1] };
+
+function NavIcon({ icon, active }) {
+  return (
+    <AppIcon
+      icon={icon}
+      className={`transition-colors duration-150 ${
+        active ? 'text-[#00B0FF]' : 'text-white/90 group-hover/row:text-white'
+      }`}
+    />
+  );
+}
 
 function NavRow({ item, badge = 0 }) {
-  const Icon = item.icon;
+  const reduceMotion = useReducedMotion();
+
   return (
     <NavLink
       to={item.to}
@@ -24,22 +34,27 @@ function NavRow({ item, badge = 0 }) {
     >
       {({ isActive }) => (
         <>
-          <span className="relative grid h-5 w-5 shrink-0 place-items-center">
-            <Icon
-              className={`h-[18px] w-[18px] transition-colors duration-200 ease-premium ${
-                isActive ? 'text-[#00B2EE]' : 'text-white/85 group-hover/row:text-white'
-              }`}
-              strokeWidth={isActive ? 2 : 1.75}
-            />
+          {isActive &&
+            (reduceMotion ? (
+              <span className="nav-item-active pointer-events-none absolute inset-0" />
+            ) : (
+              <motion.span
+                layoutId="activeTabPill"
+                className="nav-item-active pointer-events-none absolute inset-0"
+                transition={PILL_TRANSITION}
+              />
+            ))}
+          <span className="relative z-20 inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center">
+            <NavIcon icon={item.icon} active={isActive} />
           </span>
-          <span className="min-w-0 flex-1 truncate whitespace-nowrap">{item.label}</span>
+          <span className="relative z-20 min-w-0 flex-1 truncate whitespace-nowrap">{item.label}</span>
           {badge > 0 && (
             <CountBadge
               count={badge}
               max={99}
               tone={isActive ? 'brand' : 'onBrand'}
               ring={false}
-              className="h-[1.125rem] shrink-0"
+              className="relative z-20 mr-1.5 h-4 min-w-4 shrink-0 text-[10px] font-semibold"
             />
           )}
         </>
@@ -50,10 +65,8 @@ function NavRow({ item, badge = 0 }) {
 
 function SectionLabel({ children }) {
   return (
-    <div className="relative flex h-6 items-center px-6">
-      <p className="truncate whitespace-nowrap text-micro font-bold uppercase tracking-[0.12em] text-white/65">
-        {children}
-      </p>
+    <div className="flex items-center px-5">
+      <p className="nav-section-label truncate whitespace-nowrap">{children}</p>
     </div>
   );
 }
@@ -63,9 +76,11 @@ function SectionLabel({ children }) {
  *   canSee: (item: object) => boolean,
  *   onLogout: () => void,
  *   unreadCount?: number,
+ *   className?: string,
+ *   layoutGroupId?: string,
  * }} props
  */
-export function Sidebar({ canSee, onLogout, unreadCount = 0 }) {
+export function Sidebar({ canSee, onLogout, unreadCount = 0, className = '', layoutGroupId = 'admin-sidebar' }) {
   const sections = NAV_SECTIONS.map((section) => ({
     ...section,
     items: section.items.filter(canSee),
@@ -75,56 +90,65 @@ export function Sidebar({ canSee, onLogout, unreadCount = 0 }) {
   const footerItems = NAV_FOOTER_ITEMS.filter(canSee);
 
   return (
-    <aside
-      className="nav-surface relative z-40 m-0 hidden h-full w-64 shrink-0 flex-col justify-start overflow-y-auto rounded-l-3xl p-0 md:flex"
-      aria-label="Sidebar"
-    >
-      <div className="relative flex h-16 shrink-0 items-center gap-3 px-5">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[13px] bg-white shadow-[0_2px_8px_rgba(15,23,42,0.14)]">
-          <img src="/logo.jpeg" alt="Hadir.ai logo" className="h-6 w-6 rounded-[9px] object-cover" />
-        </span>
-        <span className="min-w-0">
-          <span className="block truncate whitespace-nowrap text-subheading font-bold tracking-[-0.02em] text-white">
-            Hadir.ai
-          </span>
-          <span className="block truncate whitespace-nowrap text-micro font-medium text-white/75">
-            Admin console
-          </span>
-        </span>
-      </div>
-
-      <nav
-        className="relative flex-none space-y-1 py-4 pb-1"
-        aria-label="Main navigation"
+    <LayoutGroup id={layoutGroupId}>
+      <aside
+        className={`nav-surface relative z-40 m-0 flex h-full min-h-0 w-64 shrink-0 flex-col justify-start overflow-y-auto p-0 ${className || 'hidden md:flex'}`}
+        aria-label="Sidebar"
       >
-        {sections.map((section, index) => (
-          <div key={section.id} className={index === 0 ? 'space-y-1' : 'mt-4 space-y-1'}>
-            {section.label && <SectionLabel>{section.label}</SectionLabel>}
-            {section.items.map((item) => (
+        <div className="relative flex h-[3.75rem] shrink-0 items-center gap-3 px-4">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-white/95 shadow-[0_1px_4px_rgba(15,23,42,0.12)]">
+            <img src="/logo.jpeg" alt="Hadir.ai logo" className="h-5 w-5 rounded-[7px] object-cover" />
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate whitespace-nowrap text-[14px] font-semibold tracking-[-0.02em] text-white">
+              Hadir.ai
+            </span>
+            <span className="block truncate whitespace-nowrap text-[11px] font-medium text-white/55">
+              Admin console
+            </span>
+          </span>
+        </div>
+
+        <nav
+          className="sidebar-nav"
+          aria-label="Main navigation"
+          data-lenis-prevent
+        >
+          {sections.map((section, index) => (
+            <div key={section.id} className={index === 0 ? '' : 'nav-section'}>
+              {section.label && <SectionLabel>{section.label}</SectionLabel>}
+              <div className="space-y-0.5">
+                {section.items.map((item) => (
+                  <NavRow key={item.to} item={item} />
+                ))}
+                {index === 0 && showNotifications && (
+                  <NavRow item={NOTIFICATIONS_ITEM} badge={unreadCount} />
+                )}
+              </div>
+            </div>
+          ))}
+        </nav>
+
+        <div className="relative mt-2 shrink-0 bg-[var(--nav-rail,#00B0FF)] pb-3 pt-1">
+          <div className="nav-footer-rule mx-5 mb-2" aria-hidden />
+          <div className="space-y-0.5">
+            {footerItems.map((item) => (
               <NavRow key={item.to} item={item} />
             ))}
-            {index === 0 && showNotifications && (
-              <NavRow item={NOTIFICATIONS_ITEM} badge={unreadCount} />
-            )}
+            <button
+              type="button"
+              onClick={onLogout}
+              title="Logout"
+              className={`${ROW_BASE} ${ROW_IDLE}`}
+            >
+              <span className="relative z-20 inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center">
+                <AppIcon icon={LogOut} className="text-white/90" />
+              </span>
+              <span className="relative z-20">Logout</span>
+            </button>
           </div>
-        ))}
-      </nav>
-
-      <div className="relative z-20 mt-2 shrink-0 space-y-1 border-t border-white/20 bg-transparent py-3">
-        {footerItems.map((item) => (
-          <NavRow key={item.to} item={item} />
-        ))}
-
-        <button
-          type="button"
-          onClick={onLogout}
-          title="Logout"
-          className={`${ROW_BASE} ${ROW_IDLE} w-auto`}
-        >
-          <LogOut className="h-5 w-5 shrink-0 text-white/85" strokeWidth={1.75} />
-          <span>Logout</span>
-        </button>
-      </div>
-    </aside>
+        </div>
+      </aside>
+    </LayoutGroup>
   );
 }

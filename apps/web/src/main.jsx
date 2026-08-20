@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { AppRouter } from './core/router/AppRouter';
 import { API_BASE_URL } from './core/config/api';
+import 'lenis/dist/lenis.css';
 import './shared/styles/index.css';
 
 if (import.meta.env.DEV) {
