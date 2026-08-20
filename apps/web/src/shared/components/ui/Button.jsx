@@ -20,6 +20,7 @@ const SIZES = {
 const SPINNER_TONE = {
   primary: 'border-white/35 border-t-white',
   danger: 'border-white/35 border-t-white',
+  dangerSoft: 'border-white/35 border-t-white',
   success: 'border-white/35 border-t-white',
 };
 

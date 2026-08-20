@@ -1,16 +1,6 @@
 import { useCallback, useMemo, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  BellOff,
-  CalendarClock,
-  CalendarDays,
-  ClipboardCheck,
-  Clock3,
-  Info,
-  Laptop,
-  Ticket,
-  X,
-} from 'lucide-react';
+import { BellOff, X } from 'lucide-react';
 import { adminService } from '../services/adminService';
 import { useSilentPoll, useSessionState } from '../../../shared/hooks/useSilentPoll';
 import { useNotificationStore } from '../../notifications/store/notificationStore';
@@ -27,6 +17,8 @@ import { Alert } from '../../../shared/components/ui/Alert';
 import { Select } from '../../../shared/components/ui/Select';
 import { EmptyStateBody } from '../../../shared/components/ui/EmptyState';
 import { SkeletonFeed } from '../../../shared/components/ui/Skeleton';
+import { AppIcon } from '../../../shared/components/AppIcon';
+import { notificationKindMeta } from '../../../shared/lib/notificationIcons';
 
 const TYPE_OPTIONS = [
   { value: '', label: 'All types' },
@@ -45,28 +37,6 @@ const READ_FILTERS = [
   { id: 'true', label: 'Read' },
 ];
 
-const KIND_META = {
-  approval: { label: 'Approvals', Icon: ClipboardCheck },
-  leave: { label: 'Leave updates', Icon: CalendarClock },
-  attendance: { label: 'Attendance alerts', Icon: Clock3 },
-  ticket: { label: 'Tickets', Icon: Ticket },
-  work_mode: { label: 'Work mode', Icon: Laptop },
-  calendar: { label: 'Calendar', Icon: CalendarDays },
-  system: { label: 'System', Icon: Info },
-};
-
-function notificationKind(type) {
-  const value = String(type || '').toLowerCase();
-  if (value.includes('leave')) return 'leave';
-  if (value.includes('approval')) return 'approval';
-  if (value.includes('attendance') || value.includes('check_in') || value.includes('late') || value.includes('absent')) {
-    return 'attendance';
-  }
-  if (value.startsWith('ticket')) return 'ticket';
-  if (value.includes('work_mode') || value === 'remote_work') return 'work_mode';
-  if (value.includes('calendar')) return 'calendar';
-  return 'system';
-}
 
 function notificationDestination(notification) {
   const type = String(notification?.type || '').toLowerCase();
@@ -239,17 +209,7 @@ export function NotificationsPage() {
 
   return (
     <div className="notifications-directory admin-page gap-4 animate-fade-up">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Notifications</h1>
-          <p className="mt-1 text-sm text-slate-500">What needs you, as it happens.</p>
-        </div>
-        <button type="button" onClick={markAllRead} disabled={busy || !hasUnread} className="ui-btn-secondary ui-btn-sm">
-          Mark all as read
-        </button>
-      </div>
-
-      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+      <div className="filter-action-bar">
         <div className="ui-segment" role="tablist" aria-label="Read state">
           {READ_FILTERS.map((item) => (
             <button
@@ -286,11 +246,14 @@ export function NotificationsPage() {
         <p className="text-xs tabular-nums text-slate-400">
           {total} {total === 1 ? 'notification' : 'notifications'}
         </p>
+        <button type="button" onClick={markAllRead} disabled={busy || !hasUnread} className="ui-btn-secondary ui-btn-sm ml-auto">
+          Mark all as read
+        </button>
       </div>
 
       {error && <Alert type="error">{error}</Alert>}
 
-      <section className="admin-fill-scroll notifications-inbox">
+      <section className="notifications-inbox">
         {loading ? (
           <div className="px-4 py-4">
             <SkeletonFeed count={6} />
@@ -350,7 +313,7 @@ export function NotificationsPage() {
 }
 
 function NotificationRow({ item, onOpen, onDelete }) {
-  const kind = KIND_META[notificationKind(item.type)] || KIND_META.system;
+  const kind = notificationKindMeta(item.type);
   const Icon = kind.Icon;
   const destination = notificationDestination(item);
   const unread = !item.read;
@@ -362,7 +325,7 @@ function NotificationRow({ item, onOpen, onDelete }) {
       <div className={`notifications-row ${unread ? 'is-unread' : ''}`}>
         <button type="button" className="notifications-row-main" onClick={onOpen}>
           <span className={`notifications-icon ${unread ? 'is-unread' : ''}`} aria-hidden>
-            <Icon className="h-4 w-4" strokeWidth={1.75} />
+            <AppIcon icon={Icon} />
           </span>
           <span className="min-w-0 flex-1 text-left">
             <span className="flex items-baseline gap-2">
@@ -395,7 +358,7 @@ function NotificationRow({ item, onOpen, onDelete }) {
             className="notifications-dismiss"
             aria-label="Delete notification"
           >
-            <X className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+            <X className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
           </button>
         </div>
       </div>

@@ -16,6 +16,7 @@ import { Alert } from '../../../shared/components/ui/Alert';
 import { canAccessFeature, hasAnyPermission, hasPermission, PERMISSIONS } from '../permissions';
 import { normalizeAttendanceType } from '../utils/analyticsCharts';
 import { formatEmployeeDisplay, formatLeaveStatus, formatLeaveTypeLabel } from '../utils/leaveDisplay';
+import { PageActions } from '../../../shared/components/pageChrome';
 
 const DETAIL_TABS = [
   { id: 'overview', label: 'Overview' },
@@ -261,27 +262,23 @@ export function DepartmentsPage() {
 
   return (
     <div className="departments-directory admin-page gap-4 animate-fade-up">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Departments</h1>
-          <p className="mt-1 text-sm text-slate-500">Organize people, teams and reporting structure.</p>
-        </div>
-        {canManageDepartments && (
+      {canManageDepartments && (
+        <PageActions>
           <PermissionGate permission={PERMISSIONS.MANAGE_DEPARTMENTS}>
             <button
               type="button"
               onClick={openCreate}
               data-on-dark
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#00B0FF] px-3 text-sm font-semibold text-white transition-colors duration-150 hover:bg-[#0099E6]"
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#00B0FF] px-3 text-sm font-semibold text-white transition-colors duration-150 hover:bg-[#0099E6]"
             >
               <Plus className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
               Add department
             </button>
           </PermissionGate>
-        )}
-      </div>
+        </PageActions>
+      )}
 
-      <div className="flex flex-col gap-2 border-b border-slate-200 pb-3 sm:flex-row sm:items-center">
+      <div className="filter-action-bar">
         <div className="relative min-w-0 flex-1 sm:max-w-sm">
           <Search
             className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
@@ -303,7 +300,7 @@ export function DepartmentsPage() {
 
       {error && <Alert type="error">{error}</Alert>}
 
-      <div className="admin-fill overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white">
         <GlassTable
           className="rounded-none border-0 shadow-none"
           loading={loading}
@@ -417,7 +414,7 @@ export function DepartmentsPage() {
               Close
             </button>
           </div>
-          <div className="space-y-3 overflow-y-auto p-5">
+          <div className="space-y-3 p-5">
             <label className="block space-y-1">
               <span className="ui-label">Department name</span>
               <input
@@ -476,7 +473,7 @@ export function DepartmentsPage() {
               </nav>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-5 py-4">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
               {detailTab === 'overview' && (
                 <div className="space-y-5">
                   <dl>
@@ -592,7 +589,7 @@ export function DepartmentsPage() {
             {canManageDepartments && (
               <div className="mt-auto flex flex-wrap gap-2 border-t border-slate-200 px-5 py-4">
                 <PermissionGate permission={PERMISSIONS.MANAGE_DEPARTMENTS}>
-                  <button type="button" onClick={() => onDeleteDepartment(activeDept.id)} className="ui-btn-danger-soft ui-btn-sm">
+                  <button type="button" onClick={() => onDeleteDepartment(activeDept.id)} className="ui-btn-danger ui-btn-sm">
                     Delete department
                   </button>
                 </PermissionGate>

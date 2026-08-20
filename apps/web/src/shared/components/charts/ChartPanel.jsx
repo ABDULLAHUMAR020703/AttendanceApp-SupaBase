@@ -15,6 +15,8 @@ export const ChartPanel = forwardRef(function ChartPanel(
     children,
     className = '',
     exportId,
+    surfaceClassName = 'border-hairline bg-accent-50',
+    flush = false,
   },
   ref
 ) {
@@ -37,8 +39,10 @@ export const ChartPanel = forwardRef(function ChartPanel(
       </header>
 
       <div
-        className="chart-surface flex min-h-0 flex-1 flex-col rounded-2xl border border-hairline bg-accent-50 p-3 transition-opacity duration-200 sm:p-4"
-        style={{ minHeight: 0 }}
+        className={`chart-surface flex min-h-0 flex-1 flex-col rounded-2xl border-0 transition-opacity duration-200 ${
+          flush ? 'overflow-hidden p-0' : 'p-3 sm:p-4'
+        } ${surfaceClassName}`}
+        style={{ minHeight: height }}
         role="img"
         aria-label={`${title} chart`}
       >

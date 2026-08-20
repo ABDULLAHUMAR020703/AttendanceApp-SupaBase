@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { History, SearchX } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { History, RefreshCw, SearchX } from 'lucide-react';
 import { adminService } from '../services/adminService';
 import {
   allManagerPermissions,
@@ -12,13 +12,47 @@ import {
   TableIdentity,
   TableRow,
 } from '../../../shared/components/GlassTable';
+import { SlideOverPanel } from '../../../shared/components/SlideOverPanel';
+import { PageActions } from '../../../shared/components/pageChrome';
 import { Alert } from '../../../shared/components/ui/Alert';
 import { EmptyStateBody } from '../../../shared/components/ui/EmptyState';
+import { Select } from '../../../shared/components/ui/Select';
 
 const VIEWS = [
   { id: 'roles', label: 'Roles' },
   { id: 'users', label: 'Users' },
   { id: 'permissions', label: 'Permissions' },
+];
+
+const AUDIT_FILTERS = [
+  {
+    id: 'all',
+    label: 'All activity',
+    actions: null,
+    subtitle: 'Every access-control change in this company.',
+    emptyTitle: 'No audit entries yet',
+  },
+  {
+    id: 'roles',
+    label: 'Roles',
+    actions: ['role_changed'],
+    subtitle: 'Role assignments and changes.',
+    emptyTitle: 'No role changes yet',
+  },
+  {
+    id: 'users',
+    label: 'Users',
+    actions: ['user_activated', 'user_deactivated', 'user_deleted'],
+    subtitle: 'Activation, deactivation, and account changes.',
+    emptyTitle: 'No user account changes yet',
+  },
+  {
+    id: 'permissions',
+    label: 'Permissions',
+    actions: ['permissions_changed'],
+    subtitle: 'Permission grant changes.',
+    emptyTitle: 'No permission changes yet',
+  },
 ];
 
 const ROLE_CATALOG = [
@@ -53,6 +87,35 @@ function formatWhen(iso) {
   return date.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
+function formatAction(action) {
+  const labels = {
+    permissions_changed: 'Permissions Changed',
+    user_activated: 'User Activated',
+    user_deactivated: 'User Deactivated',
+    role_changed: 'Role Changed',
+    user_deleted: 'User Deleted',
+  };
+  if (labels[action]) return labels[action];
+  const text = String(action || '').replace(/_/g, ' ').trim();
+  if (!text) return '—';
+  return text.replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function AuditHistoryButton({ open, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-haspopup="dialog"
+      aria-expanded={open}
+      className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-hair hover:bg-slate-50"
+    >
+      <History className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+      Audit History
+    </button>
+  );
+}
+
 function defaultSetForRole(roleId) {
   if (roleId === 'super_admin') return new Set(allManagerPermissions);
   if (roleId === 'manager') return new Set(defaultManagerPermissions);
@@ -76,6 +139,9 @@ export function ManagerPermissionsPage() {
   const [permissionSet, setPermissionSet] = useState(new Set());
   const [search, setSearch] = useState('');
   const [auditLogs, setAuditLogs] = useState([]);
+  const [auditOpen, setAuditOpen] = useState(false);
+  const [auditFilter, setAuditFilter] = useState('roles');
+  const [auditRefreshing, setAuditRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -102,7 +168,17 @@ export function ManagerPermissionsPage() {
     [managers, directory]
   );
 
-  const loadData = async () => {
+  const refreshAuditLogs = useCallback(async () => {
+    setAuditRefreshing(true);
+    try {
+      const logs = await adminService.getAuditLogs().catch(() => []);
+      setAuditLogs(logs || []);
+    } finally {
+      setAuditRefreshing(false);
+    }
+  }, []);
+
+  const loadData = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
@@ -124,11 +200,11 @@ export function ManagerPermissionsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   useEffect(() => {
     const manager = managers.find((row) => row.uid === selectedUid);
@@ -173,8 +249,7 @@ export function ManagerPermissionsPage() {
         prev.map((row) => (row.uid === selectedManager.uid ? { ...row, permissions } : row))
       );
       setMessage('Permissions saved.');
-      const logs = await adminService.getAuditLogs().catch(() => []);
-      setAuditLogs(logs || []);
+      refreshAuditLogs();
     } catch (err) {
       setError(err?.message || 'Failed to save permissions');
     } finally {
@@ -189,18 +264,28 @@ export function ManagerPermissionsPage() {
   const roleUsers = usersByRole[selectedRoleId] || [];
   const roleAccess = defaultSetForRole(selectedRoleId);
 
+  const auditScope = AUDIT_FILTERS.find((item) => item.id === auditFilter) || AUDIT_FILTERS[0];
+  const visibleAuditLogs = useMemo(() => {
+    if (!auditScope.actions) return auditLogs;
+    return auditLogs.filter((log) => auditScope.actions.includes(log.action));
+  }, [auditLogs, auditScope]);
+
   const openUserPermissions = (uid) => {
     setSelectedUid(uid);
     setView('permissions');
   };
 
-  return (
-    <div className="permissions-directory admin-page gap-4 animate-fade-up">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Permissions</h1>
-        <p className="mt-1 text-sm text-slate-500">Review role access, then assign grants to individual users.</p>
-      </div>
+  const openAuditHistory = () => {
+    setAuditFilter(view);
+    setAuditOpen(true);
+    refreshAuditLogs();
+  };
 
+  return (
+    <div className="permissions-directory admin-page admin-page-locked gap-4 animate-fade-up">
+      <PageActions>
+        <AuditHistoryButton open={auditOpen} onClick={openAuditHistory} />
+      </PageActions>
       {error && <Alert type="error">{error}</Alert>}
       {message && <Alert type="success">{message}</Alert>}
 
@@ -220,29 +305,33 @@ export function ManagerPermissionsPage() {
       </div>
 
       {view === 'roles' && (
-        <div className="admin-fill grid min-h-0 gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
-          <aside className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-            {ROLE_CATALOG.map((role) => {
-              const active = role.id === selectedRoleId;
-              const count = (usersByRole[role.id] || []).length;
-              return (
-                <button
-                  key={role.id}
-                  type="button"
-                  onClick={() => setSelectedRoleId(role.id)}
-                  className={`permissions-rail-item w-full text-left ${active ? 'is-active' : ''}`}
-                >
-                  <span className="block text-sm font-medium text-slate-900">{role.name}</span>
-                  <span className="mt-0.5 block text-xs text-slate-400">
-                    {loading ? '—' : count === 1 ? '1 person' : `${count} people`}
-                  </span>
-                </button>
-              );
-            })}
-          </aside>
-
+        <PermissionsColumns
+          rail={
+            <aside className="permissions-rail">
+      <div className="permissions-rail-list" data-lenis-prevent>
+                {ROLE_CATALOG.map((role) => {
+                  const active = role.id === selectedRoleId;
+                  const count = (usersByRole[role.id] || []).length;
+                  return (
+                    <button
+                      key={role.id}
+                      type="button"
+                      onClick={() => setSelectedRoleId(role.id)}
+                      className={`permissions-rail-item w-full text-left ${active ? 'is-active' : ''}`}
+                    >
+                      <span className="block text-sm font-medium text-slate-900">{role.name}</span>
+                      <span className="mt-0.5 block text-xs text-slate-400">
+                        {loading ? '—' : count === 1 ? '1 person' : `${count} people`}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </aside>
+          }
+        >
           {selectedRole && (
-            <section className="min-h-0 overflow-auto rounded-xl border border-slate-200 bg-white p-5">
+            <div className="permissions-panel-body p-5" data-lenis-prevent>
               <h2 className="text-[17px] font-semibold tracking-tight text-slate-900">{selectedRole.name}</h2>
               <p className="mt-1 max-w-2xl text-sm text-slate-500">{selectedRole.description}</p>
               <p className="mt-3 text-sm text-slate-600">
@@ -298,22 +387,25 @@ export function ManagerPermissionsPage() {
                   : 'Open a module to see which grants are included.'}
               </p>
               <PermissionMatrix value={roleAccess} readOnly />
-            </section>
+            </div>
           )}
-        </div>
+        </PermissionsColumns>
       )}
 
       {view === 'users' && (
-        <div className="admin-fill grid min-h-0 gap-4 lg:grid-cols-[22rem_minmax(0,1fr)]">
-          <UserRail
-            loading={loading}
-            search={search}
-            onSearch={setSearch}
-            rows={filteredManagers}
-            selectedUid={selectedUid}
-            onSelect={setSelectedUid}
-          />
-          <section className="min-h-0 overflow-auto rounded-xl border border-slate-200 bg-white p-5">
+        <PermissionsColumns
+          rail={
+            <UserRail
+              loading={loading}
+              search={search}
+              onSearch={setSearch}
+              rows={filteredManagers}
+              selectedUid={selectedUid}
+              onSelect={setSelectedUid}
+            />
+          }
+        >
+          <div className="permissions-panel-body p-5" data-lenis-prevent>
             {selectedManager ? (
               <>
                 <h2 className="text-[17px] font-semibold tracking-tight text-slate-900">
@@ -343,132 +435,169 @@ export function ManagerPermissionsPage() {
             ) : (
               <p className="text-sm text-slate-500">Select a user to review their access.</p>
             )}
-          </section>
-        </div>
+          </div>
+        </PermissionsColumns>
       )}
 
       {view === 'permissions' && (
-        <div className="admin-fill grid min-h-0 gap-4 lg:grid-cols-[22rem_minmax(0,1fr)]">
-          <UserRail
-            loading={loading}
-            search={search}
-            onSearch={setSearch}
-            rows={filteredManagers}
-            selectedUid={selectedUid}
-            onSelect={setSelectedUid}
-          />
-          <section className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white">
-            {selectedManager ? (
-              <>
-                <div className="permissions-matrix-toolbar">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-slate-900">
-                      {selectedManager.name || selectedManager.username}
-                    </p>
-                    <p className="mt-0.5 text-xs text-slate-400">
-                      {roleLabel(selectedManager.role)}
-                      {selectedManager.department ? ` · ${selectedManager.department}` : ''}
-                      {` · ${grantedCount} of ${allManagerPermissions.length} granted`}
-                      {dirty ? ' · unsaved' : ''}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setPermissionSet(new Set(allManagerPermissions))}
-                      className="ui-btn-secondary ui-btn-sm"
-                    >
-                      Select All
-                    </button>
-                    <button type="button" onClick={() => setPermissionSet(new Set())} className="ui-btn-secondary ui-btn-sm">
-                      Deselect All
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPermissionSet(new Set(defaultManagerPermissions))}
-                      className="ui-btn-secondary ui-btn-sm"
-                    >
-                      Reset to Default
-                    </button>
-                    <button type="button" onClick={save} disabled={saving} className="ui-btn-primary ui-btn-sm">
-                      {saving ? 'Saving…' : 'Save Permissions'}
-                    </button>
-                  </div>
-                </div>
-                {selectedManager.role !== 'manager' && (
-                  <p className="border-b border-slate-100 px-5 py-3 text-sm text-slate-500">
-                    These grants are stored for the account. They take effect in the admin console only if the account is a
-                    manager.
+        <PermissionsColumns
+          rail={
+            <UserRail
+              loading={loading}
+              search={search}
+              onSearch={setSearch}
+              rows={filteredManagers}
+              selectedUid={selectedUid}
+              onSelect={setSelectedUid}
+            />
+          }
+        >
+          {selectedManager ? (
+            <>
+              <div className="permissions-matrix-toolbar">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-slate-900">
+                    {selectedManager.name || selectedManager.username}
                   </p>
-                )}
-                <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-5">
-                  <PermissionMatrix
-                    value={permissionSet}
-                    onToggle={togglePermission}
-                    onToggleGroupKeys={toggleGroup}
-                  />
+                  <p className="mt-0.5 text-xs text-slate-400">
+                    {roleLabel(selectedManager.role)}
+                    {selectedManager.department ? ` · ${selectedManager.department}` : ''}
+                    {` · ${grantedCount} of ${allManagerPermissions.length} granted`}
+                    {dirty ? ' · unsaved' : ''}
+                  </p>
                 </div>
-              </>
-            ) : (
-              <p className="p-5 text-sm text-slate-500">Select a user to edit permissions.</p>
-            )}
-          </section>
-        </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPermissionSet(new Set(allManagerPermissions))}
+                    className="ui-btn-secondary ui-btn-sm"
+                  >
+                    Select All
+                  </button>
+                  <button type="button" onClick={() => setPermissionSet(new Set())} className="ui-btn-secondary ui-btn-sm">
+                    Deselect All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPermissionSet(new Set(defaultManagerPermissions))}
+                    className="ui-btn-secondary ui-btn-sm"
+                  >
+                    Reset to Default
+                  </button>
+                  <button type="button" onClick={save} disabled={saving} className="ui-btn-primary ui-btn-sm">
+                    {saving ? 'Saving…' : 'Save Permissions'}
+                  </button>
+                </div>
+              </div>
+              {selectedManager.role !== 'manager' && (
+                <p className="border-b border-slate-100 px-5 py-3 text-sm text-slate-500">
+                  These grants are stored for the account. They take effect in the admin console only if the account is a
+                  manager.
+                </p>
+              )}
+              <div className="permissions-panel-body p-5" data-lenis-prevent>
+                <PermissionMatrix
+                  value={permissionSet}
+                  onToggle={togglePermission}
+                  onToggleGroupKeys={toggleGroup}
+                />
+              </div>
+            </>
+          ) : (
+            <p className="p-5 text-sm text-slate-500">Select a user to edit permissions.</p>
+          )}
+        </PermissionsColumns>
       )}
 
-      <details className="permissions-audit shrink-0 rounded-xl border border-slate-200 bg-white">
-        <summary className="permissions-audit-summary">
-          <span>Audit history</span>
-          <button
-            type="button"
-            onClick={(event) => {
-              event.preventDefault();
-              loadData();
-            }}
-            className="ui-btn-secondary ui-btn-sm"
-          >
-            Refresh
-          </button>
-        </summary>
-        <div className="border-t border-slate-100 px-4 py-3">
-          <GlassTable
-            className="rounded-none border-0 shadow-none"
-            emptyIcon={History}
-            emptyTitle="No audit entries yet"
-            emptyMessage="Permission changes are recorded here with the actor and the affected user."
-            columns={[
-              { key: 'action', label: 'Action' },
-              { key: 'actor', label: 'Actor' },
-              { key: 'target', label: 'Target' },
-              { key: 'time', label: 'Time', className: 'w-44' },
-            ]}
-          >
-            {auditLogs.map((log) => (
+      <SlideOverPanel
+        open={auditOpen}
+        onClose={() => setAuditOpen(false)}
+        size="lg"
+        title="Audit History"
+        description={auditScope.subtitle}
+        bodyClassName="overflow-x-hidden px-0 py-0"
+        headerActions={
+          <>
+            <Select
+              size="sm"
+              aria-label="Filter audit history"
+              value={auditFilter}
+              onChange={(event) => setAuditFilter(event.target.value)}
+              className="w-auto min-w-[8.75rem]"
+            >
+              {AUDIT_FILTERS.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.label}
+                </option>
+              ))}
+            </Select>
+            <button
+              type="button"
+              onClick={refreshAuditLogs}
+              disabled={auditRefreshing}
+              className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${auditRefreshing ? 'animate-spin' : ''}`} strokeWidth={2} aria-hidden />
+              Refresh
+            </button>
+          </>
+        }
+      >
+        <GlassTable
+          className="permissions-audit-table rounded-none border-0 shadow-none"
+          emptyIcon={History}
+          emptyTitle={auditScope.emptyTitle}
+          emptyMessage="Access-control changes are recorded here with the actor and the affected user."
+          columns={[
+            { key: 'action', label: 'Action' },
+            { key: 'actor', label: 'Actor' },
+            { key: 'target', label: 'Target' },
+            { key: 'time', label: 'Time', className: 'text-right' },
+          ]}
+        >
+          {visibleAuditLogs.map((log) => {
+            const actionLabel = formatAction(log.action);
+            return (
               <TableRow key={log.id}>
-                <TableCell className="text-sm text-slate-800">{log.action}</TableCell>
                 <TableCell>
-                  <TableIdentity size="sm" name={log.actor?.name || log.actor?.username || 'Unknown user'} />
+                  <span className="block truncate text-xs font-medium text-slate-800" title={actionLabel}>
+                    {actionLabel}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  <TableIdentity size="xs" name={log.actor?.name || log.actor?.username || 'Unknown user'} />
                 </TableCell>
                 <TableCell>
                   <TableIdentity
-                    size="sm"
+                    size="xs"
                     name={log.target?.name || log.target?.username || 'Unknown user'}
                     tone="neutral"
                   />
                 </TableCell>
-                <TableCell className="whitespace-nowrap text-xs text-slate-500">{formatWhen(log.timestamp)}</TableCell>
+                <TableCell className="whitespace-nowrap text-right text-xs text-slate-400">
+                  {formatWhen(log.timestamp)}
+                </TableCell>
               </TableRow>
-            ))}
-          </GlassTable>
-        </div>
-      </details>
+            );
+          })}
+        </GlassTable>
+      </SlideOverPanel>
+    </div>
+  );
+}
+
+function PermissionsColumns({ rail, children }) {
+  return (
+    <div className="permissions-content-wrapper">
+      {rail}
+      <section className="permissions-panel">{children}</section>
     </div>
   );
 }
 
 function UserRail({ loading, search, onSearch, rows, selectedUid, onSelect }) {
   return (
-    <aside className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white">
+    <aside className="permissions-rail">
       <div className="shrink-0 border-b border-slate-200 p-3">
         <input
           value={search}
@@ -478,7 +607,7 @@ function UserRail({ loading, search, onSearch, rows, selectedUid, onSelect }) {
           className="ui-input w-full"
         />
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="permissions-rail-list" data-lenis-prevent>
         {loading && (
           <div className="space-y-2 p-3">
             {Array.from({ length: 5 }).map((_, index) => (

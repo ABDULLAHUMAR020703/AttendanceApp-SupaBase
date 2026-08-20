@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CalendarCheck, CalendarDays, Check, ChevronLeft, ChevronRight, Palmtree } from 'lucide-react';
+import { CalendarClock, CalendarDays, CalendarOff, Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import { adminService } from '../services/adminService';
 import { useAuthStore } from '../../auth/store/authStore';
 import { SlideOverPanel } from '../../../shared/components/SlideOverPanel';
@@ -23,6 +23,7 @@ import {
   formatLeaveTypeLabel,
 } from '../utils/leaveDisplay';
 import { useSilentPoll } from '../../../shared/hooks/useSilentPoll';
+import { PageActions } from '../../../shared/components/pageChrome';
 
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 const BALANCE_KEYS = {
@@ -317,10 +318,29 @@ export function LeavesPage() {
 
   return (
     <div className="leaves-directory admin-page gap-4 animate-fade-up">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Leaves</h1>
-        <p className="mt-1 text-sm text-slate-500">Manage time off, balances and leave requests.</p>
-      </div>
+      <PageActions>
+        <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-1.5 py-0.5">
+          <button
+            type="button"
+            className="grid h-7 w-7 place-items-center rounded-full text-slate-400 hover:bg-slate-50 hover:text-[#00B0FF]"
+            aria-label="Previous month"
+            onClick={() => setMonthDate(new Date(monthDate.getFullYear(), monthDate.getMonth() - 1, 1))}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <p className="min-w-[8.5rem] text-center text-sm font-semibold text-slate-900">
+            {monthDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+          </p>
+          <button
+            type="button"
+            className="grid h-7 w-7 place-items-center rounded-full text-slate-400 hover:bg-slate-50 hover:text-[#00B0FF]"
+            aria-label="Next month"
+            onClick={() => setMonthDate(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1))}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      </PageActions>
 
       {error && <Alert type="error">{error}</Alert>}
       {notice && (
@@ -334,7 +354,7 @@ export function LeavesPage() {
           label="Pending"
           subtitle="Needs approval"
           value={loading ? '—' : summary.pending}
-          icon={CalendarCheck}
+          icon={CalendarClock}
           tone="warning"
           actionable={summary.pending > 0}
           active={statusFilter === 'pending'}
@@ -361,7 +381,7 @@ export function LeavesPage() {
           label="On leave"
           subtitle="Away today"
           value={loading ? '—' : summary.on_leave}
-          icon={Palmtree}
+          icon={CalendarOff}
           active={statusFilter === 'on_leave'}
           onClick={() => toggleFilter('on_leave')}
         />
@@ -369,7 +389,7 @@ export function LeavesPage() {
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18.5rem]">
         <section className="min-w-0">
-          <div className="mb-3 flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="mb-3 flex shrink-0 flex-col gap-2 filter-action-bar sm:flex-row sm:items-center">
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -407,7 +427,7 @@ export function LeavesPage() {
           <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white">
             {directoryEmpty ? (
               <EmptyStateBody
-                icon={Palmtree}
+                icon={CalendarClock}
                 title="No leave requests"
                 description="When employees submit leave requests, they land here for review with their approval chain attached."
                 action={
@@ -509,27 +529,7 @@ export function LeavesPage() {
 
         <aside className="rounded-xl border border-slate-200/80 bg-white p-4">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-slate-900">
-              {monthDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
-            </p>
-            <div className="flex gap-1">
-              <button
-                type="button"
-                className="ui-btn-ghost ui-btn-sm px-2"
-                aria-label="Previous month"
-                onClick={() => setMonthDate(new Date(monthDate.getFullYear(), monthDate.getMonth() - 1, 1))}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                className="ui-btn-ghost ui-btn-sm px-2"
-                aria-label="Next month"
-                onClick={() => setMonthDate(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1))}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
+            <p className="text-sm font-semibold text-slate-900">Calendar</p>
           </div>
           <div className="mt-3 grid grid-cols-7 gap-px text-center">
             {WEEKDAYS.map((label, index) => (
@@ -610,7 +610,7 @@ export function LeavesPage() {
                 </button>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto px-5 py-4">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
               <dl>
                 <DetailField label="Employee">{formatEmployeeDisplay(activeLeave)}</DetailField>
                 <DetailField label="Leave type">{formatLeaveTypeLabel(activeLeave.leave_type)}</DetailField>

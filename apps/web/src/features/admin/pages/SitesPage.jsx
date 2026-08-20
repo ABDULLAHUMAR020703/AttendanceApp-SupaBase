@@ -1,11 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { MapPin } from 'lucide-react';
 import { adminService } from '../services/adminService';
 import { useAuthStore } from '../../auth/store/authStore';
 import { Alert } from '../../../shared/components/ui/Alert';
 import { Select } from '../../../shared/components/ui/Select';
+import { EmptyStateBody } from '../../../shared/components/ui/EmptyState';
 import { hasPermission, PERMISSIONS } from '../permissions';
 import { useSilentPoll } from '../../../shared/hooks/useSilentPoll';
-import { GeofenceMap, zoomForRadius } from '../components/GeofenceMap';
+import { GeofenceMap } from '../components/GeofenceMap';
+import {
+  acceptBoundedNumber,
+  coordinateErrors,
+  findDuplicateSiteName,
+  overlappingPartners,
+  overlapMap,
+  parseLatitude,
+  parseLongitude,
+  wrapLongitude,
+} from '../utils/geofence';
+import { PageActions } from '../../../shared/components/pageChrome';
 
 const EMPTY_DRAFT = {
   name: '',
@@ -24,7 +37,6 @@ const STEPS = [
   { id: 5, label: 'Review' },
 ];
 
-const addressCache = new Map();
 
 function formatMeters(value) {
   const meters = Number(value);
@@ -38,38 +50,39 @@ function formatCoord(value) {
   return Number.isFinite(num) ? num.toFixed(5) : '-';
 }
 
-function shortAddress(value) {
-  if (!value) return '';
-  return String(value)
-    .split(',')
-    .slice(0, 3)
-    .map((part) => part.trim())
+
+function lookupAddress(lat, lng) {
+  return `${formatCoord(lat)}, ${formatCoord(lng)}`;
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isUuid(value) {
+  return UUID_RE.test(String(value || '').trim());
+}
+
+function personLookupKeys(person) {
+  return [person?.uid, person?.id, person?.username, person?.employee_uid, person?.employeeUid]
     .filter(Boolean)
-    .join(', ');
+    .map((value) => String(value).toLowerCase());
 }
 
-function coordKey(lat, lng) {
-  return `${Number(lat).toFixed(5)},${Number(lng).toFixed(5)}`;
+function resolveDepartmentLabel(person, departmentsById) {
+  const named = String(person?.department || person?.employee_department || '').trim();
+  if (named && !isUuid(named)) return named;
+  return (
+    departmentsById.get(String(person?.department_id || person?.employee_department_id || named || '')) ||
+    named ||
+    ''
+  );
 }
 
-async function lookupAddress(lat, lng) {
-  const key = coordKey(lat, lng);
-  if (addressCache.has(key)) return addressCache.get(key);
-  try {
-    const response = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=16`,
-      { headers: { Accept: 'application/json' } }
-    );
-    if (!response.ok) throw new Error('geocode failed');
-    const data = await response.json();
-    const label = data?.display_name ? shortAddress(data.display_name) : `${formatCoord(lat)}, ${formatCoord(lng)}`;
-    addressCache.set(key, label);
-    return label;
-  } catch {
-    const fallback = `${formatCoord(lat)}, ${formatCoord(lng)}`;
-    addressCache.set(key, fallback);
-    return fallback;
-  }
+function displayPersonName(person, fallback) {
+  const name = String(person?.name || person?.username || person?.employee_name || person?.employeeName || '').trim();
+  if (name && !isUuid(name)) return name;
+  const fallbackName = String(fallback || '').trim();
+  if (fallbackName && !isUuid(fallbackName)) return fallbackName;
+  return 'Unknown person';
 }
 
 export function SitesPage() {
@@ -92,7 +105,8 @@ export function SitesPage() {
   const [assignSiteIds, setAssignSiteIds] = useState([]);
   const [assignSaving, setAssignSaving] = useState(false);
   const [siteAssignSaving, setSiteAssignSaving] = useState(false);
-  const geocodeQueue = useRef(0);
+  const [focusNonce, setFocusNonce] = useState(0);
+  const listRef = useRef(null);
 
   const canManage = hasPermission(user, PERMISSIONS.MANAGE_GEOFENCING);
 
@@ -108,7 +122,7 @@ export function SitesPage() {
       ]);
       setSites(sitesData || []);
       setDepartments(departmentsData || []);
-      setUsers((usersData || []).filter((row) => row.role === 'employee' || row.role === 'manager'));
+      setUsers(usersData || []);
       setAssignments(assignmentData || []);
     } catch (err) {
       if (!silent) setError(err?.response?.data?.error || err?.message || 'Failed to load sites');
@@ -124,41 +138,54 @@ export function SitesPage() {
   useSilentPoll(load, 30000);
 
   useEffect(() => {
-    if (!sites.length) return undefined;
-    let cancelled = false;
-    const token = (geocodeQueue.current += 1);
-    (async () => {
+    if (!sites.length) {
+      setAddresses({});
+      return;
+    }
+    setAddresses((current) => {
+      const next = {};
+      let changed = false;
       for (const site of sites) {
-        if (cancelled || token !== geocodeQueue.current) return;
-        if (addresses[site.id]) continue;
-        const label = await lookupAddress(site.latitude, site.longitude);
-        if (cancelled) return;
-        setAddresses((current) => (current[site.id] ? current : { ...current, [site.id]: label }));
-        await new Promise((resolve) => setTimeout(resolve, 1100));
+        const label = current[site.id] || lookupAddress(site.latitude, site.longitude);
+        next[site.id] = label;
+        if (current[site.id] !== label) changed = true;
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // Geocode only when the site set changes, not on every address tick.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sites.map((site) => site.id).join('|')]);
+      if (Object.keys(current).length !== sites.length) changed = true;
+      return changed ? next : current;
+    });
+  }, [sites]);
+
+  const assignableUsers = useMemo(
+    () => users.filter((row) => row.role === 'employee' || row.role === 'manager'),
+    [users]
+  );
 
   const peopleBySite = useMemo(() => {
-    const usersByUid = new Map(users.map((row) => [String(row.uid), row]));
+    const departmentsById = new Map(departments.map((row) => [String(row.id), row.name]));
+    const usersByKey = new Map();
+    for (const row of users) {
+      for (const key of personLookupKeys(row)) {
+        if (!usersByKey.has(key)) usersByKey.set(key, row);
+      }
+    }
     const map = new Map();
     for (const row of assignments) {
       const siteId = row.site_id;
       if (!map.has(siteId)) map.set(siteId, []);
-      const person = usersByUid.get(String(row.employee_uid));
+      const uid = String(row.employee_uid || row.employeeUid || '');
+      const person =
+        usersByKey.get(uid.toLowerCase()) ||
+        usersByKey.get(String(row.employee_username || row.username || '').toLowerCase()) ||
+        null;
+      const resolved = person || row;
       map.get(siteId).push({
-        uid: row.employee_uid,
-        name: person?.name || person?.username || row.employee_uid,
-        department: person?.department || '',
+        uid: person?.uid || row.employee_uid,
+        name: displayPersonName(resolved, row.employee_name || row.employeeName),
+        department: resolveDepartmentLabel(resolved, departmentsById),
       });
     }
     return map;
-  }, [assignments, users]);
+  }, [assignments, departments, users]);
 
   const filteredSites = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -169,37 +196,63 @@ export function SitesPage() {
     });
   }, [sites, addresses, query]);
 
-  const selected = sites.find((site) => site.id === selectedId) || filteredSites[0] || sites[0] || null;
+  const overlapsBySite = useMemo(() => overlapMap(sites), [sites]);
+  const overlappingIds = useMemo(() => Array.from(overlapsBySite.keys()), [overlapsBySite]);
+
+  const selected = sites.find((site) => site.id === selectedId) || null;
+
+  const duplicateName = useMemo(
+    () => findDuplicateSiteName(sites, draft.name),
+    [sites, draft.name]
+  );
+  const nameError = duplicateName
+    ? String(duplicateName.department_id) === String(draft.department_id)
+      ? 'An active location with this name already exists in this department.'
+      : 'An active location with this name already exists in this account.'
+    : '';
+  const coordErrors = useMemo(
+    () => (draft.latitude === '' && draft.longitude === '' ? {} : coordinateErrors(draft.latitude, draft.longitude)),
+    [draft.latitude, draft.longitude]
+  );
+
+  const mapPreview = useMemo(() => {
+    const lat = parseLatitude(draft.latitude);
+    const lng = parseLongitude(draft.longitude);
+    if (!wizard || lat == null || lng == null) return null;
+    const preview = {
+      id: 'preview',
+      latitude: lat,
+      longitude: lng,
+      radius: Number(draft.radius) || 150,
+      name: draft.name || 'New location',
+    };
+    return {
+      ...preview,
+      overlapping: overlappingPartners(sites, preview).length > 0,
+    };
+  }, [wizard, draft.latitude, draft.longitude, draft.radius, draft.name, sites]);
+
+  const draftOverlapPartners = useMemo(
+    () => (mapPreview ? overlappingPartners(sites, mapPreview) : []),
+    [sites, mapPreview]
+  );
 
   useEffect(() => {
-    if (selected && !sites.some((site) => site.id === selectedId)) {
-      setSelectedId(selected.id);
+    if (selectedId && !sites.some((site) => site.id === selectedId)) {
+      setSelectedId(null);
     }
-  }, [selected, selectedId, sites]);
+  }, [selectedId, sites]);
 
-  const mapCenter = useMemo(() => {
-    if (wizard && draft.latitude !== '' && Number.isFinite(Number(draft.latitude)) && Number.isFinite(Number(draft.longitude))) {
-      return { lat: Number(draft.latitude), lng: Number(draft.longitude) };
-    }
-    if (selected) return { lat: Number(selected.latitude), lng: Number(selected.longitude) };
-    if (sites[0]) return { lat: Number(sites[0].latitude), lng: Number(sites[0].longitude) };
-    return { lat: 24.8607, lng: 67.0011 };
-  }, [wizard, draft.latitude, draft.longitude, selected, sites]);
+  const fitKey = wizard && mapPreview
+    ? `preview:${mapPreview.latitude}:${mapPreview.longitude}:${mapPreview.radius}`
+    : selectedId
+      ? `site:${selectedId}:${focusNonce}`
+      : `all:${sites.map((site) => site.id).join(',')}`;
 
-  const mapZoom = useMemo(() => {
-    const radius = wizard ? Number(draft.radius) || 150 : Number(selected?.radius) || 150;
-    return zoomForRadius(mapCenter.lat, radius, { width: 720, height: 560 });
-  }, [wizard, draft.radius, selected, mapCenter.lat]);
-
-  const mapPreview =
-    wizard && draft.latitude !== '' && draft.longitude !== ''
-      ? {
-          latitude: Number(draft.latitude),
-          longitude: Number(draft.longitude),
-          radius: Number(draft.radius) || 150,
-          name: draft.name || 'New location',
-        }
-      : null;
+  const selectSite = (id) => {
+    setSelectedId(id);
+    setFocusNonce((n) => n + 1);
+  };
 
   const departmentName = (id) => departments.find((row) => String(row.id) === String(id))?.name || '-';
 
@@ -222,20 +275,40 @@ export function SitesPage() {
   };
 
   const canAdvance = () => {
-    if (step === 1) return Boolean(draft.name.trim() && draft.department_id);
-    if (step === 2) return draft.latitude !== '' && draft.longitude !== '' && Number.isFinite(Number(draft.latitude)) && Number.isFinite(Number(draft.longitude));
+    if (step === 1) return Boolean(draft.name.trim() && draft.department_id && !nameError);
+    if (step === 2) {
+      return parseLatitude(draft.latitude) != null && parseLongitude(draft.longitude) != null;
+    }
     if (step === 3) return Number(draft.radius) > 0;
+    if (step === 5) {
+      return (
+        Boolean(draft.name.trim() && draft.department_id && !nameError) &&
+        parseLatitude(draft.latitude) != null &&
+        parseLongitude(draft.longitude) != null &&
+        Number(draft.radius) > 0
+      );
+    }
     return true;
   };
 
   const createSite = async () => {
+    if (nameError) {
+      setError(nameError);
+      return;
+    }
+    const lat = parseLatitude(draft.latitude);
+    const lng = parseLongitude(draft.longitude);
+    if (lat == null || lng == null) {
+      setError('Latitude must be between -90 and 90, and longitude between -180 and 180.');
+      return;
+    }
     setCreating(true);
     setError('');
     try {
       const created = await adminService.createSite({
         name: draft.name.trim(),
-        latitude: Number(draft.latitude),
-        longitude: Number(draft.longitude),
+        latitude: lat,
+        longitude: lng,
         radius: Number(draft.radius),
         department_id: draft.department_id,
       });
@@ -256,7 +329,7 @@ export function SitesPage() {
       if (siteId) setSelectedId(siteId);
     } catch (err) {
       console.error('[SitesPage] Failed to create site:', err);
-      setError(err?.message || 'Failed to create site');
+      setError(err?.response?.data?.error || err?.message || 'Failed to create site');
     } finally {
       setCreating(false);
     }
@@ -317,22 +390,21 @@ export function SitesPage() {
     }
   };
 
-  const assigned = selected ? peopleBySite.get(selected.id) || [] : [];
-  const assignedUids = new Set(assigned.map((row) => String(row.uid)));
+  useEffect(() => {
+    if (!selectedId || !listRef.current) return;
+    const row = listRef.current.querySelector(`[data-geofence-id="${selectedId}"]`);
+    row?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [selectedId]);
 
   return (
-    <div className="geofencing-directory admin-page gap-4 animate-fade-up">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Geofencing</h1>
-          <p className="mt-1 text-sm text-slate-500">Control where location-based attendance can be recorded.</p>
-        </div>
-        {canManage && !wizard && (
+    <div className="geofencing-directory admin-page admin-page-locked gap-4 animate-fade-up">
+      {canManage && !wizard && (
+        <PageActions>
           <button type="button" onClick={startWizard} className="ui-btn-primary ui-btn-sm">
             Add location
           </button>
-        )}
-      </div>
+        </PageActions>
+      )}
 
       {error && <Alert type="error">{error}</Alert>}
       {notice && (
@@ -341,17 +413,19 @@ export function SitesPage() {
         </Alert>
       )}
 
-      <div className="admin-fill grid min-h-[34rem] grid-cols-[24rem_1fr] overflow-hidden rounded-xl border border-slate-200">
-        <aside className="flex min-h-0 flex-col border-b border-slate-200 lg:order-1 lg:w-96 lg:shrink-0 lg:border-b-0 lg:border-r">
+      <div className="geofencing-main-wrapper geofencing-workspace admin-fill">
+        <aside className="geofencing-sidebar">
           {wizard ? (
             <WizardPanel
               step={step}
               draft={draft}
               departments={departments}
-              users={users}
+              users={assignableUsers}
               creating={creating}
               canAdvance={canAdvance()}
               departmentName={departmentName}
+              nameError={nameError}
+              coordErrors={coordErrors}
               onDraft={setDraft}
               onStep={setStep}
               onCancel={closeWizard}
@@ -360,7 +434,7 @@ export function SitesPage() {
             />
           ) : (
             <>
-              <div className="border-b border-slate-200 p-3">
+              <div className="filter-action-bar border-b border-slate-200 px-3 py-2">
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
@@ -369,89 +443,115 @@ export function SitesPage() {
                   className="h-9 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-[#00B0FF] focus:outline-none focus:ring-2 focus:ring-[#00B0FF]/20"
                 />
               </div>
-              <div className="min-h-0 flex-1 overflow-y-auto">
+              <div className="geofencing-master" data-lenis-prevent ref={listRef}>
                 {loading && (
                   <div className="space-y-2 p-3">
                     {Array.from({ length: 4 }).map((_, index) => (
-                      <div key={index} className="skeleton h-16 rounded-lg" />
+                      <div key={index} className="skeleton h-14 rounded-xl" />
                     ))}
                   </div>
                 )}
                 {!loading && filteredSites.length === 0 && (
-                  <div className="px-4 py-10 text-center">
-                    <p className="text-sm font-medium text-slate-800">No geofence sites yet</p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Add a site with a centre point and radius, then assign people so mobile check-ins can be verified.
-                    </p>
+                  <EmptyStateBody
+                    icon={MapPin}
+                    title="No geofence sites yet"
+                    description="Add a site with a centre point and radius, then assign people so mobile check-ins can be verified."
+                    action={
+                      canManage ? (
+                        <button type="button" onClick={startWizard} className="ui-btn-primary ui-btn-sm">
+                          Add location
+                        </button>
+                      ) : null
+                    }
+                    className="px-4 py-12"
+                  />
+                )}
+                {!loading && filteredSites.length > 0 && (
+                  <div className="space-y-2 p-3">
+                    {filteredSites.map((site) => {
+                      const people = peopleBySite.get(site.id) || [];
+                      const expanded = selected?.id === site.id;
+                      return (
+                        <div
+                          key={site.id}
+                          data-geofence-id={site.id}
+                          className={`geofence-card rounded-xl border transition-colors ${
+                            expanded
+                              ? 'border-sky-500 bg-sky-50/40'
+                              : 'border-slate-200 bg-white hover:bg-slate-50'
+                          }`}
+                        >
+                          <button
+                            type="button"
+                            aria-expanded={expanded}
+                            onClick={() => selectSite(site.id)}
+                            className="w-full px-3.5 py-2.5 text-left"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="min-w-0 truncate text-sm font-semibold text-slate-800">{site.name}</p>
+                              <QuietStatus active label="Active" />
+                            </div>
+                            <p className="mt-1 text-xs tabular-nums text-slate-500">
+                              {formatCoord(site.latitude)}, {formatCoord(site.longitude)}
+                              <span className="text-slate-300"> • </span>
+                              {formatMeters(site.radius)}
+                              <span className="text-slate-300"> • </span>
+                              {people.length} {people.length === 1 ? 'person' : 'people'} assigned
+                            </p>
+                          </button>
+                          {expanded && (
+                            <LocationDetail
+                              site={site}
+                              people={people}
+                              users={assignableUsers}
+                              assignedUids={new Set(people.map((row) => String(row.uid)))}
+                              departmentName={departmentName(site.department_id)}
+                              canManage={canManage}
+                              saving={siteAssignSaving}
+                              onTogglePerson={togglePersonOnSite}
+                              assignEmployeeUid={assignEmployeeUid}
+                              assignSiteIds={assignSiteIds}
+                              assignSaving={assignSaving}
+                              sites={sites}
+                              onPickEmployee={loadEmployeeAssignments}
+                              onToggleSite={toggleSite}
+                              onSaveAssignments={saveAssignments}
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
-                {!loading &&
-                  filteredSites.map((site) => {
-                    const people = peopleBySite.get(site.id) || [];
-                    const active = selected?.id === site.id;
-                    return (
-                      <button
-                        key={site.id}
-                        type="button"
-                        onClick={() => setSelectedId(site.id)}
-                        className={`w-full border-b border-slate-100 px-4 py-3 text-left transition-colors ${
-                          active ? 'bg-[#F4FBFF]' : 'hover:bg-slate-50'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="truncate text-sm font-medium text-slate-900">{site.name}</p>
-                          <QuietStatus active label="Active" />
-                        </div>
-                        <p className="mt-0.5 truncate text-xs text-slate-400">
-                          {addresses[site.id] || `${formatCoord(site.latitude)}, ${formatCoord(site.longitude)}`}
-                        </p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          {formatMeters(site.radius)}
-                          <span className="text-slate-300"> / </span>
-                          {people.length} {people.length === 1 ? 'person' : 'people'}
-                        </p>
-                      </button>
-                    );
-                  })}
               </div>
-              {selected && (
-                <LocationDetail
-                  site={selected}
-                  address={addresses[selected.id]}
-                  people={assigned}
-                  users={users}
-                  assignedUids={assignedUids}
-                  departmentName={departmentName(selected.department_id)}
-                  canManage={canManage}
-                  saving={siteAssignSaving}
-                  onTogglePerson={togglePersonOnSite}
-                  assignEmployeeUid={assignEmployeeUid}
-                  assignSiteIds={assignSiteIds}
-                  assignSaving={assignSaving}
-                  sites={sites}
-                  onPickEmployee={loadEmployeeAssignments}
-                  onToggleSite={toggleSite}
-                  onSaveAssignments={saveAssignments}
-                />
-              )}
             </>
           )}
         </aside>
 
-        <div className="relative h-96 min-w-0 flex-1 bg-slate-100">
+        <div className="geofence-map-container geofencing-map-pane">
           <GeofenceMap
-            center={mapCenter}
-            zoom={mapZoom}
             sites={sites}
             selectedId={wizard ? null : selected?.id}
+            fitKey={fitKey}
+            overlappingIds={
+              wizard
+                ? Array.from(new Set([...overlappingIds, ...draftOverlapPartners.map((site) => site.id)]))
+                : overlappingIds
+            }
             preview={mapPreview}
             pickMode={wizard && (step === 2 || step === 3)}
             onSelect={(id) => {
               if (wizard) return;
-              setSelectedId(id);
+              selectSite(id);
+            }}
+            onResetView={() => {
+              if (!wizard) setSelectedId(null);
             }}
             onPick={({ lat, lng }) => {
-              setDraft((current) => ({ ...current, latitude: String(lat), longitude: String(lng) }));
+              const nextLat = parseLatitude(Math.min(90, Math.max(-90, Number(lat))));
+              const nextLng = wrapLongitude(lng);
+              if (nextLat == null || nextLng == null) return;
+              setDraft((current) => ({ ...current, latitude: String(nextLat), longitude: String(nextLng) }));
             }}
             className="h-full w-full"
           />
@@ -469,6 +569,8 @@ function WizardPanel({
   creating,
   canAdvance,
   departmentName,
+  nameError,
+  coordErrors = {},
   onDraft,
   onStep,
   onCancel,
@@ -491,7 +593,7 @@ function WizardPanel({
           Step {step} of {STEPS.length} / {STEPS[step - 1].label}
         </p>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4" data-lenis-prevent>
         {step === 1 && (
           <div className="space-y-3">
             <label className="block space-y-1">
@@ -504,6 +606,7 @@ function WizardPanel({
                 autoFocus
               />
             </label>
+            {nameError && <p className="text-xs text-amber-700">{nameError}</p>}
             <label className="block space-y-1">
               <span className="text-xs font-medium uppercase tracking-[0.06em] text-slate-400">Department</span>
               <Select
@@ -522,12 +625,47 @@ function WizardPanel({
         )}
         {step === 2 && (
           <div className="space-y-3 text-sm text-slate-600">
-            <p>Click the map to place the centre. You can drag and zoom to refine it.</p>
-            <p className="tabular-nums text-slate-500">
-              {draft.latitude && draft.longitude
-                ? `${formatCoord(draft.latitude)}, ${formatCoord(draft.longitude)}`
-                : 'No point selected yet.'}
-            </p>
+            <p>Click the map to place the centre, or enter coordinates. Latitude must be between -90 and 90, longitude between -180 and 180.</p>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block space-y-1">
+                <span className="text-xs font-medium uppercase tracking-[0.06em] text-slate-400">Latitude</span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min="-90"
+                  max="90"
+                  step="any"
+                  value={draft.latitude}
+                  onChange={(e) => {
+                    const next = acceptBoundedNumber(e.target.value, -90, 90);
+                    if (next == null) return;
+                    onDraft((current) => ({ ...current, latitude: next }));
+                  }}
+                  className="ui-input tabular-nums"
+                  placeholder="24.86070"
+                />
+                {coordErrors.latitude && <p className="text-xs text-rose-600">{coordErrors.latitude}</p>}
+              </label>
+              <label className="block space-y-1">
+                <span className="text-xs font-medium uppercase tracking-[0.06em] text-slate-400">Longitude</span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min="-180"
+                  max="180"
+                  step="any"
+                  value={draft.longitude}
+                  onChange={(e) => {
+                    const next = acceptBoundedNumber(e.target.value, -180, 180);
+                    if (next == null) return;
+                    onDraft((current) => ({ ...current, longitude: next }));
+                  }}
+                  className="ui-input tabular-nums"
+                  placeholder="67.00110"
+                />
+                {coordErrors.longitude && <p className="text-xs text-rose-600">{coordErrors.longitude}</p>}
+              </label>
+            </div>
           </div>
         )}
         {step === 3 && (
@@ -569,6 +707,7 @@ function WizardPanel({
                     <label className="flex cursor-pointer items-center gap-2 py-2 text-sm">
                       <input
                         type="checkbox"
+                        className="ui-checkbox"
                         checked={draft.assigneeUids.includes(row.uid)}
                         onChange={() => onToggleAssignee(row.uid)}
                       />
@@ -622,7 +761,6 @@ function WizardPanel({
 
 function LocationDetail({
   site,
-  address,
   people,
   users,
   assignedUids,
@@ -639,33 +777,31 @@ function LocationDetail({
   onSaveAssignments,
 }) {
   return (
-    <div className="max-h-[48%] overflow-y-auto border-t border-slate-200 p-4">
-      <p className="text-sm font-semibold text-slate-900">{site.name}</p>
-      <dl className="mt-2">
-        <DetailField label="Address">{address || `${formatCoord(site.latitude)}, ${formatCoord(site.longitude)}`}</DetailField>
-        <DetailField label="Radius">{formatMeters(site.radius)}</DetailField>
-        <DetailField label="Status"><QuietStatus active label="Active" /></DetailField>
+    <div className="geofence-accordion-panel border-t border-sky-100 px-3.5 pb-3 pt-1.5">
+      <dl>
         <DetailField label="Department">{departmentName}</DetailField>
         <DetailField label="Attendance">Check-in must be inside this geofence.</DetailField>
       </dl>
 
-      <p className="mt-4 text-xs font-medium uppercase tracking-[0.06em] text-slate-400">Assigned workforce</p>
+      <p className="mt-2 text-[11px] font-medium uppercase tracking-[0.06em] text-slate-400">Assigned workforce</p>
       {people.length === 0 ? (
-        <p className="mt-2 text-sm text-slate-500">No one is assigned to this location.</p>
+        <p className="mt-1 text-sm text-slate-500">No one is assigned to this location.</p>
       ) : (
-        <ul className="mt-1 divide-y divide-slate-100">
+        <ul className="mt-0.5">
           {people.map((person) => (
-            <li key={person.uid} className="flex items-center justify-between gap-2 py-2">
-              <span className="min-w-0">
-                <span className="block truncate text-sm text-slate-800">{person.name}</span>
-                <span className="block truncate text-xs text-slate-400">{person.department}</span>
+            <li key={person.uid} className="flex items-center justify-between gap-2 py-1.5">
+              <span className="min-w-0 break-words text-sm text-slate-800">
+                {person.name}
+                {person.department ? (
+                  <span className="text-slate-400"> • {person.department}</span>
+                ) : null}
               </span>
               {canManage && (
                 <button
                   type="button"
                   disabled={saving}
                   onClick={() => onTogglePerson(site.id, person.uid, false)}
-                  className="text-xs font-medium text-slate-400 hover:text-rose-500"
+                  className="shrink-0 text-xs font-medium text-slate-400 hover:text-rose-500"
                 >
                   Remove
                 </button>
@@ -676,21 +812,25 @@ function LocationDetail({
       )}
 
       {canManage && (
-        <details className="geofence-advanced mt-3">
+        <details className="geofence-advanced mt-1.5">
           <summary>Assign people</summary>
-          <ul className="mt-2 max-h-40 overflow-y-auto divide-y divide-slate-100">
+          <ul className="mt-1">
             {users.map((row) => {
               const checked = assignedUids.has(String(row.uid));
               return (
                 <li key={row.uid}>
-                  <label className="flex cursor-pointer items-center gap-2 py-1.5 text-sm">
+                  <label className="flex cursor-pointer items-center gap-2 py-1 text-sm">
                     <input
                       type="checkbox"
+                      className="ui-checkbox"
                       disabled={saving}
                       checked={checked}
                       onChange={() => onTogglePerson(site.id, row.uid, !checked)}
                     />
-                    <span className="truncate text-slate-700">{row.name || row.username}</span>
+                    <span className="truncate text-slate-700">
+                      {displayPersonName(row)}
+                      {row.department ? <span className="text-slate-400"> • {row.department}</span> : null}
+                    </span>
                   </label>
                 </li>
               );
@@ -700,9 +840,9 @@ function LocationDetail({
       )}
 
       {canManage && (
-        <details className="geofence-advanced mt-2">
+        <details className="geofence-advanced mt-1">
           <summary>Assign sites to an employee</summary>
-          <div className="mt-3 space-y-3">
+          <div className="mt-1.5 space-y-2">
             <Select
               value={assignEmployeeUid}
               onChange={(e) => onPickEmployee(e.target.value)}
@@ -710,12 +850,13 @@ function LocationDetail({
               <option value="">Select employee</option>
               {users.map((row) => (
                 <option key={row.uid} value={row.uid}>
-                  {row.name || row.username} ({row.department})
+                  {displayPersonName(row)}
+                  {row.department ? ` (${row.department})` : ''}
                 </option>
               ))}
             </Select>
             {assignEmployeeUid && (
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1.5">
                 {sites.map((item) => (
                   <label
                     key={item.id}
@@ -762,9 +903,9 @@ function QuietStatus({ active, label }) {
 
 function DetailField({ label, children }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 border-b border-slate-100 py-2">
+    <div className="flex items-baseline justify-between gap-3 border-b border-slate-100 py-1.5">
       <dt className="shrink-0 text-[11px] font-medium uppercase tracking-[0.06em] text-slate-400">{label}</dt>
-      <dd className="min-w-0 text-right text-sm text-slate-800">{children || '-'}</dd>
+      <dd className="min-w-0 text-right text-sm leading-5 text-slate-800">{children || '-'}</dd>
     </div>
   );
 }

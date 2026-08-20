@@ -1,23 +1,23 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Bell,
   BellOff,
   Building2,
   CalendarDays,
-  LogOut,
   Menu,
   Plus,
-  Search,
   Ticket,
   UserPlus,
 } from 'lucide-react';
+import { AppIcon } from './AppIcon';
+import { notificationKindMeta } from '../lib/notificationIcons';
 import { AnimatePresence, motion } from 'framer-motion';
 import { adminService } from '../../features/admin/services/adminService';
 import { queryMockNotifications, setMockFallbackActive } from '../../features/notifications/mockNotifications';
-import { useAuthStore } from '../../features/auth/store/authStore';
 import { useDismiss } from '../lib/useDismiss';
 import { NAV_SECTIONS } from './navConfig';
+import { usePageChrome } from './pageChrome';
 import { CountBadge } from './ui/CountBadge';
 import { EmptyStateBody } from './ui/EmptyState';
 import { MenuItem, MenuLabel, MenuPanel, useMenuNavigation } from './ui/Menu';
@@ -30,7 +30,7 @@ const ROUTE_INDEX = NAV_SECTIONS.reduce((acc, section) => {
   });
   return acc;
 }, {
-  '/notifications': { section: null, label: 'Notifications' },
+  '/notifications': { section: 'Main', label: 'Notifications' },
   '/settings': { section: null, label: 'Settings' },
 });
 
@@ -52,118 +52,6 @@ const PANEL = 'ui-menu absolute right-0 top-[calc(100%+0.5rem)] z-30 w-60';
 /* Borderless 32px square: the container only appears on hover, Linear-style. */
 const HEADER_ICON_BTN =
   'inline-flex h-8 w-8 items-center justify-center rounded-lg text-ink-muted transition-all duration-200 ease-premium hover:bg-[#E6F4FA] hover:text-accent-600 active:scale-95';
-
-/** Jump-to-screen search: filters the screens this user can actually reach. */
-function ScreenSearch({ items }) {
-  const navigate = useNavigate();
-  const [query, setQuery] = useState('');
-  const [open, setOpen] = useState(false);
-  const [cursor, setCursor] = useState(0);
-  const inputRef = useRef(null);
-  const ref = useDismiss(() => setOpen(false));
-
-  const matches = useMemo(() => {
-    const term = query.trim().toLowerCase();
-    if (!term) return [];
-    return items.filter((item) => item.label.toLowerCase().includes(term)).slice(0, 6);
-  }, [items, query]);
-
-  useEffect(() => {
-    const onKey = (event) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault();
-        inputRef.current?.focus();
-      }
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, []);
-
-  const go = (item) => {
-    if (!item) return;
-    navigate(item.to);
-    setQuery('');
-    setOpen(false);
-    inputRef.current?.blur();
-  };
-
-  return (
-    <div ref={ref} className={`${POPOVER_ROOT} hidden lg:flex`}>
-      <Search
-        className="pointer-events-none absolute left-2.5 top-1/2 h-[15px] w-[15px] -translate-y-1/2 text-[#00BCFF]"
-        aria-hidden
-      />
-      <input
-        ref={inputRef}
-        type="search"
-        role="combobox"
-        aria-expanded={open && matches.length > 0}
-        aria-controls="screen-search-results"
-        value={query}
-        placeholder="Search screens"
-        onChange={(event) => {
-          setQuery(event.target.value);
-          setCursor(0);
-          setOpen(true);
-        }}
-        onFocus={() => setOpen(true)}
-        onKeyDown={(event) => {
-          if (event.key === 'ArrowDown') {
-            event.preventDefault();
-            setCursor((index) => Math.min(index + 1, matches.length - 1));
-          } else if (event.key === 'ArrowUp') {
-            event.preventDefault();
-            setCursor((index) => Math.max(index - 1, 0));
-          } else if (event.key === 'Enter') {
-            go(matches[cursor]);
-          }
-        }}
-        className="ui-input h-8 min-h-0 w-52 rounded-lg border-[#D0ECF9] bg-white py-0 pl-8 pr-10 text-label transition-all duration-200 hover:border-[#70C9EF] hover:bg-[#F0F8FF] focus:w-64 focus:border-[#00BCFF] focus:bg-white"
-      />
-      <kbd className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 rounded border border-[#D0ECF9] bg-[#E6F4FA] px-1.5 py-px text-micro font-semibold text-[#00BCFF] xl:block">
-        ⌘K
-      </kbd>
-
-      <AnimatePresence>
-        {open && query.trim() !== '' && (
-          <motion.div
-            id="screen-search-results"
-            role="listbox"
-            className={`${PANEL} w-72`}
-            initial={{ opacity: 0, scale: 0.96, y: -4 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: -4 }}
-            transition={{ duration: 0.15, ease: 'easeOut' }}
-          >
-            {matches.length === 0 ? (
-              <p className="px-3 py-3 text-sm text-slate-500">
-                No screen matches “<span className="font-semibold text-slate-700">{query.trim()}</span>”.
-              </p>
-            ) : (
-              matches.map((item, index) => {
-                const Icon = item.icon;
-                return (
-                  <button
-                    key={item.to}
-                    type="button"
-                    role="option"
-                    aria-selected={index === cursor}
-                    onMouseEnter={() => setCursor(index)}
-                    onClick={() => go(item)}
-                    className={`ui-menu-item ${index === cursor ? 'ui-menu-item-active' : ''}`}
-                  >
-                    <Icon className="shrink-0 text-[#00A3FF]" aria-hidden />
-                    <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                  </button>
-                );
-              })
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
 
 /** Create-shortcuts, filtered to the destinations this user can reach. */
 function QuickActions({ canSee }) {
@@ -274,8 +162,8 @@ function NotificationBell({ unreadCount }) {
         className={`${HEADER_ICON_BTN} relative text-ink hover:bg-[#E6F4FA] hover:text-accent-600`}
         aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
       >
-        <Bell className="h-[18px] w-[18px]" strokeWidth={1.9} aria-hidden />
-        <CountBadge count={unreadCount} tone="brand" className="absolute -right-0.5 -top-0.5" />
+        <AppIcon icon={Bell} />
+        <CountBadge count={unreadCount} tone="brand" className="absolute right-1 -top-0.5" />
       </button>
 
       <AnimatePresence>
@@ -303,7 +191,7 @@ function NotificationBell({ unreadCount }) {
             </button>
           </div>
 
-          <div className="max-h-80 overflow-y-auto p-2" aria-busy={loading}>
+          <div className="max-h-80 overflow-y-auto overscroll-contain p-2" aria-busy={loading} data-lenis-prevent>
             {/* Skeleton mirrors the dot + two-line entry below, so nothing shifts on load. */}
             {loading && <SkeletonFeed count={3} className="px-1 py-1.5" />}
             {!loading && error && (
@@ -322,85 +210,31 @@ function NotificationBell({ unreadCount }) {
             )}
             {!loading &&
               !error &&
-              items.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => {
-                    setOpen(false);
-                    navigate('/notifications');
-                  }}
-                  className="flex w-full gap-3 rounded-xl px-3 py-2.5 text-left transition-colors duration-fast hover:bg-accent-50"
-                >
-                  <span
-                    className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${item.read ? 'bg-ink-faint' : 'bg-accent-600'}`}
-                    aria-hidden
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium text-ink">{item.title || 'Notification'}</span>
-                    <span className="mt-0.5 block line-clamp-2 text-xs leading-5 text-ink-muted">
-                      {item.body || 'Open the notification centre for details.'}
+              items.map((item) => {
+                const kind = notificationKindMeta(item.type);
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setOpen(false);
+                      navigate('/notifications');
+                    }}
+                    className="flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors duration-fast hover:bg-accent-50"
+                  >
+                    <span className={`type-icon ${item.read ? '' : 'is-unread'}`} aria-hidden>
+                      <AppIcon icon={kind.Icon} />
                     </span>
-                  </span>
-                </button>
-              ))}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium text-ink">{item.title || 'Notification'}</span>
+                      <span className="mt-0.5 block line-clamp-2 text-xs leading-5 text-ink-muted">
+                        {item.body || 'Open the notification centre for details.'}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
           </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-function ProfileMenu({ onLogout }) {
-  const user = useAuthStore((state) => state.user);
-  const [open, setOpen] = useState(false);
-  const close = useCallback(() => setOpen(false), []);
-  const ref = useDismiss(close);
-  const label = user?.username || user?.email || 'Admin';
-  const initials = String(label)
-    .replace(/@.*/, '')
-    .split(/[.\s_-]+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join('') || 'A';
-
-  return (
-    <div ref={ref} className={POPOVER_ROOT}>
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-label="Account menu"
-        className="grid h-8 w-8 place-items-center rounded-full bg-[#F0F9FD] text-[11px] font-bold text-[#00B0FF] transition-colors duration-200 hover:bg-[#00B0FF] hover:text-white"
-      >
-        {initials}
-      </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            role="menu"
-            className="ui-menu absolute right-0 top-[calc(100%+0.5rem)] z-50 w-48"
-            initial={{ opacity: 0, scale: 0.96, y: -4 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: -4 }}
-            transition={{ duration: 0.15, ease: 'easeOut' }}
-          >
-            <p className="ui-menu-label truncate normal-case tracking-normal">{label}</p>
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                close();
-                onLogout?.();
-              }}
-              className="ui-menu-item ui-menu-item-danger"
-            >
-              <LogOut aria-hidden />
-              Logout
-            </button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -409,41 +243,52 @@ function ProfileMenu({ onLogout }) {
 }
 
 /**
- * Compact application header: breadcrumb + page title, then search and account.
+ * Unified application header: breadcrumb or page lead, screen actions, then
+ * global create and notifications.
  */
-export function TopBar({ pathname, items, canSee, unreadCount = 0, onOpenMobileNav, onLogout }) {
+export function TopBar({ pathname, canSee, unreadCount = 0, onOpenMobileNav }) {
   const meta = routeMeta(pathname);
+  const chrome = usePageChrome();
   const showNotifications = canSee({ to: '/notifications', feature: 'notifications' });
 
   return (
-    <header className="z-20 flex h-12 shrink-0 items-center gap-4 border-b border-slate-100 bg-white px-4 py-1 md:px-6">
+    <header className="sticky top-0 z-20 flex min-h-12 shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-slate-100 bg-white px-4 py-1.5 md:px-6">
       <button
         type="button"
         onClick={onOpenMobileNav}
         className={`${HEADER_ICON_BTN} -ml-1 md:hidden`}
         aria-label="Open navigation menu"
       >
-        <Menu className="h-[18px] w-[18px]" aria-hidden />
+        <AppIcon icon={Menu} />
       </button>
 
-      <nav aria-label="Breadcrumb" className="min-w-0">
-        <ol className="flex min-w-0 items-center gap-1.5">
-          {meta.section && (
-            <>
-              <li className="hidden shrink-0 text-xs font-medium text-[#8898AA] sm:block">{meta.section}</li>
-              <li className="hidden shrink-0 text-xs text-[#8898AA] sm:block" aria-hidden>
-                /
-              </li>
-            </>
-          )}
-          <li className="min-w-0 truncate text-xl font-bold leading-none text-slate-900" aria-current="page">
-            {meta.label}
-          </li>
-        </ol>
-      </nav>
+      {chrome?.lead ? (
+        <h1 className="min-w-0 flex-1 truncate text-[15px] font-semibold leading-tight text-slate-900 sm:text-base">
+          {chrome.lead}
+        </h1>
+      ) : (
+        <nav aria-label="Breadcrumb" className="min-w-0 flex-1">
+          <ol className="flex min-w-0 items-center gap-1.5">
+            {meta.section && (
+              <>
+                <li className="hidden shrink-0 text-xs font-medium text-[#8898AA] sm:block">{meta.section}</li>
+                <li className="hidden shrink-0 text-xs text-[#8898AA] sm:block" aria-hidden>
+                  /
+                </li>
+              </>
+            )}
+            <li className="min-w-0 truncate text-[15px] font-semibold leading-none text-slate-900 sm:text-base" aria-current="page">
+              {meta.label}
+            </li>
+          </ol>
+        </nav>
+      )}
 
-      <div className="ml-auto flex h-full items-center gap-2">
-        <ScreenSearch items={items} />
+      <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1.5">
+        <div
+          ref={chrome?.setActionsNode}
+          className="topbar-page-actions flex min-w-0 flex-wrap items-center justify-end gap-1.5"
+        />
         <QuickActions canSee={canSee} />
 
         {showNotifications && (
@@ -451,7 +296,6 @@ export function TopBar({ pathname, items, canSee, unreadCount = 0, onOpenMobileN
             <NotificationBell unreadCount={unreadCount} />
           </div>
         )}
-        <ProfileMenu onLogout={onLogout} />
       </div>
     </header>
   );

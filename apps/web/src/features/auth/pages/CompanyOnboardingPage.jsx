@@ -99,10 +99,10 @@ export function CompanyOnboardingPage() {
   };
 
   return (
-    <div className="auth-page relative overflow-y-auto bg-page">
+    <div className="auth-page relative min-h-dvh bg-page">
       <HalftoneAura />
 
-      <div className="relative z-10 flex min-h-full items-center justify-center px-4 py-10">
+      <div className="relative z-10 flex min-h-dvh items-center justify-center px-4 py-10">
         <div className="w-full max-w-md animate-fade-up">
           <Link to="/" className="mb-6 flex items-center justify-center gap-2 text-ink">
             <img
@@ -154,7 +154,7 @@ export function CompanyOnboardingPage() {
 
               {statusLoading && <p className="text-label text-ink-muted">Checking onboarding…</p>}
               {statusError && <Alert type="error">{statusError}</Alert>}
-              {!statusLoading && !requiresKey && (
+              {!statusLoading && !statusError && !requiresKey && (
                 <Alert type="info">
                   First company: no server key required. For additional companies, configure{' '}
                   <code className="font-semibold">COMPANY_ONBOARDING_SECRET</code> and enter it below.

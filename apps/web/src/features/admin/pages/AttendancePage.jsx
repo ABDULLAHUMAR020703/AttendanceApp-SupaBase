@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CalendarClock, Clock, LogIn, UserCheck, UserX, Palmtree } from 'lucide-react';
+import { CalendarCheck2, CalendarOff, Clock, LogIn, UserCheck, UserX } from 'lucide-react';
 import { adminService } from '../services/adminService';
 import { SlideOverPanel } from '../../../shared/components/SlideOverPanel';
 import {
@@ -12,8 +12,10 @@ import {
 } from '../../../shared/components/GlassTable';
 import { Alert } from '../../../shared/components/ui/Alert';
 import { Select } from '../../../shared/components/ui/Select';
+import { DatePickerField } from './calendarPickers';
 import { KpiMetricCard, KpiMetricGrid } from '../../../shared/components/ui/KpiMetricCard';
 import { PermissionGate, useAnyPermission, usePermission } from '../../../shared/components/PermissionGate';
+import { PageActions } from '../../../shared/components/pageChrome';
 import { PERMISSIONS } from '../permissions';
 import { useSilentPoll } from '../../../shared/hooks/useSilentPoll';
 import { normalizeAttendanceType } from '../utils/analyticsCharts';
@@ -122,6 +124,13 @@ function formatHours(ms) {
 
 function formatWorkMode(value) {
   return WORK_MODE_LABELS[String(value || 'in_office').toLowerCase()] || 'In office';
+}
+
+function workModeDotColor(value) {
+  const mode = String(value || 'in_office').toLowerCase();
+  if (mode === 'remote' || mode === 'fully_remote') return '#64748b';
+  if (mode === 'hybrid' || mode === 'semi_remote') return '#00a3ff';
+  return '#0f172a';
 }
 
 function personKeys(person) {
@@ -649,57 +658,51 @@ export function AttendancePage() {
 
   return (
     <div className="attendance-directory admin-page gap-4 animate-fade-up">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Attendance</h1>
-          <p className="mt-1 text-sm text-slate-500">Monitor daily attendance, working hours and exceptions.</p>
+      <PageActions>
+        <DatePickerField
+          size="toolbar"
+          value={dateInput}
+          onChange={setDateInput}
+          allowClear={false}
+          aria-label="Attendance date"
+        />
+        <button
+          type="button"
+          onClick={jumpToToday}
+          className="inline-flex h-8 items-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 transition-colors hover:border-[#00B0FF]/50 hover:text-[#00B0FF]"
+        >
+          Today
+        </button>
+        <div className="ui-segment" role="tablist" aria-label="Attendance period">
+          {PERIODS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              role="tab"
+              aria-selected={period === item.id}
+              onClick={() => setPeriod(item.id)}
+              className={`ui-segment-item ${period === item.id ? 'ui-segment-item-active' : ''}`}
+            >
+              {item.label}
+            </button>
+          ))}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <input
-            type="date"
-            value={dateInput}
-            onChange={(e) => setDateInput(e.target.value)}
-            aria-label="Attendance date"
-            className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 focus:border-[#00B0FF] focus:outline-none focus:ring-2 focus:ring-[#00B0FF]/20"
-          />
+        {canManual && (
+          <button type="button" onClick={() => setShowManual(true)} disabled={actionLoading} className="ui-btn-primary ui-btn-sm">
+            Manual Correction
+          </button>
+        )}
+        {canExport && (
           <button
             type="button"
-            onClick={jumpToToday}
-            className="inline-flex h-9 items-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 transition-colors hover:border-[#00B0FF]/50 hover:text-[#00B0FF]"
+            onClick={handleExport}
+            disabled={actionLoading || loading}
+            className="ui-btn-secondary ui-btn-sm"
           >
-            Today
+            {actionLoading ? 'Exporting…' : 'Export Attendance'}
           </button>
-          <div className="ui-segment" role="tablist" aria-label="Attendance period">
-            {PERIODS.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                role="tab"
-                aria-selected={period === item.id}
-                onClick={() => setPeriod(item.id)}
-                className={`ui-segment-item ${period === item.id ? 'ui-segment-item-active' : ''}`}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-          {canManual && (
-            <button type="button" onClick={() => setShowManual(true)} disabled={actionLoading} className="ui-btn-primary ui-btn-sm">
-              Manual Correction
-            </button>
-          )}
-          {canExport && (
-            <button
-              type="button"
-              onClick={handleExport}
-              disabled={actionLoading || loading}
-              className="ui-btn-secondary ui-btn-sm"
-            >
-              {actionLoading ? 'Exporting…' : 'Export Attendance'}
-            </button>
-          )}
-        </div>
-      </div>
+        )}
+      </PageActions>
 
       {notice && (
         <Alert type={notice.type} onDismiss={() => setNotice(null)}>
@@ -747,7 +750,7 @@ export function AttendancePage() {
               label="On leave"
               subtitle="Approved off-time"
               value={loading ? '—' : summary.on_leave}
-              icon={Palmtree}
+              icon={CalendarOff}
               active={statusFilter === 'on_leave'}
               onClick={() => toggleStatus('on_leave')}
             />
@@ -763,7 +766,7 @@ export function AttendancePage() {
           </KpiMetricGrid>
         </div>
 
-        <div className="flex flex-col gap-2 border-b border-slate-200 pb-3 lg:flex-row lg:items-center">
+        <div className="filter-action-bar border-b border-slate-200 pb-3">
           <input
             value={employeeQuery}
             onChange={(e) => setEmployeeQuery(e.target.value)}
@@ -806,7 +809,7 @@ export function AttendancePage() {
             className="rounded-none border-0 shadow-none"
             loading={loading}
             skeletonRows={8}
-            emptyIcon={CalendarClock}
+            emptyIcon={CalendarCheck2}
             emptyTitle={error ? 'Could not load attendance' : directoryEmpty ? 'No attendance to show' : 'No matching people'}
             emptyMessage={
               error
@@ -851,7 +854,9 @@ export function AttendancePage() {
                   )}
                 </TableCell>
                 <TableCell className="text-sm tabular-nums text-slate-700">{formatHours(session.hoursMs)}</TableCell>
-                <TableCell className="text-sm text-slate-500">{formatWorkMode(session.workMode)}</TableCell>
+                <TableCell>
+                  <WorkModeMark workMode={session.workMode} />
+                </TableCell>
                 <TableCell>
                   <StatusMark status={session.status} />
                 </TableCell>
@@ -897,7 +902,7 @@ export function AttendancePage() {
               Close
             </button>
           </div>
-          <div className="space-y-4 overflow-y-auto p-5">
+          <div className="space-y-4 p-5">
             <label className="block space-y-1">
               <span className="ui-label">Employee</span>
               <Select
@@ -970,7 +975,7 @@ export function AttendancePage() {
                 </button>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto px-5 py-4">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
               <dl>
                 <DetailField label="Status"><StatusMark status={activeSession.status} /></DetailField>
                 <DetailField label="Check-in">{formatEventStamp(activeSession.checkin?.timestamp, period !== 'day')}</DetailField>
@@ -978,7 +983,7 @@ export function AttendancePage() {
                   {activeSession.open ? 'Still working' : formatEventStamp(activeSession.checkout?.timestamp, period !== 'day')}
                 </DetailField>
                 <DetailField label="Working hours">{formatHours(activeSession.hoursMs)}</DetailField>
-                <DetailField label="Work mode">{formatWorkMode(activeSession.workMode)}</DetailField>
+                <DetailField label="Work mode"><WorkModeMark workMode={activeSession.workMode} /></DetailField>
                 <DetailField label="Location">{activeSession.location || '—'}</DetailField>
               </dl>
 
@@ -1020,6 +1025,19 @@ export function AttendancePage() {
         )}
       </SlideOverPanel>
     </div>
+  );
+}
+
+function WorkModeMark({ workMode }) {
+  return (
+    <span className="inline-flex items-center gap-2 text-sm text-slate-600">
+      <span
+        className="h-1.5 w-1.5 shrink-0 rounded-full"
+        style={{ backgroundColor: workModeDotColor(workMode) }}
+        aria-hidden
+      />
+      {formatWorkMode(workMode)}
+    </span>
   );
 }
 

@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Laptop2 } from 'lucide-react';
 import { adminService } from '../services/adminService';
 import { useAuthStore } from '../../auth/store/authStore';
 import { SlideOverPanel } from '../../../shared/components/SlideOverPanel';
@@ -11,9 +12,15 @@ import {
   TableRow,
 } from '../../../shared/components/GlassTable';
 import { Alert } from '../../../shared/components/ui/Alert';
+import { EmptyStateBody } from '../../../shared/components/ui/EmptyState';
 import { formatStatusLabel } from '../../../shared/components/ui';
 import { canAccessFeature, hasPermission, PERMISSIONS } from '../permissions';
 import { useSilentPoll } from '../../../shared/hooks/useSilentPoll';
+import {
+  applyMockWorkModeDecision,
+  cloneMockWorkModeRequests,
+  isMockWorkModeRequestId,
+} from '../utils/workModeRequestsMock';
 
 const MODE_CATALOG = [
   {
@@ -117,6 +124,7 @@ export function WorkModeRequestsPage() {
   const [activeMode, setActiveMode] = useState(null);
   const [activeRequest, setActiveRequest] = useState(null);
   const [requestFilter, setRequestFilter] = useState('pending');
+  const mockQueueRef = useRef(null);
 
   const canApprove = hasPermission(user, PERMISSIONS.APPROVE_WORK_MODE);
   const canReject = hasPermission(user, PERMISSIONS.REJECT_WORK_MODE);
@@ -128,9 +136,20 @@ export function WorkModeRequestsPage() {
     setError('');
     try {
       const data = await adminService.getWorkModeRequests();
-      setRows(data || []);
-    } catch (err) {
-      if (!silent) setError(err.message || 'Failed to load requests');
+      if (Array.isArray(data) && data.length > 0) {
+        mockQueueRef.current = null;
+        setRows(data);
+      } else {
+        if (!mockQueueRef.current) {
+          mockQueueRef.current = cloneMockWorkModeRequests();
+        }
+        setRows(mockQueueRef.current);
+      }
+    } catch {
+      if (!mockQueueRef.current) {
+        mockQueueRef.current = cloneMockWorkModeRequests();
+      }
+      setRows(mockQueueRef.current);
     } finally {
       if (!silent) setLoading(false);
     }
@@ -198,8 +217,17 @@ export function WorkModeRequestsPage() {
     setBusyId(id);
     setError('');
     try {
-      await adminService.processWorkModeRequest(id, { status, admin_notes: notes[id] || '' });
-      await loadRequests();
+      if (isMockWorkModeRequestId(id)) {
+        const next = applyMockWorkModeDecision(mockQueueRef.current || rows, id, {
+          status,
+          admin_notes: notes[id] || '',
+        });
+        mockQueueRef.current = next;
+        setRows(next);
+      } else {
+        await adminService.processWorkModeRequest(id, { status, admin_notes: notes[id] || '' });
+        await loadRequests();
+      }
       if (normalizeStatus(status) !== 'pending') {
         setActiveRequest((current) => (current?.id === id ? null : current));
       }
@@ -226,11 +254,6 @@ export function WorkModeRequestsPage() {
 
   return (
     <div className="work-modes-directory admin-page gap-4 animate-fade-up">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Work modes</h1>
-        <p className="mt-1 text-sm text-slate-500">Define where and how your teams work.</p>
-      </div>
-
       {error && <Alert type="error">{error}</Alert>}
 
       <section className="shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white">
@@ -269,7 +292,7 @@ export function WorkModeRequestsPage() {
         </GlassTable>
       </section>
 
-      <section className="admin-fill min-h-0">
+      <section>
         <div className="mb-3 flex shrink-0 flex-wrap items-end justify-between gap-3">
           <div>
             <h2 className="text-sm font-semibold text-slate-900">Change requests</h2>
@@ -293,7 +316,7 @@ export function WorkModeRequestsPage() {
           </div>
         </div>
 
-        <div className="admin-fill overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white">
           {loading ? (
             <GlassTable
               className="rounded-none border-0 shadow-none"
@@ -308,19 +331,21 @@ export function WorkModeRequestsPage() {
               ]}
             />
           ) : rows.length === 0 ? (
-            <div className="px-4 py-10 text-center">
-              <p className="text-sm font-medium text-slate-800">No work mode requests</p>
-              <p className="mx-auto mt-1 max-w-sm text-sm text-slate-500">
-                When someone asks to switch between office, hybrid and remote, the request lands here for approval.
-              </p>
-              <button
-                type="button"
-                onClick={() => navigate('/approvals')}
-                className="mt-3 text-sm font-medium text-[#00B0FF] hover:underline"
-              >
-                Review approval steps
-              </button>
-            </div>
+            <EmptyStateBody
+              icon={Laptop2}
+              title="No work mode requests"
+              description="When someone asks to switch between office, hybrid and remote, the request lands here for approval."
+              action={
+                <button
+                  type="button"
+                  onClick={() => navigate('/approval-workflows')}
+                  className="ui-btn-primary ui-btn-sm"
+                >
+                  Review approval steps
+                </button>
+              }
+              className="px-4 py-12"
+            />
           ) : (
             <GlassTable
               className="rounded-none border-0 shadow-none"
@@ -399,7 +424,7 @@ export function WorkModeRequestsPage() {
                 </button>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto px-5 py-4">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
               <dl>
                 <DetailField label="Work mode">{selectedMode.name}</DetailField>
                 <DetailField label="Status"><QuietStatus active label="Active" /></DetailField>
@@ -478,7 +503,7 @@ export function WorkModeRequestsPage() {
                 </button>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto px-5 py-4">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
               <dl>
                 <DetailField label="Status">
                   <QuietStatus
@@ -530,7 +555,7 @@ export function WorkModeRequestsPage() {
                     type="button"
                     disabled={busyId === activeRequest.id}
                     onClick={() => process(activeRequest.id, 'rejected')}
-                    className="ui-btn-danger-soft ui-btn-sm"
+                    className="ui-btn-danger ui-btn-sm"
                   >
                     Reject
                   </button>

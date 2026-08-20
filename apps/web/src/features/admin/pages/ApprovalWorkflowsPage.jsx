@@ -367,15 +367,10 @@ export function ApprovalWorkflowsPage() {
 
   return (
     <div className="approvals-directory admin-page gap-4 animate-fade-up">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Approvals</h1>
-        <p className="mt-1 text-sm text-slate-500">Review requests that need your attention.</p>
-      </div>
-
       {error && <Alert type="error">{error}</Alert>}
       {notice && <Alert type="success">{notice}</Alert>}
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="filter-action-bar">
         <div className="ui-segment" role="tablist" aria-label="Approval inbox">
           {BUCKETS.map((item) => (
             <button
@@ -401,8 +396,8 @@ export function ApprovalWorkflowsPage() {
         </Select>
       </div>
 
-      <div className="admin-fill overflow-hidden rounded-xl border border-slate-200 bg-white">
-        <GlassTable>
+      <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white">
+        <GlassTable
           className="rounded-none border-0 shadow-none"
           loading={inboxLoading}
           skeletonRows={6}
@@ -461,7 +456,7 @@ export function ApprovalWorkflowsPage() {
                           setRejectTarget(item);
                           setRejectNote('');
                         }}
-                        className="ui-btn-danger-soft ui-btn-sm"
+                        className="ui-btn-danger ui-btn-sm"
                       >
                         Reject
                       </button>
@@ -590,7 +585,7 @@ export function ApprovalWorkflowsPage() {
                 </button>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto px-5 py-4">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
               <dl>
                 <DetailField label="Requester">{activeItem.person}</DetailField>
                 <DetailField label="Request type">{REQUEST_TYPE_LABELS[activeItem.category]}</DetailField>
@@ -621,7 +616,7 @@ export function ApprovalWorkflowsPage() {
                 {canRejectItem(activeItem) && (
                   <button
                     type="button"
-                    className="ui-btn-danger-soft ui-btn-sm"
+                    className="ui-btn-danger ui-btn-sm"
                     disabled={busyKey === activeItem.key}
                     onClick={() => {
                       setRejectTarget(activeItem);
@@ -659,7 +654,7 @@ export function ApprovalWorkflowsPage() {
             </button>
             <button
               type="button"
-              className="ui-btn-danger-soft ui-btn-sm"
+              className="ui-btn-danger ui-btn-sm"
               disabled={Boolean(busyKey)}
               onClick={() => processItem(rejectTarget, 'rejected', rejectNote.trim())}
             >

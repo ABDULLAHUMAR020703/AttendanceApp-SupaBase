@@ -5,13 +5,14 @@ import {
   AlertCircle,
   ArrowUpRight,
   Building2,
-  CalendarCheck,
-  CalendarDays,
+  CalendarClock,
+  CalendarOff,
   Check,
   ChevronRight,
   Clock,
   LogIn,
   LogOut,
+  Laptop2,
   Minus,
   MoreHorizontal,
   PenLine,
@@ -21,7 +22,7 @@ import {
   UserCheck,
   UserCog,
   UserPlus,
-  Users,
+  UsersRound,
   X,
 } from 'lucide-react';
 import { adminService } from '../services/adminService';
@@ -1535,7 +1536,7 @@ function DirectorySnapshotCard({ loading, directoryRows, onLeaveKeys, checkedInK
 
           {!loading && directoryRows.length === 0 && (
             <CardEmpty
-              icon={Users}
+              icon={UsersRound}
               title="No people yet"
               description="Invite your team and their live attendance status will show up here."
               action={<GhostAction onClick={() => navigate('/users')}>Open Users</GhostAction>}
@@ -1716,7 +1717,7 @@ const ACTIVITY_STYLES = {
   },
   checkout: { dot: '#00BCFF', label: 'Check-out', icon: LogOut, chip: 'bg-[#E6F4FA] text-[#00BCFF]' },
   manual: { dot: '#F59E0B', label: 'Manual override', icon: PenLine, chip: 'bg-warning-surface text-warning-ink' },
-  leave: { dot: '#00BCFF', label: 'Leave', icon: CalendarDays, chip: 'bg-[#E6F4FA] text-[#00BCFF]' },
+  leave: { dot: '#00BCFF', label: 'Leave', icon: CalendarClock, chip: 'bg-[#E6F4FA] text-[#00BCFF]' },
   user: { dot: '#94A3B8', label: 'Profile update', icon: UserCog, chip: 'bg-surface-muted text-[#64748B]' },
 };
 
@@ -1835,7 +1836,7 @@ function ActivityTimelineCard({ loading, items, lastEventLabel, onOpen }) {
                           className={`absolute -bottom-0.5 -right-0.5 grid h-4 w-4 place-items-center rounded-full ring-2 ring-white ${meta.chip}`}
                           aria-hidden
                         >
-                          <ActivityIcon className="h-2.5 w-2.5" strokeWidth={2.5} />
+                          <ActivityIcon className="h-2.5 w-2.5" />
                 </span>
                 </span>
                       <span className="min-w-0 flex-1">
@@ -2859,7 +2860,7 @@ export function DashboardPage() {
         label: 'Pending leave',
         value: pendingCounts.leaves,
         subtitle: 'Awaiting approval',
-        icon: CalendarCheck,
+        icon: CalendarClock,
         tone: 'warning',
         actionable: pendingCounts.leaves > 0,
         onClick: () => navigate('/leaves'),
@@ -2868,7 +2869,7 @@ export function DashboardPage() {
         label: 'Work modes',
         value: pendingCounts.workModes,
         subtitle: 'Awaiting approval',
-        icon: CalendarCheck,
+        icon: Laptop2,
         tone: 'warning',
         actionable: pendingCounts.workModes > 0,
         onClick: canViewWorkModes ? () => navigate('/work-mode-requests') : undefined,
@@ -2894,7 +2895,7 @@ export function DashboardPage() {
       label: 'On leave',
       value: onLeaveToday,
       subtitle: 'Approved off today',
-      icon: CalendarDays,
+      icon: CalendarOff,
       onClick: canViewLeaves ? () => navigate('/leaves') : undefined,
     },
     {

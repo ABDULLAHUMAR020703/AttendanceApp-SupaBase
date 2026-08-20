@@ -31,6 +31,9 @@ export const CHART_COLORS = {
 export const CHART_RANKS = ['#00BCFF', '#3ABCEF', '#70C9EF'];
 export const CHART_RANK_REST = '#C2ECF9';
 
+/** Monochrome blue slices for the department donut, largest → smallest. */
+export const DEPARTMENT_DONUT_COLORS = ['#0284c7', '#38bdf8', '#bae6fd', '#7dd3fc', '#e0f2fe'];
+
 export const rankColor = (index) => CHART_RANKS[index] || CHART_RANK_REST;
 
 /* Plus Jakarta Sans is the only family the app loads; SVG text has to be told. */
@@ -61,7 +64,7 @@ export const CHART_GRID = {
 };
 
 export const CHART_ANIMATION = {
-  duration: 600,
+  duration: 800,
   easing: 'ease-out',
 };
 

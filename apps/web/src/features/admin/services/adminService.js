@@ -424,6 +424,8 @@ export const adminService = {
     executeApiCall(async () => (await api.patch(apiUrl(`/api/admin/tickets/${id}/assign`), { assigned_to })).data.data, 'Failed to assign ticket'),
   closeTicket: async (id) =>
     executeApiCall(async () => (await api.patch(apiUrl(`/api/admin/tickets/${id}/close`), {})).data.data, 'Failed to close ticket'),
+  reopenTicket: async (id) =>
+    executeApiCall(async () => (await api.patch(apiUrl(`/api/admin/tickets/${id}/reopen`), {})).data.data, 'Failed to reopen ticket'),
 
   getCalendarEvents: async () =>
     executeApiCall(async () => (await api.get(apiUrl('/api/admin/calendar-events'))).data.data, 'Failed to load events'),

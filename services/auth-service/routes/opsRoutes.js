@@ -271,6 +271,40 @@ router.patch('/tickets/:id/close', async (req, res) => {
   }
 });
 
+router.patch('/tickets/:id/reopen', async (req, res) => {
+  const ctx = await withTenantContext(req, res);
+  if (!ctx) return;
+  const { requester, companyId } = ctx;
+  if (!(await requirePerm(requester, 'close_tickets', res))) return;
+  try {
+    const { data: existing } = await supabase
+      .from('tickets')
+      .select('*')
+      .eq('id', req.params.id)
+      .eq('company_id', companyId)
+      .maybeSingle();
+    if (!existing) return res.status(404).json({ success: false, error: 'Ticket not found' });
+
+    const nextStatus = existing.assigned_to ? 'in_progress' : 'open';
+    const { data, error } = await supabase
+      .from('tickets')
+      .update({
+        status: nextStatus,
+        closed_at: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', req.params.id)
+      .eq('company_id', companyId)
+      .select()
+      .single();
+    if (error) throw error;
+
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ── Calendar ──────────────────────────────────────────────────────────────────
 
 router.get('/calendar-events', async (req, res) => {

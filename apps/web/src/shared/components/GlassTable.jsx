@@ -50,11 +50,11 @@ export function GlassTable({
   return (
     <div className={cn('ui-table-shell', className)}>
       {/*
-        Sticky heads need a scrolling ancestor. The table body always scrolls inside
-        this region; the page itself stays fixed. An optional maxHeight caps the box
-        when the parent is not a flex fill.
+        Horizontal overflow stays on this wrapper so wide tables don't push the page.
+        Vertical overflow is left visible: long tables grow with the page instead of
+        creating a second scrollbar. Pass maxHeight only when a capped region is required.
       */}
-      <div className="ui-table-scroll" style={maxHeight ? { maxHeight } : undefined}>
+      <div className="ui-table-scroll" style={maxHeight ? { maxHeight } : undefined} data-lenis-prevent-horizontal>
         <table className="min-w-full">
           <thead className="ui-table-head sticky top-0 z-10">
             <tr>
@@ -172,18 +172,24 @@ export function TableIdentity({ name, secondary, onClick, tone = 'accent', size 
   const Tag = onClick ? 'button' : 'div';
   const palette =
     tone === 'neutral' ? 'bg-slate-100 text-slate-500' : 'bg-sky-50 text-sky-600';
-  const compact = size === 'sm';
+  const tiny = size === 'xs';
+  const compact = size === 'sm' || tiny;
 
   return (
     <Tag
       data-identity
+      title={name}
       {...(onClick ? { type: 'button', onClick } : {})}
-      className={cn('group flex min-w-0 items-center gap-2.5 text-left', onClick && 'cursor-pointer')}
+      className={cn(
+        'group flex min-w-0 items-center text-left',
+        tiny ? 'gap-1.5' : 'gap-2.5',
+        onClick && 'cursor-pointer'
+      )}
     >
       <span
         className={cn(
           'flex shrink-0 items-center justify-center rounded-full font-semibold uppercase',
-          compact ? 'h-8 w-8 text-[10px]' : 'h-9 w-9 text-xs',
+          tiny ? 'h-6 w-6 text-[9px]' : compact ? 'h-8 w-8 text-[10px]' : 'h-9 w-9 text-xs',
           palette
         )}
         aria-hidden
@@ -193,7 +199,8 @@ export function TableIdentity({ name, secondary, onClick, tone = 'accent', size 
       <span className="min-w-0">
         <span
           className={cn(
-            'block truncate text-sm font-semibold text-slate-800 transition-colors',
+            'block truncate transition-colors',
+            tiny ? 'text-xs font-medium text-slate-700' : 'text-sm font-semibold text-slate-800',
             onClick && 'group-hover:text-sky-600'
           )}
         >

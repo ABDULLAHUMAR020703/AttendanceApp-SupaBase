@@ -259,18 +259,13 @@ export function SettingsPage() {
   return (
     <PermissionGate permission={PERMISSIONS.ACCESS_SYSTEM_SETTINGS}>
       <div className="settings-directory admin-page gap-4 animate-fade-up">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Settings</h1>
-          <p className="mt-1 text-sm text-slate-500">Configure how this workspace records work, leave and alerts.</p>
-        </div>
-
         {message && (
           <Alert type={message.ok ? 'success' : 'error'} onDismiss={() => setMessage(null)}>
             {message.text}
           </Alert>
         )}
 
-        <div className="admin-fill grid min-h-0 gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+        <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
           <nav className="settings-nav" aria-label="Settings sections">
             {NAV.map((group) => (
               <div key={group.heading} className="settings-nav-group">
@@ -337,7 +332,7 @@ export function SettingsPage() {
                 type="button"
                 onClick={() => setConfirm({ type: 'reset' })}
                 disabled={saving || loading}
-                className="ui-btn-danger-soft ui-btn-sm"
+                className="ui-btn-danger ui-btn-sm"
               >
                 Reset
               </button>

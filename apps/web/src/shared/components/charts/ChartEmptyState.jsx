@@ -1,9 +1,13 @@
+import { AppIcon } from '../AppIcon';
+
 export function ChartEmptyState({
   title = 'No data available',
   description,
   actions = [],
   icon,
 }) {
+  const Icon = typeof icon === 'function' ? icon : null;
+
   return (
     <div
       className="flex h-full min-h-0 flex-col items-center justify-center gap-3 px-6 py-6 text-center"
@@ -11,8 +15,8 @@ export function ChartEmptyState({
       aria-live="polite"
     >
       {icon && (
-        <div className="grid h-11 w-11 place-items-center rounded-full border border-[#D0ECF9] bg-[#E6F4FA] text-[#00BCFF]">
-          {icon}
+        <div className="type-icon text-[#00BCFF]">
+          {Icon ? <AppIcon icon={Icon} /> : icon}
         </div>
       )}
       <div className="space-y-1.5 max-w-sm">

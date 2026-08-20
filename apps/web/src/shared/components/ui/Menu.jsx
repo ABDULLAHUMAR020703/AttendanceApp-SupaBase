@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { AppIcon } from '../AppIcon';
 import { cn } from '../../lib/cn';
 
 export const DROPDOWN_MOTION = {
-  initial: { opacity: 0, scale: 0.96, y: -4 },
+  initial: { opacity: 0, scale: 0.96, y: -6 },
   animate: { opacity: 1, scale: 1, y: 0 },
-  exit: { opacity: 0, scale: 0.96, y: -4 },
-  transition: { duration: 0.15, ease: 'easeOut' },
+  exit: { opacity: 0, scale: 0.96, y: -6 },
+  transition: { duration: 0.16, ease: [0.16, 1, 0.3, 1] },
 };
 
 /**
@@ -95,9 +96,9 @@ export function MenuItem({ icon: Icon, tone, disabled, onSelect, children, class
       className={cn('ui-menu-item', tone === 'danger' && 'ui-menu-item-danger', className)}
     >
       {Icon && (
-        <Icon
+        <AppIcon
+          icon={Icon}
           className={cn('shrink-0', tone === 'danger' ? 'text-current' : 'text-[#00A3FF]')}
-          aria-hidden
         />
       )}
       <span className="min-w-0 flex-1 truncate">{children}</span>

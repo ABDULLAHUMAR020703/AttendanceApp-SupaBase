@@ -109,7 +109,7 @@ export function LiveStatusCard({ employees = DEFAULT_EMPLOYEE_CARDS, className =
       {cards.map((employee, index) => (
         <StackedEmployeeCard
           key={employee.id}
-          employee={employee}
+ c         employee={employee}
           index={index}
           total={cards.length}
           scrollProgress={scrollYProgress}

@@ -10,11 +10,8 @@ import {
 import { useAnalyticsMetrics } from '../../../shared/components/charts/useAnalyticsMetrics';
 import { Skeleton, SkeletonGroup } from '../../../shared/components/ui/Skeleton';
 import { adminService } from '../services/adminService';
-import {
-  formatRangeLabel,
-  getAggregationLabel,
-  hasSeriesData,
-} from '../utils/analyticsCharts';
+import { formatRangeLabel, getAggregationLabel, hasSeriesData } from '../utils/analyticsCharts';
+import { PageActions } from '../../../shared/components/pageChrome';
 
 const DepartmentBarChart = lazy(() =>
   import('../../../shared/components/charts/DepartmentBarChart').then((m) => ({
@@ -185,42 +182,26 @@ export function AnalyticsPage() {
         label: 'Attendance events',
         value: kpis.attendanceEvents,
         hint: selectedRange ? formatRangeLabel(selectedRange.start, selectedRange.end) : 'Select a range',
-        accent: 'blue',
       },
-      {
-        id: 'checkins',
-        label: 'Check-ins',
-        value: kpis.checkins,
-        hint: 'In selected period',
-        accent: 'green',
-      },
-      {
-        id: 'checkouts',
-        label: 'Check-outs',
-        value: kpis.checkouts,
-        hint: 'In selected period',
-        accent: 'green',
-      },
+      { id: 'checkins', label: 'Check-ins', value: kpis.checkins, hint: 'In selected period' },
+      { id: 'checkouts', label: 'Check-outs', value: kpis.checkouts, hint: 'In selected period' },
       {
         id: 'unique-attendees',
         label: 'Unique attendees',
         value: kpis.uniqueAttendees,
         hint: 'Users with activity in range',
-        accent: 'purple',
       },
       {
         id: 'new-registrations',
         label: 'New registrations',
         value: kpis.newRegistrations,
         hint: 'Users created in range',
-        accent: 'amber',
       },
       {
         id: 'avg-events',
         label: 'Avg events / attendee',
         value: kpis.avgEventsPerAttendee.toFixed(2),
         hint: 'Per unique attendee',
-        accent: 'blue',
       },
     ],
     [kpis, selectedRange]
@@ -243,21 +224,9 @@ export function AnalyticsPage() {
 
   return (
     <div className="analytics-page admin-page gap-4 animate-fade-up print:overflow-visible print:text-slate-900">
-      <section className="print:hidden">
-        <h1 className="page-title">Analytics</h1>
-        <p className="mt-1 text-sm text-ink-muted">
-          Department headcount and attendance activity for your company.
-        </p>
-      </section>
-
-      {error && (
-        <GlassCard className="p-4" role="alert">
-          <p className="text-sm text-danger-ink">{error}</p>
-        </GlassCard>
-      )}
-
-      <GlassCard className="shrink-0 p-5 print:hidden">
+      <PageActions>
         <DateRangeSelector
+          compact
           preset={datePreset}
           customFrom={customFrom}
           customTo={customTo}
@@ -267,13 +236,21 @@ export function AnalyticsPage() {
           onCustomFromChange={handleCustomFromChange}
           onCustomToChange={handleCustomToChange}
         />
-      </GlassCard>
+        <button type="button" onClick={() => window.print()} className="ui-btn-secondary ui-btn-sm print:hidden">
+          Export
+        </button>
+      </PageActions>
+
+      {error && (
+        <GlassCard className="p-4" role="alert">
+          <p className="text-sm text-danger-ink">{error}</p>
+        </GlassCard>
+      )}
 
       <AnalyticsKpiGrid items={kpiItems} loading={loading || recalculating} className="shrink-0 print:grid-cols-3" />
 
-      <div className="admin-fill flex min-h-0 flex-col gap-4">
-      <div className="admin-fill grid min-h-0 flex-1 gap-4 xl:grid-cols-2">
-        <GlassCard className="flex h-full min-h-0 flex-col overflow-hidden p-5">
+      <div className="grid gap-4 xl:grid-cols-2">
+        <GlassCard hover={false} className="flex min-h-[22rem] flex-col p-5">
           <ChartPanel
             exportId="chart-department-distribution"
             title="Department Size Distribution"
@@ -281,6 +258,7 @@ export function AnalyticsPage() {
             loading={loading}
             recalculating={recalculating}
             isEmpty={!hasDepartmentData}
+            surfaceClassName="border-0 bg-white"
             emptyState={{
               title: 'No department data yet',
               description:
@@ -295,13 +273,10 @@ export function AnalyticsPage() {
                 enableDrillDown
               />
             </ChartSuspense>
-            <p className="mt-2 text-center text-[11px] text-slate-400" aria-hidden="true">
-              Department
-            </p>
           </ChartPanel>
         </GlassCard>
 
-        <GlassCard className="flex h-full min-h-0 flex-col overflow-hidden p-5">
+        <GlassCard hover={false} className="flex min-h-[22rem] flex-col p-5">
           <ChartPanel
             exportId="chart-attendance-activity"
             title="Attendance Activity"
@@ -309,6 +284,8 @@ export function AnalyticsPage() {
             loading={loading}
             recalculating={recalculating}
             isEmpty={rangeInvalid || !hasAttendanceData}
+            surfaceClassName="border-0 bg-white"
+            flush={!rangeInvalid && hasAttendanceData}
             emptyState={
               rangeInvalid
                 ? {
@@ -338,7 +315,7 @@ export function AnalyticsPage() {
         </GlassCard>
       </div>
 
-      <GlassCard className="max-h-[9rem] shrink-0 overflow-y-auto p-5">
+      <GlassCard hover={false} className="p-5">
         <h2 className="card-title mb-1">Organization insights</h2>
         <p className="mb-4 text-xs text-ink-muted">
           Account and structure metrics alongside your filtered attendance period
@@ -371,7 +348,6 @@ export function AnalyticsPage() {
           <p className="text-sm text-ink-muted">Select a valid date range to view insights.</p>
         )}
       </GlassCard>
-      </div>
     </div>
   );
 }

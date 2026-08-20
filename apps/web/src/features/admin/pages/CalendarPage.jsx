@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CalendarPlus, ChevronLeft, ChevronRight, Clock3, Plus, Search, Users, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CalendarOff, CalendarPlus, ChevronLeft, ChevronRight, Clock3, Plus, Search, X } from 'lucide-react';
 import { PermissionGate, useAnyPermission } from '../../../shared/components/PermissionGate';
 import { adminService } from '../services/adminService';
 import { PERMISSIONS } from '../permissions';
@@ -8,6 +8,7 @@ import { useSilentPoll, useSessionState } from '../../../shared/hooks/useSilentP
 import { EmptyStateBody } from '../../../shared/components/ui/EmptyState';
 import { SkeletonFeed } from '../../../shared/components/ui/Skeleton';
 import { DatePickerField, TimePickerField } from './calendarPickers';
+import { PageActions } from '../../../shared/components/pageChrome';
 import { formatEmployeeDisplay, formatLeaveStatus, formatLeaveTypeLabel } from '../utils/leaveDisplay';
 import { normalizeAttendanceType } from '../utils/analyticsCharts';
 
@@ -28,7 +29,13 @@ const EVENT_DASH = {
   other: '#F59E0B',
 };
 
-const AVATAR_TONES = ['#00B0FF', '#70C8F4', '#0094BE'];
+const AVATAR_PALETTE = [
+  'bg-sky-100 text-sky-700',
+  'bg-indigo-100 text-indigo-700',
+  'bg-emerald-100 text-emerald-700',
+  'bg-amber-100 text-amber-700',
+  'bg-violet-100 text-violet-700',
+];
 
 const GRID_LINE = 'rgba(136, 152, 170, 0.18)';
 
@@ -54,7 +61,7 @@ const emptyForm = {
 const pad = (value) => String(value).padStart(2, '0');
 const toDateKey = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 const inputClass =
-  'mt-1.5 w-full min-w-0 rounded-xl border border-slate-200 bg-[#F0F9FD] px-3 py-2.5 text-sm font-medium text-slate-800 placeholder:text-[#8898AA] transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] [&::-webkit-calendar-picker-indicator]:opacity-0 focus:border-[#00B0FF] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#70C8F4]/30';
+  'mt-1 w-full min-w-0 rounded-lg border border-slate-200 bg-[#F0F9FD] px-2.5 py-1.5 h-9 text-xs font-medium text-slate-800 placeholder:text-[#8898AA] transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] [&::-webkit-calendar-picker-indicator]:opacity-0 focus:border-[#00B0FF] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#70C8F4]/30';
 
 function parseDate(value) {
   if (!value) return null;
@@ -182,6 +189,87 @@ function employeeName(row) {
   return row?.employee?.name || row?.employee_name || row?.employeeName || row?.name || row?.username || row?.employee_uid || row?.user_uid || 'Employee';
 }
 
+function personInitials(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+}
+
+function peopleFromSummary(summary, event) {
+  const map = new Map();
+  const add = (key, name, status, photo) => {
+    const id = String(key || name || '').trim().toLowerCase();
+    if (!id || map.has(id)) return;
+    map.set(id, { key: id, name: name || 'Employee', status, photo: photo || '' });
+  };
+  for (const leave of summary?.leaves || []) {
+    add(
+      leave.employee_uid || leave.employeeUid,
+      formatEmployeeDisplay(leave),
+      normalizeStatus(leave.status) === 'approved' ? 'On Leave' : 'Leave pending',
+      leave.employee?.avatar_url || leave.avatar_url
+    );
+  }
+  for (const row of summary?.attendance || []) {
+    add(
+      row.user_uid || row.employee_uid || row.username,
+      employeeName(row),
+      'Attending',
+      row.avatar_url || row.employee?.avatar_url
+    );
+  }
+  for (const request of summary?.workModeRequests || []) {
+    add(
+      request.employee_uid,
+      employeeName(request),
+      'Work mode',
+      request.employee?.avatar_url
+    );
+  }
+  const people = Array.from(map.values());
+  if (people.length === 0 && event?.title) {
+    people.push({
+      key: String(event.id || event.title),
+      name: event.title,
+      status: EVENT_TYPES.find((type) => type.value === event.type)?.label || 'Event',
+      photo: '',
+    });
+  }
+  return people;
+}
+
+function AvatarGroup({ people = [], max = 3 }) {
+  if (!people.length) return null;
+  const shown = people.slice(0, max);
+  const extra = people.length - shown.length;
+  return (
+    <span className="flex items-center -space-x-1.5">
+      {shown.map((person, index) => (
+        <span
+          key={person.key}
+          title={`${person.name} • ${person.status}`}
+          className={`relative inline-flex h-5 w-5 items-center justify-center overflow-hidden rounded-full border-2 border-white text-[9px] font-semibold shadow-sm ${AVATAR_PALETTE[index % AVATAR_PALETTE.length]}`}
+        >
+          {person.photo ? (
+            <img src={person.photo} alt="" className="h-full w-full object-cover" />
+          ) : (
+            personInitials(person.name)
+          )}
+        </span>
+      ))}
+      {extra > 0 && (
+        <span
+          title={`${extra} more`}
+          className="inline-flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-slate-100 text-[9px] font-bold text-slate-600 shadow-sm"
+        >
+          +{extra}
+        </span>
+      )}
+    </span>
+  );
+}
+
 function attendanceDateKey(row) {
   if (!row?.timestamp) return '';
   const date = new Date(row.timestamp);
@@ -247,34 +335,29 @@ function daySummary({ dateKey, events = [], attendanceRows = [], leaveRows = [],
   };
 }
 
-function TimelineEventCard({ event, index, onClick, compact = false }) {
+function TimelineEventCard({ event, index, onClick, compact = false, hourHeight = HOUR_HEIGHT, timelineHeight = TIMELINE_HEIGHT, people = [] }) {
   const dash = EVENT_DASH[event.type] || EVENT_DASH.other;
   const start = eventStartMinutes(event, index);
   const duration = event.type === 'holiday' ? 80 : event.type === 'meeting' ? 95 : 70;
-  const top = clamp(((start - TIMELINE_START * 60) / TIMELINE_MINUTES) * TIMELINE_HEIGHT, 10, TIMELINE_HEIGHT - 92);
-  const height = clamp((duration / 60) * HOUR_HEIGHT, 88, 128);
-  const avatarCount = event.type === 'reminder' ? 1 : event.type === 'holiday' ? 2 : 3;
+  const dense = hourHeight < 52;
+  const top = clamp(((start - TIMELINE_START * 60) / TIMELINE_MINUTES) * timelineHeight, 2, Math.max(2, timelineHeight - 20));
+  const height = clamp((duration / 60) * hourHeight, dense ? 22 : 44, dense ? hourHeight * 1.45 : Math.min(hourHeight * 1.7, 120));
+  const attendees = people.length ? people : peopleFromSummary(null, event);
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`calendar-card absolute z-[1] flex flex-col items-start rounded-2xl bg-white px-4 py-3.5 text-left transition-all duration-200 ${compact ? 'left-4 w-[min(36rem,calc(100%-2rem))]' : 'inset-x-2'}`}
-      style={{ top, minHeight: height }}
+      className={`calendar-card absolute z-[1] flex flex-col items-start text-left transition-all duration-200 ${
+        dense ? 'rounded-xl px-2 py-1.5' : 'rounded-2xl px-4 py-3.5'
+      } ${compact ? 'left-4 w-[min(36rem,calc(100%-2rem))]' : 'inset-x-2'} bg-white`}
+      style={{ top, height, minHeight: height }}
     >
-      <span className="mb-2 block h-1 w-6 rounded-full" style={{ backgroundColor: dash }} aria-hidden />
-      <span className="line-clamp-2 text-sm font-semibold leading-snug tracking-tight text-slate-800">{event.title}</span>
-      <span className="mt-auto flex w-full items-center justify-between gap-2 pt-2">
-        <span className="text-xs font-medium text-[#8898AA]">{timeLabel(event)}</span>
-        <span className="flex -space-x-1.5" aria-hidden>
-          {Array.from({ length: avatarCount }, (_, avatar) => (
-            <span
-              key={avatar}
-              className="h-6 w-6 rounded-full border-2 border-white"
-              style={{ backgroundColor: AVATAR_TONES[avatar % AVATAR_TONES.length] }}
-            />
-          ))}
-        </span>
+      <span className={`${dense ? 'mb-1 h-0.5 w-4' : 'mb-2 h-1 w-6'} block rounded-full`} style={{ backgroundColor: dash }} aria-hidden />
+      <span className={`line-clamp-2 font-semibold leading-snug tracking-tight text-slate-800 ${dense ? 'text-[11px]' : 'text-sm'}`}>{event.title}</span>
+      <span className={`mt-auto flex w-full items-center justify-between gap-2 ${dense ? 'pt-0.5' : 'pt-2'}`}>
+        <span className={`font-medium text-[#8898AA] ${dense ? 'text-[10px]' : 'text-xs'}`}>{timeLabel(event)}</span>
+        <AvatarGroup people={attendees} />
       </span>
     </button>
   );
@@ -285,22 +368,22 @@ function MiniCalendar({ monthDate, selectedDate, eventDays, onSelect, onShiftMon
   const selectedKey = selectedDate || '';
 
   return (
-    <div className="px-1 py-1 text-slate-800">
-      <div className="mb-4 flex items-center justify-between">
+    <div className="px-1 py-0.5 text-slate-800">
+      <div className="mb-1.5 flex items-center justify-between">
         <p className="text-sm font-bold tracking-tight">{formatMonthLabel(monthDate)}</p>
         <div className="flex gap-1">
-          <button type="button" onClick={() => onShiftMonth(-1)} className="grid h-8 w-8 place-items-center rounded-full text-slate-400 transition-all duration-200 hover:bg-slate-100 hover:text-[#00B0FF] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00B0FF]/30" aria-label="Previous month">
-            <ChevronLeft className="h-4 w-4" aria-hidden />
+          <button type="button" onClick={() => onShiftMonth(-1)} className="grid h-7 w-7 place-items-center rounded-full text-slate-400 transition-all duration-200 hover:bg-slate-100 hover:text-[#00B0FF] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00B0FF]/30" aria-label="Previous month">
+            <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
           </button>
-          <button type="button" onClick={() => onShiftMonth(1)} className="grid h-8 w-8 place-items-center rounded-full text-slate-400 transition-all duration-200 hover:bg-slate-100 hover:text-[#00B0FF] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00B0FF]/30" aria-label="Next month">
-            <ChevronRight className="h-4 w-4" aria-hidden />
+          <button type="button" onClick={() => onShiftMonth(1)} className="grid h-7 w-7 place-items-center rounded-full text-slate-400 transition-all duration-200 hover:bg-slate-100 hover:text-[#00B0FF] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00B0FF]/30" aria-label="Next month">
+            <ChevronRight className="h-3.5 w-3.5" aria-hidden />
           </button>
         </div>
       </div>
-      <div className="mb-2 grid grid-cols-7 text-center text-[10px] font-bold tracking-[0.08em] text-slate-400">
-        {MINI_WEEKDAYS.map((day, index) => <span key={`${day}-${index}`} className="py-1">{day}</span>)}
+      <div className="mb-1.5 grid grid-cols-7 text-center text-[10px] font-bold tracking-[0.08em] text-slate-400">
+        {MINI_WEEKDAYS.map((day, index) => <span key={`${day}-${index}`} className="py-0.5">{day}</span>)}
       </div>
-      <div className="grid grid-cols-7 gap-y-1 text-center text-[12px]">
+      <div className="grid grid-cols-7 gap-y-0.5 text-center text-[12px]">
         {cells.map((cell) => {
           const active = cell.key === selectedKey;
           const hasEvent = eventDays.has(cell.key);
@@ -309,7 +392,7 @@ function MiniCalendar({ monthDate, selectedDate, eventDays, onSelect, onShiftMon
               key={cell.key}
               type="button"
               onClick={() => onSelect(cell.key)}
-              className={`relative mx-auto flex h-8 w-8 flex-col items-center justify-center rounded-full font-bold transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00B0FF]/30 ${
+              className={`relative mx-auto flex h-7 w-7 flex-col items-center justify-center rounded-full p-1 font-bold transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00B0FF]/30 ${
                 active
                   ? 'bg-[#00B0FF] text-white shadow-sm'
                   : cell.inMonth
@@ -348,9 +431,9 @@ function MonthGrid({ monthDate, selectedDate, eventsByDay, summariesByDay, onSel
   const todayKey = toDateKey(new Date());
 
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-7 overflow-hidden rounded-2xl border border-[#E8F0F5] bg-white">
+    <div className="grid h-full min-h-0 grid-cols-7 grid-rows-[auto_repeat(6,minmax(0,1fr))] overflow-hidden rounded-2xl border border-[#E8F0F5] bg-white">
       {WEEKDAYS.map((day, index) => (
-        <div key={`${day}-${index}`} className="border-b border-[#E8F0F5] bg-slate-50 px-2 py-2 text-center text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">
+        <div key={`${day}-${index}`} className="shrink-0 border-b border-[#E8F0F5] bg-slate-50 px-1 py-1.5 text-center text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 sm:px-2 sm:py-2 sm:text-[11px]">
           {day}
         </div>
       ))}
@@ -368,10 +451,10 @@ function MonthGrid({ monthDate, selectedDate, eventsByDay, summariesByDay, onSel
             key={cell.key}
             type="button"
             onClick={() => onOpenDay(cell.key)}
-            className={`group flex min-h-[108px] flex-col items-start gap-1.5 overflow-hidden border-b border-r border-[#E8F0F5] p-2 text-left transition hover:bg-slate-50/80 ${active ? 'bg-[#F0FAFF]' : cell.inMonth ? 'bg-white' : 'bg-slate-50/70'}`}
+            className={`group flex h-full min-h-0 flex-col items-start gap-0.5 overflow-hidden border-b border-r border-[#E8F0F5] p-1 text-left transition hover:bg-slate-50/80 sm:gap-1 sm:p-2 ${active ? 'bg-[#F0FAFF]' : cell.inMonth ? 'bg-white' : 'bg-slate-50/70'}`}
           >
             <span className="flex w-full items-center justify-between gap-2">
-              <span className={`grid h-7 w-7 place-items-center rounded-full text-xs font-semibold ${
+              <span className={`grid h-6 w-6 place-items-center rounded-full text-[11px] font-semibold sm:h-7 sm:w-7 sm:text-xs ${
                 active ? 'bg-[#00B0FF] text-white' : isToday ? 'border border-[#00B0FF]/40 bg-white text-[#0284C7]' : cell.inMonth ? 'text-slate-800' : 'text-slate-300'
               }`}>
                 {cell.date.getDate()}
@@ -385,16 +468,16 @@ function MonthGrid({ monthDate, selectedDate, eventsByDay, summariesByDay, onSel
               </span>
             </span>
             {summary.approvedLeaves?.length > 0 && (
-              <span className="rounded-md bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium text-sky-700">
+              <span className="hidden rounded-md bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 lg:inline">
                 {summary.approvedLeaves.length} on leave
               </span>
             )}
             {summary.checkins?.length > 0 && (
-              <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
+              <span className="hidden rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 lg:inline">
                 {summary.checkins.length} check-ins
               </span>
             )}
-            {dayEvents.slice(0, 2).map((event) => (
+            {dayEvents.slice(0, 1).map((event) => (
               <span
                 key={event.id}
                 role="presentation"
@@ -405,7 +488,7 @@ function MonthGrid({ monthDate, selectedDate, eventsByDay, summariesByDay, onSel
                 {event.title}
               </span>
             ))}
-            {dayEvents.length > 2 && <span className="text-[10px] font-medium text-slate-400">+{dayEvents.length - 2} more</span>}
+            {dayEvents.length > 1 && <span className="text-[10px] font-medium text-slate-400">+{dayEvents.length - 1} more</span>}
           </button>
         );
       })}
@@ -430,6 +513,8 @@ export function CalendarPage() {
   const [workModeRows, setWorkModeRows] = useState([]);
   const [users, setUsers] = useState([]);
   const [activeDay, setActiveDay] = useState('');
+  const timelineBodyRef = useRef(null);
+  const [hourHeight, setHourHeight] = useState(48);
 
   const canViewAttendance = useAnyPermission([PERMISSIONS.VIEW_ATTENDANCE, PERMISSIONS.MANUAL_ATTENDANCE]);
   const canViewLeaves = useAnyPermission([PERMISSIONS.VIEW_LEAVE_REQUESTS, PERMISSIONS.APPROVE_LEAVE, PERMISSIONS.REJECT_LEAVE]);
@@ -460,6 +545,25 @@ export function CalendarPage() {
 
   useEffect(() => { load(); }, [load]);
   useSilentPoll(load, 30000, []);
+
+  const hourCount = TIMELINE_END - TIMELINE_START;
+
+  useEffect(() => {
+    const node = timelineBodyRef.current;
+    if (!node || view === 'month') return undefined;
+    const measure = () => {
+      const height = node.getBoundingClientRect().height;
+      if (height > 0) setHourHeight(height / hourCount);
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', measure);
+      return () => window.removeEventListener('resize', measure);
+    }
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [view, hourCount, loading]);
 
   useEffect(() => {
     const date = parseDate(selectedDate);
@@ -526,10 +630,11 @@ export function CalendarPage() {
   const todayIndex = timelineDays.findIndex((day) => day.key === todayKey);
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   const showNow = view !== 'month' && todayIndex >= 0 && nowMinutes >= TIMELINE_START * 60 && nowMinutes <= TIMELINE_END * 60;
-  const nowTop = showNow ? ((nowMinutes - TIMELINE_START * 60) / TIMELINE_MINUTES) * TIMELINE_HEIGHT : 0;
-  const navigatorDate = parseDate(selectedDate) || monthDate;
   const timeColWidth = 64;
   const dayCols = Math.max(timelineDays.length, 1);
+  const timelineHeight = hourHeight * hourCount;
+  const nowTop = showNow ? ((nowMinutes - TIMELINE_START * 60) / TIMELINE_MINUTES) * timelineHeight : 0;
+  const navigatorDate = parseDate(selectedDate) || monthDate;
 
   function updateForm(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -645,47 +750,41 @@ export function CalendarPage() {
   const headerLabel = view === 'day' ? formatDayLabel(navigatorDate) : formatMonthLabel(navigatorDate);
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden font-sans text-[#0F172A] antialiased lg:flex-row">
+    <div className="calendar-page flex h-full min-h-0 flex-col gap-3 overflow-hidden font-sans text-[#0F172A] antialiased lg:flex-row lg:gap-4">
+      <PageActions>
+        <div className="inline-flex ui-segment">
+          {['month', 'week', 'day'].map((item) => {
+            const active = view === item;
+            return (
+              <button
+                key={item}
+                type="button"
+                onClick={() => setView(item)}
+                className={`ui-segment-item capitalize ${active ? 'ui-segment-item-active' : ''}`}
+              >
+                {item}
+              </button>
+            );
+          })}
+        </div>
+        <button type="button" onClick={jumpToToday} className="inline-flex h-8 items-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 transition-colors hover:border-[#00B0FF]/50 hover:text-[#00B0FF]">Today</button>
+        <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-1.5 py-0.5">
+          <button type="button" onClick={() => shiftRange(-1)} className="grid h-7 w-7 place-items-center rounded-full text-[#8898AA] transition-all duration-200 hover:bg-white hover:text-[#00B0FF] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00B0FF]/40" aria-label="Previous">
+            <ChevronLeft className="h-4 w-4" aria-hidden />
+          </button>
+          <p className="min-w-[8.5rem] text-center text-sm font-semibold text-slate-900">{headerLabel}</p>
+          <button type="button" onClick={() => shiftRange(1)} className="grid h-7 w-7 place-items-center rounded-full text-[#8898AA] transition-all duration-200 hover:bg-white hover:text-[#00B0FF] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00B0FF]/40" aria-label="Next">
+            <ChevronRight className="h-4 w-4" aria-hidden />
+          </button>
+        </div>
+      </PageActions>
       <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-3xl border border-[rgba(136,152,170,0.18)] bg-[#F8FAFC] shadow-[0_8px_24px_rgba(0,167,214,0.08)]">
-        <header className="flex shrink-0 flex-col gap-3 border-b border-[rgba(136,152,170,0.18)] bg-white px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0">
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Calendar</h1>
-            <p className="mt-1 text-sm text-slate-500">See workforce availability at a glance.</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="inline-flex ui-segment">
-              {['month', 'week', 'day'].map((item) => {
-                const active = view === item;
-                return (
-                  <button
-                    key={item}
-                    type="button"
-                    onClick={() => setView(item)}
-                    className={`ui-segment-item capitalize ${active ? 'ui-segment-item-active' : ''}`}
-                  >
-                    {item}
-                  </button>
-                );
-              })}
-            </div>
-            <button type="button" onClick={jumpToToday} className="inline-flex h-9 items-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 transition-colors hover:border-[#00B0FF]/50 hover:text-[#00B0FF]">Today</button>
-            <div className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1">
-              <button type="button" onClick={() => shiftRange(-1)} className="grid h-8 w-8 place-items-center rounded-full text-[#8898AA] transition-all duration-200 hover:bg-white hover:text-[#00B0FF] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00B0FF]/40" aria-label="Previous">
-                <ChevronLeft className="h-4 w-4" aria-hidden />
-              </button>
-              <p className="min-w-[8.5rem] text-center text-sm font-bold text-slate-900">{headerLabel}</p>
-              <button type="button" onClick={() => shiftRange(1)} className="grid h-8 w-8 place-items-center rounded-full text-[#8898AA] transition-all duration-200 hover:bg-white hover:text-[#00B0FF] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00B0FF]/40" aria-label="Next">
-                <ChevronRight className="h-4 w-4" aria-hidden />
-              </button>
-            </div>
-          </div>
-        </header>
 
         {error && <div className="mx-4 mt-3 shrink-0 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 sm:mx-6">{error}</div>}
         {success && <div className="mx-4 mt-3 shrink-0 rounded-xl border border-[#70C8F4]/40 bg-[#F0F9FD] px-4 py-2.5 text-sm font-semibold text-[#075985] sm:mx-6">{success}</div>}
 
         {loading ? (
-          <div className="min-h-0 flex-1 overflow-auto p-6"><SkeletonFeed count={5} /></div>
+          <div className="min-h-0 flex-1 overflow-hidden p-4"><SkeletonFeed count={5} /></div>
         ) : summariesByDay.size === 0 && view !== 'month' ? (
           <EmptyStateBody
             size="sm"
@@ -695,7 +794,7 @@ export function CalendarPage() {
             className="min-h-0 flex-1 py-8"
           />
         ) : view === 'month' ? (
-          <div className="min-h-0 flex-1 overflow-auto p-4 sm:p-5">
+          <div className="calendar-grid-body min-h-0 flex-1 overflow-hidden p-3 sm:p-4">
             <MonthGrid
               monthDate={monthDate}
               selectedDate={selectedDate}
@@ -710,50 +809,58 @@ export function CalendarPage() {
             />
           </div>
         ) : (
-          <div className="min-h-0 flex-1 overflow-auto bg-[#F8FAFC] p-4 sm:p-5">
-            <div className="min-w-[640px] overflow-hidden rounded-2xl bg-[#F8FAFC]">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[#F8FAFC] p-3 sm:p-4">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl bg-[#F8FAFC]">
               <div
-                className="grid border-b"
+                className="grid shrink-0 items-stretch border-b"
                 style={{ gridTemplateColumns: `${timeColWidth}px repeat(${dayCols}, minmax(0, 1fr))`, borderColor: GRID_LINE }}
               >
-                <div className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-[#8898AA]">Time</div>
+                <div className="box-border flex h-full items-center justify-center px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-[#8898AA]">Time</div>
                 {timelineDays.map((day) => {
                   const isSelected = day.key === selectedDate;
                   const summary = summariesByDay.get(day.key) || {};
                   return (
-                    <button
+                    <div
                       key={day.key}
-                      type="button"
-                      onClick={() => openDay(day.key)}
-                      className={`my-1 flex flex-col items-center justify-center rounded-xl px-3 py-2 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00B0FF]/40 ${
-                        isSelected ? 'bg-white shadow-sm ring-1 ring-[#00B0FF]/20' : 'bg-transparent hover:bg-white/70'
-                      } ${view === 'day' ? 'mx-auto w-fit min-w-[8rem]' : 'mx-1 w-[calc(100%-0.5rem)]'}`}
+                      className="box-border flex h-full min-h-0 flex-col items-center justify-center py-3"
                     >
-                      <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
-                        {day.label}
-                      </span>
-                      <span className="mt-0.5 text-base font-semibold leading-tight text-slate-800">
-                        {day.date.getDate()}
-                      </span>
-                      <span className="mt-1 flex h-2 items-center gap-1" aria-hidden>
-                        {summary.checkins?.length > 0 && <TypeDot tone="attendance" label="Attendance" />}
-                        {summary.leaves?.length > 0 && <TypeDot tone="leave" label="Leave" />}
-                        {summary.holidays?.length > 0 && <TypeDot tone="holiday" label="Holiday" />}
-                        {summary.workModeRequests?.length > 0 && <TypeDot tone="work" label="Work mode" />}
-                        {summary.events?.length > 0 && !summary.holidays?.length && <TypeDot tone="event" label="Event" />}
-                      </span>
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => openDay(day.key)}
+                        className={`flex w-full flex-col items-center justify-center rounded-xl px-3 py-2 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00B0FF]/40 ${
+                          isSelected ? 'bg-white shadow-sm ring-1 ring-[#00B0FF]/20' : 'bg-transparent hover:bg-white/70'
+                        } ${view === 'day' ? 'mx-auto w-fit min-w-[8rem]' : 'mx-1 w-[calc(100%-0.5rem)]'}`}
+                      >
+                        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                          {day.label}
+                        </span>
+                        <span className="my-0.5 text-sm font-bold leading-none text-slate-800">
+                          {day.date.getDate()}
+                        </span>
+                        <span className="mt-1 flex items-center justify-center gap-1" aria-hidden>
+                          {summary.checkins?.length > 0 && <TypeDot tone="attendance" label="Attendance" />}
+                          {summary.leaves?.length > 0 && <TypeDot tone="leave" label="Leave" />}
+                          {summary.holidays?.length > 0 && <TypeDot tone="holiday" label="Holiday" />}
+                          {summary.workModeRequests?.length > 0 && <TypeDot tone="work" label="Work mode" />}
+                          {summary.events?.length > 0 && !summary.holidays?.length && <TypeDot tone="event" label="Event" />}
+                        </span>
+                      </button>
+                    </div>
                   );
                 })}
               </div>
 
+              <div ref={timelineBodyRef} className="calendar-grid-body relative min-h-0 flex-1 overflow-hidden">
               <div
-                className="relative grid"
-                style={{ height: TIMELINE_HEIGHT, gridTemplateColumns: `${timeColWidth}px repeat(${dayCols}, minmax(0, 1fr))` }}
+                className="relative grid h-full min-h-0"
+                style={{
+                  gridTemplateColumns: `${timeColWidth}px repeat(${dayCols}, minmax(0, 1fr))`,
+                  height: '100%',
+                }}
               >
-                <div className="relative bg-[#F8FAFC]" style={{ borderRight: `1px solid ${GRID_LINE}` }}>
+                <div className="relative min-h-0 bg-[#F8FAFC]" style={{ borderRight: `1px solid ${GRID_LINE}` }}>
                   {TIMELINE_HOURS.slice(0, -1).map((hour, index) => (
-                    <div key={hour} className="absolute left-0 right-0 px-2 pt-1.5 text-xs font-medium text-[#8898AA]" style={{ top: index * HOUR_HEIGHT, borderTop: `1px solid ${GRID_LINE}` }}>
+                    <div key={hour} className="absolute left-0 right-0 px-2 pt-1 text-[11px] font-medium text-[#8898AA]" style={{ top: index * hourHeight, borderTop: `1px solid ${GRID_LINE}` }}>
                       {pad(hour)}:00
                     </div>
                   ))}
@@ -762,12 +869,21 @@ export function CalendarPage() {
                 {timelineDays.map((day) => {
                   const dayEvents = eventsByDay.get(day.key) || [];
                   return (
-                    <div key={day.key} className="relative overflow-hidden last:border-r-0" style={{ borderRight: `1px solid ${GRID_LINE}` }}>
+                    <div key={day.key} className="relative min-h-0 overflow-hidden last:border-r-0" style={{ borderRight: `1px solid ${GRID_LINE}` }}>
                       {TIMELINE_HOURS.slice(0, -1).map((hour, index) => (
-                        <div key={hour} className="absolute left-0 right-0" style={{ top: index * HOUR_HEIGHT, borderTop: `1px solid ${GRID_LINE}` }} />
+                        <div key={hour} className="absolute left-0 right-0" style={{ top: index * hourHeight, borderTop: `1px solid ${GRID_LINE}` }} />
                       ))}
                       {dayEvents.map((event, eventIndex) => (
-                        <TimelineEventCard key={event.id} event={event} index={eventIndex} compact={view === 'day'} onClick={() => startEdit(event)} />
+                        <TimelineEventCard
+                          key={event.id}
+                          event={event}
+                          index={eventIndex}
+                          compact={view === 'day'}
+                          hourHeight={hourHeight}
+                          timelineHeight={timelineHeight}
+                          people={peopleFromSummary(summariesByDay.get(day.key), event)}
+                          onClick={() => startEdit(event)}
+                        />
                       ))}
                     </div>
                   );
@@ -779,13 +895,14 @@ export function CalendarPage() {
                   </div>
                 )}
               </div>
+              </div>
             </div>
           </div>
         )}
       </section>
 
       <aside
-        className="flex min-h-0 w-full shrink-0 flex-col overflow-hidden rounded-3xl p-4 text-slate-800 shadow-[0_8px_24px_rgba(15,23,42,0.06)] lg:w-[360px] lg:p-5"
+        className="calendar-sidebar flex h-full max-h-[42%] min-h-0 w-full shrink-0 flex-col overflow-hidden rounded-3xl p-3 text-slate-800 shadow-[0_8px_24px_rgba(15,23,42,0.06)] lg:max-h-[calc(100vh-80px)] lg:w-[20.5rem] lg:p-3 xl:w-[360px]"
         style={{ background: SIDEBAR_GRADIENT }}
       >
         <div className="relative flex w-full shrink-0 items-center rounded-full border border-slate-200 bg-white transition-all duration-200 hover:border-slate-300 focus-within:border-[#00B0FF]/50 focus-within:ring-2 focus-within:ring-[#00B0FF]/10">
@@ -804,7 +921,7 @@ export function CalendarPage() {
           )}
         </div>
 
-        <div className="mt-4 shrink-0">
+        <div className="mt-2 min-h-0 shrink-0">
           <MiniCalendar
             monthDate={monthDate}
             selectedDate={selectedDate}
@@ -821,22 +938,23 @@ export function CalendarPage() {
         <PermissionGate anyOf={[PERMISSIONS.CREATE_EVENTS, PERMISSIONS.EDIT_EVENTS]}>
           <form
             onSubmit={handleSubmit}
-            className="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-white p-5 text-slate-800 shadow-[0_10px_25px_rgba(0,0,0,0.08)]"
+            className="mt-2 flex min-h-0 flex-1 flex-col justify-between overflow-hidden rounded-2xl bg-white p-3 text-slate-800 shadow-[0_10px_25px_rgba(0,0,0,0.08)]"
           >
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <div className="flex shrink-0 items-start justify-between gap-3">
               <div>
-                <h2 className="text-base font-bold tracking-tight text-slate-900">{mode === 'edit' ? 'Edit event' : 'Add event'}</h2>
-                <p className="mt-0.5 text-xs font-medium text-[#8898AA]">Schedule a company event</p>
+                <h2 className="text-sm font-bold tracking-tight text-slate-900">{mode === 'edit' ? 'Edit event' : 'Add event'}</h2>
+                <p className="mt-0.5 text-[11px] font-medium text-[#8898AA]">Schedule a company event</p>
               </div>
               {(mode === 'edit' || form.title) && (
-                <button type="button" onClick={closePanel} className="grid h-8 w-8 place-items-center rounded-full text-[#8898AA] transition hover:bg-[#F0F9FD] hover:text-[#00B0FF] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00B0FF]/40" aria-label="Reset form">
-                  <X className="h-4 w-4" aria-hidden />
+                <button type="button" onClick={closePanel} className="grid h-7 w-7 place-items-center rounded-full text-[#8898AA] transition hover:bg-[#F0F9FD] hover:text-[#00B0FF] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00B0FF]/40" aria-label="Reset form">
+                  <X className="h-3.5 w-3.5" aria-hidden />
                 </button>
               )}
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-3 min-h-0">
+              <div className="flex flex-wrap gap-1.5">
                 {EVENT_TYPES.map((type) => {
                   const active = form.type === type.value;
                   return (
@@ -844,7 +962,7 @@ export function CalendarPage() {
                       key={type.value}
                       type="button"
                       onClick={() => updateForm('type', type.value)}
-                      className={`rounded-full px-3 py-1.5 text-xs transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#70C8F4]/40 ${
+                      className={`rounded-full px-2.5 py-1 text-xs transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#70C8F4]/40 ${
                         active
                           ? 'border-2 border-[#00B0FF] bg-white font-semibold text-[#00B0FF] shadow-sm'
                           : 'border border-transparent bg-[#F0F9FD] font-medium text-[#8898AA] hover:border-[#70C8F4]'
@@ -856,16 +974,17 @@ export function CalendarPage() {
                 })}
               </div>
 
-              <div className="mt-4 space-y-3">
+              <div className="mt-3 space-y-2">
                 <label className="block">
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-[#8898AA]">Title</span>
                   <input required placeholder="Design review" value={form.title} onChange={(e) => updateForm('title', e.target.value)} className={inputClass} />
                 </label>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid w-full grid-cols-2 gap-2">
                   <div className="block min-w-0">
                     <span id="event-date-label" className="text-[11px] font-semibold uppercase tracking-wider text-[#8898AA]">Date</span>
                     <DatePickerField
+                      size="compact"
                       labelledBy="event-date-label"
                       value={form.date}
                       onChange={(dateKey) => {
@@ -877,6 +996,7 @@ export function CalendarPage() {
                   <div className="block min-w-0">
                     <span id="event-time-label" className="text-[11px] font-semibold uppercase tracking-wider text-[#8898AA]">Time</span>
                     <TimePickerField
+                      size="compact"
                       labelledBy="event-time-label"
                       value={form.time}
                       onChange={(time) => updateForm('time', time)}
@@ -891,24 +1011,25 @@ export function CalendarPage() {
                     placeholder="Add people, location, or agenda"
                     value={form.description}
                     onChange={(e) => updateForm('description', e.target.value)}
-                    className={`${inputClass} resize-none`}
+                    className={`${inputClass} h-14 resize-none`}
                   />
                 </label>
               </div>
+            </div>
             </div>
 
             <div className="mt-3 flex shrink-0 flex-col gap-2">
               <button
                 type="submit"
                 disabled={busy}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#00B0FF] px-4 py-3 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:bg-[#0099E6] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#70C8F4]/70"
+                className="ui-btn-primary w-full py-2 text-xs font-semibold"
               >
-                <Plus className="h-4 w-4" aria-hidden />
+                <Plus className="h-3.5 w-3.5" aria-hidden />
                 {mode === 'edit' ? 'Save event' : 'Add event'}
               </button>
               {mode === 'edit' && selected && (
                 <PermissionGate permission={PERMISSIONS.DELETE_EVENTS}>
-                  <button type="button" onClick={handleDelete} disabled={busy} className="w-full rounded-xl border border-rose-200 bg-rose-50/60 py-2.5 text-sm font-medium text-rose-500 transition-all duration-200 hover:bg-rose-100 disabled:opacity-60">
+                  <button type="button" onClick={handleDelete} disabled={busy} className="w-full rounded-xl border border-rose-200 bg-rose-50/60 py-2 text-xs font-medium text-rose-500 transition-all duration-200 hover:bg-rose-100 disabled:opacity-60">
                     Delete
                   </button>
                 </PermissionGate>
@@ -1012,15 +1133,15 @@ function DayContextPanel({ summary, onEditEvent, onClose }) {
 
 function ContextSummary({ summary }) {
   const items = [
-    { label: 'Check-ins', value: summary.checkins.length, Icon: Clock3, tone: 'text-emerald-700' },
-    { label: 'On leave', value: summary.approvedLeaves.length, Icon: Users, tone: 'text-sky-700' },
-    { label: 'Events', value: summary.events.length, Icon: CalendarPlus, tone: 'text-[#0284C7]' },
+    { label: 'Check-ins', value: summary.checkins.length, Icon: Clock3 },
+    { label: 'On leave', value: summary.approvedLeaves.length, Icon: CalendarOff },
+    { label: 'Events', value: summary.events.length, Icon: CalendarPlus },
   ];
   return (
     <div className="grid grid-cols-3 gap-2">
-      {items.map(({ label, value, Icon, tone }) => (
+      {items.map(({ label, value, Icon }) => (
         <div key={label} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
-          <Icon className={`h-4 w-4 ${tone}`} aria-hidden />
+          <Icon className="h-[18px] w-[18px] text-slate-500" aria-hidden />
           <p className="mt-2 text-lg font-semibold tabular-nums text-slate-900">{value}</p>
           <p className="text-xs text-slate-400">{label}</p>
         </div>

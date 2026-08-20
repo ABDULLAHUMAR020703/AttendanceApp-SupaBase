@@ -60,7 +60,7 @@ export function KpiMetricGrid({ children, columns = 5, className = '' }) {
   return (
     <div
       className={cn(
-        'grid h-auto grid-cols-2 gap-4 py-1 md:grid-cols-3',
+        'kpi-grid grid h-auto grid-cols-2 gap-4 py-1 md:grid-cols-3',
         columns >= 5 && 'lg:grid-cols-5',
         columns === 4 && 'lg:grid-cols-4',
         className,

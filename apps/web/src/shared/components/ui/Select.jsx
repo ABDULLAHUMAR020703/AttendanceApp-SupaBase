@@ -103,16 +103,19 @@ export function Select({
   const place = useCallback(() => {
     const rect = triggerRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const width = Math.max(150, rect.width);
-    const estimated = Math.min(options.length * 40 + 12, 280);
+    const maxWidth = Math.min(360, window.innerWidth - 16);
+    const minWidth = Math.min(maxWidth, Math.max(rect.width, 160));
+    const estimated = Math.min(options.length * 36 + 16, 280);
     const gap = 6;
     let top = rect.bottom + gap;
     if (top + estimated > window.innerHeight - 8) {
       top = Math.max(8, rect.top - estimated - gap);
     }
     let left = rect.left;
-    if (left + width > window.innerWidth - 8) left = Math.max(8, window.innerWidth - width - 8);
-    setPlacement({ top, left, width });
+    if (left + minWidth > window.innerWidth - 8) {
+      left = Math.max(8, window.innerWidth - minWidth - 8);
+    }
+    setPlacement({ top, left, minWidth, maxWidth });
   }, [options.length]);
 
   useEffect(() => {
@@ -211,9 +214,9 @@ export function Select({
           onKeyDown={onTriggerKeyDown}
           className={cn(
             'ui-select-trigger inline-flex items-center justify-between gap-2 rounded-xl font-medium text-slate-700',
-            'bg-white border border-sky-200/80 hover:border-sky-400 hover:bg-sky-50/40',
-            'transition-colors focus:outline-none focus:ring-2 focus:ring-sky-400/30',
-            open && 'border-sky-400 bg-sky-50/40',
+            'bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50',
+            'transition-colors focus:outline-none focus:ring-2 focus:ring-[#00B0FF]/20',
+            open && 'border-slate-300 bg-slate-50',
             error && 'ui-input-invalid',
             SIZE_CLASS[size] || SIZE_CLASS.md,
             triggerWidth,
@@ -224,7 +227,7 @@ export function Select({
           <ChevronDown
             className={cn(
               'h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200 ease-out',
-              open && 'rotate-180 text-sky-500',
+              open && 'rotate-180 text-slate-500',
             )}
             aria-hidden
           />
@@ -263,11 +266,14 @@ export function Select({
                   position: 'fixed',
                   top: placement.top,
                   left: placement.left,
-                  width: placement.width,
+                  minWidth: placement.minWidth,
+                  width: 'max-content',
+                  maxWidth: placement.maxWidth,
                   transformOrigin: 'top center',
-                  zIndex: 70,
+                  zIndex: 80,
                 }}
-                className="ui-menu max-h-72 overflow-y-auto"
+                className="ui-menu max-h-72 w-max min-w-full overflow-y-auto overscroll-contain"
+                data-lenis-prevent
               >
                 {items.map((item) => {
                   if (item.kind === 'group') {
@@ -290,13 +296,13 @@ export function Select({
                       onMouseEnter={() => setActiveIndex(index)}
                       onClick={() => !item.disabled && commit(item.value)}
                       className={cn(
-                        'ui-menu-item justify-between',
-                        isActive && !isSelected && 'ui-menu-item-active',
+                        'ui-menu-item justify-between whitespace-nowrap',
+                        isActive && 'ui-menu-item-active',
                         isSelected && 'ui-menu-item-selected',
                       )}
                     >
-                      <span className="min-w-0 flex-1 truncate text-left">{item.label}</span>
-                      {isSelected && <Check className="h-4 w-4 shrink-0 text-[#00A3FF]" aria-hidden />}
+                      <span className="whitespace-nowrap text-left">{item.label}</span>
+                      {isSelected && <Check className="ml-auto h-4 w-4 shrink-0 text-[#00A3FF]" aria-hidden />}
                     </button>
                   );
                 })}

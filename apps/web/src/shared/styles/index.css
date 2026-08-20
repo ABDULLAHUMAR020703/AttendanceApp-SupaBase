@@ -299,16 +299,19 @@
   html {
     -webkit-tap-highlight-color: transparent;
     width: 100%;
-    height: 100%;
-    overflow: hidden;
   }
 
+  html,
   body,
   #root {
-    width: 100%;
-    height: 100%;
+    min-width: 0;
+    min-height: 100%;
     margin: 0;
-    overflow: hidden;
+  }
+
+  #root {
+    min-height: 100dvh;
+    width: 100%;
   }
 
   body {
@@ -411,6 +414,10 @@
   .nav-surface {
     --nav-rail: #00B0FF;
     --nav-cutout: #F8FAFC;
+    display: flex;
+    height: 100%;
+    min-height: 0;
+    flex-direction: column;
     background-color: var(--nav-rail);
     background-image: none;
     color: #ffffff;
@@ -429,13 +436,23 @@
   .nav-item-active {
     background-color: var(--nav-cutout);
     color: #00B0FF;
-    border-radius: 10px;
+    border-radius: 8px;
+  }
+
+  .nav-surface .nav-row svg {
+    background: none;
+    box-shadow: none;
+  }
+
+  .nav-surface .nav-section {
+    margin-top: 12px;
   }
 
   .nav-surface .nav-section-label {
-    font-size: 10px;
+    margin-bottom: 4px;
+    font-size: 11px;
     font-weight: 600;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
     color: rgba(255, 255, 255, 0.42);
   }
@@ -445,29 +462,43 @@
     background: rgba(255, 255, 255, 0.14);
   }
 
-  @media (max-height: 820px) {
-    .nav-surface .nav-row {
-      height: 2.15rem;
-    }
-
-    .nav-surface .nav-section {
-      margin-top: 0.85rem;
-    }
+  .nav-surface .sidebar-nav {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0.25rem 0 0.25rem;
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
   }
 
-  @media (max-height: 700px) {
-    .nav-surface .nav-row {
-      height: 1.9rem;
-      font-size: 12px;
-    }
+  .nav-surface .sidebar-nav:hover,
+  .nav-surface .sidebar-nav:focus-within {
+    scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+  }
 
-    .nav-surface .nav-section {
-      margin-top: 0.55rem;
-    }
+  .nav-surface .sidebar-nav::-webkit-scrollbar {
+    width: 4px;
+  }
 
-    .nav-surface .nav-section-label {
-      font-size: 9px;
-    }
+  .nav-surface .sidebar-nav::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .nav-surface .sidebar-nav::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 9999px;
+  }
+
+  .nav-surface .sidebar-nav:hover::-webkit-scrollbar-thumb,
+  .nav-surface .sidebar-nav:focus-within::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+  }
+
+  .nav-surface .sidebar-nav::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
   }
 
   /*
@@ -708,9 +739,9 @@
   .ui-card {
     position: relative;
     border-radius: 1.25rem;
-    border: 1px solid #E8F3F8;
+    border: 1px solid rgba(226, 232, 240, 0.95);
     background-color: #ffffff;
-    box-shadow: 0 10px 30px -24px rgba(15, 23, 42, 0.22), 0 8px 22px -24px rgba(0,188,255, 0.22);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
   }
 
   /* Optional stronger brand edge for featured / hero cards */
@@ -761,6 +792,21 @@
   .calendar-card:focus-visible {
     outline: none;
     box-shadow: 0 0 0 3px rgba(112, 200, 244, 0.45), 0 10px 25px -5px rgba(0, 188, 255, 0.10);
+  }
+
+  .calendar-page {
+    min-height: 0;
+  }
+
+  .calendar-sidebar,
+  .calendar-grid-body {
+    overflow: hidden;
+    scrollbar-width: none;
+  }
+
+  .calendar-sidebar::-webkit-scrollbar,
+  .calendar-grid-body::-webkit-scrollbar {
+    display: none;
   }
 
   /* Dashboard command header status chips — ice surface, cyan presence dot. */
@@ -863,11 +909,15 @@
   .ui-btn-primary {
     @apply ui-btn shadow-[0_1px_2px_rgba(0,176,255,0.28)];
     @apply hover:shadow-[0_2px_10px_rgba(0,176,255,0.30)];
-    @apply disabled:bg-surface-muted disabled:text-[#8493A6];
+    @apply disabled:bg-surface-muted;
     /* Explicit hex so brand fill cannot fall back to a darker teal utility. */
     background-color: #00B0FF;
     /* Plain declaration, never `@apply text-white` — see the note above .ui-btn. */
     color: #ffffff;
+  }
+
+  .ui-btn-primary:disabled {
+    color: #334155;
   }
 
   .ui-btn-primary:hover:not(:disabled) {
@@ -907,11 +957,31 @@
     @apply disabled:bg-transparent disabled:text-[#8493A6];
   }
 
-  .ui-btn-danger {
-    @apply ui-btn bg-[#DC2626] shadow-[0_1px_2px_rgba(127,29,29,0.16)];
-    @apply hover:bg-[#B91C1C] hover:shadow-[0_2px_10px_rgba(220,38,38,0.26)];
-    @apply disabled:bg-surface-muted disabled:text-[#8493A6];
+  .ui-btn-danger,
+  .ui-btn-danger-soft {
+    @apply ui-btn border-transparent font-semibold;
+    @apply shadow-[0_1px_2px_rgba(239,68,68,0.28)];
+    @apply hover:shadow-[0_2px_10px_rgba(239,68,68,0.30)];
+    @apply disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none;
+    background-color: #ef4444;
     color: #ffffff;
+    border-color: transparent;
+  }
+
+  .ui-btn-danger:hover:not(:disabled),
+  .ui-btn-danger-soft:hover:not(:disabled) {
+    background-color: #dc2626;
+  }
+
+  .ui-btn-danger:active:not(:disabled),
+  .ui-btn-danger-soft:active:not(:disabled) {
+    background-color: #b91c1c;
+  }
+
+  .ui-btn-danger:focus-visible,
+  .ui-btn-danger-soft:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 1px #ffffff, 0 0 0 3px #f87171;
   }
 
   .ui-btn-success {
@@ -919,17 +989,6 @@
     @apply hover:bg-[#059669] hover:shadow-[0_2px_10px_rgba(16,185,129,0.26)];
     @apply disabled:bg-surface-muted disabled:text-[#8493A6];
     color: #ffffff;
-  }
-
-  /*
-   * Soft destructive: HIG treats delete as a red *label*, not a red slab, unless it
-   * is the confirmed final step. Inline and in-panel deletes use this; confirmation
-   * dialogs use the filled danger button.
-   */
-  .ui-btn-danger-soft {
-    @apply ui-btn border border-danger-border bg-danger-surface text-danger-ink;
-    @apply hover:border-[#E7B4B4] hover:bg-[#FBE8E8];
-    @apply disabled:border-hairline disabled:bg-surface-subtle disabled:text-[#8493A6];
   }
 
   .ui-btn-sm {
@@ -1039,9 +1098,10 @@
     appearance: none;
     -webkit-appearance: none;
     @apply relative inline-grid h-4 w-4 shrink-0 cursor-pointer place-items-center rounded border border-sky-200 bg-white;
+    color: #ffffff;
     background-repeat: no-repeat;
     background-position: center;
-    background-size: 0.7rem 0.7rem;
+    background-size: 0.75rem 0.75rem;
     transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
   }
 
@@ -1050,9 +1110,10 @@
   }
 
   .ui-checkbox:checked {
-    border-color: #00BCFF;
-    background-color: #00BCFF;
-    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M3.25 8.25 6.5 11.4 12.75 4.6' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    border-color: #00a3ff;
+    background-color: #00a3ff;
+    color: #ffffff;
+    background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 8.586l4.293-4.293a1 1 0 011.414 0z'/%3e%3c/svg%3e");
   }
 
   .ui-checkbox:focus-visible {
@@ -1062,23 +1123,23 @@
 
   /* ---------------------------------------------------------------- tables */
   .ui-table-shell {
-    @apply flex min-h-0 flex-col overflow-hidden rounded-[18px] border border-hairline bg-surface shadow-hair;
+    @apply min-w-0 overflow-hidden rounded-[18px] border border-slate-200/80 bg-surface;
   }
 
   .ui-table-scroll {
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: visible;
+  }
+
+  .admin-page-locked .ui-table-shell {
+    flex: 1 1 0%;
     min-height: 0;
+  }
+
+  .admin-page-locked .ui-table-shell .ui-table-scroll {
+    flex: 1 1 0%;
     overflow: auto;
-  }
-
-  .admin-fill > .ui-table-shell,
-  .admin-fill .ui-table-shell {
-    flex: 1 1 0%;
-    min-height: 0;
-  }
-
-  .admin-fill > .ui-table-shell .ui-table-scroll,
-  .admin-fill .ui-table-shell .ui-table-scroll {
-    flex: 1 1 0%;
   }
 
   /*
@@ -1211,11 +1272,11 @@
    * item's tint reads as a contained row rather than a full-bleed band.
    */
   .ui-menu {
-    @apply z-50 min-w-[150px] overflow-hidden rounded-2xl border border-sky-100/80 bg-white p-1.5 shadow-[0_10px_25px_-5px_rgba(0,163,255,0.1),0_8px_10px_-6px_rgba(0,0,0,0.04)] backdrop-blur-md;
+    @apply z-50 min-w-[150px] overflow-hidden rounded-xl border border-slate-200 bg-white/95 p-1.5 shadow-lg backdrop-blur-md;
   }
 
   .ui-menu-item {
-    @apply flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-label font-medium text-ink;
+    @apply flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm font-medium text-slate-700;
     @apply transition-colors duration-fast;
     @apply hover:bg-[#E6F4FA] hover:text-[#00BCFF];
     @apply focus:bg-[#E6F4FA] focus:text-[#00BCFF] focus:outline-none;
@@ -1228,7 +1289,7 @@
   }
 
   .ui-menu-item-selected {
-    @apply bg-sky-500/10 font-semibold text-[#00A3FF] hover:bg-sky-500/10 hover:text-[#00A3FF] focus:bg-sky-500/10 focus:text-[#00A3FF];
+    @apply bg-[#E6F4FA] font-medium text-[#00A3FF] hover:bg-[#E6F4FA] hover:text-[#00BCFF] focus:bg-[#E6F4FA] focus:text-[#00BCFF];
   }
 
   .ui-menu-item-danger {
@@ -1240,7 +1301,7 @@
   }
 
   .ui-menu-item > svg {
-    @apply h-4 w-4 shrink-0;
+    @apply h-[18px] w-[18px] shrink-0;
   }
 
   .ui-menu-label {
@@ -1310,8 +1371,8 @@
 }
 
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { transform: translateY(8px); }
+  to { transform: translateY(0); }
 }
 
 
@@ -1463,11 +1524,6 @@ select option:hover {
   width: 100%;
 }
 
-.chart-panel:focus-within .chart-surface {
-  outline: 2px solid rgba(0,188,255, 0.4);
-  outline-offset: 2px;
-}
-
 @media print {
   body { background: #ffffff !important; color: #0f172a !important; }
   .print\:hidden { display: none !important; }
@@ -1491,6 +1547,63 @@ select option:hover {
 .app-admin-surface .chart-panel,
 .app-admin-surface .chart-surface {
   color: #0F172A;
+}
+
+.attendance-trend-chart .recharts-wrapper,
+.attendance-trend-chart .recharts-surface {
+  overflow: visible;
+}
+
+.attendance-trend-chart .recharts-tooltip-wrapper {
+  pointer-events: none !important;
+  overflow: visible !important;
+  transition: none !important;
+}
+
+.department-size-chart .recharts-wrapper,
+.department-size-chart .recharts-surface {
+  overflow: visible;
+}
+
+.attendance-activity-chart {
+  overflow: visible;
+}
+
+.attendance-activity-chart .recharts-wrapper,
+.attendance-activity-chart .recharts-surface {
+  overflow: visible;
+}
+
+.attendance-activity-chart .recharts-tooltip-wrapper {
+  pointer-events: none !important;
+  overflow: visible !important;
+  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1), left 180ms cubic-bezier(0.16, 1, 0.3, 1), top 180ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.attendance-activity-dot circle:first-child {
+  animation: attendance-dot-glow 1.6s ease-in-out infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+@keyframes attendance-dot-glow {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.18);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .attendance-activity-chart.is-reduced-motion .attendance-activity-dot circle:first-child {
+    animation: none !important;
+    opacity: 0.7 !important;
+    transform: none !important;
+  }
 }
 
 .app-admin-surface .glass-select,
@@ -1571,11 +1684,34 @@ select option:hover {
 .app-admin-surface .admin-main .bg-accent-900,
 .app-admin-surface .admin-main .bg-\[\#00BCFF\].text-white,
 .app-admin-surface .admin-main .bg-\[\#00BCFF\] .text-white,
+.app-admin-surface .admin-main .bg-\[\#00B0FF\].text-white,
+.app-admin-surface .admin-main .bg-\[\#00B0FF\] .text-white,
+.app-admin-surface .admin-main .bg-\[\#00B0FF\],
+.app-admin-surface .admin-main .ui-btn-primary:not(:disabled),
+.app-admin-surface .admin-main .ui-btn-primary:not(:disabled) .text-white,
+.app-admin-surface .admin-main .ui-btn-danger:not(:disabled),
+.app-admin-surface .admin-main .ui-btn-danger-soft:not(:disabled),
+.app-admin-surface .admin-main .ui-btn-success:not(:disabled),
+.app-admin-surface .admin-main .bg-\[\#EF4444\].text-white,
+.app-admin-surface .admin-main .bg-\[\#EF4444\],
 .app-admin-surface .admin-main .bg-\[\#00BCFF\],
 .app-admin-surface .admin-main .kpi-folder,
 .app-admin-surface .admin-main .kpi-folder .text-white,
 .app-admin-surface .admin-main .kpi-folder [class*='text-white'] {
   color: #FFFFFF;
+}
+
+.app-admin-surface .admin-main .ui-btn-primary:disabled,
+.app-admin-surface .admin-main .ui-btn-success:disabled {
+  color: #334155;
+  background-color: #e2e8f0;
+}
+
+.app-admin-surface .admin-main .ui-btn-danger:disabled,
+.app-admin-surface .admin-main .ui-btn-danger-soft:disabled {
+  color: #ffffff;
+  background-color: #ef4444;
+  opacity: 0.5;
 }
 
 /* Force brand fills/inks to Deep Sky Blue — defeats stale Tailwind or legacy remaps. */
@@ -1856,11 +1992,53 @@ select option:hover {
   color: #8493A6;
 }
 
-.app-admin-surface .admin-main input[type='checkbox'],
 .app-admin-surface .admin-main input[type='radio'] {
-  accent-color: #00BCFF;
+  accent-color: #00a3ff;
   width: 1rem;
   height: 1rem;
+}
+
+input[type='checkbox']:not(.sr-only) {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  flex-shrink: 0;
+  cursor: pointer;
+  color: #ffffff;
+  border: 1px solid #bae6fd;
+  border-radius: 0.25rem;
+  background-color: #ffffff;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 0.75rem 0.75rem;
+  forced-color-adjust: none;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+  transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+}
+
+input[type='checkbox']:not(.sr-only):hover {
+  border-color: #7dd8ff;
+}
+
+input[type='checkbox']:not(.sr-only):checked {
+  background-color: #00a3ff;
+  border-color: #00a3ff;
+  color: #ffffff;
+  accent-color: #00a3ff;
+  background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 8.586l4.293-4.293a1 1 0 011.414 0z'/%3e%3c/svg%3e");
+}
+
+input[type='checkbox']:not(.sr-only):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 163, 255, 0.28);
+}
+
+input[type='checkbox']:not(.sr-only):disabled {
+  cursor: default;
+  opacity: 0.6;
 }
 
 /*
@@ -1957,6 +2135,84 @@ select option:hover {
 
 .users-directory .ui-pager-btn:hover {
   background-color: #f1f5f9;
+}
+
+.users-directory .user-card {
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.users-directory .user-card:hover {
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+.users-directory .user-card:focus-visible {
+  box-shadow: 0 0 0 2px rgb(0 176 255 / 0.28);
+}
+
+.users-directory .ui-segment {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+  padding: 0.25rem;
+  gap: 0.125rem;
+}
+
+.users-directory .ui-segment-item {
+  padding: 0.25rem 0.875rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1rem;
+  transition: all 200ms ease-out;
+}
+
+.users-directory .ui-segment-item-active {
+  color: #0f172a;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+.users-directory .ui-segment-item-active:hover {
+  color: #0f172a;
+}
+
+.users-directory.admin-page-locked {
+  height: 100%;
+  max-height: 100%;
+}
+
+.users-directory .users-dept-title {
+  text-transform: none;
+  letter-spacing: -0.01em;
+}
+
+.users-directory.admin-page-locked > .admin-fill.users-board {
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: auto;
+  justify-content: space-evenly;
+  gap: 0.75rem;
+}
+
+.users-directory.admin-page-locked .ui-table-shell {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.users-directory.admin-page-locked .ui-table-shell .ui-table-scroll {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 100%;
+  overflow-x: auto;
+  overflow-y: auto;
+  scrollbar-gutter: auto;
+}
+
+.users-directory.admin-page-locked .users-board > .users-dept {
+  flex: 0 1 auto;
+  min-height: 0;
+}
+
+.users-directory .users-dept .user-card {
+  align-self: start;
 }
 
 .departments-directory .ui-table-shell {
@@ -2153,17 +2409,142 @@ select option:hover {
   color: #0f172a;
 }
 
+.geofencing-directory {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.geofencing-directory .geofencing-main-wrapper,
+.geofencing-directory .geofencing-workspace {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 20px;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  flex: 1 1 0%;
+  overflow: hidden;
+  box-sizing: border-box;
+  background: transparent;
+}
+
+.geofencing-directory .geofencing-sidebar {
+  display: flex;
+  flex: 0 0 380px;
+  flex-direction: column;
+  gap: 12px;
+  width: 380px;
+  max-width: 420px;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.geofencing-directory .geofencing-master {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 6px;
+  background: #ffffff;
+}
+
+.geofencing-directory .geofencing-sidebar .filter-action-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  flex-shrink: 0;
+  margin-bottom: 0;
+  background: #ffffff;
+}
+
+.geofencing-directory .geofence-map-container,
+.geofencing-directory .geofencing-map-pane {
+  position: relative;
+  flex: 1 1 auto;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #dfeaf0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.geofencing-directory .geofence-compare-card {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 4;
+  width: min(18.5rem, calc(100% - 1.5rem));
+  max-height: calc(100% - 1.5rem);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: 0.75rem;
+  border: 1px solid #fde68a;
+  background: rgba(255, 255, 255, 0.96);
+  padding: 0.75rem 0.85rem;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.geofencing-directory .geofence-map-base {
+  background: linear-gradient(145deg, #edf5f8 0%, #dceaf0 52%, #edf6f9 100%);
+}
+
+.geofencing-directory .geofence-map-controls {
+  z-index: 6;
+}
+
+.geofencing-directory .geofence-map-controls button + button {
+  border-top: 1px solid #e2e8f0;
+}
+
+.geofencing-directory .geofence-map img {
+  z-index: 2;
+}
+
+.geofencing-directory .geofence-map svg,
+.geofencing-directory .geofence-map > button,
+.geofencing-directory .geofence-map > p {
+  z-index: 3;
+}
+
+@media (max-width: 767px) {
+  .geofencing-directory .geofencing-sidebar {
+    flex: 0 0 min(320px, 42%);
+    width: min(320px, 42%);
+    min-width: 240px;
+  }
+}
 .geofencing-directory .geofence-map {
   cursor: grab;
+  height: 100%;
+  width: 100%;
 }
 
 .geofencing-directory .geofence-map:active {
   cursor: grabbing;
 }
 
+.geofencing-directory .geofence-card,
+.geofencing-directory .geofence-accordion-panel {
+  overflow: visible;
+  max-height: none;
+}
+
 .geofencing-directory .geofence-advanced {
   border-top: 1px solid #f1f5f9;
-  padding-top: 0.75rem;
+  padding-top: 0.4rem;
 }
 
 .geofencing-directory .geofence-advanced summary {
@@ -2430,8 +2811,6 @@ select option:hover {
 }
 
 .permissions-directory .permissions-user-list {
-  max-height: 14rem;
-  overflow-y: auto;
   border: 1px solid #f1f5f9;
   border-radius: 0.75rem;
 }
@@ -2456,10 +2835,9 @@ select option:hover {
 }
 
 .permissions-directory .permissions-matrix-toolbar {
-  position: sticky;
-  top: 0;
   z-index: 10;
   display: flex;
+  flex-shrink: 0;
   flex-direction: column;
   gap: 0.75rem;
   border-bottom: 1px solid #e2e8f0;
@@ -2476,9 +2854,6 @@ select option:hover {
 }
 
 .permissions-directory .permission-matrix {
-  min-height: 0;
-  flex: 1 1 0%;
-  overflow: auto;
   border: 1px solid #e2e8f0;
   border-radius: 0.75rem;
 }
@@ -2595,27 +2970,161 @@ select option:hover {
   border-color: #e2e8f0;
 }
 
-.permissions-directory .permissions-audit-summary {
+.permissions-directory.admin-page-locked > .permissions-content-wrapper {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  cursor: pointer;
-  list-style: none;
-  padding: 0.75rem 1rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #0f172a;
+  flex-direction: column;
+  flex: 1 1 0%;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+  gap: 1.25rem;
+  box-sizing: border-box;
 }
 
-.permissions-directory .permissions-audit-summary::-webkit-details-marker {
-  display: none;
+.permissions-directory .permissions-rail {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  width: 100%;
+  max-height: 14rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  background: #fff;
+}
+
+.permissions-directory .permissions-rail-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.permissions-directory .permissions-panel {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  background: #fff;
+}
+
+.permissions-directory .permissions-panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+@media (min-width: 1024px) {
+  .permissions-directory.admin-page-locked > .permissions-content-wrapper {
+    flex-direction: row;
+    align-items: stretch;
+  }
+
+  .permissions-directory .permissions-rail {
+    flex: 0 0 280px;
+    max-width: 300px;
+    max-height: none;
+    height: 100%;
+  }
+
+  .permissions-directory .permissions-panel {
+    flex: 1 1 auto;
+    height: 100%;
+  }
+}
+
+.permissions-audit-table.ui-table-shell,
+.permissions-audit-table .ui-table-scroll {
+  overflow-x: hidden;
+}
+
+.permissions-audit-table table {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 0;
+}
+
+.permissions-audit-table .ui-th,
+.permissions-audit-table .ui-table-cell {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+
+.permissions-audit-table th,
+.permissions-audit-table td {
+  overflow: hidden;
+  vertical-align: middle;
+}
+
+.permissions-audit-table th:nth-child(1),
+.permissions-audit-table td:nth-child(1) {
+  width: 28%;
+  max-width: 0;
+}
+
+.permissions-audit-table th:nth-child(2),
+.permissions-audit-table td:nth-child(2) {
+  width: 28%;
+  max-width: 0;
+}
+
+.permissions-audit-table th:nth-child(3),
+.permissions-audit-table td:nth-child(3) {
+  width: 26%;
+  max-width: 0;
+}
+
+.permissions-audit-table th:nth-child(4),
+.permissions-audit-table td:nth-child(4) {
+  width: 18%;
+  text-align: right;
 }
 
 .tickets-directory .ui-table-shell {
   border: 0;
   box-shadow: none;
   background: transparent;
+}
+
+.tickets-directory.admin-page-locked .tickets-workspace {
+  min-height: 0;
+  align-items: stretch;
+}
+
+.tickets-directory.admin-page-locked .tickets-workspace > * {
+  min-height: 0;
+}
+
+.tickets-directory .tickets-table-card {
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.tickets-directory.admin-page-locked .tickets-table-card .ui-table-shell {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 0%;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.tickets-directory.admin-page-locked .tickets-table-card .ui-table-scroll {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow-x: auto;
+  overflow-y: auto;
+  padding-bottom: 1.5rem;
 }
 
 .tickets-directory .ui-table-head {
@@ -2696,7 +3205,27 @@ select option:hover {
 
 .tickets-directory .tickets-pane {
   min-height: 0;
-  height: 100%;
+}
+
+@media (max-width: 1023px) {
+  .tickets-directory.admin-page-locked .tickets-workspace {
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding-bottom: 1.5rem;
+  }
+
+  .tickets-directory .tickets-table-card {
+    min-height: 20rem;
+    max-height: 55dvh;
+  }
+}
+
+@media (min-width: 1024px) {
+  .tickets-directory .tickets-table-card,
+  .tickets-directory .tickets-pane {
+    height: 100%;
+    max-height: 100%;
+  }
 }
 
 .tickets-directory .tickets-avatar {
@@ -2771,10 +3300,7 @@ select option:hover {
 
 .notifications-directory .notifications-inbox {
   display: flex;
-  min-height: 0;
-  flex: 1 1 0%;
   flex-direction: column;
-  overflow: auto;
   border: 1px solid #e2e8f0;
   border-radius: 0.75rem;
   background: #fff;
@@ -2822,20 +3348,24 @@ select option:hover {
   text-align: left;
 }
 
+.type-icon,
 .notifications-directory .notifications-icon {
   display: inline-flex;
-  height: 2rem;
-  width: 2rem;
+  height: 32px;
+  width: 32px;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
-  background: #f1f5f9;
+  border-radius: 8px;
+  border: none;
+  background: #f4f7f9;
+  box-shadow: none;
   color: #64748b;
 }
 
+.type-icon.is-unread,
 .notifications-directory .notifications-icon.is-unread {
-  background: #e2e8f0;
+  background: #eef2f6;
   color: #334155;
 }
 
@@ -2883,12 +3413,18 @@ select option:hover {
 }
 
 .settings-directory .settings-nav {
-  min-height: 0;
-  overflow: auto;
+  align-self: start;
   border: 1px solid #e2e8f0;
   border-radius: 0.75rem;
   background: #fff;
   padding: 0.5rem 0;
+}
+
+@media (min-width: 1024px) {
+  .settings-directory .settings-nav {
+    position: sticky;
+    top: 0;
+  }
 }
 
 .settings-directory .settings-nav-group + .settings-nav-group {
@@ -2939,10 +3475,7 @@ select option:hover {
 
 .settings-directory .settings-panel {
   display: flex;
-  min-height: 0;
-  height: 100%;
   flex-direction: column;
-  overflow: hidden;
   border: 1px solid #e2e8f0;
   border-radius: 0.75rem;
   background: #fff;
@@ -2965,9 +3498,6 @@ select option:hover {
 }
 
 .settings-directory .settings-panel-body {
-  flex: 1 1 0%;
-  min-height: 0;
-  overflow: auto;
   padding: 0.25rem 0;
 }
 
@@ -3077,59 +3607,108 @@ select option:hover {
 
 .admin-page {
   display: flex;
-  height: 100%;
-  min-height: 0;
   min-width: 0;
   flex-direction: column;
+}
+
+.app-admin-surface .admin-main.main-content-container {
+  padding-top: 16px;
+  padding-bottom: 6rem;
+}
+
+@media (min-width: 768px) {
+  .app-admin-surface .admin-main.main-content-container {
+    padding-bottom: 24px;
+  }
+}
+
+.filter-action-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  min-height: 40px;
+}
+
+.kpi-grid {
+  margin-top: 8px;
+  margin-bottom: 16px;
+}
+
+.topbar-page-actions:empty {
+  display: none;
+}
+
+.admin-page-locked {
+  height: 100%;
+  min-height: 0;
   overflow: hidden;
 }
 
-.admin-page > * {
+.admin-page-locked > * {
   flex-shrink: 0;
 }
 
 .admin-fill {
+  min-width: 0;
+}
+
+.admin-page-locked .admin-fill {
   min-height: 0;
   min-width: 0;
   flex: 1 1 0%;
   overflow: hidden;
 }
 
-.admin-page > .admin-fill,
-.admin-page > .admin-fill-scroll {
+.admin-page-locked > .admin-fill,
+.admin-page-locked > .admin-fill-scroll {
   flex-shrink: 1;
 }
 
-.admin-fill:not(.grid) {
+.admin-page-locked .admin-fill:not(.grid):not(.geofencing-workspace):not(.geofencing-main-wrapper) {
   display: flex;
   flex-direction: column;
 }
 
-.admin-fill:not(.grid) > * {
+.admin-page-locked .admin-fill:not(.grid):not(.geofencing-workspace):not(.geofencing-main-wrapper) > * {
   flex-shrink: 0;
 }
 
-.admin-fill:not(.grid) > .admin-fill,
-.admin-fill:not(.grid) > .ui-table-shell {
+.admin-page-locked .admin-fill:not(.grid):not(.geofencing-workspace):not(.geofencing-main-wrapper) > .admin-fill,
+.admin-page-locked .admin-fill:not(.grid):not(.geofencing-workspace):not(.geofencing-main-wrapper) > .ui-table-shell {
   flex-shrink: 1;
 }
 
-.admin-fill-scroll {
+.admin-page-locked .geofencing-workspace > *,
+.admin-page-locked .geofencing-main-wrapper > * {
   min-height: 0;
+}
+
+.admin-fill-scroll {
   min-width: 0;
-  flex: 1 1 0%;
-  overflow: auto;
+}
+
+.app-admin-surface .admin-main {
+  overscroll-behavior: contain;
+}
+
+.app-admin-surface .admin-main[data-scroll-locked='true'] {
+  overflow: hidden;
+}
+
+html.page-scroll-locked,
+html.page-scroll-locked body {
+  overflow: hidden;
 }
 
 .landing-page {
-  height: 100%;
-  overflow-x: hidden;
-  overflow-y: auto;
+  min-height: 100dvh;
 }
 
 .auth-page {
-  height: 100%;
-  min-height: 0;
+  min-height: 100dvh;
 }
 
 @media (max-height: 800px) {

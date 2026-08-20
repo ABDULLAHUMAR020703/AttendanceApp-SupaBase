@@ -9,4 +9,5 @@ export { Dialog } from './Dialog';
 export { Badge, StatusBadge, RoleBadge, badgeToneForStatus, formatStatusLabel } from './Badge';
 export { AppLoader } from './AppLoader';
 export { MenuItem, MenuLabel, MenuPanel, MenuSeparator, AnchoredMenu, useMenuNavigation } from './Menu';
-export { Skeleton, SkeletonGroup, SkeletonText, SkeletonCardList, SkeletonForm, SkeletonFeed } from './Skeleton';
+export { Skeleton, SkeletonGroup, SkeletonText, SkeletonCardList, SkeletonForm, SkeletonFeed, DirectorySkeleton } from './Skeleton';
+export { KpiMetricCard, KpiMetricGrid } from './KpiMetricCard';

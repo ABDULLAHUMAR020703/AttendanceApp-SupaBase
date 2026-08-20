@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
+import { usePageScrollLock } from '../../lib/usePageScrollLock';
 
 const WIDTHS = {
   sm: 'max-w-sm',
@@ -15,6 +16,7 @@ const WIDTHS = {
  */
 export function Dialog({ open, onClose, title, description, children, footer, size = 'md' }) {
   const panelRef = useRef(null);
+  usePageScrollLock(open);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -41,6 +43,7 @@ export function Dialog({ open, onClose, title, description, children, footer, si
         ref={panelRef}
         tabIndex={-1}
         className={`relative flex max-h-[86vh] w-full flex-col overflow-hidden rounded-3xl border border-hairline bg-white shadow-overlay outline-none animate-scale-in ${WIDTHS[size] || WIDTHS.md}`}
+        data-lenis-prevent
       >
         <div className="flex items-start justify-between gap-4 border-b border-hairline px-6 py-5">
           <div className="min-w-0">
@@ -54,7 +57,7 @@ export function Dialog({ open, onClose, title, description, children, footer, si
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">{children}</div>
 
         {footer && (
           <div className="flex flex-wrap justify-end gap-2 border-t border-hairline bg-surface-subtle px-6 py-4">

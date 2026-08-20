@@ -61,10 +61,10 @@ export function LoginPage() {
   };
 
   return (
-    <div className="auth-page relative overflow-y-auto bg-[#F8FCFD]">
+    <div className="auth-page relative min-h-dvh bg-[#F8FCFD]">
       <HalftoneAura />
 
-      <div className="relative z-10 flex min-h-full flex-col items-center justify-center px-4 py-12 sm:px-6">
+      <div className="relative z-10 flex min-h-dvh flex-col items-center justify-center px-4 py-12 sm:px-6">
         <div className="w-full max-w-[26.5rem] animate-fade-up">
           {!logoFailed && (
             <div className="mb-7 flex justify-center">

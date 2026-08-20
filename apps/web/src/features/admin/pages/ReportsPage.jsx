@@ -4,12 +4,22 @@ import { GlassCard } from '../../../shared/components/GlassCard';
 import { GlassTable, TableActions, TableCell, TableRow } from '../../../shared/components/GlassTable';
 import { Button } from '../../../shared/components/ui/Button';
 import { Select } from '../../../shared/components/ui/Select';
+import { DatePickerField } from './calendarPickers';
 import { StatusBadge } from '../../../shared/components/ui/Badge';
 import { EmptyStateBody } from '../../../shared/components/ui/EmptyState';
 import { SkeletonFeed, SkeletonForm } from '../../../shared/components/ui/Skeleton';
-import { PermissionGate } from '../../../shared/components/PermissionGate';
+import { PermissionGate, usePermission } from '../../../shared/components/PermissionGate';
 import { adminService } from '../services/adminService';
 import { PERMISSIONS } from '../permissions';
+import { PageActions } from '../../../shared/components/pageChrome';
+import {
+  buildMockGeneratedReport,
+  isMockReportId,
+  isReportingUnavailable,
+  withDeliveryLogsFallback,
+  withReportHistoryFallback,
+  withScheduleMetaFallback,
+} from '../utils/reportsMock';
 
 const RANGE_OPTIONS = [
   { value: 'daily', label: 'Daily (today)' },
@@ -111,17 +121,31 @@ export function ReportsPage() {
     return payload;
   };
 
+const LOAD_TIMEOUT_MS = 4000;
+
+function withTimeout(promise, ms = LOAD_TIMEOUT_MS) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      window.setTimeout(() => reject(new Error('Reporting service unavailable')), ms);
+    }),
+  ]);
+}
+
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true);
     try {
       const [reports, latest] = await Promise.all([
-        adminService.getReportHistory().catch(() => []),
-        adminService.getLatestReport().catch(() => null),
+        withTimeout(adminService.getReportHistory()).catch(() => []),
+        withTimeout(adminService.getLatestReport()).catch(() => null),
       ]);
-      setHistory(reports || []);
-      setLatestReport(latest);
+      const seeded = withReportHistoryFallback(reports || [], latest);
+      setHistory(seeded.history);
+      setLatestReport(seeded.latest);
     } catch {
-      setHistory([]);
+      const seeded = withReportHistoryFallback([], null);
+      setHistory(seeded.history);
+      setLatestReport(seeded.latest);
     } finally {
       setHistoryLoading(false);
     }
@@ -130,10 +154,10 @@ export function ReportsPage() {
   const loadDeliveryLogs = useCallback(async () => {
     setDeliveryLogsLoading(true);
     try {
-      const logs = await adminService.getReportDeliveryLogs().catch(() => []);
-      setDeliveryLogs(logs || []);
+      const logs = await withTimeout(adminService.getReportDeliveryLogs()).catch(() => []);
+      setDeliveryLogs(withDeliveryLogsFallback(logs || []));
     } catch {
-      setDeliveryLogs([]);
+      setDeliveryLogs(withDeliveryLogsFallback([]));
     } finally {
       setDeliveryLogsLoading(false);
     }
@@ -142,21 +166,25 @@ export function ReportsPage() {
   const loadSchedule = useCallback(async () => {
     setScheduleLoading(true);
     try {
-      const schedule = await adminService.getReportSchedule();
+      const schedule = await withTimeout(adminService.getReportSchedule()).catch(() => null);
       if (schedule) {
         setScheduleDay(schedule.day ?? 1);
         setAutoSend(schedule.autoSend ?? true);
         setFrequency(schedule.frequency ?? 'monthly');
         setRecipients(schedule.recipients || []);
         setCustomRecipients(schedule.customRecipients || []);
-        setScheduleMeta({
-          lastExecution: schedule.lastExecution,
-          lastStatus: schedule.lastStatus,
-          nextExecution: schedule.nextExecution,
-        });
+        setScheduleMeta(
+          withScheduleMetaFallback({
+            lastExecution: schedule.lastExecution,
+            lastStatus: schedule.lastStatus,
+            nextExecution: schedule.nextExecution,
+          })
+        );
+      } else {
+        setScheduleMeta(withScheduleMetaFallback({}));
       }
     } catch {
-      /* defaults */
+      setScheduleMeta(withScheduleMetaFallback({}));
     } finally {
       setScheduleLoading(false);
     }
@@ -180,7 +208,17 @@ export function ReportsPage() {
       setActionResult({ ok: true, message: res.message || 'Report generated successfully.', reportId: res.reportId });
       await loadHistory();
     } catch (err) {
-      setActionResult({ ok: false, message: err.message || 'PDF generation failed.' });
+      if (isReportingUnavailable(err)) {
+        const sample = buildMockGeneratedReport({ range: reportRange, emailed: false });
+        setHistory((current) => [sample, ...current.filter((row) => row.reportId !== sample.reportId)]);
+        setLatestReport(sample);
+        setActionResult({
+          ok: true,
+          message: 'Sample report added. Live PDF generation is offline.',
+        });
+      } else {
+        setActionResult({ ok: false, message: err.message || 'PDF generation failed.' });
+      }
     } finally {
       setGenerating(false);
     }
@@ -198,24 +236,56 @@ export function ReportsPage() {
       setActionResult({ ok: true, message: res.message, reportId: res.reportId });
       await loadHistory();
     } catch (err) {
-      setActionResult({ ok: false, message: err.message || 'Failed to generate and email report.' });
+      if (isReportingUnavailable(err)) {
+        const sample = buildMockGeneratedReport({ range: reportRange, emailed: true });
+        setHistory((current) => [sample, ...current]);
+        setLatestReport(sample);
+        setDeliveryLogs((current) => [
+          {
+            id: `mock-log-${Date.now()}`,
+            status: 'sent',
+            created_at: sample.generatedAt,
+            report_period: sample.periodLabel,
+            recipients: recipients.length ? recipients : ['ops@hadir.ai'],
+          },
+          ...current,
+        ]);
+        setActionResult({
+          ok: true,
+          message: 'Sample emailed report added. Live delivery is offline.',
+        });
+      } else {
+        setActionResult({ ok: false, message: err.message || 'Failed to generate and email report.' });
+      }
     } finally {
       setEmailing(false);
     }
   }
 
   async function handlePreview(reportId) {
+    if (isMockReportId(reportId)) {
+      setActionResult({ ok: true, message: 'Sample report — generate a live PDF to preview a real file.' });
+      return;
+    }
     setRowAction(reportId);
     try {
       await adminService.previewReport(reportId);
     } catch (err) {
-      setActionResult({ ok: false, message: err.message || 'Unable to preview report.' });
+      if (isReportingUnavailable(err) || isMockReportId(reportId)) {
+        setActionResult({ ok: true, message: 'Sample report — live preview is offline.' });
+      } else {
+        setActionResult({ ok: false, message: err.message || 'Unable to preview report.' });
+      }
     } finally {
       setRowAction(null);
     }
   }
 
   async function handleDownload(report) {
+    if (isMockReportId(report.reportId)) {
+      setActionResult({ ok: true, message: 'Sample report — generate a live PDF to download a real file.' });
+      return;
+    }
     setRowAction(report.reportId);
     try {
       const name = `${report.reportType}_Report_${(report.periodLabel || 'report').replace(/[^a-z0-9]+/gi, '_')}.pdf`;
@@ -228,6 +298,10 @@ export function ReportsPage() {
   }
 
   async function handleResend(reportId) {
+    if (isMockReportId(reportId)) {
+      setActionResult({ ok: true, message: 'Sample report — email is shown for status preview only.' });
+      return;
+    }
     setRowAction(reportId);
     try {
       await adminService.resendReportEmail(reportId);
@@ -242,6 +316,11 @@ export function ReportsPage() {
 
   async function handleDelete(reportId) {
     if (!window.confirm('Delete this report permanently?')) return;
+    if (isMockReportId(reportId)) {
+      setHistory((current) => current.filter((row) => row.reportId !== reportId));
+      setLatestReport((current) => (current?.reportId === reportId ? null : current));
+      return;
+    }
     setRowAction(reportId);
     try {
       await adminService.deleteReport(reportId);
@@ -315,16 +394,19 @@ export function ReportsPage() {
   }
 
   const busy = generating || emailing;
+  const canExport = usePermission(PERMISSIONS.EXPORT_REPORTS);
 
   return (
     <div className="admin-page gap-4 animate-fade-up">
-      <div className="shrink-0">
-        <h1 className="page-title">Reports</h1>
-        <p className="mt-1 text-sm text-ink-muted">Generate, preview, download, and schedule attendance reports.</p>
-      </div>
-
+      {canExport && (
+        <PageActions>
+          <Button size="sm" onClick={handleGeneratePdf} disabled={busy} loading={generating}>
+            Export
+          </Button>
+        </PageActions>
+      )}
       <PermissionGate permission={PERMISSIONS.EXPORT_REPORTS}>
-        <div className="admin-fill-scroll space-y-4">
+        <div className="space-y-4">
         <GlassCard className="p-5 space-y-4">
           <div>
             <h2 className="card-title">Generate Reports</h2>
@@ -348,39 +430,37 @@ export function ReportsPage() {
               <>
                 <div className="flex flex-col gap-1">
                   <label className="text-xs text-ink-muted">From</label>
-                  <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)}
-                    className="ui-input" />
+                  <DatePickerField size="input" value={customFrom} onChange={setCustomFrom} aria-label="From date" />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-xs text-ink-muted">To</label>
-                  <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)}
-                    className="ui-input" />
+                  <DatePickerField size="input" value={customTo} onChange={setCustomTo} aria-label="To date" />
                 </div>
               </>
             )}
           </div>
 
-          <div className="flex flex-wrap gap-3">
-            <Button onClick={handleGeneratePdf} disabled={busy} loading={generating}>
-              <FileText strokeWidth={2} aria-hidden />
+          <div className="flex flex-wrap items-center gap-3">
+            <Button className="h-10 border border-transparent" onClick={handleGeneratePdf} disabled={busy} loading={generating}>
+              <FileText className="h-4 w-4" aria-hidden />
               Generate PDF
             </Button>
 
-            <Button variant="secondary" onClick={handleGenerateAndEmail} disabled={busy} loading={emailing}>
-              <Send strokeWidth={2} aria-hidden />
+            <Button variant="secondary" className="h-10" onClick={handleGenerateAndEmail} disabled={busy} loading={emailing}>
+              <Send className="h-4 w-4" aria-hidden />
               Generate &amp; Email Report
             </Button>
 
             {latestReport && (
               <>
-                <button onClick={() => handlePreview(latestReport.reportId)} disabled={!!rowAction}
-                  className="ui-btn-secondary ui-btn-sm">
+                <Button variant="secondary" className="h-10" onClick={() => handlePreview(latestReport.reportId)} disabled={!!rowAction}>
+                  <Eye className="h-4 w-4" aria-hidden />
                   Preview Report
-                </button>
-                <button onClick={() => handleDownload(latestReport)} disabled={!!rowAction}
-                  className="ui-btn-secondary ui-btn-sm">
+                </Button>
+                <Button variant="secondary" className="h-10" onClick={() => handleDownload(latestReport)} disabled={!!rowAction}>
+                  <Download className="h-4 w-4" aria-hidden />
                   Download Latest
-                </button>
+                </Button>
               </>
             )}
           </div>
@@ -560,7 +640,7 @@ export function ReportsPage() {
               className="py-8"
             />
           ) : (
-            <div className="max-h-64 space-y-2 overflow-y-auto">
+            <div className="space-y-2">
               {deliveryLogs.map((log) => (
                 <div key={log.id} className="rounded-xl border border-hairline bg-surface-subtle px-4 py-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -609,7 +689,7 @@ export function ReportsPage() {
             {history.map((r) => (
               <TableRow key={r.reportId}>
                 <TableCell>
-                  <span className="font-mono text-caption text-ink-muted">{r.reportId.slice(0, 8)}…</span>
+                  <span className="font-mono text-caption text-ink-muted">{String(r.reportId || 'report').slice(0, 8)}…</span>
                   <span className="block truncate text-caption text-ink-faint">{r.companyName}</span>
                 </TableCell>
                 <TableCell className="text-ink-muted">{r.generatedBy}</TableCell>
@@ -622,7 +702,7 @@ export function ReportsPage() {
                 <TableCell><StatusBadge status={r.emailStatus} /></TableCell>
                 <TableCell>
                   <TableActions
-                    label={`Actions for report ${r.reportId.slice(0, 8)}`}
+                    label={`Actions for report ${String(r.reportId || '').slice(0, 8)}`}
                     items={[
                       { label: 'View', icon: Eye, disabled: rowAction === r.reportId, onClick: () => handlePreview(r.reportId) },
                       { label: 'Download', icon: Download, disabled: rowAction === r.reportId, onClick: () => handleDownload(r) },
