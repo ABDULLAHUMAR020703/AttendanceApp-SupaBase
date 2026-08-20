@@ -442,10 +442,6 @@ function MonthGrid({ monthDate, selectedDate, eventsByDay, summariesByDay, onSel
         const summary = summariesByDay.get(cell.key) || {};
         const active = cell.key === selectedDate;
         const isToday = cell.key === todayKey;
-        const hasAttendance = (summary.checkins?.length || 0) > 0;
-        const hasLeave = (summary.leaves?.length || 0) > 0;
-        const hasHoliday = (summary.holidays?.length || 0) > 0;
-        const hasWork = (summary.workModeRequests?.length || 0) > 0;
         return (
           <button
             key={cell.key}
@@ -454,26 +450,21 @@ function MonthGrid({ monthDate, selectedDate, eventsByDay, summariesByDay, onSel
             className={`group flex h-full min-h-0 flex-col items-start gap-0.5 overflow-hidden border-b border-r border-[#E8F0F5] p-1 text-left transition hover:bg-slate-50/80 sm:gap-1 sm:p-2 ${active ? 'bg-[#F0FAFF]' : cell.inMonth ? 'bg-white' : 'bg-slate-50/70'}`}
           >
             <span className="flex w-full items-center justify-between gap-2">
-              <span className={`grid h-6 w-6 place-items-center rounded-full text-[11px] font-semibold sm:h-7 sm:w-7 sm:text-xs ${
-                active ? 'bg-[#00B0FF] text-white' : isToday ? 'border border-[#00B0FF]/40 bg-white text-[#0284C7]' : cell.inMonth ? 'text-slate-800' : 'text-slate-300'
+              <span className={`grid h-6 w-7 place-items-center rounded-md text-[11px] font-semibold sm:h-7 sm:w-8 sm:text-xs ${
+                active ? 'bg-[#E6F4FA] text-[#0284C7] ring-1 ring-[#00B0FF]/45' : isToday ? 'border border-[#00B0FF]/40 bg-white text-[#0284C7]' : cell.inMonth ? 'text-slate-800' : 'text-slate-300'
               }`}>
                 {cell.date.getDate()}
               </span>
-              <span className="flex items-center gap-1" aria-hidden>
-                {hasAttendance && <TypeDot tone="attendance" label="Attendance" />}
-                {hasLeave && <TypeDot tone="leave" label="Leave" />}
-                {hasHoliday && <TypeDot tone="holiday" label="Holiday" />}
-                {hasWork && <TypeDot tone="work" label="Work mode" />}
-                {dayEvents.length > 0 && !hasHoliday && <TypeDot tone="event" label="Event" />}
-              </span>
             </span>
             {summary.approvedLeaves?.length > 0 && (
-              <span className="hidden rounded-md bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 lg:inline">
+              <span className="flex w-full min-w-0 items-center gap-1 truncate border-l-2 border-sky-400 bg-sky-50/70 px-1.5 py-0.5 text-[10px] font-medium leading-tight text-sky-700">
+                <span className="sr-only">On leave: </span>
                 {summary.approvedLeaves.length} on leave
               </span>
             )}
             {summary.checkins?.length > 0 && (
-              <span className="hidden rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 lg:inline">
+              <span className="flex w-full min-w-0 items-center gap-1 truncate border-l-2 border-emerald-400 bg-emerald-50/70 px-1.5 py-0.5 text-[10px] font-medium leading-tight text-emerald-700">
+                <span className="sr-only">Attendance: </span>
                 {summary.checkins.length} check-ins
               </span>
             )}
@@ -482,7 +473,7 @@ function MonthGrid({ monthDate, selectedDate, eventsByDay, summariesByDay, onSel
                 key={event.id}
                 role="presentation"
                 onClick={(e) => { e.stopPropagation(); onOpenEvent(event); }}
-                className="mt-0.5 flex w-full items-center gap-1.5 truncate rounded-md bg-white/80 px-1.5 py-1 text-[10px] font-medium text-slate-700 ring-1 ring-slate-100 transition group-hover:bg-white"
+                className="mt-0.5 flex w-full items-center gap-1.5 truncate border-l-2 border-slate-300 bg-slate-50/80 px-1.5 py-1 text-[10px] font-medium text-slate-700 transition group-hover:bg-white"
               >
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: EVENT_DASH[event.type] || EVENT_DASH.other }} aria-hidden />
                 {event.title}
@@ -938,9 +929,9 @@ export function CalendarPage() {
         <PermissionGate anyOf={[PERMISSIONS.CREATE_EVENTS, PERMISSIONS.EDIT_EVENTS]}>
           <form
             onSubmit={handleSubmit}
-            className="mt-2 flex min-h-0 flex-1 flex-col justify-between overflow-hidden rounded-2xl bg-white p-3 text-slate-800 shadow-[0_10px_25px_rgba(0,0,0,0.08)]"
+            className="mt-2 flex flex-col rounded-2xl bg-white p-3 text-slate-800 shadow-[0_10px_25px_rgba(0,0,0,0.08)]"
           >
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div>
             <div className="flex shrink-0 items-start justify-between gap-3">
               <div>
                 <h2 className="text-sm font-bold tracking-tight text-slate-900">{mode === 'edit' ? 'Edit event' : 'Add event'}</h2>
@@ -980,7 +971,7 @@ export function CalendarPage() {
                   <input required placeholder="Design review" value={form.title} onChange={(e) => updateForm('title', e.target.value)} className={inputClass} />
                 </label>
 
-                <div className="grid w-full grid-cols-2 gap-2">
+                <div className="grid w-full grid-cols-1 gap-2">
                   <div className="block min-w-0">
                     <span id="event-date-label" className="text-[11px] font-semibold uppercase tracking-wider text-[#8898AA]">Date</span>
                     <DatePickerField

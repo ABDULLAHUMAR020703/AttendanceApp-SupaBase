@@ -342,6 +342,7 @@ export function TicketsPage() {
             </button>
           ))}
         </div>
+        <div className="flex flex-wrap items-center gap-2">
         <Select
           size="sm"
           value={priorityFilter}
@@ -387,6 +388,7 @@ export function TicketsPage() {
         <p className="text-xs tabular-nums text-slate-400">
           {filtered.length} {filtered.length === 1 ? 'ticket' : 'tickets'}
         </p>
+        </div>
       </div>
 
       <div className="tickets-workspace admin-fill grid gap-4 lg:grid-cols-[minmax(0,1fr)_24rem] xl:grid-cols-[minmax(0,1fr)_28rem]">

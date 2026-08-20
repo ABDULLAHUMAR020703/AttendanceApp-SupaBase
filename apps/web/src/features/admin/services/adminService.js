@@ -28,7 +28,10 @@ const extractApiMessage = (error, fallbackMessage) => {
   if (status === 502 || status === 503 || status === 504) {
     return 'Backend is unavailable (gateway or upstream service). Check Coolify health and try again.';
   }
-  if (error?.code === 'ERR_NETWORK' || /network error/i.test(String(error?.message || ''))) {
+  if (
+    error?.code === 'ERR_NETWORK' ||
+    /network error|fetch failed|failed to fetch|econnrefused|eacces/i.test(String(error?.message || ''))
+  ) {
     return 'Cannot reach the API gateway. Verify VITE_API_GATEWAY_URL / NEXT_PUBLIC_API_URL and network connectivity.';
   }
   if (error?.code === 'ECONNABORTED' || /timeout/i.test(String(error?.message || ''))) {

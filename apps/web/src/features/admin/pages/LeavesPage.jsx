@@ -527,7 +527,7 @@ export function LeavesPage() {
           </div>
         </section>
 
-        <aside className="rounded-xl border border-slate-200/80 bg-white p-4">
+        <aside className="self-start h-fit rounded-xl border border-slate-200/80 bg-white p-4">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-slate-900">Calendar</p>
           </div>

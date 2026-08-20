@@ -102,23 +102,14 @@ export function CompanyOnboardingPage() {
     <div className="auth-page relative min-h-dvh bg-page">
       <HalftoneAura />
 
-      <div className="relative z-10 flex min-h-dvh items-center justify-center px-4 py-10">
+      <div className="relative z-10 flex min-h-dvh items-center justify-center px-4 py-4 sm:px-6 sm:py-6">
         <div className="w-full max-w-md animate-fade-up">
-          <Link to="/" className="mb-6 flex items-center justify-center gap-2 text-ink">
-            <img
-              src={LOGO_PATH}
-              alt="Hadir.ai logo"
-              className="h-8 w-8 rounded-2xl object-cover shadow-hair"
-            />
-            <span className="text-subheading font-semibold tracking-[-0.02em]">Hadir.ai</span>
-          </Link>
-
           {!logoFailed && (
-            <div className="mb-5 flex justify-center">
+            <div className="mb-3 flex justify-center">
               <img
                 src={logoSrc}
                 alt=""
-                className="h-14 w-14 rounded-2xl border border-white object-cover shadow-raise"
+                className="h-10 w-10 rounded-2xl border border-white object-cover shadow-raise"
                 onError={() => {
                   setLogoFailed(true);
                   setLogoSrc('/logo.jpeg');
@@ -142,10 +133,10 @@ export function CompanyOnboardingPage() {
             </div>
           ) : (
             <form
-              className="space-y-5 rounded-3xl border border-hairline bg-white p-8 shadow-pop"
+              className="space-y-2 rounded-[2rem] border border-hairline bg-white p-4 shadow-pop sm:p-6"
               onSubmit={onSubmit}
             >
-              <div className="space-y-1">
+              <div className="space-y-0.5">
                 <h1 className="text-title font-semibold text-ink">Create company</h1>
                 <p className="text-label text-ink-muted">
                   Register a new tenant with a Management department and super admin.
@@ -163,6 +154,7 @@ export function CompanyOnboardingPage() {
               {!statusLoading && requiresKey && (
                 <Input
                   label="Onboarding key"
+                  size="sm"
                   placeholder="Server secret from COMPANY_ONBOARDING_SECRET"
                   value={onboardingKey}
                   onChange={(e) => setOnboardingKey(e.target.value)}
@@ -172,6 +164,7 @@ export function CompanyOnboardingPage() {
 
               <Input
                 label="Company name"
+                size="sm"
                 required
                 placeholder="Acme Inc."
                 value={companyName}
@@ -180,6 +173,7 @@ export function CompanyOnboardingPage() {
 
               <Input
                 label="Super admin full name"
+                size="sm"
                 required
                 placeholder="Jane Doe"
                 value={superAdminName}
@@ -188,6 +182,7 @@ export function CompanyOnboardingPage() {
 
               <Input
                 label="Username"
+                size="sm"
                 required
                 autoCapitalize="none"
                 placeholder="jane.admin"
@@ -197,6 +192,7 @@ export function CompanyOnboardingPage() {
 
               <Input
                 label="Email"
+                size="sm"
                 required
                 type="email"
                 placeholder="jane@company.com"
@@ -211,6 +207,7 @@ export function CompanyOnboardingPage() {
                   minLength={8}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  className="[&>input]:ui-input-sm"
                 />
               </Field>
 
@@ -218,7 +215,7 @@ export function CompanyOnboardingPage() {
 
               <Button
                 type="submit"
-                size="lg"
+                size="md"
                 loading={submitting}
                 disabled={statusLoading}
                 className="w-full"
@@ -226,16 +223,25 @@ export function CompanyOnboardingPage() {
                 Create company &amp; super admin
               </Button>
 
-              <p className="text-center text-label text-ink-muted">
+              <p className="pt-1 text-center text-label text-ink-muted">
                 <Link
                   to="/login"
                   className="font-semibold text-accent-600 transition-colors duration-fast hover:text-accent-700 hover:underline"
                 >
-                  Back to sign in
+                  Already have an account? Sign in
                 </Link>
               </p>
             </form>
           )}
+
+          <p className="mt-3 text-center">
+            <Link
+              to="/"
+              className="text-[13px] font-semibold text-[#64748B] transition hover:text-[#0F172A]"
+            >
+              Back to Home
+            </Link>
+          </p>
         </div>
       </div>
     </div>

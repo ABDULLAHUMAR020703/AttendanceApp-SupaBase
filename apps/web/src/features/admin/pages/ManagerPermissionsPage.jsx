@@ -108,7 +108,7 @@ function AuditHistoryButton({ open, onClick }) {
       onClick={onClick}
       aria-haspopup="dialog"
       aria-expanded={open}
-      className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-hair hover:bg-slate-50"
+      className="ui-btn-secondary ui-btn-sm"
     >
       <History className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
       Audit History
