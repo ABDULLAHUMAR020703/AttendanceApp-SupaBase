@@ -3,7 +3,6 @@ import { useReducedMotion } from 'framer-motion';
 import {
   Bar,
   BarChart,
-  CartesianGrid,
   LabelList,
   ResponsiveContainer,
   XAxis,
@@ -14,7 +13,6 @@ import { truncateChartLabel } from '../../../features/admin/utils/analyticsChart
 const FILL = '#00AEEF';
 const FILL_ACTIVE = '#0096d6';
 const AXIS = '#cbd5e1';
-const GRID = '#f1f5f9';
 const TICK = '#94a3b8';
 const LABEL = '#334155';
 const PERCENT = '#0f172a';
@@ -35,10 +33,6 @@ function toTitleCase(value) {
   return text.toLowerCase().replace(/\b([a-z])/g, (match) => match.toUpperCase());
 }
 
-function userCountLabel(count) {
-  return `${count} ${count === 1 ? 'user' : 'users'}`;
-}
-
 function niceHeadcountScale(peak) {
   const value = Math.max(1, Number(peak) || 1);
   const ceilings = [4, 6, 8, 10, 12, 16, 20, 24, 30, 40, 50, 60, 80, 100, 120, 160, 200];
@@ -49,17 +43,18 @@ function niceHeadcountScale(peak) {
   return { domain: [0, max], ticks };
 }
 
-function BarTopBadge({ x, y, width, payload }) {
+function BarValueLabels({ x, y, width, height, payload }) {
   if (x == null || y == null || !payload) return null;
   const cx = x + width / 2;
+  const tallBar = Number(height) >= 30;
   return (
     <g>
       <text
         x={cx}
-        y={y - 22}
+        y={tallBar ? y - 10 : y - 24}
         textAnchor="middle"
         fill={PERCENT}
-        fontSize={13}
+        fontSize={12}
         fontWeight={700}
         fontFamily={CHART_FONT}
       >
@@ -67,14 +62,14 @@ function BarTopBadge({ x, y, width, payload }) {
       </text>
       <text
         x={cx}
-        y={y - 8}
+        y={tallBar ? y + 20 : y - 8}
         textAnchor="middle"
-        fill={COUNT}
-        fontSize={11}
-        fontWeight={500}
+        fill={tallBar ? '#ffffff' : COUNT}
+        fontSize={12}
+        fontWeight={700}
         fontFamily={CHART_FONT}
       >
-        {userCountLabel(payload.value)}
+        {payload.value}
       </text>
     </g>
   );
@@ -130,7 +125,8 @@ export const DepartmentBarChart = memo(function DepartmentBarChart({
   );
 
   const crowded = rows.length > 6;
-  const innerWidth = rows.length * 80 + 56;
+  const innerWidth = rows.length * 88 + 56;
+  const barSize = rows.length <= 4 ? 82 : 58;
 
   const handleBarClick = useCallback(
     (item) => {
@@ -157,21 +153,20 @@ export const DepartmentBarChart = memo(function DepartmentBarChart({
         <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
           <BarChart
             data={rows}
-            margin={{ top: 32, right: 24, left: 8, bottom: 8 }}
-            barCategoryGap="20%"
-            maxBarSize={60}
+            margin={{ top: 30, right: 24, left: 8, bottom: 10 }}
+            barCategoryGap="12%"
+            maxBarSize={barSize}
           >
-            <CartesianGrid vertical={false} stroke={GRID} strokeDasharray="3 3" />
             <XAxis
               dataKey="name"
-              axisLine={{ stroke: AXIS, strokeWidth: 2 }}
+              axisLine={{ stroke: AXIS, strokeWidth: 1 }}
               tickLine={false}
               interval={0}
               tick={<CategoryTick />}
             />
             <YAxis
               type="number"
-              axisLine={{ stroke: AXIS, strokeWidth: 2 }}
+              axisLine={{ stroke: AXIS, strokeWidth: 1 }}
               tickLine={false}
               tick={{ fill: TICK, fontSize: 11, fontWeight: 500, fontFamily: CHART_FONT }}
               ticks={scale.ticks}
@@ -183,7 +178,7 @@ export const DepartmentBarChart = memo(function DepartmentBarChart({
               dataKey="value"
               fill={FILL}
               radius={[4, 4, 0, 0]}
-              barSize={52}
+              barSize={barSize}
               cursor={interactive ? 'pointer' : 'default'}
               onClick={handleBarClick}
               activeBar={{ fill: FILL_ACTIVE }}
@@ -191,7 +186,7 @@ export const DepartmentBarChart = memo(function DepartmentBarChart({
               animationDuration={800}
               animationEasing="ease-out"
             >
-              <LabelList dataKey="value" content={BarTopBadge} />
+              <LabelList dataKey="value" content={BarValueLabels} />
             </Bar>
           </BarChart>
         </ResponsiveContainer>

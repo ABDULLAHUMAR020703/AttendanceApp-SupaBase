@@ -798,7 +798,13 @@
     min-height: 0;
   }
 
-  .calendar-sidebar,
+  .calendar-sidebar {
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: none;
+    overscroll-behavior: contain;
+  }
+
   .calendar-grid-body {
     overflow: hidden;
     scrollbar-width: none;

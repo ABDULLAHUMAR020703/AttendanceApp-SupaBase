@@ -285,7 +285,7 @@ function AnalyticsShowcaseMockup() {
       <div className="absolute -inset-8 rounded-[2.5rem] bg-white/10 blur-3xl" />
 
       <svg className="pointer-events-none absolute inset-0 z-30 hidden h-full w-full overflow-visible lg:block" viewBox="0 0 760 700" fill="none" aria-hidden="true">
-        <g transform="translate(0 -76)">
+        <g transform="translate(14 -64)">
           <path d="M510 86C474 94 454 112 444 142" stroke="white" strokeWidth="2.3" strokeLinecap="round" />
           <path d="M438 130l5 16 13-11" stroke="white" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" />
         </g>

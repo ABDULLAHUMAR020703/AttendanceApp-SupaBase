@@ -893,20 +893,20 @@ export function CalendarPage() {
       </section>
 
       <aside
-        className="calendar-sidebar flex h-full max-h-[42%] min-h-0 w-full shrink-0 flex-col overflow-hidden rounded-3xl p-3 text-slate-800 shadow-[0_8px_24px_rgba(15,23,42,0.06)] lg:max-h-[calc(100vh-80px)] lg:w-[20.5rem] lg:p-3 xl:w-[360px]"
+        className="calendar-sidebar flex h-full max-h-[42%] min-h-0 w-full shrink-0 flex-col overflow-x-hidden overflow-y-auto rounded-3xl p-1.5 text-slate-800 shadow-[0_8px_24px_rgba(15,23,42,0.06)] sm:p-3 lg:max-h-[calc(100vh-80px)] lg:w-[20.5rem] lg:p-3 xl:w-[360px]"
         style={{ background: SIDEBAR_GRADIENT }}
       >
-        <div className="relative flex w-full shrink-0 items-center rounded-full border border-slate-200 bg-white transition-all duration-200 hover:border-slate-300 focus-within:border-[#00B0FF]/50 focus-within:ring-2 focus-within:ring-[#00B0FF]/10">
-          <Search className="pointer-events-none absolute left-3.5 h-4 w-4 text-slate-400" aria-hidden />
+        <div className="relative mx-1 flex h-10 w-[calc(100%-0.5rem)] shrink-0 items-center overflow-hidden rounded-full border border-[#C2ECF9] bg-white transition-all duration-200 hover:border-[#70C8F4] focus-within:border-[#00B0FF]/60 focus-within:ring-2 focus-within:ring-[#00B0FF]/10">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search..."
-            className={`w-full rounded-full bg-transparent py-2 pl-10 text-sm font-medium text-slate-800 outline-none placeholder:text-slate-400 ${query ? 'pr-10' : 'pr-4'}`}
+            className={`h-full w-full rounded-full bg-transparent pl-10 text-sm font-medium text-slate-800 outline-none placeholder:text-slate-400 ${query ? 'pr-10' : 'pr-4'}`}
           />
           {query && (
-            <button type="button" onClick={() => setQuery('')} className="absolute right-2 grid h-7 w-7 place-items-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" aria-label="Clear search">
+            <button type="button" onClick={() => setQuery('')} className="absolute right-2 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" aria-label="Clear search">
               <X className="h-3.5 w-3.5" aria-hidden />
             </button>
           )}
@@ -929,7 +929,7 @@ export function CalendarPage() {
         <PermissionGate anyOf={[PERMISSIONS.CREATE_EVENTS, PERMISSIONS.EDIT_EVENTS]}>
           <form
             onSubmit={handleSubmit}
-            className="mt-2 flex flex-col rounded-2xl bg-white p-3 text-slate-800 shadow-[0_10px_25px_rgba(0,0,0,0.08)]"
+            className="mt-2 flex flex-col rounded-2xl bg-white p-2 text-slate-800 shadow-[0_10px_25px_rgba(0,0,0,0.08)] sm:p-3"
           >
             <div>
             <div className="flex shrink-0 items-start justify-between gap-3">
@@ -953,7 +953,7 @@ export function CalendarPage() {
                       key={type.value}
                       type="button"
                       onClick={() => updateForm('type', type.value)}
-                      className={`rounded-full px-2.5 py-1 text-xs transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#70C8F4]/40 ${
+                      className={`rounded-full px-2.5 py-0.5 text-xs transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#70C8F4]/40 ${
                         active
                           ? 'border-2 border-[#00B0FF] bg-white font-semibold text-[#00B0FF] shadow-sm'
                           : 'border border-transparent bg-[#F0F9FD] font-medium text-[#8898AA] hover:border-[#70C8F4]'
@@ -965,10 +965,10 @@ export function CalendarPage() {
                 })}
               </div>
 
-              <div className="mt-3 space-y-2">
+              <div className="mt-2 space-y-1.5">
                 <label className="block">
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-[#8898AA]">Title</span>
-                  <input required placeholder="Design review" value={form.title} onChange={(e) => updateForm('title', e.target.value)} className={inputClass} />
+                  <input required placeholder="Design review" value={form.title} onChange={(e) => updateForm('title', e.target.value)} className={`${inputClass} h-8`} />
                 </label>
 
                 <div className="grid w-full grid-cols-1 gap-2">
@@ -1002,18 +1002,18 @@ export function CalendarPage() {
                     placeholder="Add people, location, or agenda"
                     value={form.description}
                     onChange={(e) => updateForm('description', e.target.value)}
-                    className={`${inputClass} h-14 resize-none`}
+                    className={`${inputClass} h-10 resize-none`}
                   />
                 </label>
               </div>
             </div>
             </div>
 
-            <div className="mt-3 flex shrink-0 flex-col gap-2">
+            <div className="mt-2 flex shrink-0 flex-col gap-1.5">
               <button
                 type="submit"
                 disabled={busy}
-                className="ui-btn-primary w-full py-2 text-xs font-semibold"
+                className="ui-btn-primary w-full py-1.5 text-xs font-semibold"
               >
                 <Plus className="h-3.5 w-3.5" aria-hidden />
                 {mode === 'edit' ? 'Save event' : 'Add event'}

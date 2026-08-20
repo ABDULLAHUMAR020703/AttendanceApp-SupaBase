@@ -16,7 +16,7 @@ const TRIGGER = {
   field:
     'mt-1.5 flex h-11 w-full min-w-0 items-center gap-2 rounded-xl border border-[#D0ECF9] bg-[#F0F9FD] px-3 text-sm font-medium text-slate-800 transition-all duration-200 hover:border-[#70C9EF] focus:border-[#00BCFF] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[rgba(0,188,255,0.25)]',
   compact:
-    'mt-1 flex h-9 w-full min-w-0 items-center gap-1.5 rounded-lg border border-[#D0ECF9] bg-[#F0F9FD] px-2.5 pr-2.5 text-xs font-medium text-slate-800 transition-all duration-200 hover:border-[#70C9EF] focus:border-[#00BCFF] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgba(0,163,255,0.25)]',
+    'mt-1 flex h-8 w-full min-w-0 items-center gap-1.5 rounded-lg border border-[#D0ECF9] bg-[#F0F9FD] px-2.5 pr-2.5 text-xs font-medium text-slate-800 transition-all duration-200 hover:border-[#70C9EF] focus:border-[#00BCFF] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[rgba(0,163,255,0.25)]',
   input:
     'flex h-10 w-full min-w-0 items-center gap-2 rounded-xl border border-[#D0ECF9] bg-white px-3.5 text-sm font-medium text-slate-800 transition-all duration-200 hover:border-[#70C9EF] focus:border-[#00BCFF] focus:outline-none focus:ring-4 focus:ring-[rgba(0,188,255,0.25)]',
   toolbar:
