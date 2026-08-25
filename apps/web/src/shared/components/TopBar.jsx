@@ -14,7 +14,6 @@ import { AppIcon } from './AppIcon';
 import { notificationKindMeta } from '../lib/notificationIcons';
 import { AnimatePresence, motion } from 'framer-motion';
 import { adminService } from '../../features/admin/services/adminService';
-import { queryMockNotifications, setMockFallbackActive } from '../../features/notifications/mockNotifications';
 import { useDismiss } from '../lib/useDismiss';
 import { NAV_SECTIONS } from './navConfig';
 import { usePageChrome } from './pageChrome';
@@ -138,13 +137,7 @@ function NotificationBell({ unreadCount }) {
     try {
       const res = await adminService.getNotifications({ page: 1, limit: 5 });
       const live = Array.isArray(res.data) ? res.data : [];
-      if (live.length > 0) {
-        setMockFallbackActive(false);
-        setItems(live);
-      } else {
-        setMockFallbackActive(true);
-        setItems(queryMockNotifications({ page: 1, limit: 5 }).data);
-      }
+      setItems(live);
     } catch (err) {
       setError(err?.message || 'Failed to load notifications');
     } finally {

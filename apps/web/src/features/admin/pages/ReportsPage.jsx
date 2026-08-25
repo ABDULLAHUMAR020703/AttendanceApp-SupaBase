@@ -11,14 +11,6 @@ import { PermissionGate, usePermission } from '../../../shared/components/Permis
 import { adminService } from '../services/adminService';
 import { PERMISSIONS } from '../permissions';
 import { PageActions } from '../../../shared/components/pageChrome';
-import {
-  buildMockGeneratedReport,
-  isMockReportId,
-  isReportingUnavailable,
-  withDeliveryLogsFallback,
-  withReportHistoryFallback,
-  withScheduleMetaFallback,
-} from '../utils/reportsMock';
 
 const RANGE_OPTIONS = [
   { value: 'daily', label: 'Daily (today)' },
@@ -156,13 +148,11 @@ function withTimeout(promise, ms = LOAD_TIMEOUT_MS) {
         withTimeout(adminService.getReportHistory()).catch(() => []),
         withTimeout(adminService.getLatestReport()).catch(() => null),
       ]);
-      const seeded = withReportHistoryFallback(reports || [], latest);
-      setHistory(seeded.history);
-      setLatestReport(seeded.latest);
+      setHistory(Array.isArray(reports) ? reports : []);
+      setLatestReport(latest || null);
     } catch {
-      const seeded = withReportHistoryFallback([], null);
-      setHistory(seeded.history);
-      setLatestReport(seeded.latest);
+      setHistory([]);
+      setLatestReport(null);
     } finally {
       setHistoryLoading(false);
     }
@@ -172,9 +162,9 @@ function withTimeout(promise, ms = LOAD_TIMEOUT_MS) {
     setDeliveryLogsLoading(true);
     try {
       const logs = await withTimeout(adminService.getReportDeliveryLogs()).catch(() => []);
-      setDeliveryLogs(withDeliveryLogsFallback(logs || []));
+      setDeliveryLogs(Array.isArray(logs) ? logs : []);
     } catch {
-      setDeliveryLogs(withDeliveryLogsFallback([]));
+      setDeliveryLogs([]);
     } finally {
       setDeliveryLogsLoading(false);
     }
@@ -190,18 +180,16 @@ function withTimeout(promise, ms = LOAD_TIMEOUT_MS) {
         setFrequency(schedule.frequency ?? 'monthly');
         setRecipients(schedule.recipients || []);
         setCustomRecipients(schedule.customRecipients || []);
-        setScheduleMeta(
-          withScheduleMetaFallback({
-            lastExecution: schedule.lastExecution,
-            lastStatus: schedule.lastStatus,
-            nextExecution: schedule.nextExecution,
-          })
-        );
+        setScheduleMeta({
+          lastExecution: schedule.lastExecution,
+          lastStatus: schedule.lastStatus,
+          nextExecution: schedule.nextExecution,
+        });
       } else {
-        setScheduleMeta(withScheduleMetaFallback({}));
+        setScheduleMeta({});
       }
     } catch {
-      setScheduleMeta(withScheduleMetaFallback({}));
+      setScheduleMeta({});
     } finally {
       setScheduleLoading(false);
     }
@@ -225,17 +213,7 @@ function withTimeout(promise, ms = LOAD_TIMEOUT_MS) {
       setActionResult({ ok: true, message: res.message || 'Report generated successfully.', reportId: res.reportId });
       await loadHistory();
     } catch (err) {
-      if (isReportingUnavailable(err)) {
-        const sample = buildMockGeneratedReport({ range: reportRange, emailed: false });
-        setHistory((current) => [sample, ...current.filter((row) => row.reportId !== sample.reportId)]);
-        setLatestReport(sample);
-        setActionResult({
-          ok: true,
-          message: 'Sample report added. Live PDF generation is offline.',
-        });
-      } else {
-        setActionResult({ ok: false, message: err.message || 'PDF generation failed.' });
-      }
+      setActionResult({ ok: false, message: err.message || 'PDF generation failed.' });
     } finally {
       setGenerating(false);
     }
@@ -253,56 +231,24 @@ function withTimeout(promise, ms = LOAD_TIMEOUT_MS) {
       setActionResult({ ok: true, message: res.message, reportId: res.reportId });
       await loadHistory();
     } catch (err) {
-      if (isReportingUnavailable(err)) {
-        const sample = buildMockGeneratedReport({ range: reportRange, emailed: true });
-        setHistory((current) => [sample, ...current]);
-        setLatestReport(sample);
-        setDeliveryLogs((current) => [
-          {
-            id: `mock-log-${Date.now()}`,
-            status: 'sent',
-            created_at: sample.generatedAt,
-            report_period: sample.periodLabel,
-            recipients: recipients.length ? recipients : ['ops@hadir.ai'],
-          },
-          ...current,
-        ]);
-        setActionResult({
-          ok: true,
-          message: 'Sample emailed report added. Live delivery is offline.',
-        });
-      } else {
-        setActionResult({ ok: false, message: err.message || 'Failed to generate and email report.' });
-      }
+      setActionResult({ ok: false, message: err.message || 'Failed to generate and email report.' });
     } finally {
       setEmailing(false);
     }
   }
 
   async function handlePreview(reportId) {
-    if (isMockReportId(reportId)) {
-      setActionResult({ ok: true, message: 'Sample report — generate a live PDF to preview a real file.' });
-      return;
-    }
     setRowAction(reportId);
     try {
       await adminService.previewReport(reportId);
     } catch (err) {
-      if (isReportingUnavailable(err) || isMockReportId(reportId)) {
-        setActionResult({ ok: true, message: 'Sample report — live preview is offline.' });
-      } else {
-        setActionResult({ ok: false, message: err.message || 'Unable to preview report.' });
-      }
+      setActionResult({ ok: false, message: err.message || 'Unable to preview report.' });
     } finally {
       setRowAction(null);
     }
   }
 
   async function handleDownload(report) {
-    if (isMockReportId(report.reportId)) {
-      setActionResult({ ok: true, message: 'Sample report — generate a live PDF to download a real file.' });
-      return;
-    }
     setRowAction(report.reportId);
     try {
       const name = `${report.reportType}_Report_${(report.periodLabel || 'report').replace(/[^a-z0-9]+/gi, '_')}.pdf`;
@@ -315,10 +261,6 @@ function withTimeout(promise, ms = LOAD_TIMEOUT_MS) {
   }
 
   async function handleResend(reportId) {
-    if (isMockReportId(reportId)) {
-      setActionResult({ ok: true, message: 'Sample report — email is shown for status preview only.' });
-      return;
-    }
     setRowAction(reportId);
     try {
       await adminService.resendReportEmail(reportId);
@@ -333,11 +275,6 @@ function withTimeout(promise, ms = LOAD_TIMEOUT_MS) {
 
   async function handleDelete(reportId) {
     if (!window.confirm('Delete this report permanently?')) return;
-    if (isMockReportId(reportId)) {
-      setHistory((current) => current.filter((row) => row.reportId !== reportId));
-      setLatestReport((current) => (current?.reportId === reportId ? null : current));
-      return;
-    }
     setRowAction(reportId);
     try {
       await adminService.deleteReport(reportId);

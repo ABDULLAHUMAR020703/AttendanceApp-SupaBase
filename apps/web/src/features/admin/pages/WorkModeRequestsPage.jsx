@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Laptop2 } from 'lucide-react';
 import { adminService } from '../services/adminService';
@@ -16,11 +16,6 @@ import { EmptyStateBody } from '../../../shared/components/ui/EmptyState';
 import { formatStatusLabel } from '../../../shared/components/ui';
 import { canAccessFeature, hasPermission, PERMISSIONS } from '../permissions';
 import { useSilentPoll } from '../../../shared/hooks/useSilentPoll';
-import {
-  applyMockWorkModeDecision,
-  cloneMockWorkModeRequests,
-  isMockWorkModeRequestId,
-} from '../utils/workModeRequestsMock';
 
 const MODE_CATALOG = [
   {
@@ -124,7 +119,6 @@ export function WorkModeRequestsPage() {
   const [activeMode, setActiveMode] = useState(null);
   const [activeRequest, setActiveRequest] = useState(null);
   const [requestFilter, setRequestFilter] = useState('pending');
-  const mockQueueRef = useRef(null);
 
   const canApprove = hasPermission(user, PERMISSIONS.APPROVE_WORK_MODE);
   const canReject = hasPermission(user, PERMISSIONS.REJECT_WORK_MODE);
@@ -136,20 +130,10 @@ export function WorkModeRequestsPage() {
     setError('');
     try {
       const data = await adminService.getWorkModeRequests();
-      if (Array.isArray(data) && data.length > 0) {
-        mockQueueRef.current = null;
-        setRows(data);
-      } else {
-        if (!mockQueueRef.current) {
-          mockQueueRef.current = cloneMockWorkModeRequests();
-        }
-        setRows(mockQueueRef.current);
-      }
-    } catch {
-      if (!mockQueueRef.current) {
-        mockQueueRef.current = cloneMockWorkModeRequests();
-      }
-      setRows(mockQueueRef.current);
+      setRows(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setRows([]);
+      setError(err?.message || 'Failed to load work mode requests');
     } finally {
       if (!silent) setLoading(false);
     }
@@ -217,17 +201,8 @@ export function WorkModeRequestsPage() {
     setBusyId(id);
     setError('');
     try {
-      if (isMockWorkModeRequestId(id)) {
-        const next = applyMockWorkModeDecision(mockQueueRef.current || rows, id, {
-          status,
-          admin_notes: notes[id] || '',
-        });
-        mockQueueRef.current = next;
-        setRows(next);
-      } else {
-        await adminService.processWorkModeRequest(id, { status, admin_notes: notes[id] || '' });
-        await loadRequests();
-      }
+      await adminService.processWorkModeRequest(id, { status, admin_notes: notes[id] || '' });
+      await loadRequests();
       if (normalizeStatus(status) !== 'pending') {
         setActiveRequest((current) => (current?.id === id ? null : current));
       }

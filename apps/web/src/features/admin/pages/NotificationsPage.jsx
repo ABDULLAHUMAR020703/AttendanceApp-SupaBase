@@ -4,15 +4,6 @@ import { BellOff, X } from 'lucide-react';
 import { adminService } from '../services/adminService';
 import { useSilentPoll, useSessionState } from '../../../shared/hooks/useSilentPoll';
 import { useNotificationStore } from '../../notifications/store/notificationStore';
-import {
-  countMockUnread,
-  deleteMockNotification,
-  isMockNotificationId,
-  markAllMockNotificationsRead,
-  markMockNotificationRead,
-  queryMockNotifications,
-  setMockFallbackActive,
-} from '../../notifications/mockNotifications';
 import { Alert } from '../../../shared/components/ui/Alert';
 import { Select } from '../../../shared/components/ui/Select';
 import { EmptyStateBody } from '../../../shared/components/ui/EmptyState';
@@ -121,23 +112,9 @@ export function NotificationsPage() {
           type: typeFilter || undefined,
         });
         const live = Array.isArray(res.data) ? res.data : [];
-        if (live.length > 0) {
-          setMockFallbackActive(false);
-          setItems(live);
-          setTotal(res.total || live.length);
-          await refreshBadge();
-        } else {
-          setMockFallbackActive(true);
-          const mock = queryMockNotifications({
-            page,
-            limit,
-            read: readFilter || undefined,
-            type: typeFilter || undefined,
-          });
-          setItems(mock.data);
-          setTotal(mock.total);
-          useNotificationStore.setState({ unreadCount: countMockUnread() });
-        }
+        setItems(live);
+        setTotal(res.total || live.length);
+        await refreshBadge();
       } catch (err) {
         if (!silent) setError(err.message || 'Failed to load notifications');
       } finally {
@@ -153,22 +130,16 @@ export function NotificationsPage() {
   useSilentPoll(load, 30000, [page, readFilter, typeFilter]);
 
   async function markRead(id) {
-    if (isMockNotificationId(id)) {
-      markMockNotificationRead(id);
-    } else {
-      await adminService.markNotificationRead(id);
-    }
+    await adminService.markNotificationRead(id);
     setItems((prev) => prev.map((item) => (item.id === id ? { ...item, read: true } : item)));
     decrement();
   }
 
   async function markAllRead() {
-    const usingMocks = items.some((item) => isMockNotificationId(item.id));
     setBusy(true);
     setError('');
     try {
-      if (usingMocks) markAllMockNotificationsRead();
-      else await adminService.markAllNotificationsRead();
+      await adminService.markAllNotificationsRead();
       setItems((prev) => prev.map((item) => ({ ...item, read: true })));
       clearBadge();
     } catch (err) {
@@ -179,12 +150,6 @@ export function NotificationsPage() {
   }
 
   async function remove(id) {
-    if (isMockNotificationId(id)) {
-      deleteMockNotification(id);
-      setItems((prev) => prev.filter((item) => item.id !== id));
-      useNotificationStore.setState({ unreadCount: countMockUnread() });
-      return;
-    }
     await adminService.deleteNotification(id);
     setItems((prev) => prev.filter((item) => item.id !== id));
     await refreshBadge();

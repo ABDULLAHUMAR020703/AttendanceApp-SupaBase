@@ -10,10 +10,8 @@ import {
   buildAttendanceSeries,
   buildDepartmentChartData,
   computeAnalyticsKpis,
-  getRangeDayCount,
   resolveDateRange,
 } from '../../../features/admin/utils/analyticsCharts';
-import { withAttendanceActivityFallback } from '../../../features/admin/utils/analyticsActivityMock';
 
 export function useAnalyticsMetrics({
   datePreset,
@@ -37,8 +35,7 @@ export function useAnalyticsMetrics({
 
   const attendanceSeries = useMemo(() => {
     if (!selectedRange || rangeInvalid) return { data: [], granularity: 'daily' };
-    const built = buildAttendanceSeries(attendanceRecords, selectedRange);
-    return withAttendanceActivityFallback(built, getRangeDayCount(selectedRange));
+    return buildAttendanceSeries(attendanceRecords, selectedRange);
   }, [attendanceRecords, selectedRange, rangeInvalid]);
 
   const kpis = useMemo(() => {

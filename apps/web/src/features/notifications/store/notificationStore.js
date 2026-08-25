@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { adminService } from '../../admin/services/adminService';
-import { countMockUnread, isMockFallbackActive } from '../mockNotifications';
 
 export const useNotificationStore = create((set, get) => ({
   unreadCount: 0,
@@ -10,9 +9,9 @@ export const useNotificationStore = create((set, get) => ({
     set({ loading: true });
     try {
       const count = await adminService.getUnreadNotificationCount();
-      set({ unreadCount: count || (isMockFallbackActive() ? countMockUnread() : 0) });
+      set({ unreadCount: Number(count) || 0 });
     } catch {
-      if (isMockFallbackActive()) set({ unreadCount: countMockUnread() });
+      set({ unreadCount: 0 });
     } finally {
       set({ loading: false });
     }

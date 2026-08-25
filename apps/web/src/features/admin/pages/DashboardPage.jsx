@@ -38,7 +38,6 @@ import { StatusBadge } from '../../../shared/components/ui/Badge';
 import { MenuItem, MenuPanel, useMenuNavigation } from '../../../shared/components/ui/Menu';
 import { KpiMetricCard, KpiMetricGrid } from '../../../shared/components/ui/KpiMetricCard';
 import { rankColor } from '../../../shared/components/charts/chartTheme';
-import { buildDashboardMock, shouldSeedDashboardMock } from '../utils/dashboardMock';
 
 const AttendanceTrendAreaChart = lazy(() =>
   import('../../../shared/components/charts/AttendanceTrendAreaChart').then((m) => ({
@@ -2180,23 +2179,6 @@ export function DashboardPage() {
         pendingLeaves: nextLeaves.filter((leave) => leave.status === 'pending').length,
         attendanceRecords: nextAttendance.length,
       };
-      let mockActivity = [];
-
-      /* When live attendance is empty, seed Soft UI preview data so KPIs / ops / heatmap render. */
-      if (shouldSeedDashboardMock(nextAttendance)) {
-        const mock = buildDashboardMock({ existingUsers: nextUsers });
-        nextUsers = mock.users;
-        nextAttendance = mock.attendance;
-        nextLeaves = nextLeaves.length ? nextLeaves : mock.leaves;
-        nextWorkModes = nextWorkModes.length ? nextWorkModes : mock.workModes;
-        nextStats = {
-          ...nextStats,
-          ...mock.stats,
-          pendingLeaves: Math.max(nextStats.pendingLeaves || 0, mock.stats.pendingLeaves),
-        };
-        mockActivity = mock.activity;
-      }
-
       setStats(nextStats);
       setCachedUsers(nextUsers);
       setAttendance(nextAttendance);
@@ -2245,8 +2227,6 @@ export function DashboardPage() {
           action: 'Profile updated',
         });
       }
-
-      for (const item of mockActivity) activity.push(item);
 
       setActivityItems(
         activity
