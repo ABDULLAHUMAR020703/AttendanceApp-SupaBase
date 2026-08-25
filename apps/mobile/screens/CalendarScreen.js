@@ -815,7 +815,10 @@ export default function CalendarScreen({ navigation, route }) {
                 borderTopRightRadius: 24,
                 borderBottomLeftRadius: tablet ? 24 : 0,
                 borderBottomRightRadius: tablet ? 24 : 0,
-                maxHeight: tablet ? '85%' : '80%',
+                // Give the keyboard-aware scroll container a definite height.
+                // With only maxHeight, its flex: 1 child can collapse to zero
+                // height on Android, leaving only the modal backdrop visible.
+                height: tablet ? '85%' : '80%',
                 width: '100%',
                 maxWidth: tablet ? 700 : undefined,
                 alignSelf: 'center',
