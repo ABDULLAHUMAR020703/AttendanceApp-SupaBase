@@ -74,13 +74,14 @@ jobs:
       # ── 3. Install JS dependencies ──────────────────────────────────────────
       - name: Install dependencies
         working-directory: apps/mobile
-        run: npm install
+        run: npm ci
 
       # ── 4. Authenticate with Expo / EAS ─────────────────────────────────────
       - name: Setup Expo + EAS CLI
         uses: expo/expo-github-action@v8
         with:
           eas-version: latest
+          packager: npm
           token: ${{ secrets.EXPO_TOKEN }}
 
       # ── 5a. Deploy to PREVIEW (master branch) ───────────────────────────────
