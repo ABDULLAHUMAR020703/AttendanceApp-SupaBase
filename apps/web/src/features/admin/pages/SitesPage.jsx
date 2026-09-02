@@ -12,6 +12,8 @@ import {
   acceptBoundedNumber,
   coordinateErrors,
   findDuplicateSiteName,
+  isNullIsland,
+  MAX_RADIUS_METERS,
   overlappingPartners,
   overlapMap,
   parseLatitude,
@@ -51,7 +53,8 @@ function formatCoord(value) {
 }
 
 
-function lookupAddress(lat, lng) {
+// Not a reverse-geocode — just a display label for the centre point.
+function formatCoordinateLabel(lat, lng) {
   return `${formatCoord(lat)}, ${formatCoord(lng)}`;
 }
 
@@ -91,8 +94,10 @@ export function SitesPage() {
   const [departments, setDepartments] = useState([]);
   const [users, setUsers] = useState([]);
   const [assignments, setAssignments] = useState([]);
-  const [addresses, setAddresses] = useState({});
+  const [coordinateLabels, setCoordinateLabels] = useState({});
   const [selectedId, setSelectedId] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -139,14 +144,14 @@ export function SitesPage() {
 
   useEffect(() => {
     if (!sites.length) {
-      setAddresses({});
+      setCoordinateLabels({});
       return;
     }
-    setAddresses((current) => {
+    setCoordinateLabels((current) => {
       const next = {};
       let changed = false;
       for (const site of sites) {
-        const label = current[site.id] || lookupAddress(site.latitude, site.longitude);
+        const label = current[site.id] || formatCoordinateLabel(site.latitude, site.longitude);
         next[site.id] = label;
         if (current[site.id] !== label) changed = true;
       }
@@ -191,24 +196,27 @@ export function SitesPage() {
     const q = query.trim().toLowerCase();
     return sites.filter((site) => {
       if (!q) return true;
-      const address = addresses[site.id] || '';
-      return `${site.name} ${address}`.toLowerCase().includes(q);
+      const label = coordinateLabels[site.id] || '';
+      return `${site.name} ${label}`.toLowerCase().includes(q);
     });
-  }, [sites, addresses, query]);
+  }, [sites, coordinateLabels, query]);
 
   const overlapsBySite = useMemo(() => overlapMap(sites), [sites]);
   const overlappingIds = useMemo(() => Array.from(overlapsBySite.keys()), [overlapsBySite]);
 
   const selected = sites.find((site) => site.id === selectedId) || null;
 
+  // Uniqueness rule mirrors the DB: UNIQUE(company_id, department_id, name).
   const duplicateName = useMemo(
-    () => findDuplicateSiteName(sites, draft.name),
-    [sites, draft.name]
+    () =>
+      findDuplicateSiteName(sites, draft.name, {
+        departmentId: draft.department_id || null,
+        ignoreId: editingId,
+      }),
+    [sites, draft.name, draft.department_id, editingId]
   );
   const nameError = duplicateName
-    ? String(duplicateName.department_id) === String(draft.department_id)
-      ? 'An active location with this name already exists in this department.'
-      : 'An active location with this name already exists in this account.'
+    ? 'An active location with this name already exists in this department.'
     : '';
   const coordErrors = useMemo(
     () => (draft.latitude === '' && draft.longitude === '' ? {} : coordinateErrors(draft.latitude, draft.longitude)),
@@ -257,6 +265,7 @@ export function SitesPage() {
   const departmentName = (id) => departments.find((row) => String(row.id) === String(id))?.name || '-';
 
   const startWizard = () => {
+    setEditingId(null);
     setWizard(true);
     setStep(1);
     setDraft({
@@ -267,8 +276,26 @@ export function SitesPage() {
     setError('');
   };
 
+  const startEdit = (site) => {
+    if (!site) return;
+    setEditingId(site.id);
+    setWizard(true);
+    setStep(1);
+    setDraft({
+      name: site.name || '',
+      department_id: site.department_id ? String(site.department_id) : '',
+      latitude: site.latitude != null ? String(site.latitude) : '',
+      longitude: site.longitude != null ? String(site.longitude) : '',
+      radius: Number(site.radius) || EMPTY_DRAFT.radius,
+      assigneeUids: [],
+    });
+    setNotice('');
+    setError('');
+  };
+
   const closeWizard = () => {
     setWizard(false);
+    setEditingId(null);
     setStep(1);
     setDraft(EMPTY_DRAFT);
     setCreating(false);
@@ -277,15 +304,21 @@ export function SitesPage() {
   const canAdvance = () => {
     if (step === 1) return Boolean(draft.name.trim() && draft.department_id && !nameError);
     if (step === 2) {
-      return parseLatitude(draft.latitude) != null && parseLongitude(draft.longitude) != null;
+      return (
+        parseLatitude(draft.latitude) != null &&
+        parseLongitude(draft.longitude) != null &&
+        !isNullIsland(draft.latitude, draft.longitude)
+      );
     }
-    if (step === 3) return Number(draft.radius) > 0;
+    if (step === 3) return Number(draft.radius) > 0 && Number(draft.radius) <= MAX_RADIUS_METERS;
     if (step === 5) {
       return (
         Boolean(draft.name.trim() && draft.department_id && !nameError) &&
         parseLatitude(draft.latitude) != null &&
         parseLongitude(draft.longitude) != null &&
-        Number(draft.radius) > 0
+        !isNullIsland(draft.latitude, draft.longitude) &&
+        Number(draft.radius) > 0 &&
+        Number(draft.radius) <= MAX_RADIUS_METERS
       );
     }
     return true;
@@ -302,36 +335,75 @@ export function SitesPage() {
       setError('Latitude must be between -90 and 90, and longitude between -180 and 180.');
       return;
     }
+    if (isNullIsland(lat, lng)) {
+      setError('Coordinates (0, 0) are not a valid location. Pick a point on the map.');
+      return;
+    }
+    const radiusValue = Number(draft.radius);
+    if (!Number.isFinite(radiusValue) || radiusValue <= 0 || radiusValue > MAX_RADIUS_METERS) {
+      setError(`Radius must be between 1 and ${MAX_RADIUS_METERS} metres.`);
+      return;
+    }
+    if (creating) return; // guard rapid double-submit
     setCreating(true);
     setError('');
     try {
-      const created = await adminService.createSite({
+      const payload = {
         name: draft.name.trim(),
         latitude: lat,
         longitude: lng,
         radius: Number(draft.radius),
         department_id: draft.department_id,
-      });
-      const site = created?.data || created;
-      const siteId = site?.id;
-      if (siteId && draft.assigneeUids.length) {
-        await Promise.all(
-          draft.assigneeUids.map(async (uid) => {
-            const current = await adminService.getEmployeeSites(uid).catch(() => []);
-            const ids = Array.from(new Set([...(current || []).map((row) => row.site_id), siteId]));
-            await adminService.setEmployeeSites(uid, ids);
-          })
-        );
+      };
+      let siteId;
+      if (editingId) {
+        const updated = await adminService.updateSite(editingId, payload);
+        siteId = (updated?.data || updated)?.id || editingId;
+      } else {
+        const created = await adminService.createSite(payload);
+        const site = created?.data || created;
+        siteId = site?.id;
+        if (siteId && draft.assigneeUids.length) {
+          await Promise.all(
+            draft.assigneeUids.map(async (uid) => {
+              const current = await adminService.getEmployeeSites(uid).catch(() => []);
+              const ids = Array.from(new Set([...(current || []).map((row) => row.site_id), siteId]));
+              await adminService.setEmployeeSites(uid, ids);
+            })
+          );
+        }
       }
-      setNotice('Location created.');
+      setNotice(editingId ? 'Location updated.' : 'Location created.');
       closeWizard();
       await load();
       if (siteId) setSelectedId(siteId);
     } catch (err) {
-      console.error('[SitesPage] Failed to create site:', err);
-      setError(err?.response?.data?.error || err?.message || 'Failed to create site');
+      console.error('[SitesPage] Failed to save site:', err);
+      setError(err?.response?.data?.error || err?.message || 'Failed to save site');
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleDeleteSite = async (site) => {
+    if (!site?.id || deletingId) return;
+    // eslint-disable-next-line no-alert
+    if (!window.confirm(`Delete "${site.name}"? This also removes its people assignments.`)) {
+      return;
+    }
+    setDeletingId(site.id);
+    setError('');
+    try {
+      await adminService.deleteSite(site.id);
+      setNotice('Location deleted.');
+      if (selectedId === site.id) setSelectedId(null);
+      if (editingId === site.id) closeWizard();
+      await load();
+    } catch (err) {
+      console.error('[SitesPage] Failed to delete site:', err);
+      setError(err?.response?.data?.error || err?.message || 'Failed to delete site');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -431,6 +503,7 @@ export function SitesPage() {
               onCancel={closeWizard}
               onToggleAssignee={toggleAssignee}
               onCreate={createSite}
+              editing={Boolean(editingId)}
             />
           ) : (
             <>
@@ -516,6 +589,9 @@ export function SitesPage() {
                               onPickEmployee={loadEmployeeAssignments}
                               onToggleSite={toggleSite}
                               onSaveAssignments={saveAssignments}
+                              onEdit={startEdit}
+                              onDelete={handleDeleteSite}
+                              deleting={deletingId === site.id}
                             />
                           )}
                         </div>
@@ -576,11 +652,12 @@ function WizardPanel({
   onCancel,
   onToggleAssignee,
   onCreate,
+  editing = false,
 }) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="border-b border-slate-200 px-4 py-3">
-        <p className="text-sm font-semibold text-slate-900">Add location</p>
+        <p className="text-sm font-semibold text-slate-900">{editing ? 'Edit location' : 'Add location'}</p>
         <ol className="mt-2 flex gap-1">
           {STEPS.map((item) => (
             <li
@@ -750,7 +827,7 @@ function WizardPanel({
             </button>
           ) : (
             <button type="button" onClick={onCreate} disabled={creating || !canAdvance} className="ui-btn-primary ui-btn-sm">
-              {creating ? 'Creating...' : 'Create location'}
+              {creating ? 'Saving...' : editing ? 'Save changes' : 'Create location'}
             </button>
           )}
         </div>
@@ -775,13 +852,40 @@ function LocationDetail({
   onPickEmployee,
   onToggleSite,
   onSaveAssignments,
+  onEdit,
+  onDelete,
+  deleting = false,
 }) {
   return (
     <div className="geofence-accordion-panel border-t border-sky-100 px-3.5 pb-3 pt-1.5">
       <dl>
         <DetailField label="Department">{departmentName}</DetailField>
+        <DetailField label="Centre">
+          {formatCoord(site.latitude)}, {formatCoord(site.longitude)} • {formatMeters(site.radius)}
+        </DetailField>
         <DetailField label="Attendance">Check-in must be inside this geofence.</DetailField>
       </dl>
+
+      {canManage && (
+        <div className="mt-2 flex gap-2">
+          <button
+            type="button"
+            onClick={() => onEdit?.(site)}
+            disabled={deleting}
+            className="ui-btn-secondary ui-btn-sm"
+          >
+            Edit location
+          </button>
+          <button
+            type="button"
+            onClick={() => onDelete?.(site)}
+            disabled={deleting}
+            className="ui-btn-ghost ui-btn-sm text-rose-600 hover:text-rose-700"
+          >
+            {deleting ? 'Deleting…' : 'Delete'}
+          </button>
+        </div>
+      )}
 
       <p className="mt-2 text-[11px] font-medium uppercase tracking-[0.06em] text-slate-400">Assigned workforce</p>
       {people.length === 0 ? (

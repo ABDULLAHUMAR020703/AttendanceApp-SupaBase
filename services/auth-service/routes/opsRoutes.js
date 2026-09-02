@@ -28,22 +28,15 @@ const DEFAULT_APP_SETTINGS = {
   theme: { accent: 'indigo', density: 'comfortable' },
 };
 
-function parseRequester(req) {
-  const raw = req.get('x-user-context');
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
+const { resolveRequester } = require('../lib/resolveRequester');
 
 async function withTenantContext(req, res) {
-  const requester = parseRequester(req);
+  const requester = await resolveRequester(req);
   if (!requester?.uid) {
-    res.status(401).json({ success: false, error: 'Unauthorized' });
+    res.status(401).json({ success: false, error: 'Authentication required. Sign in again.' });
     return null;
   }
+  // Re-load the authoritative row by the VERIFIED uid.
   const { data: user } = await supabase
     .from('users')
     .select('uid, username, email, role, department, company_id, name')

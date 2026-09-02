@@ -1,10 +1,25 @@
+try {
+  // Optional for local `npm start`; compose/Coolify inject env directly.
+  require('dotenv').config();
+} catch {
+  /* dotenv not installed — rely on process env */
+}
+
 const express = require('express');
 const cors = require('cors');
+const axios = require('axios');
 
 const authRoutes = require('./routes/auth');
 const reportRoutes = require('./routes/reports');
 const adminRoutes = require('./routes/admin');
 const { probeHttp } = require('./lib/health');
+const { attachIdentity, requireIdentity, INTERNAL_API_SECRET } = require('./lib/authenticate');
+
+// Every internal forward carries the shared secret so auth-service / reporting-
+// service can distinguish a gateway-vouched X-User-Context from a forged one.
+if (INTERNAL_API_SECRET) {
+  axios.defaults.headers.common['x-internal-auth'] = INTERNAL_API_SECRET;
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -26,7 +41,28 @@ app.use((req, res, next) => {
 });
 
 // Middleware
-app.use(cors());
+const ALLOWED_ORIGINS = String(process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+if (ALLOWED_ORIGINS.length === 0) {
+  console.warn(
+    '[gateway cors] ALLOWED_ORIGINS is not set — allowing all origins. Set a ' +
+      'comma-separated list of your web origins for production.'
+  );
+}
+app.use(
+  cors({
+    origin(origin, cb) {
+      // Non-browser callers (mobile, curl, server-to-server) send no Origin.
+      if (!origin || ALLOWED_ORIGINS.length === 0 || ALLOWED_ORIGINS.includes(origin)) {
+        return cb(null, true);
+      }
+      return cb(null, false);
+    },
+    credentials: true,
+  })
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -45,10 +81,15 @@ app.use((req, res, next) => {
   next();
 });
 
+// Auth: strip client-supplied trust headers, verify the bearer token, and
+// re-stamp a trusted identity for internal services. Runs on every route;
+// public routes (login, onboarding) simply proceed without an identity.
+app.use(attachIdentity);
+
 // Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/reports', reportRoutes);
-app.use('/api/admin', adminRoutes);
+app.use('/api/reports', requireIdentity, reportRoutes);
+app.use('/api/admin', requireIdentity, adminRoutes);
 
 // Liveness: process is up (used for basic restarts)
 app.get('/health', async (req, res) => {

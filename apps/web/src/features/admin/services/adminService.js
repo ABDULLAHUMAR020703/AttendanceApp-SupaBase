@@ -296,6 +296,16 @@ export const adminService = {
     executeApiCall(async () => (await api.get(apiUrl('/api/admin/sites'))).data.data, 'Failed to load sites'),
   createSite: async (payload) =>
     executeApiCall(async () => (await api.post(apiUrl('/api/admin/sites'), payload)).data, 'Failed to create site'),
+  updateSite: async (id, payload) =>
+    executeApiCall(
+      async () => (await api.patch(apiUrl(`/api/admin/sites/${id}`), payload)).data,
+      'Failed to update site'
+    ),
+  deleteSite: async (id) =>
+    executeApiCall(
+      async () => (await api.delete(apiUrl(`/api/admin/sites/${id}`))).data,
+      'Failed to delete site'
+    ),
   assignEmployeeSite: async (payload) =>
     executeApiCall(async () => (await api.post(apiUrl('/api/admin/employee-sites'), payload)).data, 'Failed to assign site'),
   getAttendance: async () =>

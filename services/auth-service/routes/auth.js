@@ -59,7 +59,15 @@ const hasTenantWidePeopleAccess = async (requester) =>
  * @param {import('express').Request} req
  * @returns {{ uid?: string, role?: string, company_id?: string, companyId?: string, department?: string } | null}
  */
+const { isGatewayVouched, STRICT_IDENTITY } = require('../lib/resolveRequester');
+
+/**
+ * X-User-Context is only authoritative when the api-gateway vouched for it
+ * (shared INTERNAL_API_SECRET). In legacy mode (secret unset) the previous
+ * behaviour is kept so a code-only deploy does not lock admins out.
+ */
 function parseRequester(req) {
+  if (STRICT_IDENTITY && !isGatewayVouched(req)) return null;
   const raw = req.get('x-user-context') || req.get('X-User-Context');
   if (!raw) return null;
   try {
@@ -823,7 +831,8 @@ router.post('/users', async (req, res) => {
 router.delete('/users/:uid', async (req, res) => {
   const timestamp = new Date().toISOString();
   const { uid } = req.params;
-  const requester = parseRequester(req) || (req.body || {}).requester;
+  // Identity comes only from a gateway-vouched X-User-Context — never the body.
+  const requester = parseRequester(req);
   console.log(`[${timestamp}] Auth Service: Delete user request for uid: ${uid}`);
 
   try {

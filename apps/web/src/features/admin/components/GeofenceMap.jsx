@@ -176,8 +176,10 @@ function formatCoord(value) {
   return Number.isFinite(num) ? num.toFixed(5) : '-';
 }
 
+// Neutral starting camera when there are no sites to fit. Purely cosmetic — no
+// site data is ever seeded from this; real sites always drive the view.
 function defaultView() {
-  return { lat: 24.8607, lng: 67.0011, zoom: 12 };
+  return { lat: 20, lng: 0, zoom: 3 };
 }
 
 /**
@@ -276,7 +278,7 @@ export function GeofenceMap({
         };
       }
     }
-    return zoomToFitSites(sites, size) || { center: { lat: 24.8607, lng: 67.0011 }, zoom: 12 };
+    return zoomToFitSites(sites, size) || { center: { lat: 20, lng: 0 }, zoom: 3 };
   }, [preview, overlappingIds, selectedId, sites, size]);
 
   useEffect(() => {

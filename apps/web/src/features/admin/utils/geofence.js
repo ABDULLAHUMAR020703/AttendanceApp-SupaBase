@@ -33,8 +33,19 @@ export function parseLongitude(value) {
   return lng;
 }
 
+/** The (0, 0) pair is the null-island reading — never a real configured office. */
+export function isNullIsland(latitude, longitude) {
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+  return Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) < 0.0001 && Math.abs(lng) < 0.0001;
+}
+
+/** Largest radius a site geofence may use, in metres. */
+export const MAX_RADIUS_METERS = 100000;
+
 export function hasValidCoordinates(site) {
-  return parseLatitude(site?.latitude) != null && parseLongitude(site?.longitude) != null;
+  if (parseLatitude(site?.latitude) == null || parseLongitude(site?.longitude) == null) return false;
+  return !isNullIsland(site.latitude, site.longitude);
 }
 
 /** Keep in-progress typing (e.g. "-" / "33.") but reject completed values outside [min, max]. */
@@ -59,6 +70,9 @@ export function coordinateErrors(latitude, longitude) {
   else if (parseLatitude(latitude) == null) errors.latitude = 'Latitude must be between -90 and 90.';
   if (longitude === '' || longitude == null) errors.longitude = 'Longitude is required.';
   else if (parseLongitude(longitude) == null) errors.longitude = 'Longitude must be between -180 and 180.';
+  if (!errors.latitude && !errors.longitude && isNullIsland(latitude, longitude)) {
+    errors.latitude = 'Coordinates (0, 0) are not a valid location. Pick a point on the map.';
+  }
   return errors;
 }
 
@@ -69,12 +83,18 @@ export function normalizeSiteName(value) {
     .toLowerCase();
 }
 
-export function findDuplicateSiteName(sites, name, { ignoreId } = {}) {
+/**
+ * Uniqueness rule matches the DB: UNIQUE(company_id, department_id, name).
+ * A clash is only a clash within the SAME department. Pass `departmentId` to
+ * scope the check; omit it to fall back to an account-wide check (legacy).
+ */
+export function findDuplicateSiteName(sites, name, { ignoreId, departmentId } = {}) {
   const target = normalizeSiteName(name);
   if (!target) return null;
   return (
     (sites || []).find((site) => {
       if (ignoreId && String(site.id) === String(ignoreId)) return false;
+      if (departmentId != null && String(site.department_id) !== String(departmentId)) return false;
       return normalizeSiteName(site.name) === target;
     }) || null
   );

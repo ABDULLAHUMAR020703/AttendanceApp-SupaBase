@@ -51,6 +51,8 @@ router.delete('/departments/:id', (req, res) => forward(req, res, 'delete', `/ap
 
 router.get('/sites', (req, res) => forward(req, res, 'get', '/api/admin/sites'));
 router.post('/sites', (req, res) => forward(req, res, 'post', '/api/admin/sites'));
+router.patch('/sites/:id', (req, res) => forward(req, res, 'patch', `/api/admin/sites/${req.params.id}`));
+router.delete('/sites/:id', (req, res) => forward(req, res, 'delete', `/api/admin/sites/${req.params.id}`));
 
 router.post('/employee-sites', (req, res) => forward(req, res, 'post', '/api/admin/employee-sites'));
 router.get('/employee-sites', (req, res) => forward(req, res, 'get', '/api/admin/employee-sites'));

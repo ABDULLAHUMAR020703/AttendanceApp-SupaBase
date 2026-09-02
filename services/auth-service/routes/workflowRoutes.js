@@ -4,6 +4,25 @@
 const express = require('express');
 const { supabase } = require('../config/supabase');
 const { requirePermission } = require('../lib/permissions');
+const { normalizeDepartmentName, toLookupKey } = require('../lib/orgNormalize');
+
+/** Resolve a department UUID from an id or a (possibly display) name in a company. */
+async function resolveDepartmentId({ department_id, department }, companyId) {
+  if (department_id) return String(department_id);
+  const raw = String(department || '').trim();
+  if (!raw || !companyId) return null;
+  const key = toLookupKey(normalizeDepartmentName(raw) || raw);
+  const { data } = await supabase
+    .from('departments')
+    .select('id, name, normalized_name')
+    .eq('company_id', companyId);
+  const row = (data || []).find(
+    (d) =>
+      toLookupKey(d.normalized_name) === key ||
+      toLookupKey(normalizeDepartmentName(d.name) || d.name) === key
+  );
+  return row?.id ? String(row.id) : null;
+}
 const {
   ensureDefaultWorkflows,
   getWorkflowForRequestType,
@@ -18,15 +37,7 @@ const router = express.Router();
 
 const ROLES = { SUPER_ADMIN: 'super_admin', MANAGER: 'manager', EMPLOYEE: 'employee' };
 
-const parseRequester = (req) => {
-  const raw = req.get('x-user-context') || req.get('X-User-Context');
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-};
+// Identity resolved via lib/resolveRequester inside withTenantContext.
 
 async function withTenantContext(req, res) {
   const { resolveRequester } = require('../lib/resolveRequester');
@@ -306,12 +317,19 @@ router.get('/employee-sites', async (req, res) => {
     const filtered = (data || []).filter((row) => row.sites?.company_id === companyId);
     const scoped = requester.role === ROLES.MANAGER
       ? await (async () => {
+          const managerDeptId = await resolveDepartmentId(requester, companyId);
+          if (!managerDeptId) return [];
           const { data: deptUsers } = await supabase
             .from('users')
-            .select('uid')
-            .eq('company_id', companyId)
-            .eq('department', requester.department);
-          const uidSet = new Set((deptUsers || []).map((u) => u.uid));
+            .select('uid, department_id, department')
+            .eq('company_id', companyId);
+          const uidSet = new Set();
+          for (const u of deptUsers || []) {
+            const uDeptId = u.department_id
+              ? String(u.department_id)
+              : await resolveDepartmentId({ department: u.department }, companyId);
+            if (uDeptId === managerDeptId) uidSet.add(String(u.uid));
+          }
           return filtered.filter((r) => uidSet.has(String(r.employee_uid)));
         })()
       : filtered;
@@ -356,23 +374,33 @@ router.put('/employee-sites/:employeeUid', async (req, res) => {
   try {
     const { data: employee } = await supabase
       .from('users')
-      .select('uid, department, company_id')
+      .select('uid, department, department_id, company_id')
       .eq('uid', req.params.employeeUid)
       .eq('company_id', companyId)
       .single();
     if (!employee) return res.status(404).json({ success: false, error: 'Employee not found' });
-    if (requester.role === ROLES.MANAGER && requester.department !== employee.department) {
-      return res.status(403).json({ success: false, error: 'Managers can only assign their department employees' });
+
+    let managerDeptId = null;
+    if (requester.role === ROLES.MANAGER) {
+      managerDeptId = await resolveDepartmentId(requester, companyId);
+      const employeeDeptId = await resolveDepartmentId(employee, companyId);
+      if (!managerDeptId || employeeDeptId !== managerDeptId) {
+        return res
+          .status(403)
+          .json({ success: false, error: 'Managers can only assign their department employees' });
+      }
     }
 
     if (siteIds.length > 0) {
-      const { data: sites } = await supabase
-        .from('sites')
-        .select('id')
-        .eq('company_id', companyId)
-        .in('id', siteIds);
+      let siteQuery = supabase.from('sites').select('id, department_id').eq('company_id', companyId).in('id', siteIds);
+      const { data: sites } = await siteQuery;
       if ((sites || []).length !== siteIds.length) {
         return res.status(400).json({ success: false, error: 'One or more sites are invalid for this company' });
+      }
+      if (managerDeptId && (sites || []).some((s) => String(s.department_id) !== managerDeptId)) {
+        return res
+          .status(403)
+          .json({ success: false, error: 'Managers can only assign employees to their department sites' });
       }
     }
 

@@ -50,24 +50,8 @@ const getRequesterDepartment = async (requester, companyId) => {
   return data || null;
 };
 
-const parseRequester = (req) => {
-  const raw = req.get('x-user-context');
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw);
-  } catch (error) {
-    return null;
-  }
-};
-
-const requireRequester = (req, res) => {
-  const requester = parseRequester(req);
-  if (!requester || !requester.uid || !requester.role) {
-    res.status(401).json({ success: false, error: 'Missing requester context' });
-    return null;
-  }
-  return requester;
-};
+// Identity is resolved centrally via lib/resolveRequester (JWT / gateway-vouched
+// X-User-Context). Do not read x-user-context directly in this file.
 
 const requireSuperAdmin = (requester, res) => {
   if (requester.role !== ROLES.SUPER_ADMIN) {
@@ -114,9 +98,14 @@ const ATTENDANCE_READ_PERMISSIONS = ['view_attendance', 'manual_attendance'];
  * Resolves tenant from X-User-Context (company_id) or users row by uid.
  * @returns {Promise<{ requester: object, companyId: string }|null>}
  */
+const { resolveRequester } = require('../lib/resolveRequester');
+
 const withTenantContext = async (req, res) => {
-  const requester = requireRequester(req, res);
-  if (!requester) return null;
+  const requester = await resolveRequester(req);
+  if (!requester || !requester.uid || !requester.role) {
+    res.status(401).json({ success: false, error: 'Authentication required. Sign in again.' });
+    return null;
+  }
   const companyId = await getTenantCompanyId(supabase, requester);
   if (!companyId) {
     res.status(403).json({
@@ -966,6 +955,79 @@ router.get('/departments/overview', async (req, res) => {
   }
 });
 
+const {
+  SITE_RADIUS_MAX,
+  validateSiteGeometry,
+  isUniqueViolation,
+  siteNameKey,
+} = require('../lib/siteValidation');
+
+/** Resolve a department UUID from a (possibly display) name within a company. */
+async function getDepartmentIdByName(name, companyId) {
+  const raw = String(name || '').trim();
+  if (!raw || !companyId) return null;
+  const key = toLookupKey(normalizeDepartmentName(raw) || raw);
+  const { data } = await supabase
+    .from('departments')
+    .select('id, name, normalized_name')
+    .eq('company_id', companyId);
+  const row = (data || []).find(
+    (d) =>
+      toLookupKey(d.normalized_name) === key ||
+      toLookupKey(normalizeDepartmentName(d.name) || d.name) === key
+  );
+  return row?.id ? String(row.id) : null;
+}
+
+/** Caller's authoritative department UUID (by id, then normalized name). */
+async function resolveRequesterDepartmentId(requester, companyId) {
+  if (requester?.department_id) return String(requester.department_id);
+  const dept = await getRequesterDepartment(requester, companyId);
+  return dept?.id ? String(dept.id) : null;
+}
+
+/** Case-insensitive name clash within a single (company, department). */
+async function siteNameClashInDepartment(companyId, departmentId, name, excludeId = null) {
+  const key = siteNameKey(name);
+  if (!key || !departmentId) return false;
+  const { data } = await supabase
+    .from('sites')
+    .select('id, name')
+    .eq('company_id', companyId)
+    .eq('department_id', departmentId);
+  return (data || []).some(
+    (r) => String(r.id) !== String(excludeId) && siteNameKey(r.name) === key
+  );
+}
+
+/**
+ * Load a site the caller is allowed to administer, or send the error response.
+ * @returns {Promise<object|null>} the site row, or null (response already sent)
+ */
+async function loadManageableSite(siteId, requester, companyId, res) {
+  const { data: site } = await supabase
+    .from('sites')
+    .select('*')
+    .eq('id', siteId)
+    .eq('company_id', companyId)
+    .maybeSingle();
+  if (!site) {
+    res.status(404).json({ success: false, error: 'Site not found in your company' });
+    return null;
+  }
+  if (requester.role === ROLES.MANAGER) {
+    const managerDeptId = await resolveRequesterDepartmentId(requester, companyId);
+    if (!managerDeptId || String(site.department_id) !== managerDeptId) {
+      res.status(403).json({
+        success: false,
+        error: 'Managers can only manage sites in their own department',
+      });
+      return null;
+    }
+  }
+  return site;
+}
+
 router.get('/sites', async (req, res) => {
   const ctx = await withTenantContext(req, res);
   if (!ctx) return;
@@ -978,9 +1040,9 @@ router.get('/sites', async (req, res) => {
       .eq('company_id', companyId)
       .order('created_at', { ascending: false });
     if (requester.role === ROLES.MANAGER) {
-      const managerDept = await getRequesterDepartment(requester, companyId);
-      if (!managerDept?.id) return res.status(200).json({ success: true, data: [] });
-      query = query.eq('department_id', managerDept.id);
+      const managerDeptId = await resolveRequesterDepartmentId(requester, companyId);
+      if (!managerDeptId) return res.status(200).json({ success: true, data: [] });
+      query = query.eq('department_id', managerDeptId);
     } else {
       const { data: depts } = await supabase.from('departments').select('id').eq('company_id', companyId);
       const ids = (depts || []).map((d) => d.id).filter(Boolean);
@@ -1001,66 +1063,187 @@ router.post('/sites', async (req, res) => {
   const { requester, companyId } = ctx;
   if (!(await requireAdminPermission(requester, 'manage_geofencing', res))) return;
   try {
-    const payload = { ...req.body };
-    if (requester.role === ROLES.MANAGER) {
-      const managerDept = await getRequesterDepartment(requester, companyId);
-      if (!managerDept?.id) return res.status(400).json({ success: false, error: 'Manager department not mapped' });
-      if (payload.department_id !== managerDept.id) {
-        return res.status(403).json({ success: false, error: 'Managers can only create sites in their department' });
-      }
-    } else if (payload.department_id != null) {
-      const { data: d } = await supabase
-        .from('departments')
-        .select('id')
-        .eq('id', payload.department_id)
-        .eq('company_id', companyId)
-        .maybeSingle();
-      if (!d) {
-        return res.status(400).json({ success: false, error: 'Department not in this tenant' });
-      }
-    }
-    payload.company_id = companyId;
-    const name = String(payload.name || '').trim();
+    const body = req.body || {};
+    const name = String(body.name || '').trim();
     if (!name) {
       return res.status(400).json({ success: false, error: 'Location name is required' });
     }
-    const latitude = Number(payload.latitude);
-    const longitude = Number(payload.longitude);
-    const radius = Number(payload.radius);
-    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
-      return res.status(400).json({ success: false, error: 'Latitude must be between -90 and 90' });
+
+    // Resolve + authorize the target department.
+    let departmentId = body.department_id != null ? String(body.department_id) : null;
+    if (requester.role === ROLES.MANAGER) {
+      const managerDeptId = await resolveRequesterDepartmentId(requester, companyId);
+      if (!managerDeptId) {
+        return res.status(400).json({ success: false, error: 'Your account is not linked to a department' });
+      }
+      if (departmentId && departmentId !== managerDeptId) {
+        return res
+          .status(403)
+          .json({ success: false, error: 'Managers can only create sites in their department' });
+      }
+      departmentId = managerDeptId;
     }
-    if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
-      return res.status(400).json({ success: false, error: 'Longitude must be between -180 and 180' });
+    if (!departmentId) {
+      return res.status(400).json({ success: false, error: 'Department is required' });
     }
-    if (!Number.isFinite(radius) || radius <= 0) {
-      return res.status(400).json({ success: false, error: 'Radius must be greater than 0' });
+    const { data: dept } = await supabase
+      .from('departments')
+      .select('id')
+      .eq('id', departmentId)
+      .eq('company_id', companyId)
+      .maybeSingle();
+    if (!dept) {
+      return res.status(400).json({ success: false, error: 'Department not in this tenant' });
     }
-    const { data: existing, error: existingError } = await supabase
-      .from('sites')
-      .select('id, name, department_id')
-      .eq('company_id', companyId);
-    if (existingError) throw existingError;
-    const nameKey = name.toLowerCase();
-    const clash = (existing || []).find((row) => String(row.name || '').trim().toLowerCase() === nameKey);
-    if (clash) {
-      const sameDept = payload.department_id && String(clash.department_id) === String(payload.department_id);
-      return res.status(400).json({
+
+    const latitude = Number(body.latitude);
+    const longitude = Number(body.longitude);
+    const radius = Number(body.radius);
+    const geomError = validateSiteGeometry({ latitude, longitude, radius });
+    if (geomError) return res.status(400).json({ success: false, error: geomError });
+
+    if (await siteNameClashInDepartment(companyId, departmentId, name)) {
+      return res.status(409).json({
         success: false,
-        error: sameDept
-          ? 'An active location with this name already exists in this department'
-          : 'An active location with this name already exists in this account',
+        error: 'An active location with this name already exists in this department',
       });
     }
-    payload.name = name;
-    payload.latitude = latitude;
-    payload.longitude = longitude;
-    payload.radius = radius;
-    const { data, error } = await supabase.from('sites').insert(payload).select().single();
-    if (error) throw error;
+
+    const { data, error } = await supabase
+      .from('sites')
+      .insert({
+        company_id: companyId,
+        department_id: departmentId,
+        name,
+        latitude,
+        longitude,
+        radius: Math.round(radius),
+      })
+      .select()
+      .single();
+    if (error) {
+      if (isUniqueViolation(error)) {
+        return res.status(409).json({
+          success: false,
+          error: 'An active location with this name already exists in this department',
+        });
+      }
+      throw error;
+    }
     res.status(201).json({ success: true, data });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message || 'Failed to create site' });
+  }
+});
+
+router.patch('/sites/:id', async (req, res) => {
+  const ctx = await withTenantContext(req, res);
+  if (!ctx) return;
+  const { requester, companyId } = ctx;
+  if (!(await requireAdminPermission(requester, 'manage_geofencing', res))) return;
+  try {
+    const site = await loadManageableSite(req.params.id, requester, companyId, res);
+    if (!site) return;
+
+    const body = req.body || {};
+    const patch = {};
+
+    // Department move: super_admin only, target must be in the company.
+    let targetDepartmentId = String(site.department_id);
+    if (body.department_id != null && String(body.department_id) !== String(site.department_id)) {
+      if (requester.role === ROLES.MANAGER) {
+        return res
+          .status(403)
+          .json({ success: false, error: 'Managers cannot move a site to another department' });
+      }
+      const { data: dept } = await supabase
+        .from('departments')
+        .select('id')
+        .eq('id', body.department_id)
+        .eq('company_id', companyId)
+        .maybeSingle();
+      if (!dept) {
+        return res.status(400).json({ success: false, error: 'Department not in this tenant' });
+      }
+      targetDepartmentId = String(body.department_id);
+      patch.department_id = targetDepartmentId;
+    }
+
+    const name = body.name != null ? String(body.name).trim() : site.name;
+    if (!name) return res.status(400).json({ success: false, error: 'Location name is required' });
+    if (name !== site.name) patch.name = name;
+
+    const latitude = body.latitude != null ? Number(body.latitude) : Number(site.latitude);
+    const longitude = body.longitude != null ? Number(body.longitude) : Number(site.longitude);
+    const radius = body.radius != null ? Number(body.radius) : Number(site.radius);
+    const geomError = validateSiteGeometry({ latitude, longitude, radius });
+    if (geomError) return res.status(400).json({ success: false, error: geomError });
+    if (latitude !== Number(site.latitude)) patch.latitude = latitude;
+    if (longitude !== Number(site.longitude)) patch.longitude = longitude;
+    if (Math.round(radius) !== Number(site.radius)) patch.radius = Math.round(radius);
+
+    if (Object.keys(patch).length === 0) {
+      return res.status(200).json({ success: true, data: site });
+    }
+
+    if (
+      (patch.name || patch.department_id) &&
+      (await siteNameClashInDepartment(companyId, targetDepartmentId, name, site.id))
+    ) {
+      return res.status(409).json({
+        success: false,
+        error: 'An active location with this name already exists in this department',
+      });
+    }
+
+    const { data, error } = await supabase
+      .from('sites')
+      .update(patch)
+      .eq('id', site.id)
+      .eq('company_id', companyId)
+      .select()
+      .single();
+    if (error) {
+      if (isUniqueViolation(error)) {
+        return res.status(409).json({
+          success: false,
+          error: 'An active location with this name already exists in this department',
+        });
+      }
+      throw error;
+    }
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message || 'Failed to update site' });
+  }
+});
+
+router.delete('/sites/:id', async (req, res) => {
+  const ctx = await withTenantContext(req, res);
+  if (!ctx) return;
+  const { requester, companyId } = ctx;
+  if (!(await requireAdminPermission(requester, 'manage_geofencing', res))) return;
+  try {
+    const site = await loadManageableSite(req.params.id, requester, companyId, res);
+    if (!site) return;
+
+    // Remove assignments first so no orphaned employee_sites rows remain even if
+    // the FK is not ON DELETE CASCADE.
+    const { error: unassignError } = await supabase
+      .from('employee_sites')
+      .delete()
+      .eq('site_id', site.id);
+    if (unassignError) throw unassignError;
+
+    const { error } = await supabase
+      .from('sites')
+      .delete()
+      .eq('id', site.id)
+      .eq('company_id', companyId);
+    if (error) throw error;
+    res.status(200).json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message || 'Failed to delete site' });
   }
 });
 
@@ -1073,7 +1256,7 @@ router.post('/employee-sites', async (req, res) => {
     const { employee_uid, site_id } = req.body;
     const { data: employee } = await supabase
       .from('users')
-      .select('uid, department, company_id')
+      .select('uid, department, department_id, company_id')
       .eq('uid', employee_uid)
       .eq('company_id', companyId)
       .single();
@@ -1086,8 +1269,21 @@ router.post('/employee-sites', async (req, res) => {
     if (!employee || !site) {
       return res.status(400).json({ success: false, error: 'Invalid employee or site' });
     }
-    if (requester.role === ROLES.MANAGER && requester.department !== employee.department) {
-      return res.status(403).json({ success: false, error: 'Managers can only assign their department employees' });
+    if (requester.role === ROLES.MANAGER) {
+      const managerDeptId = await resolveRequesterDepartmentId(requester, companyId);
+      const employeeDeptId = employee.department_id
+        ? String(employee.department_id)
+        : (await getDepartmentIdByName(employee.department, companyId));
+      if (!managerDeptId || employeeDeptId !== managerDeptId) {
+        return res
+          .status(403)
+          .json({ success: false, error: 'Managers can only assign their department employees' });
+      }
+      if (String(site.department_id) !== managerDeptId) {
+        return res
+          .status(403)
+          .json({ success: false, error: 'Managers can only assign employees to their department sites' });
+      }
     }
     const { data, error } = await supabase
       .from('employee_sites')

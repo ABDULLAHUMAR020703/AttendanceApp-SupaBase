@@ -60,6 +60,9 @@ services:
       <<: [*app-env, *supabase-env]
       PORT: "3001"
       COMPANY_ONBOARDING_SECRET: ${COMPANY_ONBOARDING_SECRET:-}
+      # Shared secret: only requests carrying this (stamped by the gateway) may
+      # supply an authoritative X-User-Context. Unset = legacy mode.
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:-}
     expose:
       - "3001"
     networks:
@@ -139,6 +142,12 @@ services:
       # Docker DNS — do not set these in Coolify.
       AUTH_SERVICE_URL: http://auth-service:3001
       REPORTING_SERVICE_URL: http://reporting-service:3002
+      # Gateway verifies the caller's Supabase JWT and derives identity itself.
+      # ANON key only — never the service-role key in the gateway.
+      SUPABASE_URL: ${SUPABASE_URL:?SUPABASE_URL is required}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:?SUPABASE_ANON_KEY is required}
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:-}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
     # Traefik reaches this over the Docker network via expose.
     expose:
       - "80"
