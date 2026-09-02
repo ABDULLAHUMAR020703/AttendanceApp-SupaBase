@@ -54,6 +54,9 @@ const toCoords = (locationObject, source) => {
   if (!locationObject?.coords) return null;
   const { latitude, longitude, accuracy } = locationObject.coords;
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) return null;
+  // Reject the null-island (0, 0) reading — it indicates a failed fix, not a real position.
+  if (Math.abs(latitude) < 0.0001 && Math.abs(longitude) < 0.0001) return null;
   return {
     latitude,
     longitude,

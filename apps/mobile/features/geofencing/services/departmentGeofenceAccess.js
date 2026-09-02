@@ -121,13 +121,31 @@ export async function listManageableDepartments(user) {
  */
 export function mapGeofenceRowToOfficeLocation(row) {
   if (!row) return null;
+
+  const latitude = Number(row.latitude);
+  const longitude = Number(row.longitude);
+
+  // Supabase is the source of truth: a row without real, in-range coordinates is
+  // not a usable geofence. Never fabricate a location.
+  if (
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude) ||
+    latitude < -90 ||
+    latitude > 90 ||
+    longitude < -180 ||
+    longitude > 180 ||
+    (Math.abs(latitude) < 0.0001 && Math.abs(longitude) < 0.0001)
+  ) {
+    return null;
+  }
+
   return {
     id: row.id,
     department_id: row.department_id,
     department_name: row.department_name,
     name: row.site_name || row.name || 'Office',
-    latitude: row.latitude,
-    longitude: row.longitude,
+    latitude,
+    longitude,
     radius_meters: row.radius_meters ?? row.radius ?? 1000,
     updated_at: row.updated_at,
     source: row.source || 'department',

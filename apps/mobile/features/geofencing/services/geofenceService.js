@@ -86,6 +86,93 @@ export const getCurrentLocation = async () => {
   }
 };
 
+/** Latitude/longitude are finite and not the null-island (0, 0) reading. */
+export const isValidGeoCoordinate = (latitude, longitude) => {
+  if (typeof latitude !== 'number' || typeof longitude !== 'number') return false;
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return false;
+  if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) return false;
+  if (Math.abs(latitude) < 0.0001 && Math.abs(longitude) < 0.0001) return false;
+  return true;
+};
+
+/** Typed error so the UI can show a specific message for each GPS failure. */
+export class GeofenceLocationError extends Error {
+  constructor(code, message) {
+    super(message);
+    this.name = 'GeofenceLocationError';
+    this.code = code;
+  }
+}
+
+/**
+ * Fetch a fresh GPS fix for editing a geofence. Uses the existing Expo GPS
+ * implementation and throws a GeofenceLocationError with a clear message for
+ * permission denied, GPS disabled, timeout, unavailable GPS, and invalid (0,0)
+ * readings. Never returns dummy/fallback coordinates.
+ * @returns {Promise<{latitude: number, longitude: number, accuracy: number|null}>}
+ */
+export const getCurrentPositionForEditing = async () => {
+  let status;
+  try {
+    ({ status } = await Location.getForegroundPermissionsAsync());
+    if (status !== 'granted') {
+      ({ status } = await Location.requestForegroundPermissionsAsync());
+    }
+  } catch (err) {
+    throw new GeofenceLocationError('permission_error', 'Could not check location permission. Try again.');
+  }
+  if (status !== 'granted') {
+    throw new GeofenceLocationError(
+      'permission_denied',
+      'Location permission denied. Enable it in Settings to use your current location.'
+    );
+  }
+
+  let servicesEnabled;
+  try {
+    servicesEnabled = await Location.hasServicesEnabledAsync();
+  } catch (err) {
+    servicesEnabled = false;
+  }
+  if (!servicesEnabled) {
+    throw new GeofenceLocationError('gps_disabled', 'Location services are turned off. Turn on GPS and try again.');
+  }
+
+  let position;
+  try {
+    let timeoutId;
+    const timeoutPromise = new Promise((_, reject) => {
+      timeoutId = setTimeout(
+        () => reject(new GeofenceLocationError('timeout', 'Getting your location timed out. Move to an open area and try again.')),
+        12000
+      );
+    });
+    try {
+      position = await Promise.race([
+        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+        timeoutPromise,
+      ]);
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
+  } catch (err) {
+    if (err instanceof GeofenceLocationError) throw err;
+    const code = err?.code;
+    if (code === 'E_LOCATION_SERVICES_DISABLED') {
+      throw new GeofenceLocationError('gps_disabled', 'Location services are turned off. Turn on GPS and try again.');
+    }
+    throw new GeofenceLocationError('unavailable', 'Your location is currently unavailable. Check your GPS signal and try again.');
+  }
+
+  const latitude = position?.coords?.latitude;
+  const longitude = position?.coords?.longitude;
+  if (!isValidGeoCoordinate(latitude, longitude)) {
+    throw new GeofenceLocationError('invalid', 'Received an invalid GPS reading. Try again in a moment.');
+  }
+
+  return { latitude, longitude, accuracy: position?.coords?.accuracy ?? null };
+};
+
 /**
  * Save geofences to AsyncStorage
  * @param {Array} geofences - Array of geofence objects
@@ -475,6 +562,14 @@ export const updateOfficeLocation = async (
       return {
         success: false,
         error: 'Valid radius (greater than 0) is required',
+      };
+    }
+
+    if (Math.abs(latitude) < 0.0001 && Math.abs(longitude) < 0.0001) {
+      console.error('[GeofenceService] Rejected null-island coordinates (0, 0)');
+      return {
+        success: false,
+        error: 'Invalid coordinates (0, 0). Set a real office location before saving.',
       };
     }
 

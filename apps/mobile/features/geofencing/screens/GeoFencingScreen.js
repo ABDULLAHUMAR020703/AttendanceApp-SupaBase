@@ -18,7 +18,13 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, Circle } from 'react-native-maps';
 import { useTheme } from '../../../core/contexts/ThemeContext';
-import { getOfficeLocation, updateOfficeLocation, canUpdateOfficeLocation } from '../services/geofenceService';
+import {
+  getOfficeLocation,
+  updateOfficeLocation,
+  canUpdateOfficeLocation,
+  getCurrentPositionForEditing,
+  isValidGeoCoordinate,
+} from '../services/geofenceService';
 import {
   listManageableDepartments,
   resolveUserDepartmentId,
@@ -48,12 +54,15 @@ export default function GeoFencingScreen({ navigation, route }) {
   const [departments, setDepartments] = useState([]);
   const [selectedDepartmentId, setSelectedDepartmentId] = useState(null);
   const [selectedDepartmentName, setSelectedDepartmentName] = useState('');
-  const [region, setRegion] = useState({
-    latitude: -6.2088, // Default: Jakarta, Indonesia
-    longitude: 106.8456,
-    latitudeDelta: 0.01,
-    longitudeDelta: 0.01,
-  });
+  // Neutral world view until a real saved record (or a user-picked location) exists.
+  // No hard-coded city/office coordinates are used as a fallback.
+  const WORLD_REGION = {
+    latitude: 20,
+    longitude: 0,
+    latitudeDelta: 100,
+    longitudeDelta: 100,
+  };
+  const [region, setRegion] = useState(WORLD_REGION);
 
   const canEdit = canUpdateOfficeLocation(user, selectedDepartmentId);
   const isReadOnly = !canEdit;
@@ -114,7 +123,9 @@ export default function GeoFencingScreen({ navigation, route }) {
 
       const location = await getOfficeLocation(scopedUser);
 
-      if (location) {
+      // Supabase is the source of truth. Only show a marker for a real saved
+      // record with valid coordinates — never auto-populate from GPS.
+      if (location && isValidGeoCoordinate(location.latitude, location.longitude)) {
         setOfficeLocation(location);
         setRegion({
           latitude: location.latitude,
@@ -127,36 +138,10 @@ export default function GeoFencingScreen({ navigation, route }) {
         return;
       }
 
-      if (!canEdit) {
-        setOfficeLocation(null);
-        setIsLocked(false);
-        setLocationName('No geofence configured');
-        return;
-      }
-
-      const { getCurrentLocation } = await import('../services/geofenceService');
-      const gpsLocation = await getCurrentLocation();
-      if (gpsLocation) {
-        const initialLocation = {
-          id: 'draft',
-          latitude: gpsLocation.latitude,
-          longitude: gpsLocation.longitude,
-          radius_meters: 1000,
-        };
-        setOfficeLocation(initialLocation);
-        setRegion({
-          latitude: gpsLocation.latitude,
-          longitude: gpsLocation.longitude,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
-        });
-        setIsLocked(false);
-        await resolveLocationName(gpsLocation.latitude, gpsLocation.longitude);
-      } else {
-        setOfficeLocation(null);
-        setIsLocked(false);
-        setLocationName('Unknown location');
-      }
+      setOfficeLocation(null);
+      setIsLocked(false);
+      setRegion(WORLD_REGION);
+      setLocationName(canEdit ? 'No office location set' : 'No geofence configured');
     } catch (err) {
       console.error('[GeoFencingScreen] Error loading office location:', err);
       setError(err.message || 'Failed to load office location');
@@ -170,9 +155,16 @@ export default function GeoFencingScreen({ navigation, route }) {
   };
 
   const handleSelectDepartment = async (dept) => {
+    if (String(dept.id) === String(selectedDepartmentId)) return;
+    // Clear stale state so the previous department's record is never shown while
+    // the newly selected department's record loads from Supabase.
+    setOfficeLocation(null);
+    setError(null);
+    setLocationName('Loading…');
+    setIsLocked(false);
+    setRegion(WORLD_REGION);
     setSelectedDepartmentId(String(dept.id));
     setSelectedDepartmentName(dept.name);
-    setIsLocked(false);
   };
 
   // Handle map ready event
@@ -235,7 +227,12 @@ export default function GeoFencingScreen({ navigation, route }) {
     }
 
     const { latitude, longitude } = event.nativeEvent.coordinate;
-    
+
+    if (!isValidGeoCoordinate(latitude, longitude)) {
+      console.warn('[GeoFencingScreen] Ignored marker drag to invalid coordinates', { latitude, longitude });
+      return;
+    }
+
     console.log('[GeoFencingScreen] Marker drag ended - updating officeLocation state:', {
       latitude: latitude.toFixed(6),
       longitude: longitude.toFixed(6),
@@ -271,7 +268,12 @@ export default function GeoFencingScreen({ navigation, route }) {
   };
 
   const handleSaveLocation = async () => {
-    if (isReadOnly || !officeLocation) {
+    if (isReadOnly || isLocked || isSaving || !officeLocation) {
+      return;
+    }
+
+    if (!isValidGeoCoordinate(officeLocation.latitude, officeLocation.longitude)) {
+      Alert.alert('Invalid location', 'The selected coordinates are not valid. Pick a location on the map or use your current location.');
       return;
     }
 
@@ -317,58 +319,36 @@ export default function GeoFencingScreen({ navigation, route }) {
       return;
     }
 
+    if (isLocked) {
+      Alert.alert('Locked', 'Unlock the location before changing it.');
+      return;
+    }
+
     console.log('[GeoFencingScreen] "Use Current Location" button pressed - fetching GPS...');
 
     try {
-      const { getCurrentLocation } = await import('../services/geofenceService');
-      const gpsLocation = await getCurrentLocation();
+      const gpsLocation = await getCurrentPositionForEditing();
 
-      if (gpsLocation) {
-        console.log('[GeoFencingScreen] GPS location obtained via button:', {
-          latitude: gpsLocation.latitude.toFixed(6),
-          longitude: gpsLocation.longitude.toFixed(6),
-          previousLatitude: officeLocation?.latitude?.toFixed(6),
-          previousLongitude: officeLocation?.longitude?.toFixed(6),
-        });
+      const newLocation = {
+        id: officeLocation?.id,
+        latitude: gpsLocation.latitude,
+        longitude: gpsLocation.longitude,
+        // Preserve the saved radius when editing an existing record; default only for new.
+        radius_meters: officeLocation?.radius_meters || 1000,
+      };
 
-        // Update officeLocation state (single source of truth) with GPS coordinates
-        const newLocation = {
-          id: officeLocation?.id || 'office_location',
-          latitude: gpsLocation.latitude,
-          longitude: gpsLocation.longitude,
-          radius_meters: 1000, // Always use 1000m
-          updated_by: user?.username,
-          updated_at: new Date().toISOString(),
-        };
-
-        // Update state - this will trigger marker to snap to GPS position
-        setOfficeLocation(newLocation);
-        
-        // Re-center map to new marker position
-        setRegion({
-          latitude: gpsLocation.latitude,
-          longitude: gpsLocation.longitude,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
-        });
-
-        // Resolve location name from GPS coordinates
-        await resolveLocationName(gpsLocation.latitude, gpsLocation.longitude);
-
-        // Unlock marker when using current location (allows dragging before locking)
-        setIsLocked(false);
-
-        console.log('[GeoFencingScreen] Marker snapped to GPS location:', {
-          latitude: newLocation.latitude.toFixed(6),
-          longitude: newLocation.longitude.toFixed(6),
-        });
-      } else {
-        console.warn('[GeoFencingScreen] GPS location unavailable');
-        Alert.alert('Error', 'Could not get current location. Please enable location services.');
-      }
+      setOfficeLocation(newLocation);
+      setRegion({
+        latitude: gpsLocation.latitude,
+        longitude: gpsLocation.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      });
+      await resolveLocationName(gpsLocation.latitude, gpsLocation.longitude);
+      setIsLocked(false);
     } catch (err) {
-      console.error('[GeoFencingScreen] Error getting current location:', err);
-      Alert.alert('Error', 'Failed to get current location');
+      console.warn('[GeoFencingScreen] Use Current Location failed:', err?.code, err?.message);
+      Alert.alert('Location unavailable', err?.message || 'Could not get your current location.');
     }
   };
 
@@ -377,10 +357,17 @@ export default function GeoFencingScreen({ navigation, route }) {
    * Does NOT call GPS - only saves current state
    */
   const handleLockLocation = async () => {
-    if (isReadOnly || !officeLocation) {
-      console.warn('[GeoFencingScreen] handleLockLocation: Read-only or no location');
+    if (isReadOnly || isSaving || !officeLocation) {
+      console.warn('[GeoFencingScreen] handleLockLocation: read-only, saving, or no location');
       return;
     }
+
+    if (!isValidGeoCoordinate(officeLocation.latitude, officeLocation.longitude)) {
+      Alert.alert('Invalid location', 'The selected coordinates are not valid. Pick a location on the map or use your current location.');
+      return;
+    }
+
+    const radiusMeters = officeLocation.radius_meters || 1000;
 
     try {
       setIsSaving(true);
@@ -389,7 +376,7 @@ export default function GeoFencingScreen({ navigation, route }) {
       console.log('[GeoFencingScreen] Locking location - saving officeLocation state to DB:', {
         latitude: officeLocation.latitude.toFixed(6),
         longitude: officeLocation.longitude.toFixed(6),
-        radius: 1000,
+        radius: radiusMeters,
         locationName,
         user: user?.username,
         userRole: user?.role,
@@ -400,7 +387,7 @@ export default function GeoFencingScreen({ navigation, route }) {
       const result = await updateOfficeLocation(
         officeLocation.latitude,
         officeLocation.longitude,
-        1000,
+        radiusMeters,
         user,
         selectedDepartmentId
       );
@@ -409,7 +396,7 @@ export default function GeoFencingScreen({ navigation, route }) {
       console.log('[GeoFencingScreen] Final payload sent to Supabase:', {
         latitude: officeLocation.latitude.toFixed(6),
         longitude: officeLocation.longitude.toFixed(6),
-        radius_meters: 1000,
+        radius_meters: radiusMeters,
         locationName,
       });
 
@@ -417,16 +404,12 @@ export default function GeoFencingScreen({ navigation, route }) {
         console.log('[GeoFencingScreen] Location locked successfully');
         // Disable marker dragging
         setIsLocked(true);
-        
-        // Update office location with saved data
+
+        // Prefer the freshly persisted record from Supabase (source of truth).
         if (result.location) {
           setOfficeLocation(result.location);
         } else {
-          // Update radius to 1000m
-          setOfficeLocation({
-            ...officeLocation,
-            radius_meters: 1000,
-          });
+          setOfficeLocation({ ...officeLocation, radius_meters: radiusMeters });
         }
 
         // Show success feedback
@@ -700,13 +683,13 @@ export default function GeoFencingScreen({ navigation, route }) {
                   description={`Radius: ${formatDistance(officeLocation.radius_meters || 1000)}${isLocked ? ' (Locked)' : ''}`}
                 />
 
-                {/* 1km radius circle (always 1000m) */}
+                {/* Radius circle — uses the saved radius */}
                 <Circle
                   center={{
                     latitude: officeLocation.latitude,
                     longitude: officeLocation.longitude,
                   }}
-                  radius={1000} // Always 1000m = 1km
+                  radius={officeLocation.radius_meters || 1000}
                   strokeColor="#ef4444"
                   fillColor="rgba(239, 68, 68, 0.2)"
                   strokeWidth={2}
@@ -796,7 +779,7 @@ export default function GeoFencingScreen({ navigation, route }) {
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Radius</Text>
                 <Text style={styles.infoValue}>
-                  {formatDistance(1000)} {/* Always 1000m */}
+                  {formatDistance(officeLocation.radius_meters || 1000)}
                 </Text>
               </View>
 
