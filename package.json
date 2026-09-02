@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "description": "Attendance App - Supabase Migration",
   "scripts": {
+    "dev": "npm run dev --prefix apps/web",
+    "dev:web": "npm run dev --prefix apps/web",
+    "dev:auth": "npm run dev --prefix services/auth-service",
+    "dev:gateway": "npm run dev --prefix services/api-gateway",
     "supabase": "supabase",
     "db:login": "supabase login",
     "db:link": "supabase link",

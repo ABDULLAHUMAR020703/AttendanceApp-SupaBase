@@ -7,6 +7,9 @@ import { Alert } from '../../../shared/components/ui/Alert';
 
 const LOGO_PATH = '/logo.jpeg';
 
+/** Set to true to show Google / Apple sign-in and the "Or with" divider. */
+const SHOW_SOCIAL_AUTH = false;
+
 const FIELD =
   'h-12 w-full rounded-2xl border border-[#C2ECF9] bg-[#F8FCFD] px-4 text-[15px] font-medium text-[#0F172A] outline-none transition placeholder:font-normal placeholder:text-[#94A3B8] focus:border-[#00BFFF] focus:bg-white focus:ring-[3px] focus:ring-[rgba(0,191,255,0.25)]';
 
@@ -103,7 +106,7 @@ export function LoginPage() {
                   type="text"
                   value={usernameOrEmail}
                   onChange={(e) => setUsernameOrEmail(e.target.value)}
-                  placeholder="hammad@techdot.ai"
+                  placeholder="Email"
                   autoComplete="username"
                   required
                   className={FIELD}
@@ -156,38 +159,42 @@ export function LoginPage() {
               </Link>
             </div>
 
-            <div className="relative my-7">
-              <div className="absolute inset-0 flex items-center" aria-hidden>
-                <div className="w-full border-t border-[#DCEFF7]" />
-              </div>
-              <div className="relative flex justify-center">
-                <span className="bg-white px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#94A3B8]">
-                  Or with
-                </span>
-              </div>
-            </div>
+            {SHOW_SOCIAL_AUTH && (
+              <>
+                <div className="relative my-7">
+                  <div className="absolute inset-0 flex items-center" aria-hidden>
+                    <div className="w-full border-t border-[#DCEFF7]" />
+                  </div>
+                  <div className="relative flex justify-center">
+                    <span className="bg-white px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#94A3B8]">
+                      Or with
+                    </span>
+                  </div>
+                </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-[#DCEFF7] bg-white text-[13px] font-semibold text-[#0F172A] transition hover:border-[#70C9EF] hover:bg-[#E6F4FA]"
-              >
-                <GoogleIcon className="h-5 w-5" />
-                Google
-              </button>
-              <button
-                type="button"
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-[#DCEFF7] bg-white text-[13px] font-semibold text-[#0F172A] transition hover:border-[#70C9EF] hover:bg-[#E6F4FA]"
-              >
-                <AppleIcon className="h-5 w-5" />
-                Apple
-              </button>
-            </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-[#DCEFF7] bg-white text-[13px] font-semibold text-[#0F172A] transition hover:border-[#70C9EF] hover:bg-[#E6F4FA]"
+                  >
+                    <GoogleIcon className="h-5 w-5" />
+                    Google
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-[#DCEFF7] bg-white text-[13px] font-semibold text-[#0F172A] transition hover:border-[#70C9EF] hover:bg-[#E6F4FA]"
+                  >
+                    <AppleIcon className="h-5 w-5" />
+                    Apple
+                  </button>
+                </div>
+              </>
+            )}
 
             <button
               type="submit"
               disabled={loading}
-              className="mt-6 inline-flex h-12 w-full items-center justify-center rounded-2xl bg-[#00BFFF] text-[15px] font-bold text-white shadow-[0_12px_28px_-8px_rgba(0,191,255,0.45)] transition hover:bg-[#00A8E6] hover:shadow-[0_16px_34px_-8px_rgba(0,168,230,0.4)] active:translate-y-px active:bg-[#00A8E6] disabled:cursor-not-allowed disabled:opacity-70"
+              className={`${SHOW_SOCIAL_AUTH ? 'mt-6' : 'mt-8'} inline-flex h-12 w-full items-center justify-center rounded-2xl bg-[#00BFFF] text-[15px] font-bold text-white shadow-[0_12px_28px_-8px_rgba(0,191,255,0.45)] transition hover:bg-[#00A8E6] hover:shadow-[0_16px_34px_-8px_rgba(0,168,230,0.4)] active:translate-y-px active:bg-[#00A8E6] disabled:cursor-not-allowed disabled:opacity-70`}
             >
               {loading ? 'Signing in…' : 'Sign In'}
             </button>
