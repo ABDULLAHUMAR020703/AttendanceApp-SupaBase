@@ -100,15 +100,7 @@
       ],
       "expo-web-browser",
       "expo-updates",
-      "expo-font",
-      [
-        "expo-build-properties",
-        {
-          "ios": {
-            "useModularHeaders": true
-          }
-        }
-      ]
+      "expo-font"
     ],
     "extra": {
       "apiGatewayUrl": "https://api.hadir.techdotglobal.com",
