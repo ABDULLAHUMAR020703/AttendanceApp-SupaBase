@@ -18,10 +18,13 @@ ENV NODE_ENV=production \
     PORT=3002 \
     HOST=0.0.0.0
 
-RUN addgroup -S app && adduser -S app -G app \
-  && apk add --no-cache su-exec \
-  && mkdir -p /app/data/reports \
-  && chown -R app:app /app
+# Split into separate layers (was one chained RUN): isolates which step
+# fails in build logs and lets Docker cache the earlier steps independently
+# of apk's network-dependent fetch from Alpine's CDN.
+RUN addgroup -S app && adduser -S app -G app
+RUN apk add --no-cache su-exec
+RUN mkdir -p /app/data/reports
+RUN chown -R app:app /app
 
 COPY --from=deps --chown=app:app /app/node_modules ./node_modules
 COPY --chown=app:app services/reporting-service/package.json ./
