@@ -102,4 +102,43 @@ router.delete('/notifications/:id', (req, res) => forward(req, res, 'delete', `/
 router.get('/settings', (req, res) => forward(req, res, 'get', '/api/admin/settings'));
 router.put('/settings', (req, res) => forward(req, res, 'put', '/api/admin/settings'));
 
+// Payroll V1 — thin forward to auth-service, same pattern as everything above.
+router.get('/payroll/dashboard', (req, res) => forward(req, res, 'get', '/api/admin/payroll/dashboard'));
+router.get('/payroll/salary-profiles', (req, res) => forward(req, res, 'get', '/api/admin/payroll/salary-profiles'));
+router.post('/payroll/salary-profiles', (req, res) => forward(req, res, 'post', '/api/admin/payroll/salary-profiles'));
+router.patch('/payroll/salary-profiles/:id', (req, res) =>
+  forward(req, res, 'patch', `/api/admin/payroll/salary-profiles/${req.params.id}`)
+);
+router.get('/payroll/periods', (req, res) => forward(req, res, 'get', '/api/admin/payroll/periods'));
+router.post('/payroll/periods', (req, res) => forward(req, res, 'post', '/api/admin/payroll/periods'));
+router.get('/payroll/periods/:id', (req, res) => forward(req, res, 'get', `/api/admin/payroll/periods/${req.params.id}`));
+router.post('/payroll/periods/:id/calculate', (req, res) =>
+  forward(req, res, 'post', `/api/admin/payroll/periods/${req.params.id}/calculate`)
+);
+router.post('/payroll/periods/:id/recalculate', (req, res) =>
+  forward(req, res, 'post', `/api/admin/payroll/periods/${req.params.id}/recalculate`)
+);
+router.post('/payroll/periods/:id/review', (req, res) =>
+  forward(req, res, 'post', `/api/admin/payroll/periods/${req.params.id}/review`)
+);
+router.post('/payroll/periods/:id/approve', (req, res) =>
+  forward(req, res, 'post', `/api/admin/payroll/periods/${req.params.id}/approve`)
+);
+router.post('/payroll/periods/:id/lock', (req, res) =>
+  forward(req, res, 'post', `/api/admin/payroll/periods/${req.params.id}/lock`)
+);
+router.get('/payroll/periods/:id/records', (req, res) =>
+  forward(req, res, 'get', `/api/admin/payroll/periods/${req.params.id}/records`)
+);
+router.get('/payroll/records/:id', (req, res) => forward(req, res, 'get', `/api/admin/payroll/records/${req.params.id}`));
+router.post('/payroll/records/:id/adjustments', (req, res) =>
+  forward(req, res, 'post', `/api/admin/payroll/records/${req.params.id}/adjustments`)
+);
+router.delete('/payroll/adjustments/:kind/:id', (req, res) =>
+  forward(req, res, 'delete', `/api/admin/payroll/adjustments/${req.params.kind}/${req.params.id}`)
+);
+router.get('/payroll/reports/summary/:periodId', (req, res) =>
+  forward(req, res, 'get', `/api/admin/payroll/reports/summary/${req.params.periodId}`)
+);
+
 module.exports = router;

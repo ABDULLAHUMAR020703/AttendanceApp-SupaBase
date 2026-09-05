@@ -14,6 +14,7 @@ import {
   Ticket,
   UsersRound,
   Bell,
+  Wallet,
 } from 'lucide-react';
 
 /**
@@ -60,6 +61,7 @@ export const NAV_SECTIONS = [
         icon: ShieldCheck,
       },
       { to: '/tickets', label: 'Tickets', feature: 'tickets', icon: Ticket },
+      { to: '/payroll', label: 'Payroll', feature: 'payroll', superAdminOnly: true, icon: Wallet },
     ],
   },
   {

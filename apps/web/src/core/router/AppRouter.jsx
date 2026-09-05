@@ -25,6 +25,10 @@ import { ManagerPermissionsPage } from '../../features/admin/pages/ManagerPermis
 import { ApprovalWorkflowsPage } from '../../features/admin/pages/ApprovalWorkflowsPage';
 import { WorkModeRequestsPage } from '../../features/admin/pages/WorkModeRequestsPage';
 import { NotificationsPage } from '../../features/admin/pages/NotificationsPage';
+import { PayrollDashboardPage } from '../../features/admin/pages/PayrollDashboardPage';
+import { PayrollPeriodPage } from '../../features/admin/pages/PayrollPeriodPage';
+import { PayrollEmployeesPage } from '../../features/admin/pages/PayrollEmployeesPage';
+import { PayrollReportsPage } from '../../features/admin/pages/PayrollReportsPage';
 
 function Protected({ children }) {
   const { user, loading } = useAuthStore();
@@ -107,6 +111,10 @@ export function AppRouter() {
         <Route path="tickets" element={<PermissionRoute feature="tickets"><TicketsPage /></PermissionRoute>} />
         <Route path="calendar" element={<PermissionRoute feature="calendar"><CalendarPage /></PermissionRoute>} />
         <Route path="notifications" element={<PermissionRoute feature="notifications"><NotificationsPage /></PermissionRoute>} />
+        <Route path="payroll" element={<PermissionRoute feature="payroll" superAdminOnly><PayrollDashboardPage /></PermissionRoute>} />
+        <Route path="payroll/employees" element={<PermissionRoute feature="payroll" superAdminOnly><PayrollEmployeesPage /></PermissionRoute>} />
+        <Route path="payroll/reports" element={<PermissionRoute feature="payroll" superAdminOnly><PayrollReportsPage /></PermissionRoute>} />
+        <Route path="payroll/periods/:id" element={<PermissionRoute feature="payroll" superAdminOnly><PayrollPeriodPage /></PermissionRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

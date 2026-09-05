@@ -138,6 +138,11 @@ const FEATURE_PERMISSIONS = {
   permissions: [],
   notifications: ['manage_notifications'],
   approvalWorkflows: ['manage_approval_workflows'],
+  // No manager permission grants payroll access (spec: managers do not get
+  // payroll access merely by managing attendance/leave) — the route/nav is
+  // additionally guarded with superAdminOnly so this stays super_admin-only
+  // even though an empty array would otherwise let any authenticated role in.
+  payroll: [],
 };
 
 const REQUEST_TYPES = {
