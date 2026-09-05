@@ -132,6 +132,11 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    # Binding to port 80 as the non-root `app` user (see Dockerfile) requires
+    # this capability; cap_drop: ALL strips it otherwise, causing EACCES on
+    # startup (app.listen fails -> uncaught 'error' event -> exit 1 crash-loop).
+    cap_add:
+      - NET_BIND_SERVICE
     read_only: true
     tmpfs:
       - /tmp:size=32m,mode=1777
