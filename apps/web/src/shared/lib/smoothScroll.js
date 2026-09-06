@@ -7,10 +7,20 @@ import Lenis from 'lenis';
  *
  * lerp stays close to native (default 0.1 is a touch floaty). 0.16 tracks the
  * wheel closely enough to feel controlled rather than cinematic.
+ *
+ * `autoToggle` is intentionally OFF. In that mode Lenis drives its running state
+ * from a 1ms discrete `overflow` transition on the wrapper and turns `stop()` /
+ * `start()` into async no-ops that only take effect on the next `transitionend`.
+ * We also lock/unlock the scroller imperatively (modals, drawers, the mobile
+ * nav) via `lockPageScroll()`, and the two mechanisms race: an unlock that lands
+ * before the toggle transition resolves leaves the wrapper stuck at
+ * `overflow: clip` with Lenis parked, so the page can no longer scroll at all
+ * (mouse, trackpad, touch or scrollbar). Plain `stop()`/`start()` — synchronous
+ * `internalStop`/`internalStart` — plus the existing `data-scroll-locked`
+ * attribute is the reliable path.
  */
 const LENIS_OPTIONS = {
   autoRaf: true,
-  autoToggle: true,
   anchors: true,
   stopInertiaOnNavigate: true,
   lerp: 0.16,

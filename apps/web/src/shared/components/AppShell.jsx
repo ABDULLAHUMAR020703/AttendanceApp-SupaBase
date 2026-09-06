@@ -68,8 +68,17 @@ export function AppShell() {
   useEffect(() => {
     setMobileNavOpen(false);
     resetScrollPosition();
-    getLenis()?.resize();
-  }, [location.pathname]);
+    const lenis = getLenis();
+    if (lenis) {
+      // Pages that own their internal scroll regions don't want the page-level
+      // smooth scroller competing for the wheel; everywhere else it drives the
+      // main column. (Replaces Lenis `autoToggle`, which raced with our
+      // imperative scroll locks — see smoothScroll.js.)
+      if (fillsViewport) lenis.stop();
+      else lenis.start();
+      lenis.resize();
+    }
+  }, [location.pathname, fillsViewport]);
 
   return (
     <div className="app-admin-surface m-0 flex h-dvh w-full overflow-hidden bg-[#E8F3F8] p-0 text-ink md:p-4">
