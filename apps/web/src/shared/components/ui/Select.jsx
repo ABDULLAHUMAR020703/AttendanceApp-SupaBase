@@ -10,7 +10,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Check, ChevronDown } from 'lucide-react';
+import { Check, ChevronDown, Search } from 'lucide-react';
 import { cn } from '../../lib/cn';
 import { useDismiss } from '../../lib/useDismiss';
 import { Field, fieldId } from './Field';
@@ -60,6 +60,8 @@ export function Select({
   hint,
   size = 'md',
   optional,
+  searchable = false,
+  searchPlaceholder = 'Search…',
   className = '',
   id,
   children,
@@ -81,6 +83,13 @@ export function Select({
   const items = useMemo(() => flattenOptions(children), [children]);
   const options = useMemo(() => items.filter((item) => item.kind === 'option'), [items]);
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const searchRef = useRef(null);
+  const normalizedQuery = searchable ? query.trim().toLowerCase() : '';
+  const navOptions = useMemo(() => {
+    if (!normalizedQuery) return options;
+    return options.filter((item) => optionLabel(item).toLowerCase().includes(normalizedQuery));
+  }, [options, normalizedQuery]);
   const [uncontrolled, setUncontrolled] = useState(defaultValue ?? options[0]?.value ?? '');
   const selectedValue = value !== undefined ? value : uncontrolled;
   const selected = options.find((item) => String(item.value) === String(selectedValue)) || null;
@@ -96,8 +105,8 @@ export function Select({
   const describedBy = error ? `${selectId}-error` : hint ? `${selectId}-hint` : ariaDescribedByProp;
 
   const enabledIndexes = useMemo(
-    () => options.map((item, index) => (item.disabled ? -1 : index)).filter((index) => index >= 0),
-    [options],
+    () => navOptions.map((item, index) => (item.disabled ? -1 : index)).filter((index) => index >= 0),
+    [navOptions],
   );
 
   const place = useCallback(() => {
@@ -121,15 +130,16 @@ export function Select({
   useEffect(() => {
     if (!open) {
       setPlacement(null);
+      setQuery('');
       return undefined;
     }
     place();
     const selectedIndex = Math.max(
       0,
-      options.findIndex((item) => String(item.value) === String(selectedValue)),
+      navOptions.findIndex((item) => String(item.value) === String(selectedValue)),
     );
     setActiveIndex(selectedIndex);
-    const frame = requestAnimationFrame(() => listRef.current?.focus());
+    const frame = requestAnimationFrame(() => (searchable ? searchRef.current : listRef.current)?.focus());
     window.addEventListener('resize', place);
     window.addEventListener('scroll', place, true);
     return () => {
@@ -137,11 +147,17 @@ export function Select({
       window.removeEventListener('resize', place);
       window.removeEventListener('scroll', place, true);
     };
-  }, [open, place, options, selectedValue]);
+  }, [open, place, navOptions, selectedValue, searchable]);
 
   useEffect(() => {
-    if (open && placement) listRef.current?.focus();
-  }, [open, placement]);
+    if (open && placement) (searchable ? searchRef.current : listRef.current)?.focus();
+  }, [open, placement, searchable]);
+
+  // Keep the active row valid as the query narrows the list.
+  useEffect(() => {
+    if (!open) return;
+    setActiveIndex((current) => (current < navOptions.length ? current : 0));
+  }, [open, navOptions.length]);
 
   const commit = (next) => {
     if (value === undefined) setUncontrolled(next);
@@ -182,9 +198,13 @@ export function Select({
     } else if (event.key === 'End') {
       event.preventDefault();
       if (enabledIndexes.length) setActiveIndex(enabledIndexes[enabledIndexes.length - 1]);
-    } else if (event.key === 'Enter' || event.key === ' ') {
+    } else if (event.key === 'Enter') {
       event.preventDefault();
-      const item = options[activeIndex];
+      const item = navOptions[activeIndex];
+      if (item && !item.disabled) commit(item.value);
+    } else if (event.key === ' ' && !searchable) {
+      event.preventDefault();
+      const item = navOptions[activeIndex];
       if (item && !item.disabled) commit(item.value);
     } else if (event.key === 'Escape' || event.key === 'Tab') {
       setOpen(false);
@@ -272,40 +292,89 @@ export function Select({
                   transformOrigin: 'top center',
                   zIndex: 80,
                 }}
-                className="ui-menu max-h-72 w-max min-w-full overflow-y-auto overscroll-contain"
+                className="ui-menu flex max-h-72 w-max min-w-full flex-col overscroll-contain"
                 data-lenis-prevent
               >
-                {items.map((item) => {
-                  if (item.kind === 'group') {
-                    return (
-                      <p key={item.key} className="ui-menu-label">
-                        {item.label}
-                      </p>
-                    );
-                  }
-                  const index = options.indexOf(item);
-                  const isSelected = String(item.value) === String(selectedValue);
-                  const isActive = index === activeIndex;
-                  return (
-                    <button
-                      key={item.key}
-                      type="button"
-                      role="option"
-                      disabled={item.disabled}
-                      aria-selected={isSelected}
-                      onMouseEnter={() => setActiveIndex(index)}
-                      onClick={() => !item.disabled && commit(item.value)}
-                      className={cn(
-                        'ui-menu-item justify-between whitespace-nowrap',
-                        isActive && 'ui-menu-item-active',
-                        isSelected && 'ui-menu-item-selected',
-                      )}
-                    >
-                      <span className="whitespace-nowrap text-left">{item.label}</span>
-                      {isSelected && <Check className="ml-auto h-4 w-4 shrink-0 text-[#00A3FF]" aria-hidden />}
-                    </button>
-                  );
-                })}
+                {searchable && (
+                  <div className="flex items-center gap-2 border-b border-slate-100 px-2.5 py-2">
+                    <Search className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+                    <input
+                      ref={searchRef}
+                      type="text"
+                      value={query}
+                      onChange={(event) => {
+                        setQuery(event.target.value);
+                        setActiveIndex(0);
+                      }}
+                      placeholder={searchPlaceholder}
+                      aria-label={searchPlaceholder}
+                      className="w-full bg-transparent text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none"
+                    />
+                  </div>
+                )}
+                <div className="min-w-full flex-1 overflow-y-auto">
+                  {searchable ? (
+                    navOptions.length === 0 ? (
+                      <p className="px-3 py-2 text-sm text-slate-400">No matches</p>
+                    ) : (
+                      navOptions.map((item, index) => {
+                        const isSelected = String(item.value) === String(selectedValue);
+                        const isActive = index === activeIndex;
+                        return (
+                          <button
+                            key={item.key}
+                            type="button"
+                            role="option"
+                            disabled={item.disabled}
+                            aria-selected={isSelected}
+                            onMouseEnter={() => setActiveIndex(index)}
+                            onClick={() => !item.disabled && commit(item.value)}
+                            className={cn(
+                              'ui-menu-item w-full justify-between whitespace-nowrap',
+                              isActive && 'ui-menu-item-active',
+                              isSelected && 'ui-menu-item-selected',
+                            )}
+                          >
+                            <span className="whitespace-nowrap text-left">{item.label}</span>
+                            {isSelected && <Check className="ml-auto h-4 w-4 shrink-0 text-[#00A3FF]" aria-hidden />}
+                          </button>
+                        );
+                      })
+                    )
+                  ) : (
+                    items.map((item) => {
+                      if (item.kind === 'group') {
+                        return (
+                          <p key={item.key} className="ui-menu-label">
+                            {item.label}
+                          </p>
+                        );
+                      }
+                      const index = navOptions.indexOf(item);
+                      const isSelected = String(item.value) === String(selectedValue);
+                      const isActive = index === activeIndex;
+                      return (
+                        <button
+                          key={item.key}
+                          type="button"
+                          role="option"
+                          disabled={item.disabled}
+                          aria-selected={isSelected}
+                          onMouseEnter={() => setActiveIndex(index)}
+                          onClick={() => !item.disabled && commit(item.value)}
+                          className={cn(
+                            'ui-menu-item justify-between whitespace-nowrap',
+                            isActive && 'ui-menu-item-active',
+                            isSelected && 'ui-menu-item-selected',
+                          )}
+                        >
+                          <span className="whitespace-nowrap text-left">{item.label}</span>
+                          {isSelected && <Check className="ml-auto h-4 w-4 shrink-0 text-[#00A3FF]" aria-hidden />}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
               </motion.div>
             ) : null}
           </AnimatePresence>,

@@ -13,6 +13,7 @@ import { SlideOverPanel } from '../../../shared/components/SlideOverPanel';
 import { GlassTable, TableCell, TableIdentity, TableRow } from '../../../shared/components/GlassTable';
 import { PageActions } from '../../../shared/components/pageChrome';
 import { formatCurrency, formatDate } from '../../../shared/lib/format';
+import { CURRENCIES, DEFAULT_CURRENCY_CODE, currencyLabel } from '../../../shared/lib/currencies';
 
 const todayKey = () => new Date().toISOString().slice(0, 10);
 
@@ -24,7 +25,7 @@ function currentProfile(profiles) {
 const emptyForm = {
   salary_type: 'monthly',
   basic_salary: '',
-  currency: 'PKR',
+  currency: DEFAULT_CURRENCY_CODE,
   overtime_enabled: false,
   overtime_rate: '',
   standard_working_days: 22,
@@ -285,7 +286,19 @@ export function PayrollEmployeesPage() {
             />
           </div>
           <div className="grid grid-cols-3 gap-3">
-            <Input label="Currency" value={form.currency} onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value.toUpperCase() }))} />
+            <Select
+              label="Currency"
+              value={form.currency}
+              searchable
+              searchPlaceholder="Search currencies…"
+              onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))}
+            >
+              {CURRENCIES.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {currencyLabel(c.code)}
+                </option>
+              ))}
+            </Select>
             <Input
               label="Standard working days"
               type="number"
